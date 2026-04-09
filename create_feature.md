@@ -271,6 +271,92 @@ Si pas de BLoC → la page utilise `ConsumerWidget` avec Riverpod.
 
 ---
 
+### 3.7 — Infrastructure de test (`test/`)
+
+Génère un fichier de test de base qui prépare le terrain pour quand le dev implémentera la logique. Ce fichier contient les mocks, le `setUp`, et un test squelette — mais **aucun test fonctionnel** (il n'y a pas encore de logique à tester).
+
+#### Test du use case (`test/src/domain/usecase/get_{feature_name}_use_case_test.dart`)
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:{feature_name}/src/domain/repository/{feature_name}_repository.dart';
+import 'package:{feature_name}/src/domain/usecase/get_{feature_name}_use_case.dart';
+
+class _Mock{FeatureName}Repository extends Mock
+    implements {FeatureName}Repository {}
+
+void main() {
+  late Get{FeatureName}UseCase sut;
+  late _Mock{FeatureName}Repository mockRepository;
+
+  setUp(() {
+    mockRepository = _Mock{FeatureName}Repository();
+    sut = Get{FeatureName}UseCase(
+      {featureName}Repository: mockRepository,
+    );
+  });
+
+  // TODO: Implement tests when use case logic is written.
+  // Use /create_test to generate intent-driven tests.
+}
+```
+
+#### Test du BLoC (si BLoC sélectionné) (`test/src/presentation/bloc/{feature_name}_bloc_test.dart`)
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:{feature_name}/src/presentation/bloc/{feature_name}_bloc.dart';
+import 'package:{feature_name}/src/presentation/bloc/{feature_name}_event.dart';
+import 'package:{feature_name}/src/presentation/bloc/{feature_name}_state.dart';
+
+// TODO: Add mock classes for BLoC dependencies
+
+void main() {
+  late {FeatureName}Bloc sut;
+
+  setUp(() {
+    sut = {FeatureName}Bloc();
+  });
+
+  tearDown(() {
+    sut.close();
+  });
+
+  test('initial state is {FeatureName}Initial', () {
+    expect(sut.state, isA<{FeatureName}Initial>());
+  });
+
+  // TODO: Implement tests when BLoC logic is written.
+  // Use /create_test to generate intent-driven tests.
+}
+```
+
+#### Test du repository impl (si data sources) (`test/src/data/repository/{feature_name}_repository_impl_test.dart`)
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:{feature_name}/src/data/repository/{feature_name}_repository_impl.dart';
+// TODO: Import data source interfaces
+
+// TODO: Add mock classes for data sources
+
+void main() {
+  late {FeatureName}RepositoryImpl sut;
+
+  setUp(() {
+    // TODO: Initialize mocks and SUT
+  });
+
+  // TODO: Implement tests when repository logic is written.
+  // Use /create_test to generate intent-driven tests.
+}
+```
+
+---
+
 ## Étape 4 — Créer les fichiers
 
 Utilise l'outil `Write` pour créer chaque fichier. Ne crée **aucun** fichier superflu.
