@@ -20,7 +20,12 @@ Pose les questions suivantes à l'utilisateur via `AskUserQuestion` (en un seul 
    - Oui
    - Non (Riverpod providers suffisent)
 
-4. **Couche présentation** : La feature expose-t-elle de l'UI ?
+4. **Lecture des données** : Comment les données sont-elles consommées ?
+   - Stream (données réactives, mises à jour en temps réel — typique pour le local/watch)
+   - Future (one-shot, requête → réponse — typique pour le remote)
+   - Les deux (Stream pour la lecture locale, Future pour les appels API)
+
+5. **Couche présentation** : La feature expose-t-elle de l'UI ?
    - Oui (pages + widgets)
    - Non (domain/data seulement, consommée par d'autres features)
 
@@ -48,6 +53,14 @@ En fonction des réponses, génère **tous** les fichiers ci-dessous. Respecte *
 - **Sealed classes** pour les events et states des BLoCs
 - **Equatable** pour entities, events, states
 - **`resolution: workspace`** dans le pubspec.yaml
+- **Error handling avec `Either`** :
+  - Utiliser `Either<ErrorEntity, T>` (package `dartz` via `package:core/rx.dart`) pour **toute opération qui peut échouer** : appels API, lectures DB, opérations I/O
+  - `Left` = erreur (`ErrorEntity`), `Right` = succès
+  - Les **data sources** retournent `Either<ErrorEntity, T>` — c'est ici que les erreurs sont catchées et wrappées
+  - Les **repositories** propagent les `Either` reçus des data sources (pas de try/catch dans le repo, le data source a déjà géré)
+  - Les **use cases** propagent les `Either` et peuvent les combiner via `flatMap` / `flatMapAsync` (extensions dans `package:core/either_extensions.dart`)
+  - Pour les appels API, utiliser le `DataLoader` de core (`ref.watch(dataLoaderProvider)`) qui wrappe Dio et retourne `Either<ErrorEntity, T>` automatiquement
+  - Dans la **couche présentation** (BLoC), `fold()` le `Either` pour émettre le bon state : `result.fold((error) => ErrorState(error), (data) => LoadedState(data))`
 
 ---
 
@@ -107,8 +120,21 @@ class {FeatureName}Entity extends Equatable {
 #### Repository interface (`lib/src/domain/repository/{feature_name}_repository.dart`)
 
 ```dart
+import 'package:core/rx.dart';
+import 'package:core/error/domain/model/error.dart';
+
 abstract class {FeatureName}Repository {
   // TODO: Define repository contract
+  //
+  // Opérations remote (faillibles) → Either :
+  // Future<Either<ErrorEntity, {FeatureName}Entity>> fetch{FeatureName}(int id);
+  //
+  // Lectures locales réactives → Stream (pas de Either, la lecture locale ne fail pas) :
+  // Stream<List<{FeatureName}Entity>> watch{FeatureName}s();
+  // Stream<{FeatureName}Entity?> watch{FeatureName}ById(int id);
+  //
+  // Écritures locales → Future<void> :
+  // Future<void> save{FeatureName}({FeatureName}Entity entity);
 }
 ```
 
@@ -116,8 +142,14 @@ abstract class {FeatureName}Repository {
 
 **Remote** (`lib/src/domain/repository/{feature_name}_remote_data_source.dart`) :
 ```dart
+import 'package:core/rx.dart';
+import 'package:core/error/domain/model/error.dart';
+
 abstract class {FeatureName}RemoteDataSource {
   // TODO: Define remote data source contract
+  // Les appels réseau retournent toujours Either<ErrorEntity, T>.
+  // Exemple :
+  // Future<Either<ErrorEntity, {FeatureName}DataModel>> fetch{FeatureName}(int id);
 }
 ```
 
@@ -125,12 +157,29 @@ abstract class {FeatureName}RemoteDataSource {
 ```dart
 abstract class {FeatureName}LocalDataSource {
   // TODO: Define local data source contract
+  //
+  // Lectures réactives (watch) → Stream<T> :
+  // Stream<List<{FeatureName}Entity>> watch{FeatureName}s();
+  // Stream<{FeatureName}Entity?> watch{FeatureName}ById(int id);
+  //
+  // Écritures → Future<void> :
+  // Future<void> save{FeatureName}({FeatureName}Entity entity);
+  // Future<void> delete{FeatureName}(int id);
+  //
+  // Les lectures locales (Isar, SQLite) ne retournent PAS Either —
+  // elles ne peuvent pas échouer de façon récupérable.
 }
 ```
 
 #### Use case (`lib/src/domain/usecase/get_{feature_name}_use_case.dart`)
 
+Adapte le type de retour selon le choix Future/Stream :
+
+**Si Future (remote)** :
 ```dart
+import 'package:core/rx.dart';
+import 'package:core/error/domain/model/error.dart';
+
 class Get{FeatureName}UseCase {
   const Get{FeatureName}UseCase({
     required this.{featureName}Repository,
@@ -139,11 +188,29 @@ class Get{FeatureName}UseCase {
   final {FeatureName}Repository {featureName}Repository;
 
   // TODO: Define call method
-  // Future<{FeatureName}Entity> call() async {
-  //   return {featureName}Repository.get{FeatureName}();
+  // Future<Either<ErrorEntity, {FeatureName}Entity>> call(int id) async {
+  //   return {featureName}Repository.get{FeatureName}(id);
   // }
 }
 ```
+
+**Si Stream (local/watch)** :
+```dart
+class Watch{FeatureName}UseCase {
+  const Watch{FeatureName}UseCase({
+    required this.{featureName}Repository,
+  });
+
+  final {FeatureName}Repository {featureName}Repository;
+
+  // TODO: Define call method
+  // Stream<List<{FeatureName}Entity>> call() {
+  //   return {featureName}Repository.watch{FeatureName}s();
+  // }
+}
+```
+
+**Si les deux** → génère un use case par type d'opération (ex: `Watch{FeatureName}UseCase` + `Fetch{FeatureName}UseCase`).
 
 ---
 
@@ -166,10 +233,31 @@ Injecte `{FeatureName}RemoteDataSource` et/ou `{FeatureName}LocalDataSource` sel
 #### Remote data source impl (si remote) (`lib/src/data/datasource/{feature_name}_remote_data_source_impl.dart`)
 
 ```dart
+import 'package:core/rx.dart';
+import 'package:core/error/domain/model/error.dart';
+import 'package:core/load_from_remote.dart';
+
 class {FeatureName}RemoteDataSourceImpl implements {FeatureName}RemoteDataSource {
-  const {FeatureName}RemoteDataSourceImpl();
+  const {FeatureName}RemoteDataSourceImpl({
+    required this.dataLoader,
+    required this.client, // Dio client authentifié
+  });
+
+  final DataLoader dataLoader;
+  final Dio client;
 
   // TODO: Implement remote calls
+  // Utilise dataLoader.invoke() qui retourne Either<ErrorEntity, T> :
+  //
+  // @override
+  // Future<Either<ErrorEntity, {FeatureName}DataModel>> fetch{FeatureName}(int id) {
+  //   return dataLoader.invoke(
+  //     defaultErrorMessage: 'Failed to fetch {feature_name}',
+  //     request: () => client.get('/v1/endpoint/$id'),
+  //     fromJson: {FeatureName}DataModel.fromJson,
+  //     requestKey: 'fetch_{feature_name}_$id',
+  //   );
+  // }
 }
 ```
 
