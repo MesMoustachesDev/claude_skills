@@ -194,6 +194,7 @@ check_l10n_arb() {
 # barrel_api — le barrel n'expose ni la couche data ni les implémentations.
 check_barrel_api() {
   local barrel="$PKG_DIR/lib/$PKG_NAME.dart" bad
+  is_app_package && { info "package applicatif (lib/main.dart), pas de barrel"; return 0; }
   [ -f "$barrel" ] || { ko "barrel absent : lib/$PKG_NAME.dart"; return 1; }
   bad="$(grep -nE "^export '.*(src/data/|_impl\.dart)" "$barrel")"
   [ -z "$bad" ] && { info "barrel : $(grep -c '^export' "$barrel") export(s), aucune fuite de la couche data"; return 0; }
@@ -293,9 +294,13 @@ check_no_secrets() {
 # reinvented — une déclaration du package existe déjà ailleurs : même nom public (fonction top-level,
 # membre d'extension sur le même type, statique, classe, extension, enum, typedef) ou même corps à
 # renommage près (clone de type 2, ≥ dup.min_tokens tokens), workspace entier et package lui-même.
+# dup_root — la racine du workspace pour dup_check ; un monolithe (pas de features/) est son propre workspace
+dup_root() { local r; r="$(cfg features_root features)"; [ -d "$PROJECT_ROOT/$r" ] && printf '%s' "$r" || printf '%s' "$PKG_REL"; }
+is_app_package() { [ ! -f "$PKG_DIR/lib/$PKG_NAME.dart" ] && [ -f "$PKG_DIR/lib/main.dart" ]; }
+
 check_reinvented() {
   ensure_dart_tools || return 1
-  local root; root="$(cfg features_root features)"
+  local root; root="$(dup_root)"
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
     --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"} \
@@ -307,7 +312,7 @@ check_reinvented() {
 # étendu, signature). Toujours vert : c'est un producteur, le verdict vient de l'agent.
 check_dedup_candidates() {
   ensure_dart_tools || return 1
-  local root; root="$(cfg features_root features)"
+  local root; root="$(dup_root)"
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
     ${ignore:+--ignore-names "$ignore"} --ds-package "$(cfg ds.package design)" \
@@ -320,6 +325,7 @@ check_dedup_candidates() {
 # ---------------------------------------------------------------------------
 check_package_readme() {
   local readme="$PKG_DIR/README.md" barrel="$PKG_DIR/lib/$PKG_NAME.dart" rc=0 sec exp f names n missing=""
+  is_app_package && { info "package applicatif, README de package non exigé"; return 0; }
   [ -f "$readme" ] || { ko "README.md absent dans $PKG_REL — but du package et API publique"; return 1; }
   while IFS= read -r sec; do
     [ -n "$sec" ] || continue

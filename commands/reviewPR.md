@@ -10,11 +10,21 @@ que tu lises une ligne. Tu ne refais pas ces mesures ; tu lis leur rapport, et t
 lecture à ce qu'aucun script ne voit : la logique, l'architecture, la cohérence avec le reste de
 l'app, la roue réinventée par la responsabilité, la lisibilité dans six mois.
 
-## Étape 1 — Récupérer la branche cible
+## Étape 1 — Résoudre la cible
 
-La branche à reviewer est : **$ARGUMENTS**
+La cible est : **$ARGUMENTS** — une branche, une MR GitLab (`!218`), une PR GitHub (`#42`) ou une URL.
 
-Si `$ARGUMENTS` est vide, demande à l'utilisateur le nom de la branche avant de continuer.
+Si `$ARGUMENTS` est vide, demande à l'utilisateur avant de continuer. Si c'est un numéro ou une URL,
+résous-le **d'abord** en branche source et branche cible :
+
+```bash
+glab mr view 218 --output json | jq -r '.source_branch, .target_branch'     # GitLab
+gh pr view 42 --json headRefName,baseRefName                                # GitHub
+```
+
+Tout ce qui suit travaille sur la **branche source**, comparée à la **branche cible** de la MR — pas
+à `develop` par défaut, pas à la branche courante du repo. Le remote n'est pas forcément `origin` :
+`git remote` te le dit ; utilise-le partout.
 
 ## Étape 2 — Faire courir le gauntlet
 
@@ -22,7 +32,11 @@ Si `$ARGUMENTS` est vide, demande à l'utilisateur le nom de la branche avant de
 ~/.claude/scripts/pr_gauntlet.sh $ARGUMENTS
 ```
 
-Options : `--base <branche>` si la base n'est pas celle de `.claude/rules/feature_pipeline.md`,
+Le script accepte la même cible que toi (`branche`, `!218`, `#42`, URL) et résout lui-même la branche
+source et la cible de la MR via `glab`/`gh`. Lance-le **avant** de lire le diff : il fait le `fetch`,
+il sort la bonne branche dans un worktree, et son rapport te dit ce qui est déjà mesuré.
+
+Options : `--base <branche>` pour forcer une autre base que la cible de la MR,
 `--mutation` pour ajouter le mutation testing (long, à réserver aux PR qui touchent du domain/data
 critique), `--keep` pour garder le worktree.
 
@@ -38,25 +52,17 @@ continue avec le diff seul — mais dis-le, ne fais pas semblant d'avoir mesuré
 
 ## Étape 3 — Récupérer le diff
 
+Avec `<remote>`, `<source>` et `<cible>` résolus à l'étape 1 (le script les affiche aussi) :
+
 ```bash
-# Branche de base (main ou master)
-git remote show origin | grep 'HEAD branch' | awk '{print $NF}'
-
-# Liste des fichiers modifiés
-git diff origin/$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')...origin/$ARGUMENTS --name-status
-
-# Diff complet
-git diff origin/$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')...origin/$ARGUMENTS
-
-# Commits inclus dans la PR
-git log origin/$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')..origin/$ARGUMENTS --oneline
+git fetch <remote> <cible> <source>
+git diff <remote>/<cible>...<remote>/<source> --name-status     # fichiers
+git diff <remote>/<cible>...<remote>/<source>                   # diff complet
+git log <remote>/<cible>..<remote>/<source> --oneline           # commits de la MR
 ```
 
-Si la branche distante n'existe pas, essaie en local :
-```bash
-git diff $(git merge-base HEAD $ARGUMENTS)...$ARGUMENTS
-git log $(git merge-base HEAD $ARGUMENTS)...$ARGUMENTS --oneline
-```
+Si la branche source n'existe qu'en local : remplace `<remote>/<source>` par `<source>`.
+Ne compare jamais à la branche courante du repo : c'est la cible de la MR qui compte.
 
 ## Étape 4 — Charger les règles projet
 
