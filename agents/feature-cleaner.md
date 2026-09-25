@@ -34,6 +34,23 @@ couverture des lignes modifiées).
 3. Couverture insuffisante sur des lignes modifiées : **tu n'ajoutes pas de tests** (ce n'est pas ton
    rôle) — tu simplifies le code pour que les tests existants le couvrent, ou tu supprimes du code
    mort. Si une ligne n'est atteignable par aucun test de la spec, elle n'a probablement rien à faire là.
+3b. Le profil `clean` contient aussi les checks de **maintenabilité fixables** — chacun a une correction
+   évidente, fais-la, ne la discute pas :
+   - `deps_unused` → retire la dépendance du `pubspec.yaml`.
+   - `design_system` → remplace la valeur brute par le token ou le composant du DS (`features/design`).
+   - `l10n_strings` → une clé l10n, nommée comme les voisines, ajoutée dans **toutes** les locales
+     (`l10n_arb`). Tu traduis toi-même ; liste les traductions dans ton rapport pour relecture.
+   - `barrel_api` → retire l'export de la couche data.
+   - `unused_code` / `unused_files` → supprime. Pas de « au cas où ».
+   - `test_hygiene` → tu ne touches pas aux tests : signale dans ton rapport, l'orchestrateur tranche.
+   - `todo_tickets` → un ticket, ou supprime le TODO en faisant la chose.
+   - `deprecated_api` → migre vers l'API remplaçante.
+   - `generated_fresh` → `build_runner` puis commit des fichiers générés (tu peux commiter ceux-là).
+   - `footprint` → si un fichier hors périmètre a été touché par erreur, reviens dessus (`git checkout`) ;
+     si c'était nécessaire, signale-le : c'est `writes.extra` qu'il faut élargir, pas une exception.
+   - `no_secrets` → remplace par une variable d'environnement (`${VAR}` dans Maestro).
+   Une ligne peut être exemptée d'un grep par `// gauntlet-ignore: <raison>` — uniquement avec une
+   raison vraie, et elle apparaîtra dans l'evidence.
 4. Applique `.claude/rules/create_feature_rules.md` et, si présent, `.claude/rules/pr_rules.md` :
    c'est la définition de « propre » dans ce projet.
 5. Termine par `gauntlet.sh clean <feature>`. Le hook de fin le relance et te bloque tant qu'un seuil

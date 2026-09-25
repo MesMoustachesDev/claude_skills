@@ -148,8 +148,13 @@ même traitement qu'en 4.
 
 ### 6. Revue — `feature-reviewer`
 
+D'abord les scripts : `~/.claude/scripts/gauntlet.sh maintain <nom>` (dépendances inter-features
+justifiées, santé des packages pub.dev, design system, l10n, code mort, périmètre, secrets…). Son
+verdict n'arrête rien ici : le log est une **entrée** du reviewer, qui transforme chaque échec en finding.
+
 Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
-`.claude/rules/pr_rules.md` si présent, `~/.claude/commands/reviewPR.md`.
+`.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/rules/pr_rules.md` si présent,
+`.claude/rules/create_feature_rules.md`, `~/.claude/commands/reviewPR.md`.
 Au retour, lis `review.json` :
 - `critical` vide → `stages.review = PASSED`, continue.
 - sinon → **boucle** : `loops.review += 1`. Si ≤ 2 : relance l'**implementer** (prompt : la liste
@@ -188,7 +193,11 @@ Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
 ## Mesures
 Tests : <n> (dont <n> ajoutés par le hardener) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) · Complexité max : <n> · Dépendances : ✓
-Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n>
+Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/7
+
+## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
+Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
+Packages préexistants à surveiller : <warnings pub_health> · Exemptions gauntlet-ignore : <n> (<où>)
 
 ## Suggestions non appliquées        ← review.json
 ## Mutants expliqués                 ← mutants.md
