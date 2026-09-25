@@ -1,0 +1,9 @@
+# Whitelist: only the hand-written config is versioned.
+/*
+!/.gitignore
+!/commands/
+!/skills/
+
+# Managed by Claude Code / installers, not by us.
+/skills/synced/
+/skills/find-skills
