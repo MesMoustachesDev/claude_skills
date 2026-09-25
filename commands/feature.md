@@ -35,10 +35,12 @@ Le nom est en snake_case. Une feature = une branche `feature/<nom>` = un package
 |---|---|---|---|---|
 | 1 | spec | `feature-specifier` | — | **oui** : validation de la spec |
 | 2 | contracts | `feature-architect` | `contracts` | non |
+| 2b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 2 si doublons) |
 | 3 | tests | `feature-test-writer` | `red` | **oui** : skim de `tests.md`, puis gel |
 | 4 | impl | `feature-implementer` | `green` | non |
 | 5 | clean | `feature-cleaner` | `clean` | non |
-| 6 | review | `feature-reviewer` | `review` | non (boucle vers 4 si critiques) |
+| 5b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) |
+| 6 | review | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) |
 | 7 | harden | `feature-hardener` | `harden` | **oui** : mutants expliqués |
 | 8 | qa | `feature-qa` | `qa` | **oui** : captures |
 | 9 | evidence | toi | — | puis `/create_commits` et `/create_mr` |
@@ -106,10 +108,23 @@ specifier avec la spec existante + le retour, autant de fois que nécessaire). V
 ### 2. Contrats — `feature-architect`
 
 Prompt : nom, `spec.md`, `create_feature_rules.md`, package, valeur de `brick`. Au retour, vérifie
-`stages.contracts` dans `pipeline.json` (le hook l'a écrit). `PASSED` → commit :
-`git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold and contracts"`.
+`stages.contracts` dans `pipeline.json` (le hook l'a écrit).
 Le rapport mentionne un écart avec la spec → **arrêt humain hors plan** : montre l'écart, propose
 « corriger la spec et relancer l'architect » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
+
+### 2b. Roue réinventée — `feature-dedup`
+
+Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
+1. `gauntlet.sh dedup_candidates <nom>` → `.claude/features/<nom>/dedup_candidates.json`.
+   S'il n'y a aucune entrée, saute l'agent : `stages.dedup = PASSED`.
+2. Lance `feature-dedup` (prompt : nom, package, chemin des candidats, `spec.md`).
+3. `gauntlet.sh dedup_verdict <nom>` : vert → `stages.dedup = PASSED`. Rouge → relance l'**architect**
+   avec `dedup.md` (« ces déclarations existent déjà : utilise / étends l'existant »), puis 2b à
+   nouveau ; `loops.dedup_contracts`, max 2, puis arrêt humain hors plan. L'humain peut **accepter**
+   un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
+   raison, et le verdict repasse au vert. L'exemption apparaîtra dans l'evidence.
+
+Puis commit : `git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold and contracts"`.
 
 ### 3. Tests — `feature-test-writer`
 
@@ -146,6 +161,11 @@ Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntl
 Prompt : nom, package, `last_clean.log` si présent. `stages.clean = PASSED` → continue ; `FAILED` →
 même traitement qu'en 4.
 
+### 5b. Roue réinventée, second passage — `feature-dedup`
+
+Même mécanique qu'en 2b, sur le code implémenté (helpers, widgets, extensions apparus pendant 4 et 5).
+Rouge → relance le **cleaner** avec `dedup.md`, puis 5b ; `loops.dedup_clean`, max 2.
+
 ### 6. Revue — `feature-reviewer`
 
 D'abord les scripts : `~/.claude/scripts/gauntlet.sh maintain <nom>` (dépendances inter-features
@@ -153,11 +173,13 @@ justifiées, santé des packages pub.dev, design system, l10n, code mort, périm
 verdict n'arrête rien ici : le log est une **entrée** du reviewer, qui transforme chaque échec en finding.
 
 Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
-`.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/rules/pr_rules.md` si présent,
-`.claude/rules/create_feature_rules.md`, `~/.claude/commands/reviewPR.md`.
-Au retour, lis `review.json` :
-- `critical` vide → `stages.review = PASSED`, continue.
-- sinon → **boucle** : `loops.review += 1`. Si ≤ 2 : relance l'**implementer** (prompt : la liste
+`.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/features/<nom>/dedup.md`,
+`.claude/rules/pr_rules.md` si présent, `.claude/rules/create_feature_rules.md`,
+`~/.claude/commands/reviewPR.md`.
+Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un
+reviewer qui trouve des critiques doit pouvoir rendre la main) :
+- vert → `stages.review = PASSED`, continue.
+- rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance l'**implementer** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
   Au-delà de 2 : arrêt humain hors plan avec la liste des critiques persistantes.
 
@@ -198,6 +220,7 @@ Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> �
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
 Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
 Packages préexistants à surveiller : <warnings pub_health> · Exemptions gauntlet-ignore : <n> (<où>)
+Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par l'humain (<raisons>)   ← dedup.json
 
 ## Suggestions non appliquées        ← review.json
 ## Mutants expliqués                 ← mutants.md

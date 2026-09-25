@@ -87,6 +87,10 @@ case "$agent" in
     match "$rel" "$FEAT_REL/review.md" "$FEAT_REL/review.json" \
       || deny "reviewer : lecture seule. Tu n'écris que $FEAT_REL/review.md et review.json. Refusé : $rel"
     ;;
+  feature-dedup)
+    match "$rel" "$FEAT_REL/dedup.md" "$FEAT_REL/dedup.json" \
+      || deny "dedup : lecture seule. Tu n'écris que $FEAT_REL/dedup.md et dedup.json. Refusé : $rel"
+    ;;
   feature-qa)
     match "$rel" "$FEAT_REL/qa/*" "$FEAT_REL/qa.md" "$PKG_REL/maestro/*" \
       || deny "qa : zone autorisée = $PKG_REL/maestro/** et $FEAT_REL/qa/. Un bug trouvé se rapporte dans qa.md, il ne se corrige pas ici. Refusé : $rel"

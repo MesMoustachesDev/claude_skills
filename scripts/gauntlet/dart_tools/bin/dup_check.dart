@@ -4,11 +4,19 @@
 // littéraux près — clone de type 2), y compris à l'intérieur du package.
 //
 // Usage : dart run bin/dup_check.dart --root <features_root> --package <package_dir>
-//         [--min-tokens 25] [--ignore-names a,b,c]
+//         [--min-tokens 40] [--ignore-names a,b,c] [--candidates <out.json>]
 // Exit 0 si rien, 1 si des doublons sont trouvés. Une déclaration précédée ou suivie sur sa ligne
 // d'un commentaire contenant `gauntlet-ignore` est ignorée.
+//
+// --candidates : mode "roue réinventée par la responsabilité". Le script ne juge pas ; il écrit, pour
+// chaque déclaration publique du package, les déclarations du workspace qui LUI RESSEMBLENT (tokens
+// du nom, type étendu, signature, kind) avec leur signature et leur doc. Un agent lit ce JSON et
+// tranche : même responsabilité, à étendre, ou distinct. L'IA là où elle détecte mieux, sur un
+// espace de recherche que le script a réduit de 8 000 déclarations à quelques-unes.
 
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
@@ -29,16 +37,48 @@ const _skipNames = {
 
 class Decl {
   Decl(this.kind, this.name, this.file, this.line, this.pkg, this.isPublic, this.nameChecked,
-      this.fingerprint, this.tokens);
-  final String kind, name, file, pkg;
+      this.fingerprint, this.tokens, this.signature, this.doc, this.onType);
+  final String kind, name, file, pkg, signature, doc;
+  final String? onType;
   final int line, tokens;
   final bool isPublic, nameChecked;
   final int? fingerprint; // null : pas de corps (classe, enum, abstrait)
   String get where => '$file:$line';
+  String get bare => name.contains('.') ? name.split('.').last : name;
+
+  Map<String, Object?> toJson() => {
+        'kind': kind, 'name': name, 'file': file, 'line': line, 'package': pkg,
+        'signature': signature, 'doc': doc, if (onType != null) 'on': onType,
+      };
+}
+
+const _stopTokens = {
+  'get', 'set', 'build', 'on', 'to', 'from', 'is', 'has', 'use', 'case', 'usecase', 'impl', 'entity',
+  'model', 'dao', 'data', 'source', 'repository', 'remote', 'local', 'page', 'view', 'widget', 'bloc',
+  'event', 'state', 'provider', 'di', 'keys', 'the', 'a', 'an', 'x', 'ext', 'extension', 'mapper',
+  'screen', 'item', 'list', 'card', 'with', 'by', 'for', 'of', 'in', 'and', 'or', 'new', 'all',
+};
+
+/// `fetchUserProfile` → {fetch, user, profile} ; `HTTPClient` → {http, client}.
+Set<String> _nameTokens(String name) {
+  final bare = name.contains('.') ? name.split('.').last : name;
+  final parts = bare
+      .replaceAllMapped(RegExp(r'([a-z0-9])([A-Z])'), (m) => '${m[1]} ${m[2]}')
+      .replaceAllMapped(RegExp(r'([A-Z]+)([A-Z][a-z])'), (m) => '${m[1]} ${m[2]}')
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'));
+  return parts.where((t) => t.length > 1 && !_stopTokens.contains(t)).map(_stem).toSet();
+}
+
+String _stem(String t) {
+  for (final suf in ['ies', 'ing', 'ers', 'er', 'es', 's']) {
+    if (t.length > 4 && t.endsWith(suf)) return t.substring(0, t.length - suf.length) + (suf == 'ies' ? 'y' : '');
+  }
+  return t;
 }
 
 void main(List<String> args) {
-  String? root, package;
+  String? root, package, candidatesOut;
   var minTokens = 40;
   final ignore = <String>{};
   for (var i = 0; i < args.length; i++) {
@@ -51,6 +91,8 @@ void main(List<String> args) {
         minTokens = int.parse(args[++i]);
       case '--ignore-names':
         ignore.addAll(args[++i].split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
+      case '--candidates':
+        candidatesOut = args[++i];
     }
   }
   if (root == null || package == null) {
@@ -78,6 +120,11 @@ void main(List<String> args) {
 
   final target = decls.where((d) => d.pkg == _packageOf(pkgDir, rootDir.path) || _inDir(d.file, pkgDir, rootDir.path)).toList();
   final others = decls.where((d) => !target.contains(d)).toList();
+
+  if (candidatesOut != null) {
+    _writeCandidates(candidatesOut, target, others, ignore);
+    return;
+  }
 
   final findings = <String>[];
 
@@ -122,6 +169,87 @@ void main(List<String> args) {
   exit(findings.isEmpty ? 0 : 1);
 }
 
+/// Types de l'architecture : une feature en a forcément un jeu (entity, data model, DAO, mapper,
+/// repository, bloc…). Ce ne sont pas des roues réinventées, et un doublon de NOM entre eux est
+/// déjà attrapé par le mode normal. Restent les vraies candidates : utilitaires, extensions,
+/// services, widgets, enums.
+final _archSuffix = RegExp(
+    r'(Impl|Bloc|Event|State|UseCase|Usecase|Page|Screen|Keys|Di|Route|Entity|DataModel|UiModel|Dao|DaoX|DataSource|Repository|Mapper|MapperX|Params|Request|Response|Funnel|Viewed|Tapped)$');
+
+/// Candidats par ressemblance, pour l'agent feature-dedup. Score = somme des poids IDF des tokens de
+/// nom partagés (un token présent partout ne vaut rien, un token rare vaut beaucoup), +2 même type
+/// étendu, +1 même liste de types de paramètres. Même famille (type ↔ type, callable ↔ callable).
+void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<String> ignore) {
+  // Events et states de BLoC vivent sous /bloc/ : un jeu par feature, jamais des roues.
+  bool reusable(Decl o) =>
+      o.isPublic &&
+      !(o.kind == 'méthode' && o.onType == null) &&
+      !o.file.contains('/bloc/') &&
+      !_archSuffix.hasMatch(o.bare) &&
+      !_archSuffix.hasMatch(o.onType ?? '');
+  final pool = others.where(reusable).map((o) => (o, _nameTokens(o.name))).toList();
+  // IDF sur l'ensemble du workspace
+  final df = <String, int>{};
+  for (final (_, toks) in pool) {
+    for (final t in toks) {
+      df[t] = (df[t] ?? 0) + 1;
+    }
+  }
+  final n = pool.length + 1;
+  double w(String t) => log(n / ((df[t] ?? 0) + 1));
+
+  final entries = <Map<String, Object?>>[];
+  var pairs = 0;
+  for (final d in target) {
+    if (!reusable(d) || _skipNames.contains(d.bare) || ignore.contains(d.bare)) continue;
+    if (_archSuffix.hasMatch(d.bare)) continue;
+    final toks = _nameTokens(d.name);
+    if (toks.isEmpty) continue;
+    final scored = <(Decl, double)>[];
+    for (final (o, otoks) in pool) {
+      if (_family(d.kind) != _family(o.kind)) continue;
+      var s = toks.intersection(otoks).fold(0.0, (acc, t) => acc + w(t));
+      if (s <= 0) continue;
+      if (d.onType != null && d.onType == o.onType) s += 2;
+      if (d.signature.isNotEmpty && _paramTypes(d.signature) == _paramTypes(o.signature)) s += 1;
+      if (s >= 3.0) scored.add((o, s));
+    }
+    if (scored.isEmpty) continue;
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    final top = scored.take(3).toList();
+    pairs += top.length;
+    entries.add({
+      'target': d.toJson(),
+      'candidates': [for (final (o, s) in top) {...o.toJson(), 'score': double.parse(s.toStringAsFixed(1))}],
+    });
+  }
+  File(out).writeAsStringSync(const JsonEncoder.withIndent('  ').convert({
+    'package': target.isEmpty ? '' : target.first.pkg,
+    'targets': entries.length,
+    'pairs': pairs,
+    'entries': entries,
+  }));
+  stdout.writeln('   ${entries.length} déclaration(s) avec candidat(s), $pairs paire(s) à juger → $out');
+}
+
+String _family(String kind) {
+  if (kind.startsWith('extension')) return 'extension';
+  if (kind == 'fonction' || kind == 'static' || kind == 'méthode') return 'callable';
+  return 'type';
+}
+
+String _paramTypes(String signature) {
+  // "(String id, {required int count})" → "String,int"
+  final m = RegExp(r'\((.*)\)').firstMatch(signature);
+  if (m == null) return '';
+  return m.group(1)!
+      .replaceAll(RegExp(r'[{}\[\]]|required |this\.'), '')
+      .split(',')
+      .map((p) => p.trim().split(RegExp(r'\s+')).first)
+      .where((t) => t.isNotEmpty)
+      .join(',');
+}
+
 String _packageOf(String path, String root) {
   final rel = p.relative(path, from: root);
   final parts = p.split(rel);
@@ -147,7 +275,8 @@ class _Collector extends RecursiveAstVisitor<void> {
     return has(line) || has(line - 1);
   }
 
-  void _add(String kind, String name, AstNode node, {FunctionBody? body, bool nameChecked = true}) {
+  void _add(String kind, String name, AstNode node,
+      {FunctionBody? body, bool nameChecked = true, String signature = '', String? onType}) {
     if (_ignored(node)) return;
     int? fp;
     var count = 0;
@@ -156,7 +285,31 @@ class _Collector extends RecursiveAstVisitor<void> {
       count = norm.length;
       fp = norm.join(' ').hashCode;
     }
-    out.add(Decl(kind, name, file, _line(node), pkg, !name.startsWith('_'), nameChecked, fp, count));
+    final bare = name.contains('.') ? name.split('.').last : name;
+    out.add(Decl(kind, name, file, _line(node), pkg, !bare.startsWith('_'), nameChecked, fp, count,
+        signature, _doc(node), onType));
+  }
+
+  static String _doc(AstNode node) {
+    final d = node is AnnotatedNode ? node.documentationComment : null;
+    if (d == null) return '';
+    return d.tokens.map((t) => t.lexeme.replaceFirst(RegExp(r'^///?\s?'), '')).join(' ').trim();
+  }
+
+  static String _sigOf(FormalParameterList? params, TypeAnnotation? ret) =>
+      '${ret?.toSource() ?? ''} ${params?.toSource() ?? ''}'.trim();
+
+  static String _classSig(ClassDeclaration node) {
+    // analyzer ≥ 14 : les membres sont sous node.body.
+    final members = node.body.members
+        .whereType<MethodDeclaration>()
+        .map((m) => m.name.lexeme)
+        .where((n) => !n.startsWith('_'))
+        .take(12)
+        .join(', ');
+    final ext = node.extendsClause?.superclass.toSource();
+    final impl = node.implementsClause?.interfaces.map((i) => i.toSource()).join(', ');
+    return [if (ext != null) 'extends $ext', if (impl != null && impl.isNotEmpty) 'implements $impl', if (members.isNotEmpty) '{ $members }'].join(' ');
   }
 
   // Type 2 : identifiants et littéraux effacés — sauf les membres appelés après un `.`, gardés
@@ -185,7 +338,8 @@ class _Collector extends RecursiveAstVisitor<void> {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     if (node.parent is CompilationUnit) {
-      _add('fonction', node.name.lexeme, node, body: node.functionExpression.body);
+      _add('fonction', node.name.lexeme, node, body: node.functionExpression.body,
+          signature: _sigOf(node.functionExpression.parameters, node.returnType));
     }
     super.visitFunctionDeclaration(node);
   }
@@ -198,25 +352,27 @@ class _Collector extends RecursiveAstVisitor<void> {
     // comparées que par leur corps (un `fetch` sur deux repositories n'est pas un doublon).
     // Un membre d'extension est qualifié par le type étendu : `String.capitalize` collisionne avec
     // `String.capitalize`, pas `CategoryEntity.toDao` avec `RecipeEntity.toDao`.
+    final sig = _sigOf(node.parameters, node.returnType);
     if (ext != null) {
       final on = ext.onClause?.extendedType.toSource() ?? '?';
-      _add('extension sur $on', '$on.${node.name.lexeme}', node, body: node.body);
+      _add('extension sur $on', '$on.${node.name.lexeme}', node, body: node.body, signature: sig, onType: on);
     } else {
-      _add(isStatic ? 'static' : 'méthode', node.name.lexeme, node, body: node.body, nameChecked: isStatic);
+      _add(isStatic ? 'static' : 'méthode', node.name.lexeme, node, body: node.body, nameChecked: isStatic, signature: sig);
     }
     super.visitMethodDeclaration(node);
   }
 
   @override
   void visitClassDeclaration(ClassDeclaration node) {
-    _add('classe', node.namePart.typeName.lexeme, node);
+    _add('classe', node.namePart.typeName.lexeme, node, signature: _classSig(node));
     super.visitClassDeclaration(node);
   }
 
   @override
   void visitExtensionDeclaration(ExtensionDeclaration node) {
     final n = node.name?.lexeme;
-    if (n != null) _add('extension', n, node);
+    final on = node.onClause?.extendedType.toSource();
+    if (n != null) _add('extension', n, node, signature: on == null ? '' : 'on $on', onType: on);
     super.visitExtensionDeclaration(node);
   }
 

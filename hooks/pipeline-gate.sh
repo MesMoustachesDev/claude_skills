@@ -16,7 +16,8 @@ case "$agent" in
   feature-test-writer) profile=red ;;
   feature-implementer) profile=green ;;
   feature-cleaner)     profile=clean ;;
-  feature-reviewer)    profile=review ;;
+  feature-reviewer)    profile=review ;;   # format du rapport seulement ; le verdict est lu par l'orchestrateur
+  feature-dedup)       profile=dedup ;;    # idem
   feature-hardener)    profile=harden ;;
   feature-qa)          profile=qa ;;
   *) exit 0 ;;

@@ -61,14 +61,13 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
   fuite de responsabilité ?
 
 *Roue réinventée*
-- Le script `reinvented` a déjà trouvé les doublons par nom et par corps. Toi, tu cherches ceux qu'il
-  ne peut pas voir : **même responsabilité, autre nom**. Méthode, pour chaque déclaration publique
-  nouvelle du diff (fonction, extension, widget, helper, mapper, classe utilitaire) : formule sa
-  responsabilité en trois mots, puis cherche dans `features/core/lib`, `features/design/lib` et les
-  deux features voisines par ces mots et leurs synonymes (`grep -rniE 'format|price|currency'`).
-  Un équivalent existant → `critical` avec le chemin de l'existant et le remplacement à faire.
-  Un presque-équivalent (même chose à un paramètre près) → `critical` aussi : c'est l'existant qu'il
-  faut étendre, pas un jumeau à créer.
+- Le script `reinvented` a trouvé les doublons par nom et par corps ; l'agent `feature-dedup` a jugé
+  les candidats par ressemblance (`.claude/features/<nom>/dedup.md`). Lis ses verdicts : un
+  `duplicate`/`extend` encore présent dans le code → `critical`. Toi, tu couvres le dernier angle :
+  pour chaque déclaration publique nouvelle **sans candidate** (elle n'est dans aucun des deux
+  rapports), formule sa responsabilité en trois mots et cherche dans `features/core/lib` et
+  `features/design/lib` par ces mots et leurs synonymes. Un équivalent → `critical`, avec le chemin
+  de l'existant et le remplacement à faire.
 
 *Dépendances*
 - Chaque package hébergé ajouté : justifié en §8, maintenu (date de release dans le log `pub_health`),

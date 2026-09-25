@@ -285,3 +285,37 @@ check_reinvented() {
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
     --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"}
 }
+
+# dedup_candidates — entrée de l'agent feature-dedup : pour chaque déclaration réutilisable du
+# package, les déclarations du workspace qui lui ressemblent (tokens de nom pondérés IDF, type
+# étendu, signature). Toujours vert : c'est un producteur, le verdict vient de l'agent.
+check_dedup_candidates() {
+  ensure_dart_tools || return 1
+  local root; root="$(cfg features_root features)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    ${ignore:+--ignore-names "$ignore"} --candidates "$FEATURE_DIR/dedup_candidates.json"
+}
+
+# ---------------------------------------------------------------------------
+# README du package : but + API publique, en phase avec le barrel
+# ---------------------------------------------------------------------------
+check_package_readme() {
+  local readme="$PKG_DIR/README.md" barrel="$PKG_DIR/lib/$PKG_NAME.dart" rc=0 sec exp f names n missing=""
+  [ -f "$readme" ] || { ko "README.md absent dans $PKG_REL — but du package et API publique"; return 1; }
+  while IFS= read -r sec; do
+    [ -n "$sec" ] || continue
+    grep -qE "$sec" "$readme" || { ko "README.md : section manquante ($sec)"; rc=1; }
+  done < <(cfg_list readme.sections)
+  [ -f "$barrel" ] || { ko "barrel absent : lib/$PKG_NAME.dart"; return 1; }
+  # Chaque déclaration publique exportée par le barrel doit être nommée dans le README.
+  while IFS= read -r exp; do
+    f="$PKG_DIR/lib/$exp"; [ -f "$f" ] || continue
+    names="$(grep -hoE "^(abstract |final |sealed |base |mixin )*(class|enum|extension|mixin|typedef) [A-Za-z_][A-Za-z0-9_]*|^final [a-z][A-Za-z0-9_]*Provider\b" "$f" \
+             | awk '{print $NF}' | grep -v '^_' | sort -u)"
+    for n in $names; do grep -qw "$n" "$readme" || missing="$missing $n"; done
+  done < <(grep -oE "^export '[^']+'" "$barrel" | sed "s/^export '//; s/'$//" | grep -v '^package:')
+  [ -n "$missing" ] && { ko "README.md ne mentionne pas :$missing"; rc=1; }
+  [ "$rc" = 0 ] && info "README : sections présentes, API publique documentée"
+  return $rc
+}
