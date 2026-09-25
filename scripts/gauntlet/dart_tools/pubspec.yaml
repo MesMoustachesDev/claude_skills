@@ -1,0 +1,10 @@
+name: gauntlet_tools
+description: Outils d'analyse AST pour le feature pipeline (stub_check).
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  analyzer: any
+  path: any
