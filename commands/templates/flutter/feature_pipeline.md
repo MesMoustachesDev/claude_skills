@@ -103,6 +103,10 @@ readme.sections = ^## (But|Purpose), ^## (API publique|Public API)
 pr.max_lines = 600
 # Format des messages de commit (regex grep -E) ; les commits wip/fixup/squash sont toujours signalés.
 commits.pattern = ^(feat|fix|chore|refactor|test|docs|perf|ci|build|style)(\([a-z0-9_/-]+\))?!?: .+
+# Fichiers non suivis (gitignore) copiés du checkout principal dans le worktree de revue, parce qu'un
+# check en a besoin (un générateur qui lit .env…). Chemins relatifs à la racine. Pas de keystore :
+# rien dans le profil pr ne signe un binaire, et le worktree est supprimé après.
+pr.copy_untracked =
 
 # ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)

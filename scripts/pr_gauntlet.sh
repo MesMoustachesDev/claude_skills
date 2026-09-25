@@ -67,6 +67,11 @@ if [ -f "$wt/.gitmodules" ]; then
     fi
   done
 fi
+# Fichiers non suivis dont les checks ont besoin (.env lu par un générateur…) : liste explicite dans la
+# config, vide par défaut. Jamais un keystore : rien dans le profil pr ne signe un binaire.
+for f in $(cfg pr.copy_untracked | tr ',' ' '); do
+  if [ -e "$PROJECT/$f" ] && [ ! -e "$wt/$f" ]; then mkdir -p "$wt/$(dirname "$f")"; cp -R "$PROJECT/$f" "$wt/$f"; fi
+done
 # La config projet doit être visible du gauntlet dans le worktree
 [ -f "$wt/.claude/rules/feature_pipeline.md" ] || { mkdir -p "$wt/.claude/rules"; cp "$cfg_file" "$wt/.claude/rules/feature_pipeline.md"; }
 if [ ! -f "$wt/.fvmrc" ] && [ -f "$PROJECT/.fvmrc" ]; then cp "$PROJECT/.fvmrc" "$wt/.fvmrc"; fi
