@@ -86,6 +86,9 @@ todo.pattern = \((#[0-9]+|[A-Z]+-[0-9]+)\)
 # en plus des conventions (build, copyWith, call, show, of…).
 dup.min_tokens = 40
 dup.ignore_names =
+# README.md de chaque package feature : sections obligatoires (regex grep -E), et chaque export du
+# barrel doit y être nommé.
+readme.sections = ^## (But|Purpose), ^## (API publique|Public API)
 
 # ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)

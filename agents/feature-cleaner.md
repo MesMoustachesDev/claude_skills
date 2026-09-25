@@ -37,6 +37,10 @@ couverture des lignes modifiées).
 3b. Le profil `clean` contient aussi les checks de **maintenabilité fixables** — chacun a une correction
    évidente, fais-la, ne la discute pas :
    - `deps_unused` → retire la dépendance du `pubspec.yaml`.
+   - `reinvented` → supprime le doublon, utilise l'existant (import + appel). Si l'existant est dans
+     `core`/`design` et qu'il lui manque un cas, étends-le là-bas (`writes.extra`).
+   - `package_readme` → remets `README.md` en phase avec le barrel : chaque export nommé, le « But »
+     encore vrai après tes refactorings.
    - `design_system` → remplace la valeur brute par le token ou le composant du DS (`features/design`).
    - `l10n_strings` → une clé l10n, nommée comme les voisines, ajoutée dans **toutes** les locales
      (`l10n_arb`). Tu traduis toi-même ; liste les traductions dans ton rapport pour relecture.

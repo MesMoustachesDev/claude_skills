@@ -58,6 +58,11 @@ Dans un BLoC, enregistre les handlers comme **méthodes** (`on<LoadX>(_onLoad)`)
 méthode — pas de closure inline. La `build()` d'une page est un stub aussi. Le gate `stub_check`
 vérifie chaque méthode par analyse AST : une méthode « un peu implémentée » fait échouer l'étape.
 
+**4b. README.** `README.md` à la racine du package : `## But` (spec §1-§2, un paragraphe, ce que le
+package fait et ne fait pas), `## API publique` (une ligne par export du barrel — le gate
+`package_readme` vérifie que chaque déclaration exportée y est nommée), `## Dépendances` (§8).
+C'est le document que lira quelqu'un dans six mois avant d'ouvrir `src/`.
+
 **5. Dépendances.** `pubspec.yaml` du package : `core` et ce que §8 liste ; en `dev_dependencies` :
 `build_runner`, `mocktail`, `bdd_widget_test`, plus `json_serializable` si des modèles JSON existent.
 
