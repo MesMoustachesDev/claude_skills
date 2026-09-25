@@ -10,28 +10,32 @@ import 'package:{{name.snakeCase()}}/src/domain/repository/{{name.snakeCase()}}_
 import 'package:{{name.snakeCase()}}/src/presentation/bloc/{{name.snakeCase()}}_bloc.dart';{{/bloc}}
 
 // Ordre : data sources → repository → use cases → BLoC. Privés jusqu'au repository inclus.
+// Provider.autoDispose pour ce qui tient une ressource (data source, repository, BLoC) ;
+// Provider simple pour les use cases, sans état. Jamais la classe AutoDisposeProvider (dépréciée).
 {{#remote}}
-final _remoteDataSourceProvider = AutoDisposeProvider<{{name.pascalCase()}}RemoteDataSource>(
+final _remoteDataSourceProvider = Provider.autoDispose<{{name.pascalCase()}}RemoteDataSource>(
   (ref) => const {{name.pascalCase()}}RemoteDataSourceImpl(),
 );
 {{/remote}}{{#local}}
-final _localDataSourceProvider = AutoDisposeProvider<{{name.pascalCase()}}LocalDataSource>(
+final _localDataSourceProvider = Provider.autoDispose<{{name.pascalCase()}}LocalDataSource>(
   (ref) => const {{name.pascalCase()}}LocalDataSourceImpl(),
 );
 {{/local}}
-final _repositoryProvider = AutoDisposeProvider<{{name.pascalCase()}}Repository>(
+final _repositoryProvider = Provider.autoDispose<{{name.pascalCase()}}Repository>(
   (ref) => {{name.pascalCase()}}RepositoryImpl({{#remote}}remoteDataSource: ref.watch(_remoteDataSourceProvider){{#local}}, localDataSource: ref.watch(_localDataSourceProvider){{/local}}{{/remote}}{{^remote}}{{#local}}localDataSource: ref.watch(_localDataSourceProvider){{/local}}{{/remote}}),
 );
 {{#remote}}
-final fetch{{name.pascalCase()}}UseCaseProvider = AutoDisposeProvider<Fetch{{name.pascalCase()}}UseCase>(
+final fetch{{name.pascalCase()}}UseCaseProvider = Provider<Fetch{{name.pascalCase()}}UseCase>(
   (ref) => Fetch{{name.pascalCase()}}UseCase(repository: ref.watch(_repositoryProvider)),
 );
 {{/remote}}{{#local}}
-final watch{{name.pascalCase()}}UseCaseProvider = AutoDisposeProvider<Watch{{name.pascalCase()}}UseCase>(
+final watch{{name.pascalCase()}}UseCaseProvider = Provider<Watch{{name.pascalCase()}}UseCase>(
   (ref) => Watch{{name.pascalCase()}}UseCase(repository: ref.watch(_repositoryProvider)),
 );
 {{/local}}{{#bloc}}
-final {{name.camelCase()}}BlocProvider = AutoDisposeProvider<{{name.pascalCase()}}Bloc>(
-  (ref) => {{name.pascalCase()}}Bloc(),
-);
+final {{name.camelCase()}}BlocProvider = Provider.autoDispose<{{name.pascalCase()}}Bloc>((ref) {
+  final bloc = {{name.pascalCase()}}Bloc();
+  ref.onDispose(bloc.close);
+  return bloc;
+});
 {{/bloc}}
