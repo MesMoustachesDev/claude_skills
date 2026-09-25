@@ -3,7 +3,16 @@
 !/.gitignore
 !/commands/
 !/skills/
+!/agents/
+!/hooks/
+!/scripts/
+!/bricks/
 
 # Managed by Claude Code / installers, not by us.
 /skills/synced/
 /skills/find-skills
+/hooks/.rtk-hook.sha256
+
+# Build artefacts of the Dart tools shipped with the gauntlet and the brick hooks.
+.dart_tool/
+pubspec.lock
