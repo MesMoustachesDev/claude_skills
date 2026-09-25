@@ -8,13 +8,56 @@ Ton rôle est de lancer le bon agent avec le bon contexte, lire les verdicts des
 Argument : **$ARGUMENTS**
 
 ```
-/feature init                      prépare le projet (config, règles, brick, doctor)
-/feature <nom> [description]       lance ou reprend le pipeline de la feature <nom>
-/feature <nom> status              affiche l'état sans rien lancer
+/feature help                                  cette aide, avec des exemples
+/feature init                                  prépare le projet (config, règles, brick, doctor)
+/feature <nom> [description]                   nouvelle feature = nouveau package features/<nom>
+/feature <nom> --in <package> [description]    ajout à un package existant (mode extend)
+/feature <nom> status                          affiche l'état sans rien lancer
+/feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
 ```
 
-Le nom est en snake_case. Une feature = une branche `feature/<nom>` = un package `features/<nom>`
-(ou le chemin de `package_path` dans la config) = un dossier de travail `.claude/features/<nom>/`.
+Le nom est en snake_case et nomme **le changement**, pas forcément le package. Une feature = une
+branche `feature/<nom>` = un dossier de travail `.claude/features/<nom>/` = un package cible :
+- **mode `create`** (défaut) : le package `features/<nom>` (ou `package_path` de la config) est créé ;
+  tout le package est dans le périmètre des gates.
+- **mode `extend`** (`--in <package>`, ou décidé par le specifier en §8 « extension de … ») : le
+  package existe ; le **périmètre** des gates de qualité est le diff depuis `base_branch` — fichiers
+  ajoutés, lignes ajoutées. La feature est responsable de ce qu'elle touche et doit laisser le reste
+  au moins aussi bon : les gates d'intégrité (compilation, suite verte, gel, dépendances, périmètre,
+  barrel, README) restent sur le package entier.
+
+### `/feature help`
+
+Affiche le bloc d'usage ci-dessus, puis ces exemples, tels quels :
+
+```
+# Nouvelle feature, package neuf, description libre
+/feature meal_reminders "Rappels de repas : l'utilisateur programme une notification par repas planifié"
+
+# Ajout à une feature existante : le nom décrit le changement, --in désigne le package
+/feature recipe_export_pdf --in features/show_recipe "Exporter une recette en PDF depuis l'écran recette"
+
+# Correctif comportemental dans un package existant (petite spec, mêmes gates)
+/feature category_sort_fix --in features/category "Les catégories custom sont triées après les prédéfinies"
+
+# Reprendre où on en était (après une coupure, ou le lendemain)
+/feature meal_reminders
+
+# Où en est-on ?
+/feature meal_reminders status
+
+# Le dedup a jugé un widget en doublon, je le garde en connaissance de cause
+/feature meal_reminders accept dedup "MealCard n'est pas une DesignCard : pas de slot image, comportement de swipe spécifique"
+
+# Préparer un projet la première fois
+/feature init
+
+# Audit de maintenabilité d'un package existant, hors pipeline (aucun agent, scripts seuls)
+~/.claude/scripts/gauntlet.sh maintain category
+```
+
+Puis rappelle en trois lignes : les quatre arrêts humains (spec, tests, mutants, captures), que rien
+n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
 
 ---
 
@@ -81,13 +124,18 @@ Le nom est en snake_case. Une feature = une branche `feature/<nom>` = un package
 
 - Racine : `git rev-parse --show-toplevel`. Nom valide (`^[a-z][a-z0-9_]*$`).
 - `gauntlet.sh doctor` rouge → exécute `/feature init` d'abord.
+- **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
+  un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si, après
+  la spec, §8 dit « extension de `features/x` » : tu confirmes avec l'humain (« la spec propose
+  d'étendre `x` plutôt que de créer un package — d'accord ? ») et tu bascules en `extend`.
 - **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, lis-le, affiche l'état (étape
   courante, gates passés, arrêts humains validés) et reprends à la première étape non `PASSED`.
   Sinon crée le dossier et `pipeline.json` :
   ```json
-  { "feature": "<nom>", "package": "<package_path>", "branch": "feature/<nom>", "base": "<base_branch>",
-    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {} }
+  { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
+    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {}, "accepted": [] }
   ```
+  `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
 - **Branche** : `git fetch origin <base>` (ignore l'échec hors ligne). Si `feature/<nom>` existe,
   `git checkout` dessus ; sinon `git checkout -b feature/<nom> <base>`. Refuse de continuer avec un
   arbre de travail sale qui ne concerne pas cette feature : demande à l'humain de le commiter ou de le
@@ -116,7 +164,8 @@ par « validée le <date> » dans l'en-tête de la spec.
 
 ### 2. Contrats — `feature-architect`
 
-Prompt : nom, `spec.md`, `create_feature_rules.md`, package, valeur de `brick`. Au retour, vérifie
+Prompt : nom, **mode**, `spec.md`, `create_feature_rules.md`, package, valeur de `brick`. En mode
+`extend`, ajoute : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ». Au retour, vérifie
 `stages.contracts` dans `pipeline.json` (le hook l'a écrit).
 Le rapport mentionne un écart avec la spec → **arrêt humain hors plan** : montre l'écart, propose
 « corriger la spec et relancer l'architect » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
@@ -274,5 +323,10 @@ validation humaine avant tout push ou création : tu ne les contournes pas.
 - **Aux arrêts humains, sois court.** Ce que l'humain doit décider, les faits qui comptent, la question.
   Pas de récit de ce que les agents ont fait.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** L'humain décide.
-- **`status`** : affiche `pipeline.json` sous forme de tableau (étape, statut, tentatives, date) et
-  les arrêts humains validés. Rien d'autre.
+- **`status`** : affiche `pipeline.json` sous forme de tableau (mode, package, étape, statut,
+  tentatives, date) et les arrêts humains validés. Rien d'autre.
+- **`accept <étape> "<raison>"`** : pose `"accepted": true` et la raison sur les entrées bloquantes
+  du rapport de l'étape (`dedup.json`, `review.json`, `spec_review.json`, `tests_review.json`),
+  ajoute `{stage, at, reason}` à `pipeline.json → accepted`, relance le verdict. Toujours sur
+  instruction explicite de l'humain, jamais de ta propre initiative ; chaque acceptation apparaît
+  dans l'evidence.

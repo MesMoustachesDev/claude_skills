@@ -10,15 +10,27 @@ capture() {
   return $rc
 }
 
+# analyze — le package compile ; les issues (warnings, infos) ne bloquent que dans les fichiers du périmètre.
 check_analyze() {
-  # shellcheck disable=SC2086
-  capture $FLUTTER analyze --fatal-warnings --no-pub
+  local out rc issues
+  out="$(cd "$PKG_DIR" && $FLUTTER analyze --fatal-warnings --fatal-infos --no-pub 2>&1)"; rc=$?
+  [ "$rc" = 0 ] && { info "aucune issue"; return 0; }
+  # une erreur de compilation bloque toujours ; le reste est filtré au périmètre
+  if printf '%s\n' "$out" | grep -qE '^\s*error •'; then printf '%s\n' "$out" | grep -E '^\s*error •' | head -30; ko "erreurs de compilation"; return 1; fi
+  issues="$(printf '%s\n' "$out" | grep -E '^\s*(warning|info) •' | sed -E 's/^.* • ([^ ]+\.dart):([0-9]+):[0-9]+ • (.*)$/\1:\2: \3 — &/' | filter_scope_lines "$PKG_REL/" | sed -E 's/^([^:]+:[0-9]+): [^—]*— //')"
+  [ -z "$issues" ] && { info "issues hors périmètre uniquement ($(printf '%s\n' "$out" | grep -cE '^\s*(warning|info) •'), préexistantes)"; return 0; }
+  printf '%s\n' "$issues" | head -30
+  ko "issues d'analyse dans le périmètre"
+  return 1
 }
 
+# format — seuls les fichiers du périmètre doivent être formatés.
 check_format() {
-  local dirs="lib"; [ -d "$PKG_DIR/test" ] && dirs="lib test"
+  local files
+  files="$(scope_files "$PKG_REL/" | grep -E '^(lib|test)/' | while IFS= read -r f; do [ -f "$PKG_DIR/$f" ] && printf '%s\n' "$f"; done)"
+  [ -n "$files" ] || { info "aucun fichier dart dans le périmètre"; return 0; }
   # shellcheck disable=SC2086
-  capture $DART format --set-exit-if-changed --output=none $dirs
+  capture $DART format --set-exit-if-changed --output=none $files
 }
 
 check_build_runner() {
@@ -39,7 +51,7 @@ check_no_temp_markers() {
   local dirs="$PKG_DIR/lib"; [ -d "$PKG_DIR/test" ] && dirs="$dirs $PKG_DIR/test"
   local hits
   # shellcheck disable=SC2086
-  hits="$(grep -rnE --include='*.dart' --exclude='*.g.dart' 'TEMP VISUAL TEST|TEMP PIPELINE|(^|[^a-zA-Z_])print\(' $dirs 2>/dev/null | sed "s#^$PKG_DIR/##")"
+  hits="$(grep -rnE --include='*.dart' --exclude='*.g.dart' 'TEMP VISUAL TEST|TEMP PIPELINE|(^|[^a-zA-Z_])print\(' $dirs 2>/dev/null | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && return 0
   printf '%s\n' "$hits"; printf '\nmarqueurs temporaires ou print() à retirer\n'
   return 1
@@ -96,23 +108,38 @@ check_stub_check() {
   local files
   files="$(expand_globs "$PKG_DIR" $(cfg_list stub.include | tr '\n' ' ') | filter_excluded '*.g.dart' '*.freezed.dart')"
   if [ -z "$files" ]; then ko "aucun fichier ne correspond à stub.include"; return 1; fi
+  # mode extend : seules les méthodes ajoutées doivent être des stubs
+  files="$(printf '%s\n' "$files" | filter_scope_files "$PKG_REL/")"
+  if [ -z "$files" ]; then ko "aucun fichier d'implémentation dans le périmètre — l'architect n'a posé aucun contrat"; return 1; fi
   info "$(printf '%s\n' "$files" | wc -l | tr -d ' ') fichier(s) inspecté(s)"
+  scope_for_tool "$PKG_REL/" "$GAUNTLET_OUT/scope_pkg.txt"
   # shellcheck disable=SC2086
-  run_dart_tool stub_check.dart --root "$PKG_DIR" $(printf '%s ' $files)
+  run_dart_tool stub_check.dart --root "$PKG_DIR" --scope "$GAUNTLET_OUT/scope_pkg.txt" $(printf '%s ' $files)
 }
 
-# metrics — dart_code_linter, seuils depuis la config. Exit 2 de l'outil = violation.
+# metrics — dart_code_linter, seuils depuis la config, rapport JSON filtré au périmètre : une fonction
+# compte si l'une de ses lignes est nouvelle (extend) ou toujours (create).
 check_metrics() {
-  local rc out
-  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics analyze lib \
+  local json="$GAUNTLET_OUT/metrics.json" viol
+  (cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics analyze lib \
       --cyclomatic-complexity="$(cfg threshold.cyclomatic 10)" \
       --source-lines-of-code="$(cfg threshold.function_lines 30)" \
       --maximum-nesting-level="$(cfg threshold.nesting 3)" \
       --number-of-parameters="$(cfg threshold.parameters 4)" \
-      --set-exit-on-violation-level=warning \
       --exclude='{/**.g.dart,/**.freezed.dart}' \
-      --no-congratulate --reporter=console 2>&1)"; rc=$?
-  printf '%s\n' "$out" | grep -vE '^\s*$' | tail -60
-  [ "$rc" = 0 ] && info "seuils : cyclo ≤ $(cfg threshold.cyclomatic 10), lignes ≤ $(cfg threshold.function_lines 30), imbrication ≤ $(cfg threshold.nesting 3), params ≤ $(cfg threshold.parameters 4)"
-  return $rc
+      --no-congratulate --reporter=json --json-path="$json" >/dev/null 2>&1)
+  [ -s "$json" ] || { ko "dart_code_linter n'a produit aucun rapport"; return 1; }
+  viol="$(jq -r '.records[] | .path as $p | (.functions // {}) | to_entries[] | .key as $f
+            | .value.codeSpan.start.line as $s | .value.codeSpan.end.line as $e
+            | .value.metrics[] | select(.level=="warning" or .level=="alarm")
+            | "\($p):\($s):\($e) \($f) \(.metricsId)=\(.value)"' "$json" \
+        | awk -v all="$SCOPE_ALL" -v prefix="$PKG_REL/" -v scope="$SCOPE_FILE" '
+            BEGIN { while ((getline l < scope) > 0) { if (index(l, ":")) lines[l]=1; else files[l]=1 } }
+            { split($1, a, ":"); f=prefix a[1]; s=a[2]+0; e=a[3]+0; keep=(all==1)||(f in files)
+              if (!keep) for (i=s;i<=e;i++) if ((f":"i) in lines) { keep=1; break }
+              if (keep) { sub(/:[0-9]+$/, "", $1); print "   ✗ " $0 } }')"
+  [ -z "$viol" ] && { info "seuils : cyclo ≤ $(cfg threshold.cyclomatic 10), lignes ≤ $(cfg threshold.function_lines 30), imbrication ≤ $(cfg threshold.nesting 3), params ≤ $(cfg threshold.parameters 4) — rien à signaler dans le périmètre"; return 0; }
+  printf '%s\n' "$viol" | head -40
+  ko "métriques hors seuil dans le périmètre"
+  return 1
 }

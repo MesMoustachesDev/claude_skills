@@ -78,7 +78,7 @@ String _stem(String t) {
 }
 
 void main(List<String> args) {
-  String? root, package, candidatesOut, dsPackage;
+  String? root, package, candidatesOut, dsPackage, scopeFile;
   var minTokens = 40;
   final ignore = <String>{};
   for (var i = 0; i < args.length; i++) {
@@ -95,8 +95,21 @@ void main(List<String> args) {
         candidatesOut = args[++i];
       case '--ds-package':
         dsPackage = args[++i];
+      case '--scope':
+        scopeFile = args[++i];
     }
   }
+  // Périmètre (mode extend) : seules les déclarations nouvelles du package sont des cibles.
+  // Format : "chemin" (fichier entier) ou "chemin:ligne", chemins relatifs à --root.
+  final scopeFiles = <String>{}, scopeLines = <String>{};
+  if (scopeFile != null && File(scopeFile).existsSync()) {
+    for (final l in File(scopeFile).readAsLinesSync().where((l) => l.isNotEmpty)) {
+      final i = l.lastIndexOf(':');
+      if (i > 0 && int.tryParse(l.substring(i + 1)) != null) scopeLines.add(l); else scopeFiles.add(l);
+    }
+  }
+  final scopeAll = scopeFiles.isEmpty && scopeLines.isEmpty;
+  bool inScope(Decl d) => scopeAll || scopeFiles.contains(d.file) || scopeLines.contains('${d.file}:${d.line}');
   if (root == null || package == null) {
     stderr.writeln('usage: dup_check.dart --root <features_root> --package <package_dir>');
     exit(2);
@@ -120,8 +133,12 @@ void main(List<String> args) {
     unit.accept(_Collector(decls, content, p.relative(path, from: rootDir.path), pkgName, unit, inTarget));
   }
 
-  final target = decls.where((d) => d.pkg == _packageOf(pkgDir, rootDir.path) || _inDir(d.file, pkgDir, rootDir.path)).toList();
-  final others = decls.where((d) => !target.contains(d)).toList();
+  final inPackage = decls.where((d) => d.pkg == _packageOf(pkgDir, rootDir.path) || _inDir(d.file, pkgDir, rootDir.path)).toList();
+  final others = decls.where((d) => !inPackage.contains(d)).toList();
+  // En mode extend, le reste du package compte comme "existant" : un ajout qui duplique une
+  // déclaration du même package est une roue réinventée aussi.
+  final target = inPackage.where(inScope).toList();
+  if (!scopeAll) others.addAll(inPackage.where((d) => !inScope(d)));
 
   if (candidatesOut != null) {
     _writeCandidates(candidatesOut, target, others, ignore, dsPackage);

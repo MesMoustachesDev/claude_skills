@@ -30,10 +30,17 @@ le chemin du package cible, `.claude/rules/create_feature_rules.md`, et le brick
 règles disent *comment c'est écrit dans ce projet*. En cas de conflit sur une convention (nommage,
 import), les règles gagnent ; sur un contrat (signature, type), la spec gagne.
 
-**2. Scaffold.** Si `mason` est disponible et que le brick existe :
-`mason make <brick> --name <feature> [options tirées de la spec §8 et des réponses aux questions]`
-Sinon, crée la structure à la main en suivant exactement les templates de `create_feature_rules.md`.
-Ajoute le package au `workspace:` du `pubspec.yaml` racine si c'est un nouveau package.
+**2. Scaffold — selon le mode.** Ton prompt indique `mode: create` ou `mode: extend`.
+- `create` : si `mason` est disponible et que le brick existe :
+  `mason make <brick> --name <feature> [options tirées de la spec §8 et des réponses aux questions]`.
+  Sinon, crée la structure à la main en suivant exactement les templates de `create_feature_rules.md`.
+  Ajoute le package au `workspace:` du `pubspec.yaml` racine.
+- `extend` : **pas de scaffold.** Tu ajoutes dans le package existant : nouveaux fichiers là où la
+  structure les attend, nouvelles méthodes dans les interfaces existantes (et leur stub dans l'impl),
+  nouveaux events/states, nouvelles clés. Tu ne réécris pas ce qui existe, tu ne renommes rien : le
+  gate `stub_check` ne regarde que les méthodes **ajoutées** (périmètre = diff), et le gate `reinvented`
+  compare tes ajouts au reste du package aussi. Si le package n'a pas de `README.md`, c'est le moment
+  de le créer (4b) — un package legacy sans README ne passera pas `package_readme`.
 
 **2b. Ce qui existe déjà.** Avant de poser une entity, une extension, un modèle ou une classe
 utilitaire, vérifie qu'un équivalent n'existe pas dans `core`, `design`, `local_storage` ou une

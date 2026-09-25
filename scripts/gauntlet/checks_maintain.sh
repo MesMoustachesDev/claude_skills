@@ -138,12 +138,12 @@ check_design_system() {
   files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
   local pats=(); local p; while IFS= read -r p; do [ -n "$p" ] && pats+=(-e "$p"); done < <(cfg_list ds.forbidden)
   if [ "${#pats[@]}" -gt 0 ]; then
-    hits="$(printf '%s\n' "$files" | xargs grep -nE "${pats[@]}" 2>/dev/null | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##")"
+    hits="$(printf '%s\n' "$files" | xargs grep -nE "${pats[@]}" 2>/dev/null | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
     [ -n "$hits" ] && { printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "valeurs visuelles en dur : passer par le design system"; rc=1; }
   fi
   imports="$(cfg_list ds.imports)"
   if [ -n "$imports" ]; then
-    for f in $(printf '%s\n' "$files" | grep -E '/view/|/widget'); do
+    for f in $(printf '%s\n' "$files" | grep -E '/view/|/widget' | sed "s#^$PKG_DIR/##" | filter_scope_files "$PKG_REL/" | sed "s#^#$PKG_DIR/#"); do
       if ! grep -qE "^import '($(printf '%s\n' "$imports" | paste -sd'|' -))" "$f"; then
         ko "${f#$PKG_DIR/} n'importe pas le design system ($(printf '%s' "$imports" | tr '\n' ' '))"; rc=1
       fi
@@ -163,7 +163,7 @@ check_l10n_strings() {
       | while IFS= read -r line; do
           stripped="$(sed -E 's/\$\{[^}]*\}//g; s/\$[a-zA-Z_][a-zA-Z0-9_]*//g' <<<"${line#*:*:}")"
           grep -qE "$pat" <<<"$stripped" && printf '%s\n' "$line"
-        done | sed "s#^$PKG_DIR/##")"
+        done | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && { info "aucune chaîne en dur"; return 0; }
   printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "chaînes utilisateur en dur : passer par context.l10n"
   return 1
@@ -198,23 +198,27 @@ check_barrel_api() {
   return 1
 }
 
-check_unused_code() {
-  local out rc
-  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics check-unused-code lib --fatal-unused --no-congratulate --exclude='{/**.g.dart,/**.freezed.dart}' 2>&1)"; rc=$?
-  [ "$rc" = 0 ] || printf '%s\n' "$out" | grep -E '⚠|✖' | head -30 | sed 's/^/   /'
-  return $rc
+# _unused <commande> — sortie de dart_code_linter filtrée au périmètre : les entrées "at <abs>:l:c" (code)
+# ou "lib/…dart" (fichiers) sont ramenées en chemins relatifs au package.
+_unused() {
+  local out rc hits
+  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics "$1" lib --fatal-unused --no-congratulate --exclude='{/**.g.dart,/**.freezed.dart}' 2>&1)"; rc=$?
+  [ "$rc" = 0 ] && { info "rien d'inutilisé"; return 0; }
+  hits="$(printf '%s\n' "$out" | grep -E '⚠' | sed -E "s#^[[:space:]]*⚠[[:space:]]*##" \
+      ; printf '%s\n' "$out" | grep -E '^[[:space:]]*at ' | sed -E "s#^[[:space:]]*at $PKG_DIR/##; s#^[[:space:]]*at ##")"
+  local scoped
+  scoped="$(printf '%s\n' "$out" | grep -E '^[[:space:]]*at |^lib/.*\.dart$' | sed -E "s#^[[:space:]]*at $PKG_DIR/##; s#^[[:space:]]*at ##; s#:$##" | filter_scope_files "$PKG_REL/")"
+  if [ -z "$scoped" ]; then info "code inutilisé hors périmètre uniquement (préexistant)"; return 0; fi
+  printf '%s\n' "$out" | grep -E '⚠|^[[:space:]]*at ' | head -30 | sed 's/^/   /'
+  return 1
 }
-check_unused_files() {
-  local out rc
-  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics check-unused-files lib --fatal-unused --no-congratulate --exclude='{/**.g.dart,/**.freezed.dart}' 2>&1)"; rc=$?
-  [ "$rc" = 0 ] || printf '%s\n' "$out" | grep -E '⚠|✖' | head -30 | sed 's/^/   /'
-  return $rc
-}
+check_unused_code()  { _unused check-unused-code; }
+check_unused_files() { _unused check-unused-files; }
 
 # test_hygiene — pas de test désactivé, pas d'attente réelle, pas de print dans test/.
 check_test_hygiene() {
   [ -d "$PKG_DIR/test" ] || return 0
-  local hits; hits="$(grep_src "$PKG_DIR/test" "skip:[[:space:]]*(true|['\"])" "Future\.delayed\(" "sleep\(" "(^|[^a-zA-Z_])print\(")"
+  local hits; hits="$(grep_src "$PKG_DIR/test" "skip:[[:space:]]*(true|['\"])" "Future\.delayed\(" "sleep\(" "(^|[^a-zA-Z_])print\(" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && { info "test/ propre"; return 0; }
   printf '%s\n' "$hits" | head -30 | sed 's/^/   ✗ /'; ko "tests désactivés, attentes réelles ou print() dans test/"
   return 1
@@ -224,7 +228,7 @@ check_test_hygiene() {
 check_todo_tickets() {
   local pat hits; pat="$(cfg todo.pattern '\((#[0-9]+|[A-Z]+-[0-9]+)\)')"
   hits="$(grep_src "$PKG_DIR/lib" "(TODO|FIXME)" ; [ -d "$PKG_DIR/test" ] && grep_src "$PKG_DIR/test" "(TODO|FIXME)")"
-  hits="$(printf '%s\n' "$hits" | grep -v '^$' | grep -vE "(TODO|FIXME)$pat")"
+  hits="$(printf '%s\n' "$hits" | grep -v '^$' | grep -vE "(TODO|FIXME)$pat" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && { info "tous les TODO référencent un ticket"; return 0; }
   printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "TODO/FIXME sans ticket (attendu : TODO$pat)"
   return 1
@@ -234,8 +238,8 @@ check_todo_tickets() {
 check_deprecated_api() {
   local out hits
   out="$(cd "$PKG_DIR" && $FLUTTER analyze --no-pub 2>&1)"
-  hits="$(printf '%s\n' "$out" | grep -E 'deprecated_member_use')"
-  [ -z "$hits" ] && { info "aucune API dépréciée"; return 0; }
+  hits="$(printf '%s\n' "$out" | grep -E 'deprecated_member_use' | sed -E 's/^.* • ([^ ]+\.dart):([0-9]+):[0-9]+ • (.*)$/\1:\2: \3/' | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits" ] && { info "aucune API dépréciée dans le périmètre"; return 0; }
   printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "API dépréciées : migrer avant que ça casse"
   return 1
 }
@@ -274,7 +278,7 @@ check_no_secrets() {
       -e "AKIA[0-9A-Z]{16}" -e "sk_(live|test)_[0-9a-zA-Z]{10,}" -e "ghp_[0-9a-zA-Z]{20,}" -e "glpat-[0-9a-zA-Z_-]{10,}" \
       -e "BEGIN (RSA|EC|OPENSSH) PRIVATE KEY" $dirs "$PKG_DIR/maestro" 2>/dev/null | grep -v "$IGNORE_MARK")"
   local mail; mail="$(grep -rnE --include='*.yaml' "inputText:[[:space:]]*['\"]?[^\$[:space:]'\"]+@[^[:space:]'\"]+" "$PKG_DIR/maestro" 2>/dev/null)"
-  hits="$(printf '%s\n%s\n' "$hits" "$mail" | grep -v '^$' | sed "s#^$PKG_DIR/##")"
+  hits="$(printf '%s\n%s\n' "$hits" "$mail" | grep -v '^$' | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && { info "aucun secret ni identifiant en clair"; return 0; }
   printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "secrets ou identifiants en clair — variables d'environnement (\${VAR}) uniquement"
   return 1
@@ -291,7 +295,8 @@ check_reinvented() {
   local root; root="$(cfg features_root features)"
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
-    --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"}
+    --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"} \
+    --scope "$(scope_for_tool "$root/" "$GAUNTLET_OUT/scope_root.txt"; echo "$GAUNTLET_OUT/scope_root.txt")"
 }
 
 # dedup_candidates — entrée de l'agent feature-dedup : pour chaque déclaration réutilisable du
@@ -303,6 +308,7 @@ check_dedup_candidates() {
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
     ${ignore:+--ignore-names "$ignore"} --ds-package "$(cfg ds.package design)" \
+    --scope "$(scope_for_tool "$root/" "$GAUNTLET_OUT/scope_root.txt"; echo "$GAUNTLET_OUT/scope_root.txt")" \
     --candidates "$FEATURE_DIR/dedup_candidates.json"
 }
 

@@ -42,15 +42,19 @@ check_red_check() {
   if [ "$total" = 0 ]; then
     ko "aucun test exécuté — la suite ne compile probablement pas"; tail -30 "$GAUNTLET_OUT/test_stderr.log"; return 1
   fi
-  green_files="$(test_results | jq -r -s 'group_by(.file) | map(select(all(.[]; .result=="success")) | .[0].file) | .[]')"
-  passing="$(test_results | jq -r 'select(.result=="success") | "  · \(.file) — \(.name)"')"
-  [ -n "$passing" ] && { info "tests qui passent déjà contre les stubs :"; printf '%s\n' "$passing"; }
+  # mode extend : seuls les fichiers de test nouveaux ou modifiés doivent être rouges
+  local scoped_files
+  scoped_files="$(test_results | jq -r '.file' | sort -u | filter_scope_files "$PKG_REL/")"
+  if [ -z "$scoped_files" ]; then ko "aucun fichier de test dans le périmètre — le test-writer n'a rien ajouté"; return 1; fi
+  green_files="$(test_results | jq -r -s 'group_by(.file) | map(select(all(.[]; .result=="success")) | .[0].file) | .[]' | grep -xF -f <(printf '%s\n' "$scoped_files"))"
+  passing="$(test_results | jq -r 'select(.result=="success") | "\(.file):0 — \(.name)"' | filter_scope_lines "$PKG_REL/" | sed 's/^/  · /; s/:0 —/ —/')"
+  [ -n "$passing" ] && { info "tests du périmètre qui passent déjà contre les stubs :"; printf '%s\n' "$passing"; }
   if [ -n "$green_files" ]; then
     printf '%s\n' "$green_files" | sed 's/^/  ✗ tout vert : /'
     ko "ces fichiers ne testent rien que les stubs ne satisfassent déjà"
     return 1
   fi
-  info "$total test(s), rouge dans chaque fichier"
+  info "$total test(s), $(printf '%s\n' "$scoped_files" | wc -l | tr -d ' ') fichier(s) dans le périmètre, rouge dans chacun"
 }
 
 # test_names — écrit .claude/features/<f>/tests.md pour le skim humain. Toujours vert.
@@ -128,10 +132,21 @@ check_mutation() {
   thr="$(cfg threshold.mutation 85)"
   files="$(expand_globs "$PKG_DIR" $(cfg_list mutation.include | tr '\n' ' ') | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' '))"
   [ -n "$files" ] || { ko "aucun fichier ne correspond à mutation.include"; return 1; }
+  # mode extend : fichiers du périmètre seulement, et dans un fichier modifié, seules les lignes ajoutées
+  files="$(printf '%s\n' "$files" | filter_scope_files "$PKG_REL/")"
+  [ -n "$files" ] || { info "aucun fichier à muter dans le périmètre"; return 0; }
   xml="$GAUNTLET_OUT/mutation.xml"; report="$GAUNTLET_OUT/mutation-report"; rm -rf "$report"
   {
     printf '<?xml version="1.0" encoding="UTF-8"?>\n<mutations version="1.2">\n  <files>\n'
-    printf '%s\n' "$files" | sed 's#^#    <file>#; s#$#</file>#'
+    local f ranges
+    for f in $files; do
+      ranges=""
+      if [ "$SCOPE_ALL" != 1 ] && ! grep -qx "$PKG_REL/$f" "$SCOPE_FILE"; then
+        # lignes ajoutées → plages contiguës <lines begin end/>
+        ranges="$(grep "^$PKG_REL/$f:" "$SCOPE_FILE" | cut -d: -f2 | sort -n | awk 'NR==1{b=$1;e=$1;next} $1==e+1{e=$1;next} {printf "      <lines begin=\"%d\" end=\"%d\"/>\n",b,e; b=$1;e=$1} END{if(NR) printf "      <lines begin=\"%d\" end=\"%d\"/>\n",b,e}')"
+      fi
+      if [ -n "$ranges" ]; then printf '    <file>%s\n%s\n    </file>\n' "$f" "$ranges"; else printf '    <file>%s</file>\n' "$f"; fi
+    done
     printf '  </files>\n  <commands>\n    <command group="test" expected-return="0" working-directory="." timeout="900">%s test --no-pub</command>\n  </commands>\n' "$FLUTTER"
     printf '  <threshold failure="%s">\n    <rating over="95" name="A"/>\n    <rating over="85" name="B"/>\n    <rating over="70" name="C"/>\n    <rating over="0" name="D"/>\n  </threshold>\n</mutations>\n' "$thr"
   } > "$xml"

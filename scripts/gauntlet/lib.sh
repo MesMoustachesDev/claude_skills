@@ -37,15 +37,71 @@ init_project_context() {
 
   FEATURE="$1"
   if [ -n "$FEATURE" ]; then
-    PKG_REL="$(cfg package_path 'features/{name}' | sed "s/{name}/$FEATURE/g")"
-    PKG_DIR="$PROJECT_ROOT/$PKG_REL"
-    [ -d "$PKG_DIR" ] || die "package introuvable : $PKG_DIR"
-    PKG_NAME="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$PKG_DIR/pubspec.yaml" | head -1)"
     # GAUNTLET_FEATURES_ROOT : relocalise .claude/features (tests du gauntlet sans écrire dans le projet).
     FEATURE_DIR="${GAUNTLET_FEATURES_ROOT:-$PROJECT_ROOT/.claude/features}/$FEATURE"
     GAUNTLET_OUT="$FEATURE_DIR/.gauntlet"
     mkdir -p "$GAUNTLET_OUT"
+    # Mode et package : pipeline.json (écrit par l'orchestrateur) > variables d'environnement > config.
+    #   create : la feature EST le package, tout le package est dans le périmètre.
+    #   extend : la feature ajoute à un package existant, le périmètre = fichiers/lignes modifiés depuis base.
+    MODE="${GAUNTLET_MODE:-$(pipeline_get .mode)}"; MODE="${MODE:-create}"
+    PKG_REL="${GAUNTLET_PACKAGE:-$(pipeline_get .package)}"
+    [ -n "$PKG_REL" ] || PKG_REL="$(cfg package_path 'features/{name}' | sed "s/{name}/$FEATURE/g")"
+    PKG_REL="${PKG_REL%/}"
+    PKG_DIR="$PROJECT_ROOT/$PKG_REL"
+    [ -d "$PKG_DIR" ] || die "package introuvable : $PKG_DIR"
+    PKG_NAME="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$PKG_DIR/pubspec.yaml" | head -1)"
+    scope_init
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Périmètre modifié (mode extend)
+# ---------------------------------------------------------------------------
+# SCOPE_FILE : une ligne par élément, relative à PROJECT_ROOT —
+#   "chemin"        fichier entier (ajouté ou non suivi)
+#   "chemin:ligne"  ligne ajoutée dans un fichier modifié
+# SCOPE_ALL=1 en mode create : tout le package est dans le périmètre.
+scope_init() {
+  SCOPE_FILE="$GAUNTLET_OUT/scope.txt"
+  if [ "$MODE" != extend ]; then SCOPE_ALL=1; : > "$SCOPE_FILE"; return; fi
+  SCOPE_ALL=0
+  local base; base="$(merge_base)"
+  {
+    git -C "$PROJECT_ROOT" diff --name-only --diff-filter=A "$base" -- "$PKG_REL"
+    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$PKG_REL"
+    git -C "$PROJECT_ROOT" diff -U0 --diff-filter=M "$base" -- "$PKG_REL" \
+      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}'
+  } | sort -u > "$SCOPE_FILE"
+}
+scope_summary() { [ "$SCOPE_ALL" = 1 ] && echo "package entier (create)" || echo "$(grep -vc ':' "$SCOPE_FILE") fichier(s) nouveau(x), $(grep -c ':' "$SCOPE_FILE") ligne(s) ajoutée(s) dans $(grep ':' "$SCOPE_FILE" | cut -d: -f1 | sort -u | wc -l | tr -d ' ') fichier(s) modifié(s) (extend)"; }
+# in_scope_file <chemin relatif à PROJECT_ROOT> — fichier nouveau ou touché
+in_scope_file() { [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }
+# scope_files <prefix> — fichiers du périmètre, relatifs à <prefix> (ex: "$PKG_REL/"), .dart seulement
+scope_files() {
+  local prefix="$1"
+  if [ "$SCOPE_ALL" = 1 ]; then (cd "$PROJECT_ROOT/$prefix" && find lib test -name '*.dart' 2>/dev/null)
+  else cut -d: -f1 "$SCOPE_FILE" | grep '\.dart$' | sort -u | sed "s#^$prefix##"; fi
+}
+# filter_scope_lines <prefix> — stdin "chemin:ligne:…" (chemins relatifs à <prefix>) → garde les hits du périmètre
+filter_scope_lines() {
+  local prefix="$1"
+  if [ "$SCOPE_ALL" = 1 ]; then cat; return; fi
+  awk -v prefix="$prefix" -v scope="$SCOPE_FILE" '
+    BEGIN { while ((getline l < scope) > 0) { if (index(l, ":")) lines[l]=1; else files[l]=1 } }
+    { split($0, a, ":"); f=prefix a[1]; if ((f in files) || ((f":"a[2]) in lines)) print }'
+}
+# filter_scope_files <prefix> — stdin "chemin…" → garde les lignes dont le fichier est dans le périmètre
+filter_scope_files() {
+  local prefix="$1"
+  if [ "$SCOPE_ALL" = 1 ]; then cat; return; fi
+  awk -v prefix="$prefix" -v scope="$SCOPE_FILE" '
+    BEGIN { while ((getline l < scope) > 0) { sub(/:[0-9]+$/, "", l); files[l]=1 } }
+    { split($0, a, ":"); if ((prefix a[1]) in files) print }'
+}
+# scope_for_tool <prefix> <out> — copie du périmètre avec chemins relatifs à <prefix>, pour les outils Dart (--scope)
+scope_for_tool() {
+  if [ "$SCOPE_ALL" = 1 ]; then : > "$2"; else sed "s#^$1##" "$SCOPE_FILE" > "$2"; fi
 }
 
 # cfg <clé> [défaut] — lit le bloc ```ini de feature_pipeline.md
@@ -127,7 +183,7 @@ run_checks() {
   # pas par des variables — elles seraient perdues à la sortie du pipe.
   {
     local failed="" skipped="" passed="" spec name mode rc fast_failed=0
-    printf 'gauntlet %s — feature %s — package %s — %s\n' "$label" "$FEATURE" "$PKG_REL" "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf 'gauntlet %s — feature %s — package %s — périmètre : %s — %s\n' "$label" "$FEATURE" "$PKG_REL" "$(scope_summary)" "$(date '+%Y-%m-%d %H:%M:%S')"
     for spec in "$@"; do
       name="${spec%%:*}"; mode=""; [[ "$spec" == *:* ]] && mode="${spec#*:}"
       section "$name${mode:+ ($mode)}"

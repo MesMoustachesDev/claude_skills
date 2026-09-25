@@ -9,7 +9,12 @@
 # Profils : contracts | red | green | clean | harden | qa   (voir gauntlet/profiles.sh)
 # Checks  : n'importe quel check individuel (gauntlet.sh list)
 #
-# À lancer depuis n'importe où dans le repo du projet. Lit .claude/rules/feature_pipeline.md.
+# À lancer depuis n'importe où dans le repo du projet. Lit .claude/rules/feature_pipeline.md et, s'il
+# existe, .claude/features/<feature>/pipeline.json (mode create|extend, package cible).
+#   create : tout le package est dans le périmètre des gates.
+#   extend : le périmètre = fichiers et lignes ajoutés depuis base_branch ; les gates d'intégrité
+#            (compilation, tests, gel, deps, footprint, barrel, README) restent sur le package entier.
+# Hors pipeline : GAUNTLET_MODE=extend GAUNTLET_PACKAGE=features/x gauntlet.sh <check> <nom>
 # Exit 0 si tout est vert, 1 sinon. Écrit .claude/features/<feature>/.gauntlet/last_<profil>.{log,json}.
 set -u
 set -o pipefail
@@ -25,7 +30,7 @@ feature="${2:-}"
 shift 2 2>/dev/null || true
 
 case "$target" in
-  ""|-h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
   list)  profiles_list; exit 0 ;;
   doctor) init_project_context ""; run_doctor; exit $? ;;
 esac
