@@ -12,7 +12,7 @@ Ce skill ne connaît rien à ton provider Git, ton CLI, ou tes conventions de MR
 
 ## Étape 1 — Charger les règles projet
 
-Cherche un fichier `create_mr_rules.md` dans le répertoire courant puis dans les parents (jusqu'à la racine du système de fichiers).
+Cherche un fichier `create_mr_rules.md` dans `.claude/rules/` à la racine du repo Git.
 
 ### Si le fichier existe :
 
@@ -30,8 +30,8 @@ Lis-le intégralement avec `Read`. Il contient :
 1. Informe l'utilisateur
 2. Liste les templates disponibles via `ls ~/.claude/commands/templates/`
 3. Demande via `AskUserQuestion` :
-   - Choisir un template existant → copier `~/.claude/commands/templates/{choice}/create_mr_rules.md` à la racine du projet
-   - Créer un `create_mr_rules.md` minimal → demande le provider (GitHub, GitLab, etc.), le CLI, la branche de base, et génère le fichier
+   - Choisir un template existant → copier `~/.claude/commands/templates/{choice}/create_mr_rules.md` dans `.claude/rules/`
+   - Créer un `create_mr_rules.md` minimal → demande le provider (GitHub, GitLab, etc.), le CLI, la branche de base, et génère le fichier dans `.claude/rules/`
    - Annuler
 
 ---

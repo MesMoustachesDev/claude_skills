@@ -34,10 +34,10 @@ git log $(git merge-base HEAD $ARGUMENTS)...$ARGUMENTS --oneline
 
 ## Étape 3 — Charger les règles projet
 
-Vérifie si un fichier `pr_rules.md` existe dans le répertoire courant :
+Vérifie si un fichier `pr_rules.md` existe dans `.claude/rules/` à la racine du repo Git :
 
 ```bash
-[ -f pr_rules.md ] && cat pr_rules.md || echo "Aucun fichier pr_rules.md trouvé."
+[ -f .claude/rules/pr_rules.md ] && cat .claude/rules/pr_rules.md || echo "Aucun fichier pr_rules.md trouvé."
 ```
 
 Si le fichier existe, ces règles ont **priorité absolue** sur tes règles générales et doivent toutes être vérifiées explicitement.
@@ -46,7 +46,7 @@ Si le fichier existe, ces règles ont **priorité absolue** sur tes règles gén
 
 Analyse le diff en tenant compte :
 
-1. **Des règles projet** (pr_rules.md si présent)
+1. **Des règles projet** (`.claude/rules/pr_rules.md` si présent)
 2. **Des règles de bon sens universelles** listées ci-dessous
 
 ### Règles universelles
@@ -113,7 +113,7 @@ _Non bloquants mais recommandés. Même format que ci-dessus._
 _Ce qui nécessite une discussion ou contexte supplémentaire._
 
 ### 📋 Règles projet vérifiées
-_Si pr_rules.md est présent : liste chaque règle avec ✅ (respectée) / ❌ (non respectée) / ➖ (non applicable)._
+_Si `.claude/rules/pr_rules.md` est présent : liste chaque règle avec ✅ (respectée) / ❌ (non respectée) / ➖ (non applicable)._
 
 ---
 

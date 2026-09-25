@@ -19,7 +19,7 @@ Ce skill ne connaît rien à ton langage, ton framework, ou ton design system. T
 
 ## Étape 1 — Charger les règles projet
 
-Cherche un fichier `create_screen_rules.md` dans le répertoire courant puis dans les parents.
+Cherche un fichier `create_screen_rules.md` dans `.claude/rules/` à la racine du repo Git.
 
 ### Si le fichier existe :
 
@@ -38,8 +38,8 @@ Lis-le intégralement avec `Read`. Il contient :
 1. Informe l'utilisateur
 2. Liste les templates disponibles via `ls ~/.claude/commands/templates/`
 3. Demande via `AskUserQuestion` :
-   - Choisir un template existant → copier `~/.claude/commands/templates/{choice}/create_screen_rules.md` à la racine du projet
-   - Créer un template from scratch → demande brièvement la stack (framework, DS, state management, l10n) et génère un `create_screen_rules.md` minimal
+   - Choisir un template existant → copier `~/.claude/commands/templates/{choice}/create_screen_rules.md` dans `.claude/rules/`
+   - Créer un template from scratch → demande brièvement la stack (framework, DS, state management, l10n) et génère un `create_screen_rules.md` minimal dans `.claude/rules/`
    - Annuler
 
 ---

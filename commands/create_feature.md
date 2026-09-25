@@ -12,21 +12,7 @@ Ce skill ne connaît rien à ton langage, ton framework, ou ton architecture. To
 
 ## Étape 1 — Charger les règles projet
 
-Cherche un fichier `create_feature_rules.md` dans le répertoire courant puis dans les parents (jusqu'à la racine du système de fichiers).
-
-```bash
-# Recherche depuis le cwd en remontant
-find_rules_file() {
-  dir=$(pwd)
-  while [ "$dir" != "/" ]; do
-    if [ -f "$dir/create_feature_rules.md" ]; then
-      echo "$dir/create_feature_rules.md"
-      return
-    fi
-    dir=$(dirname "$dir")
-  done
-}
-```
+Cherche un fichier `create_feature_rules.md` dans `.claude/rules/` à la racine du repo Git.
 
 ### Si le fichier existe :
 
@@ -46,8 +32,8 @@ Lis-le intégralement avec l'outil `Read`. Il contient :
 2. Vérifie s'il existe des templates préfabriqués dans `~/.claude/commands/templates/`
 3. Liste les templates disponibles via `ls ~/.claude/commands/templates/`
 4. Demande à l'utilisateur via `AskUserQuestion` :
-   - Choisir un template existant (ex: `flutter`, `nextjs`, etc.) → copier `~/.claude/commands/templates/{choice}/create_feature_rules.md` à la racine du projet
-   - Créer un template from scratch → demande à l'utilisateur de décrire brièvement son stack et ses conventions, puis génère un `create_feature_rules.md` minimal
+   - Choisir un template existant (ex: `flutter`, `nextjs`, etc.) → copier `~/.claude/commands/templates/{choice}/create_feature_rules.md` dans `.claude/rules/`
+   - Créer un template from scratch → demande à l'utilisateur de décrire brièvement son stack et ses conventions, puis génère un `create_feature_rules.md` minimal dans `.claude/rules/`
    - Annuler
 
 ---
