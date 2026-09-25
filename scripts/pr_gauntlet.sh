@@ -81,7 +81,12 @@ baseref="$remote/$base"; git -C "$PROJECT" rev-parse -q --verify "$baseref" >/de
 echo "revue de $ref contre $baseref" >&2
 wt="$(mktemp -d)/wt"
 git -C "$PROJECT" worktree add -q --detach "$wt" "$ref" || { echo "worktree impossible" >&2; exit 2; }
-cleanup() { [ "$keep" = 1 ] && { echo "worktree conservé : $wt"; return; }; git -C "$PROJECT" worktree remove --force "$wt" >/dev/null 2>&1; rm -rf "$(dirname "$wt")"; }
+# Le rm -rf ne sort JAMAIS du dossier temporaire créé par mktemp : garde-fou explicite, quoi qu'il arrive.
+cleanup() {
+  [ "$keep" = 1 ] && { echo "worktree conservé : $wt"; return; }
+  git -C "$PROJECT" worktree remove --force "$wt" >/dev/null 2>&1
+  case "$(dirname "$wt")" in "${TMPDIR:-/tmp}"*|/tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) rm -rf "$(dirname "$wt")" ;; *) echo "cleanup : $wt hors du dossier temporaire, non supprimé" >&2 ;; esac
+}
 trap cleanup EXIT
 # Submodules (un package du workspace peut en être un) : un worktree ne les initialise pas tout seul.
 if [ -f "$wt/.gitmodules" ]; then
