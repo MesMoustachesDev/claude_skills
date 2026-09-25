@@ -28,3 +28,8 @@ vars:
     description: Couche présentation (page)
     default: true
     prompt: Couche présentation ?
+  riverpod3:
+    type: boolean
+    description: Riverpod ≥ 3 (Provider(isAutoDispose true)) ; false = 2.x (Provider.autoDispose). Détecté par /feature init dans pubspec.lock.
+    default: true
+    prompt: Riverpod 3 ?

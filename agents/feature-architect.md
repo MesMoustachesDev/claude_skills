@@ -32,7 +32,7 @@ import), les règles gagnent ; sur un contrat (signature, type), la spec gagne.
 
 **2. Scaffold — selon le mode.** Ton prompt indique `mode: create` ou `mode: extend`.
 - `create` : si `mason` est disponible et que le brick existe :
-  `mason make <brick> --name <feature> [options tirées de la spec §8 et des réponses aux questions]`.
+  `mason make <brick> --name <feature> --riverpod3 <true si riverpod_major = 3 dans feature_pipeline.md> [options tirées de la spec §8 et des réponses aux questions]`.
   Sinon, crée la structure à la main en suivant exactement les templates de `create_feature_rules.md`.
   Ajoute le package au `workspace:` du `pubspec.yaml` racine.
 - `extend` : **pas de scaffold.** Tu ajoutes dans le package existant : nouveaux fichiers là où la

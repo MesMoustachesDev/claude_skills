@@ -103,6 +103,9 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
    (lis `android/app/build.gradle*` → `applicationId`), `ios.app_id` (lis `ios/Runner.xcodeproj/project.pbxproj`
    → `PRODUCT_BUNDLE_IDENTIFIER`), AVD (`emulator -list-avds`), simulateur (`xcrun simctl list devices available`),
    feature de référence, commandes de build si flavors. Écris les valeurs dans le bloc `ini`.
+   `riverpod_major` : lis `pubspec.lock` (`riverpod:` → `version:`), pas le pubspec — c'est la version
+   résolue qui compte. Si le projet est en 2.x, dis-le : le global vise Riverpod 3, le brick génère la
+   forme 2.x tant que le projet n'a pas migré, et `pub_health` le rappellera à chaque feature.
 3. **Règles de code** — si `.claude/rules/create_feature_rules.md` manque : propose le template global
    (comme `/create_feature`), copie-le dans `.claude/rules/`.
 4. **Brick** — compare `.claude/rules/create_feature_rules.md` au template global (`diff`). S'ils

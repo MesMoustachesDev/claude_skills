@@ -24,6 +24,9 @@ package_path = features/{name}
 base_branch = develop
 # Brick Mason utilisé par l'architect. "project" = ./bricks/feature, "global" = ~/.claude/bricks/flutter_feature.
 brick = global
+# Majeure de Riverpod réellement résolue (pubspec.lock, détectée par /feature init). Le brick génère
+# Provider(isAutoDispose: true) en 3, Provider.autoDispose en 2.
+riverpod_major = 3
 # Zones d'écriture supplémentaires pour architect/implementer/cleaner, hors du package feature
 # (enregistrer une route, ajouter des clés l10n…). Globs relatifs à la racine du repo.
 writes.extra = features/router/**, features/l10n/lib/**

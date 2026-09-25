@@ -70,11 +70,12 @@ features/{feature_name}/
 - **Providers Riverpod** :
   - Data sources et repositories : providers **privés** (préfixés `_`)
   - Use cases, BLoCs, mappers : providers **publics**
-  - Syntaxe : `Provider.autoDispose<T>((ref) => …)` et `Provider<T>((ref) => …)`. **Jamais la classe
-    `AutoDisposeProvider`** (dépréciée en Riverpod 3 ; `Provider.autoDispose` marche en 2.x et 3.x).
-  - Data sources et repository : `Provider.autoDispose` (ils tiennent des ressources : client, stream)
+  - Syntaxe Riverpod 3 : `Provider<T>((ref) => …, isAutoDispose: true)` pour l'auto-dispose,
+    `Provider<T>((ref) => …)` sinon. Projet encore en Riverpod 2.x : `Provider.autoDispose<T>(…)`
+    (valide en 2 et 3). **Jamais la classe `AutoDisposeProvider`** : elle n'existe plus en Riverpod 3.
+  - Data sources et repository : auto-dispose (ils tiennent des ressources : client, stream)
   - Use cases : `Provider` simple — sans état, sans ressource, rien à disposer
-  - BLoC : `Provider.autoDispose` avec `ref.onDispose(bloc.close)`
+  - BLoC : auto-dispose avec `ref.onDispose(bloc.close)`
   - `ref.watch()` pour les dépendances réactives
 - **Sealed classes** pour events et states des BLoCs
 - **Equatable** pour entities, events, states
@@ -311,28 +312,34 @@ import 'package:core/flutter_riverpod.dart';
 Ordre des providers : data sources → repository → use cases → BLoC.
 
 ```dart
-final _remoteDataSourceProvider = Provider.autoDispose<{FeatureName}RemoteDataSource>(
+// Riverpod 3. En 2.x : Provider.autoDispose<T>((ref) => …) à la place de isAutoDispose: true.
+final _remoteDataSourceProvider = Provider<{FeatureName}RemoteDataSource>(
   (ref) => {FeatureName}RemoteDataSourceImpl(dataLoader: ref.watch(dataLoaderProvider)),
+  isAutoDispose: true,
 );
 
-final _repositoryProvider = Provider.autoDispose<{FeatureName}Repository>(
+final _repositoryProvider = Provider<{FeatureName}Repository>(
   (ref) => {FeatureName}RepositoryImpl(remoteDataSource: ref.watch(_remoteDataSourceProvider)),
+  isAutoDispose: true,
 );
 
 final get{FeatureName}UseCaseProvider = Provider<Get{FeatureName}UseCase>(
   (ref) => Get{FeatureName}UseCase({featureName}Repository: ref.watch(_repositoryProvider)),
 );
 
-final {featureName}BlocProvider = Provider.autoDispose<{FeatureName}Bloc>((ref) {
-  final bloc = {FeatureName}Bloc(get{FeatureName}UseCase: ref.watch(get{FeatureName}UseCaseProvider));
-  ref.onDispose(bloc.close);
-  return bloc;
-});
+final {featureName}BlocProvider = Provider<{FeatureName}Bloc>(
+  (ref) {
+    final bloc = {FeatureName}Bloc(get{FeatureName}UseCase: ref.watch(get{FeatureName}UseCaseProvider));
+    ref.onDispose(bloc.close);
+    return bloc;
+  },
+  isAutoDispose: true,
+);
 ```
 
-- Data sources et repository : privés, `Provider.autoDispose`
+- Data sources et repository : privés, auto-dispose
 - Use cases : publics, `Provider`
-- BLoC : public, `Provider.autoDispose` + `ref.onDispose(bloc.close)`, avec `.family` si paramétré
+- BLoC : public, auto-dispose + `ref.onDispose(bloc.close)`, avec `.family` si paramétré
 
 ### BLoC Event (`lib/src/presentation/bloc/{feature_name}_event.dart`)
 
