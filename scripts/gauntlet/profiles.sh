@@ -17,6 +17,10 @@ profile_checks() {
     green)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict" ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
+    # Revue de PR (pr_gauntlet.sh, mode extend sur chaque package touché) : pas de gel, pas de stubs,
+    # pas de footprint (une PR peut toucher plusieurs packages). Mutation en option.
+    pr)          echo "analyze format test deps metrics deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
+    pr_mutation) echo "$(profile_checks pr) mutation" ;;
     review)    echo "review_report" ;;
     harden)    echo "test analyze test_freeze_check:additive mutation" ;;
     qa)        echo "qa" ;;
@@ -35,6 +39,7 @@ Profils (étape → checks) :
   green      test analyze format no_stubs no_temp_markers deps test_freeze_check:strict
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
+  pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation
   review     review_report          (hook du reviewer ; verdict : review_verdict)
   harden     test analyze test_freeze_check:additive mutation
   qa         qa

@@ -62,7 +62,10 @@ check_deps_features() {
     [ "$kind" = path ] || continue
     grep -qw "$dep" <<<"$shared" && continue
     fanout=$((fanout+1))
-    if [ ! -f "$spec" ]; then ko "dépendance inter-features $dep : pas de spec pour la justifier"; rc=1
+    if [ ! -f "$spec" ]; then
+      # hors pipeline (revue de PR, audit) : pas de spec → on liste, on ne bloque pas
+      if [ -f "$FEATURE_DIR/pipeline.json" ]; then ko "dépendance inter-features $dep : pas de spec pour la justifier"; rc=1
+      else printf '[WARN] dépendance inter-features %s — pas de spec pour la justifier (à vérifier en revue)\n' "$dep"; fi
     elif ! grep -qw "$dep" <<<"$arch"; then ko "dépendance inter-features $dep absente de la spec §8 Architecture — à justifier ou à retirer"; rc=1
     fi
   done < <(pkg_deps dependencies)

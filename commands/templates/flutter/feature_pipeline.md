@@ -97,6 +97,14 @@ dup.ignore_names =
 readme.sections = ^## (But|Purpose), ^## (API publique|Public API)
 
 # ---------------------------------------------------------------------------
+# Revue de PR (pr_gauntlet.sh, /reviewPR)
+# ---------------------------------------------------------------------------
+# Au-delà de N lignes modifiées, la PR est signalée comme à découper.
+pr.max_lines = 600
+# Format des messages de commit (regex grep -E) ; les commits wip/fixup/squash sont toujours signalés.
+commits.pattern = ^(feat|fix|chore|refactor|test|docs|perf|ci|build|style)(\([a-z0-9_/-]+\))?!?: .+
+
+# ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)
 # ---------------------------------------------------------------------------
 qa.platforms = android, ios
