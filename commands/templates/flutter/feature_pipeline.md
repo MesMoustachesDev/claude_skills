@@ -65,6 +65,25 @@ deps.injection = domain, data, presentation
 deps.domain_forbidden_packages = flutter, flutter_bloc, flutter_riverpod, dio, appwrite, isar
 
 # ---------------------------------------------------------------------------
+# Maintenabilité (checks_maintain.sh)
+# ---------------------------------------------------------------------------
+# Packages du workspace que toute feature peut utiliser sans justification. Toute autre dépendance
+# inter-features doit être nommée dans la spec §8 (gate deps_features).
+deps.shared_packages = core, design, l10n, router, error, env, analytics
+# Une dépendance hébergée sans release depuis plus de N mois est signalée (bloquant si ajoutée par la feature).
+pub.max_age_months = 24
+# Design system : préfixes d'import acceptés (une vue doit en importer un) et motifs interdits en présentation.
+# Les motifs sont des regex grep -E, séparés par des virgules (donc sans virgule dedans).
+ds.imports = package:design/, package:core/design.dart
+ds.forbidden = Colors\.[a-z], TextStyle\(, Color\(0x, fontSize:, EdgeInsets\.(all|symmetric|only)\([0-9], SizedBox\((height|width): [0-9], BorderRadius\.circular\([0-9]
+# Globs (relatifs au package) exemptés des checks design_system / l10n_strings.
+ds.exempt =
+# Fichiers ARB (glob relatif à la racine) : les clés ajoutées par la feature doivent exister dans chacun.
+l10n.arb_glob = features/l10n/lib/**/*.arb
+# Un TODO/FIXME doit référencer un ticket : regex après le mot-clé.
+todo.pattern = \((#[0-9]+|[A-Z]+-[0-9]+)\)
+
+# ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)
 # ---------------------------------------------------------------------------
 qa.platforms = android, ios

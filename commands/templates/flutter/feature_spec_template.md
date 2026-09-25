@@ -251,7 +251,10 @@ N/A
 <!-- Décisions structurelles. La map des dépendances est vérifiée par le gate `deps`. -->
 
 - **Package** : nouveau `features/{feature_name}` / extension de `features/{existing}` — justification :
-- **Dépendances du package** (pubspec) : `core`, 
+- **Packages partagés utilisés** : `core`, `design`, `l10n`
+- **Dépendances inter-features** (le gate `deps_features` vérifie que chacune est nommée ici) :
+  - `{autre_feature}` — pourquoi, et pourquoi ça ne passe pas par `core`
+- **Dépendances hébergées ajoutées** (pub.dev) : aucune | `{package}` — pourquoi, dernière release le {date}, alternative rejetée
 - **Direction des couches** : `presentation → domain ← data`, `injection → *`. Aucune exception.
 - **DI** (Riverpod, `lib/src/injection/{feature_name}_di.dart`) : providers privés pour data sources et repository, publics pour use cases et BLoC.
 - **Routes** (`features/router`) : 
