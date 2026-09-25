@@ -1,0 +1,30 @@
+name: flutter_feature
+description: Package feature Flutter / Clean Architecture (domain / data / presentation), Riverpod + BLoC, Either — squelette avec stubs pour le feature pipeline.
+version: 0.1.0
+environment:
+  mason: ">=0.1.0 <0.2.0"
+vars:
+  name:
+    type: string
+    description: Nom de la feature (snake_case)
+    prompt: Nom de la feature ?
+  remote:
+    type: boolean
+    description: Data source remote (Future<Either>)
+    default: true
+    prompt: Data source remote ?
+  local:
+    type: boolean
+    description: Data source locale (Stream)
+    default: false
+    prompt: Data source locale ?
+  bloc:
+    type: boolean
+    description: BLoC pour l'état de présentation
+    default: true
+    prompt: BLoC ?
+  presentation:
+    type: boolean
+    description: Couche présentation (page)
+    default: true
+    prompt: Couche présentation ?

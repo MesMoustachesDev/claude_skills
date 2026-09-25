@@ -1,0 +1,5 @@
+name: flutter_feature_hooks
+environment:
+  sdk: ^3.5.0
+dependencies:
+  mason: any
