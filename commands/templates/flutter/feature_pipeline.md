@@ -82,6 +82,10 @@ ds.exempt =
 l10n.arb_glob = features/l10n/lib/**/*.arb
 # Un TODO/FIXME doit référencer un ticket : regex après le mot-clé.
 todo.pattern = \((#[0-9]+|[A-Z]+-[0-9]+)\)
+# Roue réinventée (dup_check) : taille minimale d'un corps pour compter comme clone, et noms à ignorer
+# en plus des conventions (build, copyWith, call, show, of…).
+dup.min_tokens = 40
+dup.ignore_names =
 
 # ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)

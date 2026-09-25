@@ -35,6 +35,13 @@ import), les règles gagnent ; sur un contrat (signature, type), la spec gagne.
 Sinon, crée la structure à la main en suivant exactement les templates de `create_feature_rules.md`.
 Ajoute le package au `workspace:` du `pubspec.yaml` racine si c'est un nouveau package.
 
+**2b. Ce qui existe déjà.** Avant de poser une entity, une extension, un modèle ou une classe
+utilitaire, vérifie qu'un équivalent n'existe pas dans `core`, `design`, `local_storage` ou une
+feature voisine (`grep -rn 'class <Nom>' features/`, `grep -rn 'extension .* on <Type>' features/`).
+Un doublon de nom fait échouer le gate `contracts` (`reinvented`) ; un doublon de rôle sera un
+`critical` en revue. Si la spec demande quelque chose qui existe déjà, utilise l'existant et note
+l'écart dans ton rapport.
+
 **3. Contrats.** Transcris §5 **à l'identique** : entities, interfaces repository et data sources,
 signatures des use cases, events/states sealed, `lib/src/presentation/keys.dart` avec toutes les
 clés en `String`. Puis §6 : les `DataModel` avec leurs annotations JSON et le squelette des mappers.

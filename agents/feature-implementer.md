@@ -35,7 +35,12 @@ tests), et la dernière sortie rouge du gauntlet.
    sur le widget ET `Semantics(identifier: <Name>Keys.x, ...)` autour — la QA Maestro ne voit que
    les identifiers. Design system pour toutes les valeurs visuelles, `context.l10n.*` pour tout texte,
    les quatre états Loading / Error / Empty / Loaded.
-5. Réutilise `core` (DataLoader, ErrorEntity, analytics, logger). Ne réécris pas ce qui existe.
+5. **Cherche avant d'écrire.** Avant de créer un helper, une extension, un widget, un mapper, une
+   classe utilitaire : `grep -rniE '<mots-clés de sa responsabilité>' features/core/lib features/design/lib`
+   puis les features voisines. S'il existe → tu l'utilises. S'il existe presque → tu l'étends (dans
+   `core` ou `design` si c'est partagé, c'est dans `writes.extra`) plutôt que d'en créer un jumeau.
+   Le gate `reinvented` attrape les doublons par nom et par corps ; le reviewer attrape les autres —
+   et un jumeau trouvé après coup coûte une boucle complète.
 6. Quand tout est vert : `gauntlet.sh green <feature>` une dernière fois. Le hook de fin le relance et
    te bloque s'il reste un rouge, un stub, un `print(`, un marqueur `TEMP`, ou un import hors couche.
 

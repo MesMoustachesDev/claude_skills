@@ -60,6 +60,16 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 - Ce qui a été mis dans `core`, `router`, `l10n` par cette feature y a-t-il sa place, ou est-ce une
   fuite de responsabilité ?
 
+*Roue réinventée*
+- Le script `reinvented` a déjà trouvé les doublons par nom et par corps. Toi, tu cherches ceux qu'il
+  ne peut pas voir : **même responsabilité, autre nom**. Méthode, pour chaque déclaration publique
+  nouvelle du diff (fonction, extension, widget, helper, mapper, classe utilitaire) : formule sa
+  responsabilité en trois mots, puis cherche dans `features/core/lib`, `features/design/lib` et les
+  deux features voisines par ces mots et leurs synonymes (`grep -rniE 'format|price|currency'`).
+  Un équivalent existant → `critical` avec le chemin de l'existant et le remplacement à faire.
+  Un presque-équivalent (même chose à un paramètre près) → `critical` aussi : c'est l'existant qu'il
+  faut étendre, pas un jumeau à créer.
+
 *Dépendances*
 - Chaque package hébergé ajouté : justifié en §8, maintenu (date de release dans le log `pub_health`),
   pas de doublon avec ce que `core` exporte déjà (un second client HTTP, un second logger…).
@@ -101,7 +111,7 @@ Pas de compliment.
   "rules_checked": {
     "pr_rules":        { "<item>": "ok|ko|na" },
     "universal":       { "<catégorie>": "ok|ko" },
-    "maintainability": { "architecture": "ok|ko", "deps_features": "ok|ko", "deps_hosted": "ok|ko|warn",
+    "maintainability": { "architecture": "ok|ko", "reinvented": "ok|ko", "deps_features": "ok|ko", "deps_hosted": "ok|ko|warn",
                          "design_system": "ok|ko", "l10n": "ok|ko", "consistency": "ok|ko", "readability": "ok|ko" }
   }
 }
@@ -118,6 +128,6 @@ tu as à être juste.
 
 ```
 Critiques : <n>  — Suggestions : <n>  — Scénarios non testés : <n>
-Règles projet : <n> ok / <n> ko / <n> n/a  — Maintenabilité : <n>/7 ok
+Règles projet : <n> ok / <n> ko / <n> n/a  — Maintenabilité : <n>/8 ok
 Verdict : mergeable en l'état | retour implementer (<n> critiques)
 ```

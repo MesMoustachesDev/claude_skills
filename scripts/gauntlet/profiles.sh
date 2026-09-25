@@ -5,11 +5,11 @@
 # si un rapide a échoué.
 
 # Maintenabilité que le cleaner peut corriger lui-même (voir checks_maintain.sh).
-MAINTAIN_FIXABLE="deps_unused design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
+MAINTAIN_FIXABLE="deps_unused reinvented design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
 
 profile_checks() {
   case "$1" in
-    contracts) echo "build_runner analyze deps stub_check" ;;
+    contracts) echo "build_runner analyze deps stub_check reinvented" ;;
     red)       echo "build_runner analyze red_check test_names" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict" ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
@@ -24,7 +24,7 @@ profile_checks() {
 profiles_list() {
   cat <<'EOF'
 Profils (étape → checks) :
-  contracts  build_runner analyze deps stub_check
+  contracts  build_runner analyze deps stub_check reinvented
   red        build_runner analyze red_check test_names
   green      test analyze format no_stubs no_temp_markers deps test_freeze_check:strict
   clean      green + metrics + maintenabilité fixable + coverage
@@ -53,6 +53,7 @@ Checks individuels :
 
 Maintenabilité (checks_maintain.sh) :
   deps_unused        chaque dépendance déclarée est importée
+  reinvented         roue réinventée : nom public déjà pris ailleurs, ou corps identique à renommage près (AST)
   deps_features      dépendances inter-features justifiées dans la spec §8, aucun cycle dans le workspace
   pub_health         packages abandonnés / sans release depuis pub.max_age_months / majeure en retard
   design_system      pas de valeur visuelle brute (ds.forbidden), chaque vue importe le DS (ds.imports)

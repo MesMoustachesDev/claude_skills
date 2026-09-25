@@ -271,3 +271,17 @@ check_no_secrets() {
   printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "secrets ou identifiants en clair — variables d'environnement (\${VAR}) uniquement"
   return 1
 }
+
+# ---------------------------------------------------------------------------
+# Roue réinventée
+# ---------------------------------------------------------------------------
+# reinvented — une déclaration du package existe déjà ailleurs : même nom public (fonction top-level,
+# membre d'extension sur le même type, statique, classe, extension, enum, typedef) ou même corps à
+# renommage près (clone de type 2, ≥ dup.min_tokens tokens), workspace entier et package lui-même.
+check_reinvented() {
+  ensure_dart_tools || return 1
+  local root; root="$(cfg features_root features)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"}
+}
