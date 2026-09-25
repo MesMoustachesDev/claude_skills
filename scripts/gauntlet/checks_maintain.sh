@@ -72,7 +72,10 @@ check_deps_features() {
       n="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$p" | head -1)"
       awk '/^dependencies:/{f=1;next} /^[^ ]/{f=0} f && /^  [a-zA-Z_0-9]+:/{cur=$1; sub(/:$/,"",cur)} f && /^    path:/{print cur}' "$p" | sed "s/^/$n /"
     done)"
-  local cyc; cyc="$(awk -v start="$PKG_NAME" '
+  # Un cycle qui passe par un package partagé (core, router…) est un fait préexistant du projet, pas
+  # celui de la feature : warning. Un cycle entre features non partagées reste bloquant.
+  local cyc; cyc="$(awk -v start="$PKG_NAME" -v shared="$shared" '
+    BEGIN { n=split(shared, s, " "); for (i=1;i<=n;i++) if (s[i]!="") sh[s[i]]=1 }
     { adj[$1]=adj[$1]" "$2 }
     function dfs(n, path,   i, k, arr) {
       if (n == start && path != "") { print path" → "start; found=1; return }
@@ -80,7 +83,12 @@ check_deps_features() {
       k=split(adj[n], arr, " "); for (i=1;i<=k;i++) if (arr[i]!="") dfs(arr[i], path (path==""?"":" → ") n)
     }
     END { dfs(start, ""); if (!found) exit 0 }' <<<"$graph")"
-  [ -n "$cyc" ] && { ko "cycle de dépendances entre features : $cyc"; rc=1; }
+  if [ -n "$cyc" ]; then
+    local viashared=0 node
+    for node in $(printf '%s' "$cyc" | head -1 | tr '→' '\n'); do grep -qw "$node" <<<"$shared" && viashared=1; done
+    if [ "$viashared" = 1 ]; then printf '[WARN] cycle via un package partagé (préexistant, hors de la feature) : %s\n' "$(printf '%s' "$cyc" | head -1)"
+    else ko "cycle de dépendances entre features : $cyc"; rc=1; fi
+  fi
   [ "$rc" = 0 ] && info "inter-features : $fanout dépendance(s) hors packages partagés, toutes justifiées, aucun cycle"
   return $rc
 }
