@@ -46,3 +46,24 @@ check_dedup_verdict() {
   ko "$n roue(s) réinventée(s) : utiliser ou étendre l'existant"
   return 1
 }
+
+# spec_review.json  : { blocking:[{section,issue,fix}], notes:[{section,issue}] }   (agent feature-spec-critic)
+# tests_review.json : { blocking:[{file,line,test,issue,fix}], notes:[...], coverage:{scenario:"tested|missing"} }  (agent feature-test-reviewer)
+
+_report_ok() { # _report_ok <file> <label> <jq-schema>
+  [ -f "$1" ] || { ko "$2 absent — l'agent doit produire ${1#$PROJECT_ROOT/}"; return 1; }
+  jq -e "$3" "$1" >/dev/null 2>&1 || { ko "$2 invalide (schéma)"; return 1; }
+}
+_verdict_ok() { # _verdict_ok <file> <label> <message>
+  local n; n="$(jq '[.blocking[] | select(.accepted != true)] | length' "$1")"
+  [ "$n" = 0 ] && return 0
+  jq -r '.blocking[] | select(.accepted != true) | "   ✗ [\(.section // .file // "-")] \(.issue)"' "$1"
+  ko "$n point(s) bloquant(s) — $3"
+  return 1
+}
+
+check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_review.json" '(.blocking|type=="array") and (.notes|type=="array")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/spec_review.json"), notes : $(jq '.notes|length' "$FEATURE_DIR/spec_review.json")"; }
+check_spec_review_verdict() { check_spec_review_report || return 1; _verdict_ok "$FEATURE_DIR/spec_review.json" "spec_review" "retour au specifier"; }
+
+check_tests_review_report()  { _report_ok "$FEATURE_DIR/tests_review.json" "tests_review.json" '(.blocking|type=="array") and (.notes|type=="array") and (.coverage|type=="object")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/tests_review.json"), scénarios sans test : $(jq '[.coverage[]|select(.=="missing")]|length' "$FEATURE_DIR/tests_review.json")"; }
+check_tests_review_verdict() { check_tests_review_report || return 1; _verdict_ok "$FEATURE_DIR/tests_review.json" "tests_review" "retour au test-writer"; }

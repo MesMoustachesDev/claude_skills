@@ -33,10 +33,12 @@ Le nom est en snake_case. Une feature = une branche `feature/<nom>` = un package
 
 | # | Étape | Agent (`subagent_type`) | Gate | Arrêt humain après |
 |---|---|---|---|---|
-| 1 | spec | `feature-specifier` | — | **oui** : validation de la spec |
+| 1 | spec | `feature-specifier` | — | non |
+| 1b | critique | `feature-spec-critic` | `spec_review_verdict` | **oui** : validation de la spec (boucle vers 1 avant) |
 | 2 | contracts | `feature-architect` | `contracts` | non |
 | 2b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 2 si doublons) |
-| 3 | tests | `feature-test-writer` | `red` | **oui** : skim de `tests.md`, puis gel |
+| 3 | tests | `feature-test-writer` | `red` | non |
+| 3b | revue des tests | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) |
 | 4 | impl | `feature-implementer` | `green` | non |
 | 5 | clean | `feature-cleaner` | `clean` | non |
 | 5b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) |
@@ -98,12 +100,19 @@ Le nom est en snake_case. Une feature = une branche `feature/<nom>` = un package
 Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), racine, chemin de sortie,
 et la phrase : « L'humain validera ta spec ; il ne veut pas être interrompu pour des choix techniques. »
 
-Au retour : lis `spec.md`. **Arrêt humain 1.** Présente en 10 lignes max : objectif, périmètre,
-nombre de scénarios, décisions techniques prises (§9), points signalés par l'agent. Puis
-`AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance le
-specifier avec la spec existante + le retour, autant de fois que nécessaire). Validation →
-`human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon » par
-« validée le <date> » dans l'en-tête de la spec.
+### 1b. Critique — `feature-spec-critic`
+
+Lance `feature-spec-critic` (prompt : nom, `spec.md`, `create_feature_rules.md`, template de spec).
+Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
+`spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
+`loops.spec`, max 2, puis tu montres les bloquants restants à l'humain avec la spec.
+
+Vert → **Arrêt humain 1.** Présente en 10 lignes max : objectif, périmètre, nombre de scénarios,
+décisions techniques prises (§9), points signalés par le specifier, notes non bloquantes du critique.
+Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance
+le specifier avec la spec existante + le retour, puis 1b, autant de fois que nécessaire).
+Validation → `human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon »
+par « validée le <date> » dans l'en-tête de la spec.
 
 ### 2. Contrats — `feature-architect`
 
@@ -132,10 +141,18 @@ Prompt : nom, `spec.md`, package, la liste des chemins autorisés en lecture (`l
 `lib/src/presentation/keys.dart`, `**/*_event.dart`, `**/*_state.dart`, `lib/src/data/model/*.dart`),
 `~/.claude/commands/create_test.md`. Au retour, `stages.red` doit être `PASSED`.
 
-**Arrêt humain 2.** Montre `.claude/features/<nom>/tests.md` (le fichier entier : c'est court et
-c'est fait pour être lu), les tests « passe déjà » avec la justification de l'agent, et les contrats
-manquants s'il y en a. `AskUserQuestion` : « Valider les tests » / « Il manque des scénarios »
-(texte libre → relance le test-writer avec le retour ; ses fichiers existants restent, il complète).
+### 3b. Revue des tests — `feature-test-reviewer`
+
+Lance `feature-test-reviewer` (prompt : nom, `spec.md`, package, `tests.md`, `create_test.md`).
+Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writer** avec
+`tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
+`gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis arrêt humain avec les bloquants restants.
+
+Vert → **Arrêt humain 2.** Montre `.claude/features/<nom>/tests.md` (le fichier entier : c'est
+court et c'est fait pour être lu), la table de couverture de `tests_review.md`, les tests « passe
+déjà » avec la justification de l'agent, et les contrats manquants s'il y en a. `AskUserQuestion` :
+« Valider les tests » / « Il manque des scénarios » (texte libre → relance le test-writer avec le
+retour, puis 3b ; ses fichiers existants restent, il complète).
 
 Validation → **gel** :
 ```bash
@@ -219,8 +236,15 @@ Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> �
 
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
 Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
-Packages préexistants à surveiller : <warnings pub_health> · Exemptions gauntlet-ignore : <n> (<où>)
 Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par l'humain (<raisons>)   ← dedup.json
+Widgets vs design system : <n> comparés, <n> remplacés, <n> extensions du DS                              ← dedup.json
+Exemptions gauntlet-ignore : <n> (<où>)
+
+## Dépendances à traiter hors feature   ← review.json → dependencies
+| Package | Problème | Alternative | Fichiers | Risque | Verdict |
+
+## Qualité des entrées               ← spec_review.json, tests_review.json
+Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> scénarios couverts, <n> bloquants corrigés avant gel
 
 ## Suggestions non appliquées        ← review.json
 ## Mutants expliqués                 ← mutants.md

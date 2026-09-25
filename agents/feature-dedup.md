@@ -41,10 +41,19 @@ candidates du workspace, avec signature, doc et score) :
      qu'il faut étendre (dans `core` ou `design` s'il y est ; c'est dans `writes.extra`), pas un jumeau
      à créer. Précise l'extension à faire.
    - **`distinct`** — ressemblance de nom, responsabilités différentes. Une ligne de raison suffit.
-4. Regarde aussi les widgets de la cible qui n'ont **aucune** candidate : un composant de présentation
-   (bouton, carte, état vide, bandeau) sans candidate est suspect, parce que `design` nomme les siens
-   autrement. Cherche par rôle dans `features/design/lib/` (`grep -rniE 'empty|banner|card|chip'`).
-   Un équivalent trouvé → ajoute la paire toi-même, verdict `duplicate` ou `extend`.
+4. **Chaque widget contre le design system.** `dedup_candidates.json` contient aussi `widgets` (tous
+   les widgets publics de la présentation de la feature) et `design_catalog` (tous les composants
+   publics du package DS, avec signature et doc). Pour **chaque** widget de la feature, sans
+   exception, pas seulement ceux qui ont une candidate par nom :
+   - lis son `build()` : que rend-il ? (un bouton, une carte, un état vide, un bandeau, un champ,
+     une liste d'items, un en-tête de section…)
+   - parcours le catalogue par **rôle**, pas par nom — `HomeEmptyContent` ne s'appelle pas
+     `DesignEmptyState`, et c'est bien le problème.
+   - un composant du DS rend la même chose → `duplicate` ; il rend presque la même chose (il manque une
+     variante, un slot) → `extend`, et c'est le DS qu'on étend ; rien d'équivalent → `distinct` avec la
+     raison « composant métier, pas de générique dans le DS ».
+   Le grep `design_system` attrape `Colors.black26` ; toi tu attrapes le `Container` qui refait une
+   `DesignCard` avec les bons tokens. Ce sont les deux moitiés du même check.
 
 Sois exigeant : « c'est presque pareil mais pas tout à fait » est un `extend`, pas un `distinct`.
 Sois honnête : deux `toUiModel` sur deux entités différentes sont `distinct`, et tu le dis en une ligne.

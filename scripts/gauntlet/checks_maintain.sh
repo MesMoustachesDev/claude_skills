@@ -294,7 +294,8 @@ check_dedup_candidates() {
   local root; root="$(cfg features_root features)"
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
   run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
-    ${ignore:+--ignore-names "$ignore"} --candidates "$FEATURE_DIR/dedup_candidates.json"
+    ${ignore:+--ignore-names "$ignore"} --ds-package "$(cfg ds.package design)" \
+    --candidates "$FEATURE_DIR/dedup_candidates.json"
 }
 
 # ---------------------------------------------------------------------------

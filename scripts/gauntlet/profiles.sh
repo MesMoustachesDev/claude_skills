@@ -9,8 +9,10 @@ MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strin
 
 profile_checks() {
   case "$1" in
+    spec_review)  echo "spec_review_report" ;;
     contracts) echo "build_runner analyze deps stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
+    tests_review) echo "tests_review_report" ;;
     red)       echo "build_runner analyze red_check test_names" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict" ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
@@ -25,9 +27,11 @@ profile_checks() {
 profiles_list() {
   cat <<'EOF'
 Profils (étape → checks) :
+  spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
   contracts  build_runner analyze deps stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
   red        build_runner analyze red_check test_names
+  tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
   green      test analyze format no_stubs no_temp_markers deps test_freeze_check:strict
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
@@ -52,6 +56,8 @@ Checks individuels :
   mutation           mutation_test sur les globs configurés, score ≥ seuil
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
+  spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
+  tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
   qa                 flows Maestro sur chaque plateforme, captures
 
 Maintenabilité (checks_maintain.sh) :

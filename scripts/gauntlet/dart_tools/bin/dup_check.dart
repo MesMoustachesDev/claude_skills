@@ -78,7 +78,7 @@ String _stem(String t) {
 }
 
 void main(List<String> args) {
-  String? root, package, candidatesOut;
+  String? root, package, candidatesOut, dsPackage;
   var minTokens = 40;
   final ignore = <String>{};
   for (var i = 0; i < args.length; i++) {
@@ -93,6 +93,8 @@ void main(List<String> args) {
         ignore.addAll(args[++i].split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
       case '--candidates':
         candidatesOut = args[++i];
+      case '--ds-package':
+        dsPackage = args[++i];
     }
   }
   if (root == null || package == null) {
@@ -122,7 +124,7 @@ void main(List<String> args) {
   final others = decls.where((d) => !target.contains(d)).toList();
 
   if (candidatesOut != null) {
-    _writeCandidates(candidatesOut, target, others, ignore);
+    _writeCandidates(candidatesOut, target, others, ignore, dsPackage);
     return;
   }
 
@@ -179,7 +181,16 @@ final _archSuffix = RegExp(
 /// Candidats par ressemblance, pour l'agent feature-dedup. Score = somme des poids IDF des tokens de
 /// nom partagés (un token présent partout ne vaut rien, un token rare vaut beaucoup), +2 même type
 /// étendu, +1 même liste de types de paramètres. Même famille (type ↔ type, callable ↔ callable).
-void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<String> ignore) {
+final _widgetBase = RegExp(r'extends \w*(Widget|State<)');
+
+void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<String> ignore, String? dsPackage) {
+  // Catalogue du design system (tous ses widgets publics) et widgets de la feature : l'agent compare
+  // chaque widget au catalogue par rôle, indépendamment des noms — le grep design_system ne voit que
+  // les valeurs brutes, pas un Container qui refait une DesignCard avec les bons tokens.
+  final designCatalog = dsPackage == null
+      ? const <Decl>[]
+      : others.where((o) => o.pkg == dsPackage && o.isPublic && o.kind == 'classe' && _widgetBase.hasMatch(o.signature)).toList();
+  final widgets = target.where((d) => d.isPublic && d.kind == 'classe' && _widgetBase.hasMatch(d.signature) && d.file.contains('/presentation/')).toList();
   // Events et states de BLoC vivent sous /bloc/ : un jeu par feature, jamais des roues.
   bool reusable(Decl o) =>
       o.isPublic &&
@@ -228,8 +239,11 @@ void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<Stri
     'targets': entries.length,
     'pairs': pairs,
     'entries': entries,
+    'widgets': [for (final w in widgets) w.toJson()],
+    'design_catalog': [for (final c in designCatalog) c.toJson()],
   }));
-  stdout.writeln('   ${entries.length} déclaration(s) avec candidat(s), $pairs paire(s) à juger → $out');
+  stdout.writeln('   ${entries.length} déclaration(s) avec candidat(s), $pairs paire(s) à juger ; '
+      '${widgets.length} widget(s) à comparer au design system (${designCatalog.length} composants) → $out');
 }
 
 String _family(String kind) {

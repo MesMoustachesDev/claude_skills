@@ -73,6 +73,12 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 - Chaque package hébergé ajouté : justifié en §8, maintenu (date de release dans le log `pub_health`),
   pas de doublon avec ce que `core` exporte déjà (un second client HTTP, un second logger…).
 - Les contraintes de version ne verrouillent pas une majeure en retard sans raison écrite.
+- **Pour chaque package que `pub_health` signale** (FAIL ou WARN, ajouté ou préexistant), tu produis
+  une recommandation dans `review.json → dependencies` : l'alternative maintenue (vérifie-la sur
+  pub.dev — date de release, score, `isDiscontinued`), le volume de migration (`grep -rl` des imports
+  dans le workspace : combien de fichiers), le risque, et un verdict `replace | pin | watch`. Le script
+  sait dire « 58 mois sans release » ; toi tu sais dire « `dartz` → `fpdart`, 41 fichiers, API proche,
+  à planifier hors de cette feature ». C'est pour l'evidence, pas un gate.
 
 *Design system et localisation*
 - Les composants utilisés existent dans `design` — et ceux qui ont été **réécrits** alors qu'un
@@ -107,6 +113,7 @@ Pas de compliment.
   "critical":      [ { "file": "lib/src/...", "line": 42, "rule": "spec §7 | archi | deps | ds | pr_rules: <item> | universal: <catégorie>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "file": "...", "line": 0, "rule": "...", "summary": "...", "fix": "..." } ],
   "missing_tests": [ { "scenario": "texte du scénario ou du cas", "why": "aucun test ne couvre ..." } ],
+  "dependencies":  [ { "package": "dartz", "issue": "pas de release depuis 58 mois", "added_by_feature": false, "alternative": "fpdart 1.x (release 2026-08, score 150/160)", "files_impacted": 41, "risk": "API Either quasi identique, Option renommée", "verdict": "watch", "note": "à planifier hors de cette feature" } ],
   "rules_checked": {
     "pr_rules":        { "<item>": "ok|ko|na" },
     "universal":       { "<catégorie>": "ok|ko" },

@@ -75,6 +75,9 @@ pub.max_age_months = 24
 # Design system : préfixes d'import acceptés (une vue doit en importer un) et motifs interdits en présentation.
 # Les motifs sont des regex grep -E, séparés par des virgules (donc sans virgule dedans).
 ds.imports = package:design/, package:core/design.dart
+# Package du design system (dossier sous features_root) : son catalogue de widgets est extrait pour
+# que l'agent feature-dedup compare chaque widget de la feature aux composants existants.
+ds.package = design
 ds.forbidden = Colors\.[a-z], TextStyle\(, Color\(0x, fontSize:, EdgeInsets\.(all|symmetric|only)\([0-9], SizedBox\((height|width): [0-9], BorderRadius\.circular\([0-9]
 # Globs (relatifs au package) exemptés des checks design_system / l10n_strings.
 ds.exempt =
