@@ -26,7 +26,7 @@ qa_prepare_android() { # → QA_DEVICE
   adb -s "$serial" shell settings put global animator_duration_scale 0 >/dev/null 2>&1
   info "build android : $(cfg android.build)"
   # shellcheck disable=SC2086
-  (cd "$PROJECT_ROOT" && $(cfg android.build) >"$GAUNTLET_OUT/build_android.log" 2>&1) || { ko "build android échoué (voir .gauntlet/build_android.log)"; tail -20 "$GAUNTLET_OUT/build_android.log"; return 1; }
+  (cd "$PROJECT_ROOT/$(cfg app_dir .)" && $(cfg android.build) >"$GAUNTLET_OUT/build_android.log" 2>&1) || { ko "build android échoué (voir .gauntlet/build_android.log)"; tail -20 "$GAUNTLET_OUT/build_android.log"; return 1; }
   apk="$PROJECT_ROOT/$(cfg android.apk)"
   [ -f "$apk" ] || { ko "APK introuvable : $apk"; return 1; }
   adb -s "$serial" install -r -d "$apk" >/dev/null 2>&1 || { ko "adb install échoué"; return 1; }
@@ -43,7 +43,7 @@ qa_prepare_ios() { # → QA_DEVICE
   wait_until 120 sh -c "xcrun simctl list devices -j | jq -e '.devices[][] | select(.udid==\"$udid\" and .state==\"Booted\")'" || { ko "le simulateur n'a pas booté"; return 1; }
   info "build ios : $(cfg ios.build)"
   # shellcheck disable=SC2086
-  (cd "$PROJECT_ROOT" && $(cfg ios.build) >"$GAUNTLET_OUT/build_ios.log" 2>&1) || { ko "build ios échoué (voir .gauntlet/build_ios.log)"; tail -20 "$GAUNTLET_OUT/build_ios.log"; return 1; }
+  (cd "$PROJECT_ROOT/$(cfg app_dir .)" && $(cfg ios.build) >"$GAUNTLET_OUT/build_ios.log" 2>&1) || { ko "build ios échoué (voir .gauntlet/build_ios.log)"; tail -20 "$GAUNTLET_OUT/build_ios.log"; return 1; }
   app="$PROJECT_ROOT/$(cfg ios.app)"
   [ -d "$app" ] || { ko ".app introuvable : $app"; return 1; }
   xcrun simctl install "$udid" "$app" || { ko "simctl install échoué"; return 1; }

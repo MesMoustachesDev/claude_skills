@@ -111,6 +111,8 @@ pr.copy_untracked =
 # ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)
 # ---------------------------------------------------------------------------
+# Dossier de l'app Flutter, relatif à la racine du repo : les builds QA y sont lancés.
+app_dir = .
 qa.platforms = android, ios
 android.avd = Pixel_6
 android.serial = emulator-5554
