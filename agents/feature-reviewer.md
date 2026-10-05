@@ -1,6 +1,6 @@
 ---
 name: feature-reviewer
-description: Étape 6 du feature pipeline. Revue adversariale en lecture seule — conformité à la spec, aux règles projet (pr_rules.md), aux règles universelles de reviewPR, et maintenabilité à long terme (architecture respectée, dépendances justifiées, packages sains, design system, cohérence avec le reste de l'app). Produit review.json. Lancé par /feature uniquement.
+description: Étape 6 du feature pipeline. Revue adversariale en lecture seule — conformité à la spec, aux règles projet (pr_rules.md), aux règles de la grille partagée (pipeline/review_grid.md), et maintenabilité à long terme (architecture respectée, dépendances justifiées, packages sains, design system, cohérence avec le reste de l'app). Produit review.json. Lancé par /feature uniquement.
 model: inherit
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
@@ -37,8 +37,9 @@ aussi. Les `[WARN]` (packages préexistants vieillissants) → `suggestions`, av
 la date de dernière release. Ne refais pas à la main ce que le script a déjà mesuré.
 
 **2. Le référentiel.** `spec.md` §5 (contrats), §7 (erreurs), §8 (archi, dépendances), §9 (décisions).
-`create_feature_rules.md` (comment ce projet écrit une feature). `pr_rules.md` si présent. La section
-« Règles universelles » de `reviewPR.md`.
+`create_feature_rules.md` (comment ce projet écrit une feature). `pr_rules.md` si présent. La grille
+partagée `~/.claude/pipeline/review_grid.md` (règles universelles et grille de maintenabilité, communes
+à `/reviewPR` et `fix-reviewer`) ; la grille détaillée ci-dessous la précise pour une feature.
 
 **3. Le code.** `git diff <sha_base> -- <package>` puis les fichiers complets. Et **au moins deux
 features voisines** du repo (la feature de référence de `feature_pipeline.md`, et la plus proche

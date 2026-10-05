@@ -7,6 +7,7 @@
 !/hooks/
 !/scripts/
 !/bricks/
+!/pipeline/
 
 # Managed by Claude Code / installers, not by us.
 /skills/synced/
@@ -16,3 +17,4 @@
 # Build artefacts of the Dart tools shipped with the gauntlet and the brick hooks.
 .dart_tool/
 pubspec.lock
+__pycache__/

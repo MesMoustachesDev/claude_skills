@@ -10,6 +10,10 @@ que tu lises une ligne. Tu ne refais pas ces mesures ; tu lis leur rapport, et t
 lecture à ce qu'aucun script ne voit : la logique, l'architecture, la cohérence avec le reste de
 l'app, la roue réinventée par la responsabilité, la lisibilité dans six mois.
 
+Corollaire : **tu poses le contexte avant de juger, et tu le partages avant de demander quoi que ce
+soit.** Le pourquoi de la MR (étape 4) et le briefing (étape 7) ne sont pas de la politesse : sans
+eux, tes remarques ne sont pas vérifiables et l'utilisateur ne peut pas les arbitrer.
+
 ## Étape 1 — Résoudre la cible
 
 La cible est : **$ARGUMENTS** — une branche, une MR GitLab (`!218`), une PR GitHub (`#42`) ou une URL.
@@ -64,7 +68,49 @@ git log <remote>/<cible>..<remote>/<source> --oneline           # commits de la 
 Si la branche source n'existe qu'en local : remplace `<remote>/<source>` par `<source>`.
 Ne compare jamais à la branche courante du repo : c'est la cible de la MR qui compte.
 
-## Étape 4 — Charger les règles projet
+## Étape 4 — Reconstituer le contexte : le *pourquoi* avant le *comment*
+
+Un diff dit ce qui change, jamais pourquoi. Avant d'analyser quoi que ce soit, va chercher
+l'intention. Une remarque de review sans le pourquoi est une remarque qu'on ne peut pas valider.
+
+**a. L'intention déclarée** — lis la description de la MR, pas seulement ses branches :
+
+```bash
+glab mr view <id> --output json | jq -r '.title, .description, .author.username, (.labels // [] | join(", "))'
+gh pr view <n> --json title,body,author,labels                              # GitHub
+```
+
+Cherche dans la description **et dans le nom de branche** une référence de ticket (JIRA, issue,
+`#123`). Si tu la trouves et qu'un outil permet de l'ouvrir, ouvre-la. Si la description est vide,
+dis-le explicitement dans le briefing : c'est en soi une remarque de review.
+
+**b. L'intention réelle** — les commits racontent souvent mieux que la description :
+
+```bash
+git log <remote>/<cible>..<remote>/<source> --stat
+```
+
+**c. Ce qui existait déjà vs ce que la MR crée vraiment.** C'est l'étape qu'on saute et qui fait
+dire des bêtises. Une MR qui « ajoute une feature » ne fait parfois que câbler une infra déjà
+présente sur la cible. Pour chaque symbole nouveau qui compte (entity, modèle, clé l10n, constante,
+provider, route), vérifie s'il existait **sur la branche cible** :
+
+```bash
+git grep -n "<Symbole>" <remote>/<cible> -- '<glob>'      # existait déjà sur la cible ?
+git grep -n "<Symbole>" <remote>/<source> -- '<glob>'     # vs état sur la branche de la MR
+```
+
+Ça change tout au verdict : un `availableLevel` figé à `Unknown()` est une étourderie si le modèle
+expose déjà `is_reachable`, et une contrainte backend si le champ n'existe pas. Ne tranche jamais
+sans avoir regardé.
+
+**d. Le voisin de référence.** Cette MR ajoute-t-elle un n-ième cas à un pattern existant ? Ouvre le
+cas le plus proche déjà en place (le type d'équipement précédent, la feature sœur) et lis-le en
+entier. C'est ton étalon : ce qui s'en écarte est suspect, ce qui le recopie fidèlement est
+« conforme au voisinage » même si le pattern lui-même est discutable, et cette nuance doit apparaître
+dans tes remarques.
+
+## Étape 5 — Charger les règles projet
 
 Vérifie si un fichier `pr_rules.md` existe dans `.claude/rules/` à la racine du repo Git :
 
@@ -76,7 +122,7 @@ Si le fichier existe, ces règles ont **priorité absolue** sur tes règles gén
 être vérifiées explicitement. Lis aussi `.claude/rules/create_feature_rules.md` s'il existe : c'est
 la définition de « comment on écrit une feature ici », et la cohérence avec elle est un critère.
 
-## Étape 5 — Analyser
+## Étape 6 — Analyser
 
 Analyse le diff en tenant compte :
 
@@ -87,77 +133,83 @@ Analyse le diff en tenant compte :
 3. **Des règles de bon sens universelles** listées ci-dessous
 4. **De la grille de maintenabilité** — ce que les scripts ne voient pas
 
-### Règles universelles
+Les règles universelles et la grille de maintenabilité vivent dans `~/.claude/pipeline/review_grid.md`
+(partagé avec `feature-reviewer` et `fix-reviewer`). Lis-le maintenant et applique-le en entier.
 
-**Qualité du code**
-- Logique incorrecte ou cas limites non gérés
-- Code mort ou commenté sans justification
-- Duplication évitable (DRY)
-- Complexité cyclomatique excessive (fonctions > 30 lignes qui gagneraient à être découpées)
-- Magic numbers / strings sans constante nommée
+## Étape 7 — Le briefing, avant toute question
 
-**Sécurité**
-- Données sensibles hardcodées (clés API, mots de passe, tokens)
-- Injection potentielle (SQL, commandes shell, etc.)
-- Inputs non validés / non sanitizés
-- Permissions trop larges
+**Obligatoire, et avant le premier `AskUserQuestion`.** Tu ne demandes jamais « on commente ou on
+skip ? » sur un point sans avoir d'abord posé le décor : sans le pourquoi et la carte du changement,
+l'utilisateur arbitre à l'aveugle.
 
-**Performance**
-- Requêtes ou opérations lourdes dans des boucles
-- Allocations mémoire inutiles ou fréquentes
-- Appels réseau bloquants sur le thread principal (mobile)
+Le briefing tient en un écran. Il ne contient **aucun verdict** et **aucune remarque** : c'est du
+contexte, pas de la review. Il comprend :
 
-**Maintenabilité**
-- Nommage ambigu ou trompeur
-- Absence de documentation sur les choix non évidents
-- Tests manquants pour de la logique métier critique
-- Dépendances introduites sans justification
+**1. Pourquoi cette MR** — titre, auteur, ticket lié, et le besoin en une ou deux phrases tiré de la
+description (étape 4a). Si la description est vide, écris-le noir sur blanc.
 
-**Spécifique mobile (Flutter / Android / Kotlin / Wear OS)**
-- Gestion du cycle de vie (leaks, états non sauvegardés)
-- Recompositions/rebuilds inutiles (Compose / Flutter)
-- Permissions non justifiées dans le manifest
-- Absence de gestion offline ou d'état de chargement
+**2. Résumé technique** — 3 à 5 lignes : ce que le code fait concrètement, pas ce que la description
+promet. Et surtout la distinction de l'étape 4c : **ce qui existait déjà sur la cible vs ce que la MR
+ajoute réellement**.
 
-### Grille de maintenabilité (jugement, pas mesure)
+**3. L'arbre du changement** — les fichiers groupés par couche, une ligne de rôle chacun, avec le
+volume. Les fichiers purement mécaniques (reformatage, regénération) sont marqués comme tels pour
+qu'on sache où ne pas chercher :
 
-Pour chaque package touché, tranche explicitement `ok` / `ko` :
+```
+data/       not_reachable_device_data_source.dart   +33/-2    query GraphQL `esls`
+            not_reachable_device_repository.dart    +31/-3    mapping Esl -> EslEntity
+domain/     not_reachable_device_repository.dart     +1/-0    enum DeviceType.esl
+presentation/
+            not_reachable_device_notifier.dart      +20/-1    titre, icône, auto-sélection d'onglet
+            not_reachable_device_page.dart          +31/-3    providers + onglet ESL
+            home_tab_page.dart                      +13/-1    callback onEslMetricsTapped
+            device_details_page.dart                +91/-115  ⚠ 1 ligne ESL, le reste = reformat
+routing/    router.dart, routes.dart                +31/-2    route esl_metrics
+```
 
-- **Architecture** : les couches de `create_feature_rules.md` sont respectées ; aucune logique métier
-  dans un widget ; aucun `DataModel` en présentation ; les `Either` sont dépliés dans le BLoC, pas
-  ailleurs ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
-- **Roue réinventée par la responsabilité** : ouvre `dedup_candidates.json`. Pour chaque paire
-  (déclaration nouvelle ↔ candidate existante) : lis les deux corps et tranche — doublon (utiliser
-  l'existant), à étendre (l'existant fait 80 %, on l'étend, on ne crée pas un jumeau), distinct. Pour
-  chaque widget nouveau, parcours `design_catalog` **par rôle** (bouton, carte, état vide, bandeau,
-  champ) : un composant du DS qui rend la même chose est un problème critique. Les scripts ont attrapé
-  les doublons par nom et par corps ; toi tu attrapes `SearchBarTextField` qui refait
-  `DesignTextField`.
-- **Dépendances** : chaque inter-features est nécessaire (pourrait passer par `core` ?) ; chaque
-  package hébergé ajouté est justifié et maintenu (le rapport `pub_health` donne la date de release) ;
-  pas de doublon avec ce que `core` exporte (second client HTTP, second logger). Pour chaque package
-  que `pub_health` signale, propose : alternative (vérifie-la sur pub.dev), fichiers impactés
-  (`grep -rl`), risque, verdict `replace | pin | watch`.
-- **Design system et l10n** : au-delà des valeurs brutes (script), les états d'écran utilisent les
-  composants d'état du DS ; les clés l10n sont nommées comme les voisines ; pas de concaténation de
-  chaînes traduites.
-- **Cohérence** : nommage, suffixes, verbes d'events, gestion d'erreur homogènes avec deux features
-  voisines que tu ouvres (la feature de référence de `feature_pipeline.md`, et la plus proche).
-- **Lisibilité à froid** : un point que toi, sans contexte, tu n'as compris qu'en lisant deux fois
-  → finding. Le barrel se comprend sans ouvrir `src/`. Le README du package est encore vrai.
-- **Tests** : pour chaque comportement ajouté dans `lib/`, un test nommé le prouve ; les assertions
-  vérifient le contenu, pas le type ; pas de `verify()` d'un appel interne hors side-effect.
+**4. Le flux** — un graphe du chemin que parcourt la donnée ou l'utilisateur à travers ce que la MR
+touche. C'est ce qui rend une remarque vérifiable : on voit où la valeur naît et où elle est
+consommée. Mermaid si le rendu le permet, ASCII sinon :
 
-## Étape 6 — Produire la revue
+```
+GraphQL esls { }           <- _getEslsQuery : demande-t-elle tous les champs utiles ?
+   -> Esl (freezed)
+   -> Esl.toEntity()       <- availableLevel figé ici
+   -> EslEntity
+   -> NotReachableDeviceNotifier
+   -> groupBy(device.availableLevel) + filtre de statut   <- consommé ici
+        ||
+   dashboard : eslMetricsReport.deviceUnreachableQuantity  <- autre source, peut diverger
+```
 
-Formate la revue ainsi :
+Quand deux chemins alimentent le même écran depuis des sources différentes, montre-les côte à côte :
+c'est là que se logent les incohérences visibles par l'utilisateur.
+
+**5. Verdict gauntlet** — les `[OK]` / `[WARN]` / `[FAIL]` bruts, et surtout **ce qui n'a pas pu
+tourner**. Si le SDK manque ou qu'un check a été sauté, dis lesquels et ce que ça implique : tout ce
+qui suit vient alors de ta lecture, pas d'une mesure. Ne laisse jamais croire qu'une chose a été
+vérifiée quand elle ne l'a pas été.
+
+Puis, et seulement puis, annonce le nombre de points d'attention et enchaîne sur le triage.
+
+## Étape 8 — Produire la revue
+
+**Si `.claude/rules/pr_rules.md` impose un workflow de review (triage puis validation des
+commentaires), il gagne : tu ne balances pas la revue complète d'un coup.** Le briefing de l'étape 7
+remplace la section Résumé, tu enchaînes sur le triage point par point, et tu gardes le format
+ci-dessous pour la **synthèse finale, après les commentaires postés** : elle récapitule ce qui a été
+commenté, ce qui a été écarté au triage et pourquoi, et le verdict.
+
+Sinon, formate la revue ainsi :
 
 ---
 
 ## 🔍 Code Review — `$ARGUMENTS`
 
 ### Résumé
-_En 2-3 phrases : ce que fait cette PR, le périmètre des changements, les packages touchés._
+_Le briefing de l'étape 7 : pourquoi cette MR (ticket, besoin), résumé technique, ce qui existait
+déjà vs ce qui est nouveau, l'arbre du changement, le graphe du flux._
 
 ### 📋 Gauntlet
 _Le verdict des scripts, tel quel : par package, la liste des checks ✓/✗, les lignes en cause. Puis
