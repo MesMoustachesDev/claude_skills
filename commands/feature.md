@@ -90,7 +90,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | 6 | review | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) |
 | 7 | harden | `feature-hardener` | `harden` | **oui** : mutants expliqués |
 | 8 | qa | `feature-qa` | `qa` | **oui** : captures |
-| 9 | evidence | toi | — | puis `/create_commits` et `/create_mr` |
+| 9 | evidence | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` |
 
 ---
 
@@ -335,6 +335,26 @@ Validation → `human_gates.qa`.
 
 ### 9. Evidence, commits, MR
 
+**9a. Graphe graphify (seulement si le projet en a un).** Cherche un `graphify-out/graph.json` dans le
+checkout principal (`git worktree list --porcelain` → premier `worktree`), à la racine ou un niveau
+en dessous. Absent → saute 9a, et pas de section « Impact » dans l'evidence. Présent :
+1. Dans le worktree, garantis que `graphify-out/` est ignoré : `git check-ignore -q graphify-out/x`,
+   sinon ajoute `graphify-out/` à `$(git rev-parse --git-common-dir)/info/exclude` (jamais au
+   `.gitignore` versionné depuis le pipeline). `create_commits` ne doit jamais l'embarquer.
+2. Copie le dossier `graphify-out/` du checkout principal au même chemin relatif dans le worktree.
+   Copie aussi le `graphify-out/cache/` qui se trouve sous la racine de scan, s'il existe.
+3. Racine de scan : le contenu de `graphify-out/.graphify_root`, avec le préfixe du checkout
+   principal remplacé par celui du worktree. Puis, depuis le dossier qui contient `graphify-out/` :
+   `graphify update <racine de scan du worktree>`. C'est de l'AST seul, sans LLM et sans coût. Échec → note-le dans
+   l'evidence et continue : graphify ne bloque jamais la livraison.
+4. **Impact** : dans `graph.json`, prends les nœuds dont le `source_file` est dans
+   `git diff --name-only <base>...HEAD`. Puis leurs voisins directs situés dans **un autre package**. Liste
+   ces packages et les symboles par lesquels ils sont touchés : ce sont les consommateurs que la MR
+   peut casser. Ignore les nœuds génériques (types du SDK, `_`, imports de `package:core/*`).
+
+Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîchira avec
+`/graphify <racine> --update` après le merge.
+
 Écris `.claude/features/<nom>/evidence.md` — la page que l'humain lit à la place du code :
 
 ```
@@ -357,6 +377,9 @@ Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <l
 Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par l'humain (<raisons>)   ← dedup.json
 Widgets vs design system : <n> comparés, <n> remplacés, <n> extensions du DS                              ← dedup.json
 Exemptions gauntlet-ignore : <n> (<où>)
+
+## Impact (graphify)                  ← 9a, seulement si le projet a un graphe
+| Package consommateur | Symboles touchés |
 
 ## Dépendances à traiter hors feature   ← review.json → dependencies
 | Package | Problème | Alternative | Fichiers | Risque | Verdict |
