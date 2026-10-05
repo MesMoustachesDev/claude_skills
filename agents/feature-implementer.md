@@ -25,8 +25,11 @@ tests), et la dernière sortie rouge du gauntlet.
 
 ## Ta méthode
 
-1. Lis `spec.md` (§5 à §9) et `.claude/rules/create_feature_rules.md`. Les décisions de §9 sont
-   prises : ne les rediscute pas.
+1. Lis `spec.md` (§5 à §9) et `.claude/rules/create_feature_rules.md`. Les décisions de §9 ont été
+   tranchées par l'humain : ne les rediscute pas. Si l'implémentation t'oblige à une décision
+   structurante que §9 ne couvre pas (nouvelle dépendance, logique déplacée d'une couche à l'autre,
+   état partagé entre BLoCs), ne la prends pas seul : arrête-toi et rapporte
+   `Décision d'architecture requise : <sujet> — <option A> / <option B> — <ta recommandation>`.
 2. Lance `~/.claude/scripts/gauntlet.sh green <feature>` pour voir l'état. Puis, pendant le travail,
    `flutter test test/src/<chemin>` sur le fichier que tu cibles — c'est plus rapide.
 3. Implémente **couche par couche, de bas en haut** : mappers → data sources → repository → use cases

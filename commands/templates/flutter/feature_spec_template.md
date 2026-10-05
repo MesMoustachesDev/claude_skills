@@ -1,9 +1,9 @@
 # Spec — {feature_name}
 
 <!--
-  Ce document est écrit par l'agent feature-specifier et validé par un humain.
-  C'est le seul gate humain obligatoire du pipeline : tout ce qui suit (contrats,
-  tests, implémentation, QA) en découle sans autre intervention.
+  Ce document est écrit par l'agent feature-specifier et validé par un humain, en deux temps :
+  d'abord chaque décision d'architecture de la section 9 (une par une), puis la spec entière.
+  Tout ce qui suit (contrats, tests, implémentation, QA) en découle.
 
   Règles d'écriture :
   - Les sections 4 à 8 sont CONSOMMÉES PAR DES AGENTS ET DES SCRIPTS. Elles doivent
@@ -262,13 +262,67 @@ N/A
 - **Events analytics** (`package:core/analytics.dart`) : 
 - **Services existants réutilisés** (ne pas réinventer) : 
 
-## 9. Décisions & alternatives rejetées
+<!--
+  Trois diagrammes Mermaid, rendus dans le rapport HTML que l'humain lit pour trancher l'archi.
+  Ils nomment les VRAIES classes de la section 5. Le rapport les comparera au code scaffoldé.
+-->
 
-<!-- Pour que le cleaner et l'implementer ne re-décident pas. Une ligne par décision : choix, alternative, raison. -->
+**Dépendances du package**
 
-| Décision | Alternative rejetée | Raison |
-|---|---|---|
-| | | |
+```mermaid
+flowchart LR
+  feature["{feature_name}"] --> core
+  feature --> l10n
+  feature --> design
+```
+
+**Flux de données**
+
+```mermaid
+flowchart LR
+  subgraph presentation
+    Page["{Name}Page"] --> Bloc["{Name}Bloc"]
+  end
+  subgraph domain
+    UC["Fetch{Name}UseCase"] --> Repo["«interface» {Name}Repository"]
+  end
+  subgraph data
+    RepoImpl["{Name}RepositoryImpl"] --> Remote["{Name}RemoteDataSourceImpl"]
+  end
+  Bloc --> UC
+  RepoImpl -. implements .-> Repo
+```
+
+**États du BLoC** (un diagramme par BLoC)
+
+```mermaid
+stateDiagram-v2
+  [*] --> Initial
+  Initial --> Loading: Load{Name}
+  Loading --> Loaded: Right(entity)
+  Loading --> Empty: NotFound
+  Loading --> Error: Left(error)
+  Error --> Loading: Retry
+```
+
+## 9. Décisions d'architecture
+
+<!--
+  Le specifier PROPOSE, l'humain TRANCHE. Chaque ligne devient une question posée à l'humain
+  (option recommandée = la décision proposée, option 2 = l'alternative). Format parsé par le
+  rapport HTML et l'orchestrateur : ne pas changer les colonnes.
+
+  - ID stable (A1, A2…), jamais renuméroté.
+  - Alternative RÉELLE : une option défendable, avec ce qu'elle changerait.
+  - Statut : proposée (specifier) → validée | modifiée (écrit après la décision de l'humain).
+  - Uniquement les décisions structurantes (package, data sources, Stream/Future, découpage
+    des BLoCs, dépendances, emplacement d'une logique ambiguë, écart à un pattern du repo).
+  Pour que le cleaner et l'implementer ne re-décident pas.
+-->
+
+| ID | Sujet | Décision proposée | Alternative | Raison | Statut |
+|---|---|---|---|---|---|
+| A1 | Package | | | | proposée |
 
 ## 10. Questions ouvertes
 

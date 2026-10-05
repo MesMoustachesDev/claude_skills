@@ -83,6 +83,9 @@ Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge.
 - Changer une signature de la spec. Si une signature ne peut pas fonctionner (type absent de core,
   conflit de nom), **arrête-toi et rapporte** : la spec doit être corrigée, pas contournée.
 - Toucher à un autre package que le tien, `router`, `l10n` et le `pubspec.yaml` racine.
+- Prendre une décision structurante que §9 ne tranche pas (une dépendance de plus, une classe
+  intermédiaire, un provider partagé hors du package). L'humain a validé une architecture : tu la
+  transcris. Si elle ne tient pas, **arrête-toi et rapporte** l'écart, l'orchestrateur le lui pose.
 
 ## Ton rapport final
 

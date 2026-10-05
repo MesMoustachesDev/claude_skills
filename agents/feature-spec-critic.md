@@ -39,7 +39,13 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
 - §6 : un payload d'exemple par `DataModel` de §5, tous les champs, et la table de mapping couvre
   chaque champ de l'entity.
 - §8 : chaque dépendance inter-features nommée ; chaque route, clé l10n, event analytics de §3-§4 listé.
-- §9 : chaque décision technique visible dans §5-§8 y est justifiée. §10 vide.
+- §8 : les trois diagrammes Mermaid sont présents et nomment les classes de §5 (pas de boîte
+  générique, pas de classe absente de §5, pas de flèche qui contredit la direction des couches).
+- §9 : chaque décision structurante visible dans §5-§8 (package, data sources, Stream/Future,
+  découpage des BLoCs, dépendance, logique à cheval sur deux couches) y a une ligne au format
+  `ID | Sujet | Décision proposée | Alternative | Raison | Statut`. Une alternative-épouvantail
+  (indéfendable, ou identique à la décision reformulée) est un bloquant : l'humain doit pouvoir
+  vraiment choisir. §10 vide.
 
 *Ambiguïté* — le test de la double lecture : pour chaque phrase de §3, §4, §7, existe-t-il deux
 implémentations raisonnables qui la satisfont toutes les deux ? (« affiche une erreur » — laquelle,

@@ -1,7 +1,7 @@
 # Feature Pipeline — orchestrateur
 
 Tu orchestres le pipeline de livraison d'une feature : une chaîne de sous-agents à contexte vierge,
-un gauntlet de scripts entre chaque, et quatre arrêts humains. **Tu n'écris aucun code toi-même.**
+un gauntlet de scripts entre chaque, et cinq arrêts humains. **Tu n'écris aucun code toi-même.**
 Ton rôle est de lancer le bon agent avec le bon contexte, lire les verdicts des scripts, et parler
 à l'humain uniquement aux gates prévus ou quand une étape est en échec définitif.
 
@@ -56,7 +56,8 @@ Affiche le bloc d'usage ci-dessus, puis ces exemples, tels quels :
 ~/.claude/scripts/gauntlet.sh maintain category
 ```
 
-Puis rappelle en trois lignes : les quatre arrêts humains (spec, tests, mutants, captures), que rien
+Puis rappelle en trois lignes : les cinq arrêts humains (architecture + spec, contrats, tests, mutants,
+captures), chacun avec un rapport HTML, que rien
 n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
 
 ---
@@ -66,6 +67,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | Quoi | Où |
 |---|---|
 | Gauntlet | `~/.claude/scripts/gauntlet.sh <profil> <nom>` — `doctor`, `list` |
+| Rapport humain | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
 | Config projet | `.claude/rules/feature_pipeline.md` (template : `~/.claude/commands/templates/flutter/feature_pipeline.md`) |
 | Règles de code | `.claude/rules/create_feature_rules.md` (template : `~/.claude/commands/templates/flutter/create_feature_rules.md`) |
 | Template de spec | `~/.claude/commands/templates/flutter/feature_spec_template.md` |
@@ -77,9 +79,9 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | # | Étape | Agent (`subagent_type`) | Gate | Arrêt humain après |
 |---|---|---|---|---|
 | 1 | spec | `feature-specifier` | — | non |
-| 1b | critique | `feature-spec-critic` | `spec_review_verdict` | **oui** : validation de la spec (boucle vers 1 avant) |
+| 1b | critique | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
 | 2 | contracts | `feature-architect` | `contracts` | non |
-| 2b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 2 si doublons) |
+| 2b | dedup | `feature-dedup` | `dedup_verdict` | **oui** : architecture réelle (code scaffoldé) vs architecture validée |
 | 3 | tests | `feature-test-writer` | `red` | non |
 | 3b | revue des tests | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) |
 | 4 | impl | `feature-implementer` | `green` | non |
@@ -115,7 +117,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
    `brick = global`. Dans les deux cas : `mason add -g <nom> --path <chemin>` si `mason` est installé.
    S'il ne l'est pas, donne la commande `dart pub global activate mason_cli` et continue : l'architect
    sait scaffolder à la main.
-5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/` et `.claude/features/.current`
+5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html` et `.claude/features/.current`
    s'ils n'y sont pas.
 6. `gauntlet.sh doctor` à nouveau. Tant qu'il est rouge, corrige ou demande. Résume ce qui a été créé.
 
@@ -160,7 +162,8 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 ### 1. Spec — `feature-specifier`
 
 Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), racine, chemin de sortie,
-et la phrase : « L'humain validera ta spec ; il ne veut pas être interrompu pour des choix techniques. »
+et la phrase : « Tu proposes l'architecture, l'humain la tranche : chaque décision structurante va en §9
+avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
 
 ### 1b. Critique — `feature-spec-critic`
 
@@ -169,10 +172,30 @@ Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier*
 `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
 `loops.spec`, max 2, puis tu montres les bloquants restants à l'humain avec la spec.
 
-Vert → **Arrêt humain 1.** Présente en 10 lignes max : objectif, périmètre, nombre de scénarios,
-décisions techniques prises (§9), points signalés par le specifier, notes non bloquantes du critique.
+Vert → **Arrêt humain 1 : architecture, puis spec.** L'humain garde la main sur l'archi : rien
+n'est scaffoldé tant qu'il n'a pas tranché chaque décision.
+
+**1a. Architecture.** `gauntlet.sh report <nom> spec`, puis `SendUserFile` du `report.html`
+(`display: render`, légende « décisions d'architecture à trancher »). Le rapport montre les cartes §9
+et les diagrammes §8. Puis `AskUserQuestion`, **une question par ligne de §9 au statut `proposée`**
+(par paquets de 4 questions max par appel) :
+- `header` : l'ID et le sujet (`A1 Package`) ; `question` : la décision en une phrase et son enjeu ;
+- option 1 : la décision proposée, suffixée « (Recommandé) », avec la raison en description ;
+- option 2 : l'alternative de §9, avec ce qu'elle changerait concrètement en description ;
+- « Other » reste ouvert pour une troisième voie.
+
+Toutes acceptées → passe la colonne Statut de ces lignes à `validée` (édition de `spec.md`, seule
+écriture que tu fais dans la spec avec l'en-tête). Au moins une changée → relance le **specifier** avec
+la spec existante et les décisions imposées (« A2 : <choix de l'humain> — statut `modifiée`, répercute
+sur §5, §6, §8 et les scénarios concernés ; ne touche pas aux autres décisions »), puis 1b, puis 1a à
+nouveau **pour les seules lignes encore `proposée`** (une décision tranchée ne se repose pas).
+`human_gates.architecture = {at, by: "user", decisions: {"A1": "validée", "A2": "modifiée"}}`.
+
+**1b. Spec.** En 10 lignes max : objectif, périmètre, nombre de scénarios, points signalés par le
+specifier, notes non bloquantes du critique. Le rapport est déjà ouvert : renvoie à ses sections
+« Spec » et « Tests » plutôt que de les recopier.
 Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance
-le specifier avec la spec existante + le retour, puis 1b, autant de fois que nécessaire).
+le specifier avec la spec existante + le retour, puis 1b ; repasse par 1a si §9 a bougé).
 Validation → `human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon »
 par « validée le <date> » dans l'en-tête de la spec.
 
@@ -201,6 +224,22 @@ Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
    un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
    raison, et le verdict repasse au vert. L'exemption apparaîtra dans l'evidence.
 
+### 2c. Arrêt humain 2 : architecture réelle
+
+L'architecture existe maintenant en code. `gauntlet.sh report <nom> contracts`, puis `SendUserFile` du
+`report.html` (`display: render`). La section « Architecture réelle » est générée depuis le package :
+diagramme des classes par couche (ajoutées en bleu, existantes en gris), dépendances du pubspec,
+providers, et les **écarts** avec la spec validée (contrat de §5 absent du code, dépendance du pubspec
+non nommée en §8, classe domain/presentation hors §5).
+
+En 5 lignes : le nombre de classes par couche, les dépendances inter-features, les écarts (tous, un
+par ligne). `AskUserQuestion` : « Valider l'architecture » / « Corriger : … » (texte libre).
+- Correction qui reste dans la spec validée (nommage, découpage, placement) → relance l'**architect**
+  avec le retour, puis 2b et 2c à nouveau.
+- Correction qui change une décision de §9 ou un contrat de §5 → retour au **specifier** (décision
+  imposée, statut `modifiée`), 1b, 1a pour cette ligne seulement, puis 2 depuis le début.
+Validation → `human_gates.contracts = {at, by: "user"}`.
+
 Puis commit : `git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold and contracts"`.
 
 ### 3. Tests — `feature-test-writer`
@@ -216,7 +255,9 @@ Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writ
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
 `gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis arrêt humain avec les bloquants restants.
 
-Vert → **Arrêt humain 2.** Montre `.claude/features/<nom>/tests.md` (le fichier entier : c'est
+Vert → **Arrêt humain 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
+(`display: render`) : matrice scénarios §4 × `.feature`, inventaire des tests par fichier. Puis montre
+`.claude/features/<nom>/tests.md` (le fichier entier : c'est
 court et c'est fait pour être lu), la table de couverture de `tests_review.md`, les tests « passe
 déjà » avec la justification de l'agent, et les contrats manquants s'il y en a. `AskUserQuestion` :
 « Valider les tests » / « Il manque des scénarios » (texte libre → relance le test-writer avec le
@@ -238,8 +279,11 @@ Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntl
   tests suspects), les 40 dernières lignes du log, et propose : relancer l'implementer avec une
   consigne / corriger un test suspect (toi, sur instruction explicite de l'humain, **et tu re-gèles** :
   nouveau commit, nouveau `tests_freeze_sha`) / revenir à la spec.
+- Le rapport contient `Décision d'architecture requise` → **arrêt humain hors plan**, comme en 1a :
+  rapport HTML, une question avec les deux options. La réponse va en §9 (nouvelle ligne, statut
+  `validée` ou `modifiée`), puis `SendMessage` à l'implementer avec la décision.
 - Le rapport liste des « tests suspects » alors que le gate est vert → transmets-les tel quel à
-  l'arrêt humain 3, ne bloque pas.
+  l'arrêt humain 4, ne bloque pas.
 
 ### 5. Nettoyage — `feature-cleaner`
 
@@ -272,7 +316,8 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
 ### 7. Durcissement — `feature-hardener`
 
 Prompt : nom, package, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
-`stages.harden = PASSED` → **arrêt humain 3.** Montre `mutants.md` en entier, le score, le nombre de
+`stages.harden = PASSED` → **arrêt humain 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
+(`display: render`). Montre `mutants.md` en entier, le score, le nombre de
 tests ajoutés, les tests existants signalés suspects (4 et 7), et `review.json → suggestions` en
 résumé. `AskUserQuestion` : « Valider » / « Ces explications ne tiennent pas : … » (texte libre →
 relance le hardener avec le retour). Validation → `human_gates.mutants`.
@@ -280,7 +325,8 @@ relance le hardener avec le retour). Validation → `human_gates.mutants`.
 ### 8. QA — `feature-qa`
 
 Prompt : nom, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
-**arrêt humain 4.** Montre `qa.md` en entier et envoie les captures avec `SendUserFile`
+**arrêt humain 5.** `gauntlet.sh report <nom> qa` (les captures y sont intégrées). Montre `qa.md` en
+entier et envoie le rapport puis les captures avec `SendUserFile`
 (`.claude/features/<nom>/qa/*/*.png`, toutes, en un appel par plateforme) — l'humain regarde des
 images, pas des chemins. `AskUserQuestion` : « Valider » / « Défauts bloquants : … » (→ relance
 l'implementer avec les défauts, puis cleaner, reviewer, hardener sont **sautés** si `lib/` n'a changé
@@ -294,6 +340,9 @@ Validation → `human_gates.qa`.
 ```
 # Evidence — <nom>
 Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
+
+## Architecture                      ← spec §8 (diagrammes mermaid) + §9 avec le statut final de chaque décision
+| ID | Décision | Statut (validée / modifiée par l'humain) |
 
 ## Acceptation
 | Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md
@@ -319,7 +368,6 @@ Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> sc
 ## Mutants expliqués                 ← mutants.md
 ## Défauts visuels mineurs           ← qa.md
 ## Captures                          ← chemins relatifs
-## Décisions techniques              ← spec §9
 ```
 
 Puis, **dans cet ordre** : invoque la skill `create_commits` (elle découpe le travail restant en
@@ -327,7 +375,10 @@ commits atomiques ; les commits de contrats et de gel existent déjà), puis la 
 lui indiquant que la description de MR est `evidence.md`. `create_mr` applique ses propres règles de
 validation humaine avant tout push ou création : tu ne les contournes pas.
 
-`stages.evidence = PASSED`. Termine par un résumé de 5 lignes et le chemin de l'evidence.
+`stages.evidence = PASSED`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
+pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter :
+`git worktree remove .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
+Termine par un résumé de 5 lignes et le chemin de l'evidence.
 
 ---
 
@@ -342,6 +393,12 @@ validation humaine avant tout push ou création : tu ne les contournes pas.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation.
 - **Aux arrêts humains, sois court.** Ce que l'humain doit décider, les faits qui comptent, la question.
   Pas de récit de ce que les agents ont fait.
+- **Chaque arrêt humain commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
+  `display: render`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
+  Les arrêts hors plan aussi : l'humain décide mieux avec le diagramme sous les yeux.
+- **L'architecture appartient à l'humain.** Aucun agent ne tranche seul une décision structurante
+  (package, couches, data sources, Stream/Future, dépendances, découpage des BLoCs). Un agent qui en
+  rencontre une nouvelle en cours de route la remonte ; tu la poses à l'humain comme en 1a.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** L'humain décide.
 - **`status`** : affiche `pipeline.json` sous forme de tableau (mode, package, étape, statut,
   tentatives, date) et les arrêts humains validés. Rien d'autre.
