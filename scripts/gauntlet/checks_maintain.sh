@@ -174,11 +174,16 @@ check_l10n_strings() {
 
 # l10n_arb — les clés ajoutées par la feature existent dans toutes les locales.
 check_l10n_arb() {
-  local glob files added f missing rc=0 base
+  local glob files added f missing rc=0 base old
   glob="$(cfg l10n.arb_glob)"; [ -n "$glob" ] || { info "l10n.arb_glob non configuré, sauté"; return 0; }
   files="$(expand_globs "$PROJECT_ROOT" "$glob")"; [ -n "$files" ] || { ko "aucun fichier ARB pour $glob"; return 1; }
   base="$(merge_base)"
-  added="$( { for f in $files; do git -C "$PROJECT_ROOT" diff -U0 "$base" -- "$f" | grep -E '^\+[[:space:]]*"[a-zA-Z][a-zA-Z0-9_]*"[[:space:]]*:' | sed -E 's/^\+[[:space:]]*"([^"]+)".*/\1/'; done; } | sort -u)"
+  # Top-level keys only: nested @meta keys (placeholders, type, example…) are not translations.
+  added="$( { for f in $files; do
+      old="$(git -C "$PROJECT_ROOT" show "$base:$f" 2>/dev/null | jq -c 'keys' 2>/dev/null)"
+      jq -n -r --argjson cur "$(jq -c 'keys' "$PROJECT_ROOT/$f")" --argjson old "${old:-[]}" \
+        '($cur - $old)[] | select(startswith("@") | not)'
+    done; } | sort -u)"
   [ -n "$added" ] || { info "aucune clé l10n ajoutée depuis $base"; return 0; }
   for f in $files; do
     missing="$(for k in $added; do jq -e --arg k "$k" 'has($k)' "$PROJECT_ROOT/$f" >/dev/null 2>&1 || printf '%s ' "$k"; done)"
@@ -205,15 +210,19 @@ check_barrel_api() {
 # _unused <commande> — sortie de dart_code_linter filtrée au périmètre : les entrées "at <abs>:l:c" (code)
 # ou "lib/…dart" (fichiers) sont ramenées en chemins relatifs au package.
 _unused() {
-  local out rc hits
+  local out rc
   out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics "$1" lib --fatal-unused --no-congratulate --exclude='{/**.g.dart,/**.freezed.dart}' 2>&1)"; rc=$?
   [ "$rc" = 0 ] && { info "rien d'inutilisé"; return 0; }
-  hits="$(printf '%s\n' "$out" | grep -E '⚠' | sed -E "s#^[[:space:]]*⚠[[:space:]]*##" \
-      ; printf '%s\n' "$out" | grep -E '^[[:space:]]*at ' | sed -E "s#^[[:space:]]*at $PKG_DIR/##; s#^[[:space:]]*at ##")"
-  local scoped
-  scoped="$(printf '%s\n' "$out" | grep -E '^[[:space:]]*at |^lib/.*\.dart$' | sed -E "s#^[[:space:]]*at $PKG_DIR/##; s#^[[:space:]]*at ##; s#:$##" | filter_scope_files "$PKG_REL/")"
+  # Strip "at " and the absolute package prefix without putting the path in a regex.
+  # Unused code is reported as file:line:col, so it is scoped by line (extend mode: only added
+  # lines count); unused files are scoped by file.
+  local scoped filter=filter_scope_files
+  [ "$1" = check-unused-code ] && filter=filter_scope_lines
+  scoped="$(printf '%s\n' "$out" | grep -E '^[[:space:]]*at |^lib/.*\.dart$' \
+      | awk -v p="$PKG_DIR/" '{ sub(/^[[:space:]]*at /, ""); if (index($0, p) == 1) $0 = substr($0, length(p) + 1); sub(/:$/, ""); print }' \
+      | "$filter" "$PKG_REL/")"
   if [ -z "$scoped" ]; then info "code inutilisé hors périmètre uniquement (préexistant)"; return 0; fi
-  printf '%s\n' "$out" | grep -E '⚠|^[[:space:]]*at ' | head -30 | sed 's/^/   /'
+  printf '%s\n' "$scoped" | head -30 | sed 's/^/   ✗ /'
   return 1
 }
 check_unused_code()  { _unused check-unused-code; }
@@ -267,7 +276,7 @@ check_footprint() {
   local -; set -f
   base="$(merge_base)"
   app="$(cfg app_dir .)"; app="${app%/}"; [ "$app" = . ] && app="" || app="$app/"
-  allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .claude/features/* .claude/rules/* $(cfg_list writes.extra | tr '\n' ' ')"
+  allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .fvmrc ${app}.fvmrc .claude/features/* .claude/rules/* $(cfg_list writes.extra | tr '\n' ' ')"
   changed="$( { git -C "$PROJECT_ROOT" diff --name-only "$base"; git -C "$PROJECT_ROOT" ls-files --others --exclude-standard; } | sort -u)"
   bad="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do
       ok_=0; for g in $allowed; do g="${g//\*\*/\*}"; case "$f" in $g) ok_=1; break;; esac; done; [ "$ok_" = 0 ] && printf '%s\n' "$f"; done)"
