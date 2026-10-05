@@ -180,7 +180,7 @@ if [[ "$FLUTTER" == fvm* ]]; then
   for rc in $(find "$wt" -maxdepth 3 -name .fvmrc -not -path '*/.git/*' 2>/dev/null); do
     v="$(jq -r '.flutter // empty' "$rc" 2>/dev/null)"; [ -n "$v" ] || continue
     if [ ! -d "$HOME/fvm/versions/$v" ]; then
-      if [ "$install_sdk" = 1 ]; then echo "fvm install $v…" >&2; fvm install "$v" >"$out/fvm_install.log" 2>&1 || { ko "sdk : fvm install $v a échoué (voir $out/fvm_install.log)" | tee -a "$report"; sdk_ok=0; }
+      if [ "$install_sdk" = 1 ]; then echo "fvm install ${v}…" >&2; fvm install "$v" >"$out/fvm_install.log" 2>&1 || { ko "sdk : fvm install $v a échoué (voir $out/fvm_install.log)" | tee -a "$report"; sdk_ok=0; }
       else ko "sdk : la branche épingle Flutter $v (${rc#$wt/}), non installé — \`fvm install $v\` ou relancer avec --install-sdk ; checks qui compilent sautés" | tee -a "$report"; sdk_ok=0; fi
     fi
   done
