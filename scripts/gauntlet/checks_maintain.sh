@@ -261,9 +261,13 @@ check_generated_fresh() {
 
 # footprint — la feature ne touche que son package, les zones autorisées et son dossier de travail.
 check_footprint() {
-  local base allowed changed bad
+  local base allowed changed bad app
+  # The allowed list holds patterns: without this, `for g in $allowed` expands them against the disk
+  # and a nested file (lib/src/...) never matches its package's pattern.
+  local -; set -f
   base="$(merge_base)"
-  allowed="$PKG_REL/* pubspec.yaml pubspec.lock .gitignore .claude/features/* $(cfg_list writes.extra | tr '\n' ' ')"
+  app="$(cfg app_dir .)"; app="${app%/}"; [ "$app" = . ] && app="" || app="$app/"
+  allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .claude/features/* .claude/rules/* $(cfg_list writes.extra | tr '\n' ' ')"
   changed="$( { git -C "$PROJECT_ROOT" diff --name-only "$base"; git -C "$PROJECT_ROOT" ls-files --others --exclude-standard; } | sort -u)"
   bad="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do
       ok_=0; for g in $allowed; do g="${g//\*\*/\*}"; case "$f" in $g) ok_=1; break;; esac; done; [ "$ok_" = 0 ] && printf '%s\n' "$f"; done)"

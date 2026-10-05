@@ -60,13 +60,19 @@ check_no_temp_markers() {
 # deps — direction des couches : lib/src/<couche>/ n'importe que les couches listées dans deps.<couche>.
 # Règles supplémentaires : imports package:/dart: uniquement (pas de relatif) ; domain sans packages interdits.
 check_deps() {
-  local layer allowed forbidden f line imp target rc=0 self="$PKG_NAME"
+  local layer allowed forbidden f line imp target g exempt rc=0 self="$PKG_NAME"
   forbidden="$(cfg_list deps.domain_forbidden_packages)"
+  # deps.exempt : globs relatifs au package, exemptés (dette existante assumée, tracée dans la config).
+  exempt="$(cfg_list deps.exempt)"
   for layer in domain data presentation injection; do
     [ -d "$PKG_DIR/lib/src/$layer" ] || continue
     allowed="$(cfg_list "deps.$layer" | tr '\n' ' ')"
     while IFS= read -r line; do
       f="${line%%:*}"; imp="$(printf '%s' "$line" | sed -E "s/^[^:]*:[0-9]+:[[:space:]]*import[[:space:]]+['\"]([^'\"]+)['\"].*/\1/")"
+      for g in $exempt; do
+        # shellcheck disable=SC2053
+        [[ "$f" == $g ]] && continue 2
+      done
       case "$imp" in
         package:*|dart:*) ;;
         *) ko "$f : import relatif '$imp' (imports package: uniquement)"; rc=1; continue ;;

@@ -15,9 +15,12 @@ run_tests_json() {
 test_results() {
   jq -c -s '
     (map(select(.type=="testStart")) | map({key:(.test.id|tostring), value:.test}) | from_entries) as $t
+    # The suite path is the test file. A testWidgets url points into flutter_test (widget_tester.dart),
+    # its root_url at the file: read the suite first, root_url next, url last.
+    | (map(select(.type=="suite")) | map({key:(.suite.id|tostring), value:.suite.path}) | from_entries) as $s
     | map(select(.type=="testDone" and (.hidden|not)))
     | map(. as $d | $t[($d.testID|tostring)] as $x
-        | {file: (($x.url // $x.root_url // "?") | sub("^file://"; "")),
+        | {file: (($s[($x.suiteID|tostring)] // $x.root_url // $x.url // "?") | sub("^file://"; "")),
            name: $x.name, result: $d.result, skipped: $d.skipped})
     | .[]' "$TEST_REPORT" 2>/dev/null | sed "s#\"file\":\"$PKG_DIR/#\"file\":\"#"
 }

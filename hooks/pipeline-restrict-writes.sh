@@ -62,8 +62,8 @@ case "$agent" in
     ;;
   feature-architect)
     is_test_path && deny "architect : les tests sont écrits par le test-writer, pas par toi."
-    match "$rel" "$PKG_REL/lib/*" "$PKG_REL/pubspec.yaml" "$PKG_REL/maestro/*" "pubspec.yaml" $extra \
-      || deny "architect : zone autorisée = $PKG_REL/lib/**, pubspec.yaml${extra:+, $extra}. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/*" "$PKG_REL/pubspec.yaml" "$PKG_REL/README.md" "$PKG_REL/maestro/*" "pubspec.yaml" $extra \
+      || deny "architect : zone autorisée = $PKG_REL/lib/**, $PKG_REL/README.md, pubspec.yaml${extra:+, $extra}. Refusé : $rel"
     ;;
   feature-test-writer)
     match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" \

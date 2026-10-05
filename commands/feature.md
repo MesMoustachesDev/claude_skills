@@ -179,9 +179,14 @@ Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
 1. `gauntlet.sh dedup_candidates <nom>` → `.claude/features/<nom>/dedup_candidates.json`.
    S'il n'y a aucune entrée, saute l'agent : `stages.dedup = PASSED`.
 2. Lance `feature-dedup` (prompt : nom, package, chemin des candidats, `spec.md`).
-3. `gauntlet.sh dedup_verdict <nom>` : vert → `stages.dedup = PASSED`. Rouge → relance l'**architect**
-   avec `dedup.md` (« ces déclarations existent déjà : utilise / étends l'existant »), puis 2b à
-   nouveau ; `loops.dedup_contracts`, max 2, puis arrêt humain hors plan. L'humain peut **accepter**
+3. `gauntlet.sh dedup_verdict <nom>` : vert → `stages.dedup = PASSED`. À ce stade le verdict ne
+   bloque que les entrées `fix_by: architect` (un choix de contrat : réutiliser un type, un use case).
+   Les entrées `fix_by: cleaner` (factoriser du code existant, extraire un widget porteur de rendu)
+   demandent du vrai code, que l'architect ne peut pas écrire sous le gate des stubs : le script les
+   affiche « reportées au cleaner » sans bloquer, tu les transmets à l'étape 5, et 5b les revérifie
+   en bloquant. Ne relance jamais l'architect sur une entrée `cleaner`. Rouge → relance l'**architect**
+   avec `dedup.md` (« ces déclarations existent déjà : utilise / étends l'existant », entrées
+   `architect` seulement), puis 2b à nouveau ; `loops.dedup_contracts`, max 2, puis arrêt humain hors plan. L'humain peut **accepter**
    un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
    raison, et le verdict repasse au vert. L'exemption apparaîtra dans l'evidence.
 
@@ -227,8 +232,9 @@ Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntl
 
 ### 5. Nettoyage — `feature-cleaner`
 
-Prompt : nom, package, `last_clean.log` si présent. `stages.clean = PASSED` → continue ; `FAILED` →
-même traitement qu'en 4.
+Prompt : nom, package, `last_clean.log` si présent, et `dedup.md` s'il porte des entrées
+`fix_by: cleaner` reportées depuis 2b (« applique ces factorisations ; 5b les revérifie et bloque »).
+`stages.clean = PASSED` → continue ; `FAILED` → même traitement qu'en 4.
 
 ### 5b. Roue réinventée, second passage — `feature-dedup`
 

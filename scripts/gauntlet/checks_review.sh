@@ -39,10 +39,21 @@ check_dedup_report() {
 
 check_dedup_verdict() {
   check_dedup_report || return 1
-  local f="$FEATURE_DIR/dedup.json" n
-  n="$(jq '[.verdicts[] | select((.verdict=="duplicate" or .verdict=="extend") and .accepted != true)] | length' "$f")"
+  local f="$FEATURE_DIR/dedup.json" n deferred open
+  # Before the implementation (2b), the architect only writes stubs: a finding whose fix means
+  # writing real code (fix_by: cleaner) is carried to the cleaner, and blocks again at 5b.
+  open='(.verdict=="duplicate" or .verdict=="extend") and .accepted != true'
+  if [ "$(pipeline_get .stages.green.status)" != PASSED ]; then
+    deferred="$(jq "[.verdicts[] | select($open and .fix_by == \"cleaner\")] | length" "$f")"
+    if [ "$deferred" != 0 ]; then
+      jq -r ".verdicts[] | select($open and .fix_by == \"cleaner\") | \"   → reporté au cleaner : \(.target.name) ≈ \(.existing.name) — \(.reason)\"" "$f"
+      info "$deferred verdict(s) reporté(s) au cleaner, revérifié(s) en 5b"
+    fi
+    open="$open and .fix_by != \"cleaner\""
+  fi
+  n="$(jq "[.verdicts[] | select($open)] | length" "$f")"
   [ "$n" = 0 ] && return 0
-  jq -r '.verdicts[] | select((.verdict=="duplicate" or .verdict=="extend") and .accepted != true) | "   ✗ \(.verdict): \(.target.name) (\(.target.file):\(.target.line)) ≈ \(.existing.package)/\(.existing.name) (\(.existing.file):\(.existing.line)) — \(.reason)"' "$f"
+  jq -r ".verdicts[] | select($open) | \"   ✗ \(.verdict): \(.target.name) (\(.target.file):\(.target.line)) ≈ \(.existing.package)/\(.existing.name) (\(.existing.file):\(.existing.line)) — \(.reason)\"" "$f"
   ko "$n roue(s) réinventée(s) : utiliser ou étendre l'existant"
   return 1
 }

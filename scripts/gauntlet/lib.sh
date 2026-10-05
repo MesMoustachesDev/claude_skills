@@ -45,6 +45,9 @@ init_project_context() {
     #   create : la feature EST le package, tout le package est dans le périmètre.
     #   extend : la feature ajoute à un package existant, le périmètre = fichiers/lignes modifiés depuis base.
     MODE="${GAUNTLET_MODE:-$(pipeline_get .mode)}"; MODE="${MODE:-create}"
+    # Base du diff : pipeline.json > config. Une feature peut partir d'une autre branche que base_branch.
+    local pipeline_base; pipeline_base="$(pipeline_get .base)"
+    [ -n "$pipeline_base" ] && BASE_BRANCH="$pipeline_base"
     PKG_REL="${GAUNTLET_PACKAGE:-$(pipeline_get .package)}"
     [ -n "$PKG_REL" ] || PKG_REL="$(cfg package_path 'features/{name}' | sed "s/{name}/$FEATURE/g")"
     PKG_REL="${PKG_REL%/}"
@@ -159,9 +162,22 @@ filter_excluded() {
 
 # merge_base — commit de référence pour les diffs (base_branch)
 merge_base() {
-  git -C "$PROJECT_ROOT" merge-base HEAD "origin/$BASE_BRANCH" 2>/dev/null \
-    || git -C "$PROJECT_ROOT" merge-base HEAD "$BASE_BRANCH" 2>/dev/null \
-    || git -C "$PROJECT_ROOT" rev-list --max-parents=0 HEAD | tail -1
+  # The closest of the remote and local merge bases: a base branch with unpushed commits must not
+  # drag them into the feature's perimeter.
+  local remote local_base
+  remote="$(git -C "$PROJECT_ROOT" merge-base HEAD "origin/$BASE_BRANCH" 2>/dev/null)"
+  local_base="$(git -C "$PROJECT_ROOT" merge-base HEAD "$BASE_BRANCH" 2>/dev/null)"
+  if [ -n "$remote" ] && [ -n "$local_base" ]; then
+    if git -C "$PROJECT_ROOT" merge-base --is-ancestor "$remote" "$local_base"; then
+      printf '%s\n' "$local_base"
+    else
+      printf '%s\n' "$remote"
+    fi
+  elif [ -n "$remote$local_base" ]; then
+    printf '%s\n' "$remote$local_base"
+  else
+    git -C "$PROJECT_ROOT" rev-list --max-parents=0 HEAD | tail -1
+  fi
 }
 
 # has_dev_dep <pkg> — le package feature déclare-t-il cette dev dependency ?

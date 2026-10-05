@@ -70,13 +70,22 @@ Sois honnête : deux `toUiModel` sur deux entités différentes sont `distinct`,
       "existing": { "name": "StringX.capitalize", "file": "features/core/lib/src/string_ext.dart", "line": 8, "package": "core" },
       "verdict":  "duplicate",
       "reason":   "même transformation ; core/string_ext.dart est importé par 14 features",
-      "fix":      "supprimer CookingProfileStringX, importer package:core/string_ext.dart, appeler .capitalize()"
+      "fix":      "supprimer CookingProfileStringX, importer package:core/string_ext.dart, appeler .capitalize()",
+      "fix_by":   "architect"
     }
   ]
 }
 ```
 
-Une entrée par paire jugée, y compris les `distinct`. Et `dedup.md`, lisible : un tableau
+Une entrée par paire jugée, y compris les `distinct`.
+
+`fix_by`, obligatoire sur chaque `duplicate`/`extend` : qui peut appliquer le correctif.
+- `architect` : le correctif est un choix de contrat — réutiliser un type, une interface, un use case,
+  une clé existants au lieu d'en déclarer un nouveau. L'architect, qui n'écrit que des stubs, peut le faire.
+- `cleaner` : le correctif demande du vrai code — factoriser du code existant qui fonctionne, extraire
+  un widget porteur de rendu, migrer des appelants. L'architect ne peut pas l'écrire sans casser le
+  gate des stubs : le verdict est reporté au cleaner (étape 5) et revérifié en 5b, où il bloque.
+Au second passage (5b), l'implémentation existe : tout correctif est pour le cleaner. Et `dedup.md`, lisible : un tableau
 cible / existant / verdict / raison, les `duplicate` et `extend` en premier.
 
 Le gate de ton hook ne vérifie que le format. Des `duplicate`/`extend` → l'orchestrateur relance
