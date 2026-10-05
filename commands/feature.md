@@ -308,7 +308,11 @@ Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
 `~/.claude/commands/reviewPR.md`.
 Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un
 reviewer qui trouve des critiques doit pouvoir rendre la main) :
-- vert → `stages.review = PASSED`, continue.
+- vert → `stages.review = PASSED`. Affiche **tout de suite** à l'humain chaque entrée de
+  `review.json → suggestions` (une ligne : fichier, problème, correctif), et demande en un
+  `AskUserQuestion` multiSelect lesquelles appliquer dans la feature. Les retenues repartent à
+  l'implementer puis au cleaner, avant le hardener ; les autres vont en « Suggestions non appliquées »
+  dans l'evidence. Ne jamais résumer les suggestions en un simple nombre.
 - rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance l'**implementer** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
   Au-delà de 2 : arrêt humain hors plan avec la liste des critiques persistantes.
