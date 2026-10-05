@@ -5,6 +5,7 @@
 #   gauntlet.sh <profil|check> <feature> [options]
 #   gauntlet.sh doctor
 #   gauntlet.sh list
+#   gauntlet.sh report <feature> [étape]   rapport HTML pour l'humain (.claude/features/<feature>/report.html)
 #
 # Profils : contracts | red | green | clean | harden | qa   (voir gauntlet/profiles.sh)
 # Checks  : n'importe quel check individuel (gauntlet.sh list)
@@ -33,6 +34,7 @@ case "$target" in
   ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
   list)  profiles_list; exit 0 ;;
   doctor) init_project_context ""; run_doctor; exit $? ;;
+  report) exec python3 "$(dirname "${BASH_SOURCE[0]}")/report/report.py" feature "$feature" "$@" ;;
 esac
 
 [ -n "$feature" ] || die "usage: gauntlet.sh <profil|check> <feature>"
