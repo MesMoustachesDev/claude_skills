@@ -56,6 +56,10 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 - L'architecture décidée en §8 est celle du code : couches, DI, routes, events analytics.
 - Aucune logique métier dans un widget ; aucun modèle de données (`DataModel`) qui remonte en
   présentation ; aucun `Either` déplié ailleurs que dans le BLoC.
+- Toute méthode de use case, repository ou data source qui fait de l'I/O faillible (réseau,
+  stockage, secure storage, Crashlytics, canal plateforme), directement ou via un autre use case,
+  renvoie `Either<ErrorEntity, T>`. Un `Future<void>`, ou un `try/catch` ajouté chez l'appelant
+  pour compenser, est un **critique**.
 - Chaque dépendance inter-features est **nécessaire** : pourrait-elle passer par `core` ? Crée-t-elle
   un couplage que la feature d'en face ne sait pas ? Un cycle se profile-t-il ?
 - Ce qui a été mis dans `core`, `router`, `l10n` par cette feature y a-t-il sa place, ou est-ce une

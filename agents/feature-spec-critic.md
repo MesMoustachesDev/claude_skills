@@ -53,7 +53,10 @@ où, avec retry ? « trié » — par quoi, dans quel sens ? « vide » — list
 un bloquant, parce que le test-writer choisira l'une et l'implementer l'autre.
 
 *Faisabilité* — les contrats de §5 respectent `create_feature_rules.md` (imports, `Either`,
-Stream/Future, sealed, Equatable) ; rien n'exige un service qui n'existe pas dans `core` sans que §8
+Stream/Future, sealed, Equatable) ; en particulier, chaque use case, repository ou data source dont
+une méthode fait de l'I/O qui peut échouer (réseau, stockage, secure storage, Crashlytics, canal
+plateforme), directement ou via un autre use case, renvoie `Either<ErrorEntity, T>` : un
+`Future<void>` sur une telle méthode est un **bloquant**, pas une note ; rien n'exige un service qui n'existe pas dans `core` sans que §8
 le dise ; les payloads de §6 sont plausibles pour le backend nommé.
 
 *Oublis classiques* — pagination, doublons, hors-ligne, concurrence (deux actions rapides), retour
