@@ -126,6 +126,19 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 ### 0. Préconditions
 
 - Racine : `git rev-parse --show-toplevel`. Nom valide (`^[a-z][a-z0-9_]*$`).
+- **Worktree, jamais de `git checkout` dans le checkout principal.** D'autres sessions y travaillent :
+  changer sa branche fait atterrir leurs commits sur la branche de la feature. Tout le pipeline tourne
+  dans `.claude/worktrees/feature-<nom>/`, sur la branche `feature/<nom>` — à faire **avant** de lire
+  ou créer `pipeline.json`, qui vit dans le worktree :
+  - `git worktree list` montre déjà `feature/<nom>` → `EnterWorktree` avec `path` = ce chemin (reprise).
+  - Sinon : `git fetch origin <base>` (ignore l'échec hors ligne), puis
+    `git worktree add .claude/worktrees/feature-<nom> -b feature/<nom> <base>` (si la branche existe
+    sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis
+    `EnterWorktree` avec ce `path`. Les sous-agents, les hooks et le gauntlet prennent le worktree
+    pour racine.
+  - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
+    worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
+  - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
 - `gauntlet.sh doctor` rouge → exécute `/feature init` d'abord.
 - **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
   un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si, après
@@ -139,10 +152,8 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
     "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {}, "accepted": [] }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
-- **Branche** : `git fetch origin <base>` (ignore l'échec hors ligne). Si `feature/<nom>` existe,
-  `git checkout` dessus ; sinon `git checkout -b feature/<nom> <base>`. Refuse de continuer avec un
-  arbre de travail sale qui ne concerne pas cette feature : demande à l'humain de le commiter ou de le
-  remiser.
+- **Branche** : déjà en place via le worktree (voir plus haut). Les modifications non commitées du
+  checkout principal ne suivent pas : signale-le si elles concernent cette feature.
 - Écris `<nom>` dans `.claude/features/.current` (secours pour les hooks quand la branche ne suit pas
   la convention).
 
