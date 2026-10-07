@@ -2,7 +2,7 @@
 # pipeline-gate.sh — Stop (→ SubagentStop) déclaré dans le frontmatter des agents feature-*.
 # L'agent ne peut pas rendre la main tant que le gauntlet de son étape est rouge. Après
 # pipeline.max_attempts échecs, on le laisse sortir et l'étape passe en FAILED : l'orchestrateur
-# appelle l'humain au lieu de tourner en rond.
+# appelle le dev au lieu de tourner en rond.
 #
 # Entrée (stdin, JSON) : agent_type, cwd
 # Sortie : exit 0 = peut s'arrêter ; exit 2 + stderr = continue, la raison est montrée à l'agent

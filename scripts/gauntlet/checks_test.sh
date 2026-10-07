@@ -60,7 +60,7 @@ check_red_check() {
   info "$total test(s), $(printf '%s\n' "$scoped_files" | wc -l | tr -d ' ') fichier(s) dans le périmètre, rouge dans chacun"
 }
 
-# test_names — écrit .claude/features/<f>/tests.md pour le skim humain. Toujours vert.
+# test_names — écrit .claude/features/<f>/tests.md pour le skim du dev. Toujours vert.
 check_test_names() {
   [ -f "$TEST_REPORT" ] || run_tests_json || true
   local out="$FEATURE_DIR/tests.md"

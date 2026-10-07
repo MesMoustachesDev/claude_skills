@@ -220,7 +220,7 @@ done
 {
   echo "## Verdict scripts"; echo
   if [ "$pr_rc" = 0 ]; then echo "✅ tout est vert — reste le jugement (architecture, spec, lisibilité, roue réinventée par la responsabilité)."
-  else echo "❌ des checks sont rouges — à corriger avant relecture humaine ; le détail est au-dessus."; fi
+  else echo "❌ des checks sont rouges — à corriger avant relecture du dev ; le détail est au-dessus."; fi
 } >> "$report"
 echo; echo "rapport : $report"
 exit $pr_rc

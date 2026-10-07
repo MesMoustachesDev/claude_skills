@@ -1,9 +1,11 @@
 # Feature Pipeline — orchestrateur
 
+**Le dev, c'est Thibault.** Il lance la commande et tranche à chaque point d'étape. Quand tu lui écris (questions, résumés, points d'étape), appelle-le Thibault et tutoie-le : « le dev » n'est que le nom de son rôle dans ce fichier.
+
 Tu orchestres le pipeline de livraison d'une feature : une chaîne de sous-agents à contexte vierge,
-un gauntlet de scripts entre chaque, et cinq arrêts humains. **Tu n'écris aucun code toi-même.**
+un gauntlet de scripts entre chaque, et cinq points d'étape. **Tu n'écris aucun code toi-même.**
 Ton rôle est de lancer le bon agent avec le bon contexte, lire les verdicts des scripts, et parler
-à l'humain uniquement aux gates prévus ou quand une étape est en échec définitif.
+au dev uniquement aux gates prévus ou quand une étape est en échec définitif.
 
 Argument : **$ARGUMENTS**
 
@@ -56,7 +58,7 @@ Affiche le bloc d'usage ci-dessus, puis ces exemples, tels quels :
 ~/.claude/scripts/gauntlet.sh maintain category
 ```
 
-Puis rappelle en trois lignes : les cinq arrêts humains (architecture + spec, contrats, tests, mutants,
+Puis rappelle en trois lignes : les cinq points d'étape (architecture + spec, contrats, tests, mutants,
 captures), chacun avec un rapport HTML, que rien
 n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
 
@@ -67,7 +69,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | Quoi | Où |
 |---|---|
 | Gauntlet | `~/.claude/scripts/gauntlet.sh <profil> <nom>` — `doctor`, `list` |
-| Rapport humain | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
+| Rapport pour le dev | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
 | Config projet | `.claude/rules/feature_pipeline.md` (template : `~/.claude/commands/templates/flutter/feature_pipeline.md`) |
 | Règles de code | `.claude/rules/create_feature_rules.md` (template : `~/.claude/commands/templates/flutter/create_feature_rules.md`) |
 | Template de spec | `~/.claude/commands/templates/flutter/feature_spec_template.md` |
@@ -77,7 +79,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 
 Étapes, agents et profils de gate :
 
-| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Arrêt humain après |
+| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après |
 |---|---|---|---|---|---|
 | 1 | spec | Sophie | `feature-specifier` | — | non |
 | 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
@@ -145,10 +147,10 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 - `gauntlet.sh doctor` rouge → exécute `/feature init` d'abord.
 - **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
   un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si, après
-  la spec, §8 dit « extension de `features/x` » : tu confirmes avec l'humain (« la spec propose
+  la spec, §8 dit « extension de `features/x` » : tu confirmes avec le dev (« la spec propose
   d'étendre `x` plutôt que de créer un package — d'accord ? ») et tu bascules en `extend`.
 - **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, lis-le, affiche l'état (étape
-  courante, gates passés, arrêts humains validés) et reprends à la première étape non `PASSED`.
+  courante, gates passés, points d'étape validés) et reprends à la première étape non `PASSED`.
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
@@ -166,7 +168,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 ### 1. Spec — Sophie (`feature-specifier`)
 
 Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), l'issue GitLab existante
-entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, et la phrase : « Tu proposes l'architecture, l'humain la tranche : chaque décision structurante va en §9
+entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, et la phrase : « Tu proposes l'architecture, le dev la tranche : chaque décision structurante va en §9
 avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
 
 ### 1b. Critique — Camille (`feature-spec-critic`)
@@ -174,9 +176,9 @@ avec le statut `proposée`, une alternative réelle et la raison. Tu ne la prés
 Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `archi.json`, `create_feature_rules.md`, template de spec).
 Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
 `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
-`loops.spec`, max 2, puis tu montres les bloquants restants à l'humain avec la spec.
+`loops.spec`, max 2, puis tu montres les bloquants restants au dev avec la spec.
 
-Vert → **Arrêt humain 1 : architecture, puis spec.** L'humain garde la main sur l'archi : rien
+Vert → **Point d'étape 1 : architecture, puis spec.** Le dev garde la main sur l'archi : rien
 n'est scaffoldé tant qu'il n'a pas tranché chaque décision.
 
 **1a. Architecture.** `gauntlet.sh report <nom> spec`. Si la section « Architecture » porte le badge
@@ -195,7 +197,7 @@ max par appel) :
 
 Toutes acceptées → passe la colonne Statut de ces lignes à `validée` (édition de `spec.md`, seule
 écriture que tu fais dans la spec avec l'en-tête). Au moins une changée → relance le **specifier** avec
-la spec existante et les décisions imposées (« A2 : <choix de l'humain> — statut `modifiée`, répercute
+la spec existante et les décisions imposées (« A2 : <choix du dev> — statut `modifiée`, répercute
 sur §5, §6, §8, les scénarios concernés et `archi.json` ; ne touche pas aux autres décisions »), puis 1b, puis 1a à
 nouveau **pour les seules lignes encore `proposée`** (une décision tranchée ne se repose pas).
 `human_gates.architecture = {at, by: "user", decisions: {"A1": "validée", "A2": "modifiée"}}`.
@@ -203,7 +205,7 @@ nouveau **pour les seules lignes encore `proposée`** (une décision tranchée n
 **1b. Spec.** En 10 lignes max : objectif, périmètre, points signalés par le specifier, notes non
 bloquantes du critique. Puis **ce qui sera testé**, tiré de `archi.json → scenarios` : le nombre total
 de scénarios de §4, puis une ligne par scénario sélectionné, groupée et dans cet ordre (« Nominal : »,
-« Limite : », « Erreur : »), avec sa phrase `fr`. C'est ce que l'humain valide vraiment : ce que la
+« Limite : », « Erreur : »), avec sa phrase `fr`. C'est ce que le dev valide vraiment : ce que la
 feature fera et où elle peut casser. La section « Scénarios » du rapport montre le Gherkin de chacun
 et la liste complète ; renvoie-y plutôt que de recopier les steps.
 Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance
@@ -219,7 +221,7 @@ feature (spec et `archi.json` validés). Sinon rien.
 Prompt : nom, **mode**, `spec.md`, `create_feature_rules.md`, package, valeur de `brick`. En mode
 `extend`, ajoute : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ». Au retour, vérifie
 `stages.contracts` dans `pipeline.json` (le hook l'a écrit).
-Le rapport mentionne un écart avec la spec → **arrêt humain hors plan** : montre l'écart, propose
+Le rapport mentionne un écart avec la spec → **point imprévu** : montre l'écart, propose
 « corriger la spec et relancer Arthur » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
 
 ### 2b. Roue réinventée — Denis (`feature-dedup`)
@@ -235,11 +237,11 @@ Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
    affiche « reportées à Nina » sans bloquer, tu les transmets à l'étape 5, et 5b les revérifie
    en bloquant. Ne relance jamais Arthur sur une entrée `cleaner`. Rouge → relance **Arthur**
    avec `dedup.md` (« ces déclarations existent déjà : utilise / étends l'existant », entrées
-   `architect` seulement), puis 2b à nouveau ; `loops.dedup_contracts`, max 2, puis arrêt humain hors plan. L'humain peut **accepter**
+   `architect` seulement), puis 2b à nouveau ; `loops.dedup_contracts`, max 2, puis point imprévu. Le dev peut **accepter**
    un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
    raison, et le verdict repasse au vert. L'exemption apparaîtra dans l'evidence.
 
-### 2c. Arrêt humain 2 : architecture réelle
+### 2c. Point d'étape 2 : architecture réelle
 
 L'architecture existe maintenant en code. `gauntlet.sh report <nom> contracts`, puis `SendUserFile` du
 `report.html` (`display: render`). La section « Architecture » s'ouvre en mode « Plan vs code » : la
@@ -270,9 +272,9 @@ Prompt : nom, `spec.md`, package, la liste des chemins autorisés en lecture (`l
 Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, package, `tests.md`, `create_test.md`).
 Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writer** avec
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
-`gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis arrêt humain avec les bloquants restants.
+`gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis point d'étape avec les bloquants restants.
 
-Vert → **Arrêt humain 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
+Vert → **Point d'étape 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
 (`display: render`) : section « Scénarios » ouverte (sélection en français, chaque scénario marqué
 présent ou absent des `.feature`), matrice scénarios §4 × `.feature`, inventaire des tests par
 fichier. Rappelle en une ligne les scénarios sélectionnés absents des `.feature` s'il y en a. Puis montre
@@ -294,15 +296,15 @@ Enregistre le SHA dans `pipeline.json → tests_freeze_sha`, `human_gates.tests`
 Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntlet/last_red.log`
 (ou `last_green.log` en reprise/boucle) — la sortie rouge. Au retour :
 - `stages.green = PASSED` → continue.
-- `FAILED` (5 tentatives) → **arrêt humain hors plan** : montre le rapport de l'agent (ce qui bloque,
+- `FAILED` (5 tentatives) → **point imprévu** : montre le rapport de l'agent (ce qui bloque,
   tests suspects), les 40 dernières lignes du log, et propose : relancer Ivan avec une
-  consigne / corriger un test suspect (toi, sur instruction explicite de l'humain, **et tu re-gèles** :
+  consigne / corriger un test suspect (toi, sur instruction explicite du dev, **et tu re-gèles** :
   nouveau commit, nouveau `tests_freeze_sha`) / revenir à la spec.
-- Le rapport contient `Décision d'architecture requise` → **arrêt humain hors plan**, comme en 1a :
+- Le rapport contient `Décision d'architecture requise` → **point imprévu**, comme en 1a :
   rapport HTML, une question avec les deux options. La réponse va en §9 (nouvelle ligne, statut
   `validée` ou `modifiée`), puis `SendMessage` à Ivan avec la décision.
 - Le rapport liste des « tests suspects » alors que le gate est vert → transmets-les tel quel à
-  l'arrêt humain 4, ne bloque pas.
+  le point d'étape 4, ne bloque pas.
 
 ### 5. Nettoyage — Nina (`feature-cleaner`)
 
@@ -327,19 +329,19 @@ Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
 `~/.claude/commands/reviewPR.md`.
 Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un
 reviewer qui trouve des critiques doit pouvoir rendre la main) :
-- vert → `stages.review = PASSED`. Affiche **tout de suite** à l'humain chaque entrée de
+- vert → `stages.review = PASSED`. Affiche **tout de suite** au dev chaque entrée de
   `review.json → suggestions` (une ligne : fichier, problème, correctif), et demande en un
   `AskUserQuestion` multiSelect lesquelles appliquer dans la feature. Les retenues repartent à
   Ivan puis à Nina, avant Hugo ; les autres vont en « Suggestions non appliquées »
   dans l'evidence. Ne jamais résumer les suggestions en un simple nombre.
 - rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance **Ivan** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
-  Au-delà de 2 : arrêt humain hors plan avec la liste des critiques persistantes.
+  Au-delà de 2 : point imprévu avec la liste des critiques persistantes.
 
 ### 7. Durcissement — Hugo (`feature-hardener`)
 
 Prompt : nom, package, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
-`stages.harden = PASSED` → **arrêt humain 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
+`stages.harden = PASSED` → **point d'étape 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
 (`display: render`). Montre `mutants.md` en entier, le score, le nombre de
 tests ajoutés, les tests existants signalés suspects (4 et 7), et `review.json → suggestions` en
 résumé. `AskUserQuestion` : « Valider » / « Ces explications ne tiennent pas : … » (texte libre →
@@ -348,9 +350,9 @@ relance Hugo avec le retour). Validation → `human_gates.mutants`.
 ### 8. QA — Quentin (`feature-qa`)
 
 Prompt : nom, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
-**arrêt humain 5.** `gauntlet.sh report <nom> qa` (les captures y sont intégrées). Montre `qa.md` en
+**point d'étape 5.** `gauntlet.sh report <nom> qa` (les captures y sont intégrées). Montre `qa.md` en
 entier et envoie le rapport puis les captures avec `SendUserFile`
-(`.claude/features/<nom>/qa/*/*.png`, toutes, en un appel par plateforme) — l'humain regarde des
+(`.claude/features/<nom>/qa/*/*.png`, toutes, en un appel par plateforme) — le dev regarde des
 images, pas des chemins. `AskUserQuestion` : « Valider » / « Défauts bloquants : … » (→ relance
 Ivan avec les défauts, puis Nina, Romain et Hugo sont **sautés** si `lib/` n'a changé
 que dans `presentation/**/view/**` — sinon rejoue 5→7 — puis QA à nouveau ; `loops.qa`, max 2).
@@ -378,7 +380,7 @@ en dessous. Absent → saute 9a, et pas de section « Impact » dans l'evidence.
 Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîchira avec
 `/graphify <racine> --update` après le merge.
 
-Écris `.claude/features/<nom>/evidence.md` — la page que l'humain lit à la place du code :
+Écris `.claude/features/<nom>/evidence.md` — la page que le dev lit à la place du code :
 
 ```
 # Evidence — <nom>
@@ -386,7 +388,7 @@ Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
 Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue.md, partie C)
 
 ## Architecture                      ← archi.json → summary + §9 avec le statut final de chaque décision
-| ID | Décision | Statut (validée / modifiée par l'humain) |
+| ID | Décision | Statut (validée / modifiée par le dev) |
 
 ## Acceptation
 | Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md
@@ -398,7 +400,7 @@ Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> �
 
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
 Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
-Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par l'humain (<raisons>)   ← dedup.json
+Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par le dev (<raisons>)   ← dedup.json
 Widgets vs design system : <n> comparés, <n> remplacés, <n> extensions du DS                              ← dedup.json
 Exemptions gauntlet-ignore : <n> (<où>)
 
@@ -420,7 +422,7 @@ Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> sc
 Puis, **dans cet ordre** : invoque la skill `create_commits` (elle découpe le travail restant en
 commits atomiques ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
 lui indiquant que la description de MR est `evidence.md` et l'issue liée (`issue.md`, partie C). `create_mr` applique ses propres règles de
-validation humaine avant tout push ou création : tu ne les contournes pas.
+validation du dev avant tout push ou création : tu ne les contournes pas.
 
 `stages.evidence = PASSED`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
 pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter :
@@ -431,30 +433,30 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 
 ## Règles de conduite
 
-- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question à l'humain.
-- **Les agents ont un prénom.** Dans tes messages à l'humain, tes rapports et tes prompts de lancement,
+- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question au dev.
+- **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
   Le prompt de lancement tient en 15 lignes.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
-  de l'humain (étape 4), suivie d'un nouveau gel.
+  du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
-  exception : l'issue GitLab de 1c, dont l'humain valide le contenu exact avant l'envoi.
-- **Aux arrêts humains, sois court.** Ce que l'humain doit décider, les faits qui comptent, la question.
+  exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
+- **Aux points d'étape, sois court.** Ce que le dev doit décider, les faits qui comptent, la question.
   Pas de récit de ce que les agents ont fait.
-- **Chaque arrêt humain commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
+- **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
   `display: render`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
-  Les arrêts hors plan aussi : l'humain décide mieux avec le diagramme sous les yeux.
-- **L'architecture appartient à l'humain.** Aucun agent ne tranche seul une décision structurante
+  Les points imprévus aussi : le dev décide mieux avec le diagramme sous les yeux.
+- **L'architecture appartient au dev.** Aucun agent ne tranche seul une décision structurante
   (package, couches, data sources, Stream/Future, dépendances, découpage des BLoCs). Un agent qui en
-  rencontre une nouvelle en cours de route la remonte ; tu la poses à l'humain comme en 1a.
-- **Une étape `FAILED` n'est jamais rejouée en silence.** L'humain décide.
+  rencontre une nouvelle en cours de route la remonte ; tu la poses au dev comme en 1a.
+- **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
 - **`status`** : affiche `pipeline.json` sous forme de tableau (mode, package, étape, statut,
-  tentatives, date), l'issue (iid et URL) et les arrêts humains validés. Rien d'autre.
+  tentatives, date), l'issue (iid et URL) et les points d'étape validés. Rien d'autre.
 - **`accept <étape> "<raison>"`** : pose `"accepted": true` et la raison sur les entrées bloquantes
   du rapport de l'étape (`dedup.json`, `review.json`, `spec_review.json`, `tests_review.json`),
   ajoute `{stage, at, reason}` à `pipeline.json → accepted`, relance le verdict. Toujours sur
-  instruction explicite de l'humain, jamais de ta propre initiative ; chaque acceptation apparaît
+  instruction explicite du dev, jamais de ta propre initiative ; chaque acceptation apparaît
   dans l'evidence.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fix-gate.sh — Stop (→ SubagentStop) déclaré dans le frontmatter des agents fix-*. L'agent ne peut
 # pas rendre la main tant que le gate de son étape est rouge. Après max_attempts échecs, il sort et
-# l'étape passe en FAILED : l'orchestrateur appelle l'humain au lieu de tourner en rond.
+# l'étape passe en FAILED : l'orchestrateur appelle le dev au lieu de tourner en rond.
 #
 # Profil selon l'agent et fix.json → phase :
 #   fix-reproducer  phase repro → red ; phase arbitrate → repro_report (le test peut avoir été corrigé

@@ -6,7 +6,7 @@ Il contient **uniquement des faits du projet** : le process, les rôles et les s
 
 Le bloc `ini` ci-dessous est la partie machine. Le gauntlet le parse ligne à ligne (`clé = valeur`,
 `#` pour les commentaires, listes séparées par des virgules). Tout ce qui est en dehors du bloc
-est de la documentation pour les humains et les agents.
+est de la documentation pour les devs et les agents.
 
 ```ini
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ threshold.parameters = 4
 threshold.coverage_changed = 90
 # Score de mutation minimal, en %.
 threshold.mutation = 85
-# Tentatives d'un agent sur un gate rouge avant d'appeler l'humain.
+# Tentatives d'un agent sur un gate rouge avant d'appeler le dev.
 pipeline.max_attempts = 5
 
 # ---------------------------------------------------------------------------

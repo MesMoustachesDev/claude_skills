@@ -1,8 +1,10 @@
 # Fix Pipeline — orchestrateur
 
+**Le dev, c'est Thibault.** Il lance la commande et tranche à chaque point d'étape. Quand tu lui écris (questions, résumés, points d'étape), appelle-le Thibault et tutoie-le : « le dev » n'est que le nom de son rôle dans ce fichier.
+
 Tu orchestres la correction d'un bug, technique ou fonctionnel, par trois sous-agents aux rôles
 étanches : **Bastien** (reproducer) possède les tests, **Fanny** (implementer) possède le code, **Victor** (reviewer)
-lit. Un gauntlet de scripts décide entre chaque étape, et l'humain intervient **une fois** : pour
+lit. Un gauntlet de scripts décide entre chaque étape, et le dev intervient **une fois** : pour
 valider le diagnostic, le test rouge **et le plan de correction** avant le gel, rapport HTML à l'appui.
 Il garde la main sur l'endroit où le code change : Fanny est tenue au plan validé. **Tu n'écris aucun code ni aucun test toi-même.**
 
@@ -35,7 +37,7 @@ Affiche le bloc d'usage ci-dessus, puis :
 /fix weekly_cap_reset status
 ```
 
-Puis en trois lignes : l'arrêt humain unique (diagnostic + test rouge + plan de correction, avec un
+Puis en trois lignes : le point d'étape unique (diagnostic + test rouge + plan de correction, avec un
 rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests sont gelés après validation, et `~/.claude/scripts/fix_gauntlet.sh list`.
 
 ---
@@ -45,13 +47,13 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | Quoi | Où |
 |---|---|
 | Gauntlet | `~/.claude/scripts/fix_gauntlet.sh <profil> <nom>` — `list` |
-| Rapport humain | `~/.claude/scripts/fix_gauntlet.sh report <nom> <étape>` → `.claude/fixes/<nom>/report.html` |
+| Rapport pour le dev | `~/.claude/scripts/fix_gauntlet.sh report <nom> <étape>` → `.claude/fixes/<nom>/report.html` |
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après le gel) |
 
-| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Humain |
+| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|
 | 1 | reproduction | Bastien | `fix-reproducer` | `red` | **oui** : diagnostic + test rouge + plan de correction, puis gel |
 | 2 | correction | Fanny | `fix-implementer` | `green` | non (arbitrage par Bastien si un test est contesté) |
@@ -74,7 +76,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
     principal (sa branche courante devient `base_branch`), puis `EnterWorktree` avec ce `path`. La
     session et les sous-agents travaillent alors dans le worktree ; `git rev-parse --show-toplevel`,
     les hooks et le gauntlet le prennent pour racine.
-  - Les modifications non commitées du checkout principal ne suivent pas : signale-le à l'humain si
+  - Les modifications non commitées du checkout principal ne suivent pas : signale-le au dev si
     `git status --short` y est non vide et qu'elles touchent le périmètre du bug.
   - Les dépendances ne sont pas versionnées : Bastien les installe dans le package du bug
     (`npm ci` s'il y a un lockfile, `flutter pub get` / `fvm flutter pub get`) — jamais `npm install`
@@ -104,20 +106,20 @@ une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
 **Note l'`agentId` retourné dans `fix.json → agents.reproducer`** : tu en auras besoin pour l'arbitrage.
 
 Au retour :
-- `Besoin humain : …` dans le rapport → pose la question à l'humain (`AskUserQuestion` ou texte), puis
+- `Besoin du dev : …` dans le rapport → pose la question au dev (`AskUserQuestion` ou texte), puis
   `SendMessage` à Bastien avec la réponse. Ne relance pas un agent neuf.
-- `stages.red` `FAILED` → arrêt humain hors plan : rapport de l'agent, 40 dernières lignes de
+- `stages.red` `FAILED` → point imprévu : rapport de l'agent, 40 dernières lignes de
   `.gauntlet/last_red.log`, options (consigne à Bastien / abandonner).
-- `stages.red` `PASSED` → arrêt humain.
+- `stages.red` `PASSED` → point d'étape.
 
-**Arrêt humain — diagnostic, test rouge et plan de correction.** D'abord
+**Point d'étape — diagnostic, test rouge et plan de correction.** D'abord
 `fix_gauntlet.sh report <nom> repro` et `SendUserFile` du `report.html` (`display: render`) : cause,
 plan avec son schéma (cause → fichiers prévus, par couche), diff du test. Puis, court :
 - Cause racine (`root_cause` + `root_cause_location`) et la preuve, en 3 lignes tirées de `diagnosis.md`.
 - Pourquoi les tests l'ont raté : `miss_reason` + la phrase du diagnostic.
 - Le test : `git diff <base_sha> -- <test_files>` (le diff entier s'il fait moins de 60 lignes, sinon les
   noms des tests et l'assertion clé), et la ligne `expected_failure` relevée dans `.gauntlet/target.out`.
-- `baseline_suite` si elle n'est pas verte : l'humain doit le savoir avant de lancer la correction.
+- `baseline_suite` si elle n'est pas verte : le dev doit le savoir avant de lancer la correction.
 - Le plan : `fix_plan.layer`, `approach`, `files`, et `rejected` (l'alternative écartée).
 - `kind: ui` → `SendUserFile` des captures `.claude/fixes/<nom>/shots/red/*.png` (display `render`).
 
@@ -127,7 +129,7 @@ plan avec son schéma (cause → fichiers prévus, par couche), diff du test. Pu
 2. **Diagnostic et test** (header `Test`) : « Valider et geler » / « Revoir le diagnostic ou le test ».
 
 Plan changé ou test à revoir → `SendMessage` à Bastien avec le retour (« mets `fix_plan` à jour
-avec le choix de l'humain » ; le gate red revalide `repro.json`), puis cet arrêt à nouveau.
+avec le choix du dev » ; le gate red revalide `repro.json`), puis cet arrêt à nouveau.
 `human_gates.plan = {at, by: "user", choice: "proposed" | "alternative" | "other"}`.
 
 Validation → **gel** :
@@ -147,21 +149,21 @@ Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles pr
 (`agents.implementer`).
 
 Au retour :
-- **Écart au plan** dans le rapport → **arrêt humain hors plan** : `fix_gauntlet.sh report <nom> repro`,
+- **Écart au plan** dans le rapport → **point imprévu** : `fix_gauntlet.sh report <nom> repro`,
   `SendUserFile`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
   ajoute `{at, files, reason}` à `fix.json → plan_deviations` (Victor le lit ; `repro.json` reste
   gelé) et `SendMessage` à Fanny « écart accepté, continue ». Refusé → `SendMessage` avec la
-  consigne de l'humain.
+  consigne du dev.
 - **Contestation de test** dans le rapport → **arbitrage**, quel que soit le gate :
   1. `phase = "arbitrate"`, ajoute `{at, test, claim}` à `arbitrations`.
   2. `SendMessage` à Bastien : la contestation telle quelle, et « tranche : test juste ou test faux ».
   3. Verdict **test juste** → `phase = "impl"`, `SendMessage` à Fanny avec l'explication de Bastien.
-     Verdict **test corrigé** → montre le diff du test à l'humain (`git diff <freeze_sha> -- <test_files>`)
+     Verdict **test corrigé** → montre le diff du test au dev (`git diff <freeze_sha> -- <test_files>`)
      et `AskUserQuestion` « Valider la correction du test » / « Refuser ». Validé → re-gel (nouveau commit
      `test(<nom>): <ce qui change> (refrozen)`, nouveau `freeze_sha`), `phase = "impl"`, `SendMessage` à
      Fanny : « le test a été corrigé, reprends ». Refusé → `SendMessage` à Bastien avec la raison.
-  4. `loops.arbitrate` max 2, puis arrêt humain hors plan avec les deux positions.
-- `stages.green` `FAILED` → arrêt humain hors plan : rapport, 40 dernières lignes de `last_green.log`,
+  4. `loops.arbitrate` max 2, puis point imprévu avec les deux positions.
+- `stages.green` `FAILED` → point imprévu : rapport, 40 dernières lignes de `last_green.log`,
   options (consigne à Fanny / revoir le diagnostic → retour à 1 avec Bastien).
 - `stages.green` `PASSED` → étape 3.
 
@@ -179,11 +181,11 @@ Puis `fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un r
 propre classification : critique, bloquant, erreur) comptent comme des critiques.
 - Aucun critique → `stages.review = PASSED`.
 - Critiques → `loops.review += 1`. Si ≤ 2 : `SendMessage` à Fanny (ou un neuf si injoignable)
-  avec la liste `critical` et leurs `fix`, puis gate green, puis revue à nouveau. Au-delà : arrêt humain
+  avec la liste `critical` et leurs `fix`, puis gate green, puis revue à nouveau. Au-delà : point d'étape
   hors plan avec les critiques persistantes.
 - `plan_respected` ≠ `yes` sans critique `fix: plan` (Victor l'a jugé acceptable) : tu le
-  signales à l'humain dans l'evidence, avec les fichiers hors plan du rapport.
-- `missing_tests` de Victor : **ne relance personne**. Ils vont dans l'evidence ; l'humain décidera
+  signales au dev dans l'evidence, avec les fichiers hors plan du rapport.
+- `missing_tests` de Victor : **ne relance personne**. Ils vont dans l'evidence ; le dev décidera
   s'ils méritent un second passage de Bastien.
 
 ### 4. Captures — seulement `kind: ui`
@@ -208,7 +210,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Cause racine             root_cause — root_cause_location
 ## Pourquoi les tests l'ont raté   miss_reason — l'explication, et le test existant corrigé s'il y en a un
 ## Preuve                   test(s) ajouté(s), rouge avant (expected_failure), vert après ; suite verte
-## Plan validé             couche, approche, alternative écartée ; choix de l'humain (proposé / alternative / autre)
+## Plan validé             couche, approche, alternative écartée ; choix du dev (proposé / alternative / autre)
 ## Correction               fichiers, en une ligne chacun, marqués prévu / écart accepté ; même défaut corrigé ailleurs
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
@@ -219,11 +221,11 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il
 n'est pas commité). Puis invoque la skill `create_commits` (le commit de gel existe déjà ; elle découpe la correction et
 l'evidence). Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
-`create_mr` à l'humain, avec l'issue liée (`issue.md`, partie C), qui
+`create_mr` au dev, avec l'issue liée (`issue.md`, partie C), qui
 appliquera ses propres validations. `stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
-mergée par l'humain. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter :
+mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter :
 `git worktree remove .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
 
 Termine par 5 lignes : cause, pourquoi raté, test, correction, chemin de l'evidence. Si la cause
@@ -234,7 +236,7 @@ ligne de l'enregistrer en mémoire.
 
 ## Règles de conduite
 
-- **Les agents ont un prénom.** Dans tes messages à l'humain, tes rapports et tes prompts de lancement,
+- **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `fix-*` ne sert qu'au `subagent_type`.
 - **Contexte vierge, passé par fichiers.** Tu donnes des chemins et des faits, pas ton historique.
   Exception voulue : Bastien et Fanny sont **repris** par `SendMessage` pour l'arbitrage
@@ -243,12 +245,12 @@ ligne de l'enregistrer en mémoire.
   le hook. Le rapport d'un agent n'en fait pas foi.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
-- **Une étape `FAILED` n'est jamais rejouée en silence.** L'humain décide.
+- **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
 - **Hors plan, sois court** : ce qui bloque, les faits, les options, la question.
-- **Le rapport d'abord.** Tout arrêt humain, prévu ou hors plan, commence par `fix_gauntlet.sh report
+- **Le rapport d'abord.** Tout point d'étape, prévu ou hors plan, commence par `fix_gauntlet.sh report
   <nom> <étape>` et `SendUserFile` `display: render`. Régénéré à chaque fois, jamais réutilisé.
-- **Le plan appartient à l'humain.** Couche, approche et fichiers de la correction sont validés avant
-  le gel. Aucun agent ne s'en écarte sans que l'humain l'ait accepté.
+- **Le plan appartient au dev.** Couche, approche et fichiers de la correction sont validés avant
+  le gel. Aucun agent ne s'en écarte sans que le dev l'ait accepté.
 - **`status`** : tableau de `fix.json` (phase, étapes, tentatives, boucles, arbitrages, gel, issue) et rien d'autre.
 - **`accept review "<raison>"`** : sur instruction explicite seulement — `"accepted": true` et la raison
   sur chaque critique restante de `review.json`, `{stage, at, reason}` dans `accepted`, relance du

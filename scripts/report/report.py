@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""report.py — rapport HTML lu par l'humain aux arrêts des pipelines /feature et /fix.
+"""report.py — rapport HTML lu par le dev aux arrêts des pipelines /feature et /fix.
 
 Usage :
   report.py feature <nom> [étape]   → .claude/features/<nom>/report.html

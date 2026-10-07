@@ -5,7 +5,7 @@
 # Usage :
 #   fix_gauntlet.sh <profil|check> <nom>
 #   fix_gauntlet.sh list
-#   fix_gauntlet.sh report <nom> [étape]   rapport HTML pour l'humain (.claude/fixes/<nom>/report.html)
+#   fix_gauntlet.sh report <nom> [étape]   rapport HTML pour le dev (.claude/fixes/<nom>/report.html)
 #
 # Exit 0 si tout est vert, 1 sinon. Écrit .claude/fixes/<nom>/.gauntlet/last_<profil>.{log,json}.
 # Les commandes de repro.json tournent depuis <racine>/<package>, avec :

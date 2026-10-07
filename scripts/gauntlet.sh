@@ -5,7 +5,7 @@
 #   gauntlet.sh <profil|check> <feature> [options]
 #   gauntlet.sh doctor
 #   gauntlet.sh list
-#   gauntlet.sh report <feature> [étape]   rapport HTML pour l'humain (.claude/features/<feature>/report.html)
+#   gauntlet.sh report <feature> [étape]   rapport HTML pour le dev (.claude/features/<feature>/report.html)
 #
 # Profils : contracts | red | green | clean | harden | qa   (voir gauntlet/profiles.sh)
 # Checks  : n'importe quel check individuel (gauntlet.sh list)

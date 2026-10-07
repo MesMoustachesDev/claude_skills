@@ -55,7 +55,7 @@ Checks individuels :
   no_temp_markers    aucun marqueur TEMP / print( dans lib/ et test/
   test               flutter test (rapport JSON conservé)
   red_check          après TEST-WRITER : chaque fichier de test a ≥ 1 échec
-  test_names         écrit .claude/features/<f>/tests.md (liste lisible pour le skim humain)
+  test_names         écrit .claude/features/<f>/tests.md (liste lisible pour le skim du dev)
   test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
   coverage           couverture des lignes modifiées depuis base_branch

@@ -1,7 +1,7 @@
 # Spec — {feature_name}
 
 <!--
-  Ce document est écrit par l'agent feature-specifier et validé par un humain, en deux temps :
+  Ce document est écrit par l'agent feature-specifier et validé par le dev, en deux temps :
   d'abord chaque décision d'architecture de la section 9 (une par une), puis la spec entière.
   Tout ce qui suit (contrats, tests, implémentation, QA) en découle.
 
@@ -263,7 +263,7 @@ N/A
 - **Services existants réutilisés** (ne pas réinventer) : 
 
 <!--
-  La vue que l'humain lit pour trancher (carte de ce qui change, parcours, arborescence des fichiers)
+  La vue que le dev lit pour trancher (carte de ce qui change, parcours, arborescence des fichiers)
   ne vit PAS ici : elle est dans `archi.json`, à côté de cette spec (format :
   ~/.claude/commands/templates/flutter/feature_archi_example.json). Le rapport HTML la rend
   interactive et la compare au code scaffoldé. Seul diagramme gardé dans la spec : la machine
@@ -285,13 +285,13 @@ stateDiagram-v2
 ## 9. Décisions d'architecture
 
 <!--
-  Le specifier PROPOSE, l'humain TRANCHE. Chaque ligne devient une question posée à l'humain
+  Le specifier PROPOSE, le dev TRANCHE. Chaque ligne devient une question posée au dev
   (option recommandée = la décision proposée, option 2 = l'alternative). Format parsé par le
   rapport HTML et l'orchestrateur : ne pas changer les colonnes.
 
   - ID stable (A1, A2…), jamais renuméroté.
   - Alternative RÉELLE : une option défendable, avec ce qu'elle changerait.
-  - Statut : proposée (specifier) → validée | modifiée (écrit après la décision de l'humain).
+  - Statut : proposée (specifier) → validée | modifiée (écrit après la décision du dev).
   - Uniquement les décisions structurantes (package, data sources, Stream/Future, découpage
     des BLoCs, dépendances, emplacement d'une logique ambiguë, écart à un pattern du repo).
   Pour que le cleaner et l'implementer ne re-décident pas.
