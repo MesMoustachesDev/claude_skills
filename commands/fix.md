@@ -49,6 +49,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
+| Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après le gel) |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Humain |
 |---|---|---|---|---|---|
@@ -89,12 +90,15 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
     "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
     "stages": {}, "attempts": {}, "freeze_sha": null, "loops": {}, "human_gates": {},
-    "arbitrations": [], "agents": {}, "accepted": [] }
+    "arbitrations": [], "agents": {}, "accepted": [], "issue": null }
   ```
+- **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
+  seulement). Une issue existante fait partie de l'entrée de Bastien.
 
 ### 1. Reproduction — Bastien (`fix-reproducer`)
 
-Prompt (15 lignes max) : nom, description brute, racine, dossier du fix, chemins des règles projet
+Prompt (15 lignes max) : nom, description brute, l'issue GitLab existante entre `<issue>` s'il y en a
+une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
 (`CLAUDE.md`, `.claude/rules/*`, `.claude/agents/*` s'il y en a — ils portent des invariants), et :
 « Une issue Sentry est citée : utilise le MCP Sentry pour la stack et les tags » si c'est le cas.
 **Note l'`agentId` retourné dans `fix.json → agents.reproducer`** : tu en auras besoin pour l'arbitrage.
@@ -133,6 +137,9 @@ git commit -m "test(<nom>): reproduce <bug en une phrase> (frozen)"
 ```
 (+ `shots/red/` pour un bug d'UI, + tout test existant corrigé par Bastien). `freeze_sha` = ce
 commit, `human_gates.repro = {at, by: "user"}`, `phase = "impl"`. Le plan est gelé avec `repro.json`.
+
+**Issue GitLab.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit fix
+(`repro.json` et `diagnosis.md` gelés). Puis lance Fanny.
 
 ### 2. Correction — Fanny (`fix-implementer`)
 
@@ -195,6 +202,7 @@ succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction v
 ```
 # Fix — <nom>
 Branche fix/<nom> · Base <base_branch>@<base_sha court> · Test gelé @<freeze_sha court>
+Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 
 ## Bug                      symptôme, en une phrase
 ## Cause racine             root_cause — root_cause_location
@@ -210,7 +218,8 @@ Branche fix/<nom> · Base <base_branch>@<base_sha court> · Test gelé @<freeze_
 
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il
 n'est pas commité). Puis invoque la skill `create_commits` (le commit de gel existe déjà ; elle découpe la correction et
-l'evidence). Tu ne pushes rien et ne crées rien d'externe : propose `create_mr` à l'humain, qui
+l'evidence). Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
+`create_mr` à l'humain, avec l'issue liée (`issue.md`, partie C), qui
 appliquera ses propres validations. `stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
@@ -240,7 +249,7 @@ ligne de l'enregistrer en mémoire.
   <nom> <étape>` et `SendUserFile` `display: render`. Régénéré à chaque fois, jamais réutilisé.
 - **Le plan appartient à l'humain.** Couche, approche et fichiers de la correction sont validés avant
   le gel. Aucun agent ne s'en écarte sans que l'humain l'ait accepté.
-- **`status`** : tableau de `fix.json` (phase, étapes, tentatives, boucles, arbitrages, gel) et rien d'autre.
+- **`status`** : tableau de `fix.json` (phase, étapes, tentatives, boucles, arbitrages, gel, issue) et rien d'autre.
 - **`accept review "<raison>"`** : sur instruction explicite seulement — `"accepted": true` et la raison
   sur chaque critique restante de `review.json`, `{stage, at, reason}` dans `accepted`, relance du
   verdict. Apparaît dans l'evidence.

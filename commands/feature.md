@@ -73,6 +73,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | Template de spec | `~/.claude/commands/templates/flutter/feature_spec_template.md` |
 | Brick global | `~/.claude/bricks/flutter_feature` |
 | État | `.claude/features/<nom>/pipeline.json` |
+| Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après la spec validée) |
 
 Étapes, agents et profils de gate :
 
@@ -151,9 +152,12 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
-    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {}, "accepted": [] }
+    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {}, "accepted": [],
+    "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
+- **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Sophie (nouveau run
+  seulement). Une issue existante fait partie de l'entrée de Sophie.
 - **Branche** : déjà en place via le worktree (voir plus haut). Les modifications non commitées du
   checkout principal ne suivent pas : signale-le si elles concernent cette feature.
 - Écris `<nom>` dans `.claude/features/.current` (secours pour les hooks quand la branche ne suit pas
@@ -161,8 +165,8 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 
 ### 1. Spec — Sophie (`feature-specifier`)
 
-Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), racine, chemin de sortie,
-et la phrase : « Tu proposes l'architecture, l'humain la tranche : chaque décision structurante va en §9
+Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), l'issue GitLab existante
+entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, et la phrase : « Tu proposes l'architecture, l'humain la tranche : chaque décision structurante va en §9
 avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
 
 ### 1b. Critique — Camille (`feature-spec-critic`)
@@ -203,6 +207,9 @@ Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications �
 Sophie avec la spec existante + le retour, puis 1b ; repasse par 1a si §9 a bougé).
 Validation → `human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon »
 par « validée le <date> » dans l'en-tête de la spec.
+
+**1c. Issue GitLab.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit
+feature (spec et `archi.json` validés). Sinon rien.
 
 ### 2. Contrats — Arthur (`feature-architect`)
 
@@ -371,6 +378,7 @@ Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîch
 ```
 # Evidence — <nom>
 Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
+Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue.md, partie C)
 
 ## Architecture                      ← archi.json → summary + §9 avec le statut final de chaque décision
 | ID | Décision | Statut (validée / modifiée par l'humain) |
@@ -406,7 +414,7 @@ Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> sc
 
 Puis, **dans cet ordre** : invoque la skill `create_commits` (elle découpe le travail restant en
 commits atomiques ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
-lui indiquant que la description de MR est `evidence.md`. `create_mr` applique ses propres règles de
+lui indiquant que la description de MR est `evidence.md` et l'issue liée (`issue.md`, partie C). `create_mr` applique ses propres règles de
 validation humaine avant tout push ou création : tu ne les contournes pas.
 
 `stages.evidence = PASSED`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
@@ -427,7 +435,8 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
   de l'humain (étape 4), suivie d'un nouveau gel.
-- **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation.
+- **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
+  exception : l'issue GitLab de 1c, dont l'humain valide le contenu exact avant l'envoi.
 - **Aux arrêts humains, sois court.** Ce que l'humain doit décider, les faits qui comptent, la question.
   Pas de récit de ce que les agents ont fait.
 - **Chaque arrêt humain commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
@@ -438,7 +447,7 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   rencontre une nouvelle en cours de route la remonte ; tu la poses à l'humain comme en 1a.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** L'humain décide.
 - **`status`** : affiche `pipeline.json` sous forme de tableau (mode, package, étape, statut,
-  tentatives, date) et les arrêts humains validés. Rien d'autre.
+  tentatives, date), l'issue (iid et URL) et les arrêts humains validés. Rien d'autre.
 - **`accept <étape> "<raison>"`** : pose `"accepted": true` et la raison sur les entrées bloquantes
   du rapport de l'étape (`dedup.json`, `review.json`, `spec_review.json`, `tests_review.json`),
   ajoute `{stage, at, reason}` à `pipeline.json → accepted`, relance le verdict. Toujours sur

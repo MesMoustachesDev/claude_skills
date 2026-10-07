@@ -32,6 +32,13 @@ riverpod_major = 3
 writes.extra = features/router/**, features/l10n/lib/**
 
 # ---------------------------------------------------------------------------
+# Issue GitLab créée par /feature et /fix (~/.claude/pipeline/issue.md). Vides = aucun label, personne.
+# ---------------------------------------------------------------------------
+issue.labels.feature =
+issue.labels.fix = bug
+issue.assignee = @me
+
+# ---------------------------------------------------------------------------
 # Seuils (surcharger ici pour dévier des défauts globaux)
 # ---------------------------------------------------------------------------
 threshold.cyclomatic = 10
