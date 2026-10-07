@@ -20,7 +20,7 @@ Le nom est en snake_case et nomme **le changement**, pas forcément le package. 
 branche `feature/<nom>` = un dossier de travail `.claude/features/<nom>/` = un package cible :
 - **mode `create`** (défaut) : le package `features/<nom>` (ou `package_path` de la config) est créé ;
   tout le package est dans le périmètre des gates.
-- **mode `extend`** (`--in <package>`, ou décidé par le specifier en §8 « extension de … ») : le
+- **mode `extend`** (`--in <package>`, ou décidé par Sophie en §8 « extension de … ») : le
   package existe ; le **périmètre** des gates de qualité est le diff depuis `base_branch` — fichiers
   ajoutés, lignes ajoutées. La feature est responsable de ce qu'elle touche et doit laisser le reste
   au moins aussi bon : les gates d'intégrité (compilation, suite verte, gel, dépendances, périmètre,
@@ -76,21 +76,21 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 
 Étapes, agents et profils de gate :
 
-| # | Étape | Agent (`subagent_type`) | Gate | Arrêt humain après |
-|---|---|---|---|---|
-| 1 | spec | `feature-specifier` | — | non |
-| 1b | critique | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
-| 2 | contracts | `feature-architect` | `contracts` | non |
-| 2b | dedup | `feature-dedup` | `dedup_verdict` | **oui** : architecture réelle (code scaffoldé) vs architecture validée |
-| 3 | tests | `feature-test-writer` | `red` | non |
-| 3b | revue des tests | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) |
-| 4 | impl | `feature-implementer` | `green` | non |
-| 5 | clean | `feature-cleaner` | `clean` | non |
-| 5b | dedup | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) |
-| 6 | review | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) |
-| 7 | harden | `feature-hardener` | `harden` | **oui** : mutants expliqués |
-| 8 | qa | `feature-qa` | `qa` | **oui** : captures |
-| 9 | evidence | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` |
+| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Arrêt humain après |
+|---|---|---|---|---|---|
+| 1 | spec | Sophie | `feature-specifier` | — | non |
+| 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
+| 2 | contracts | Arthur | `feature-architect` | `contracts` | non |
+| 2b | dedup | Denis | `feature-dedup` | `dedup_verdict` | **oui** : architecture réelle (code scaffoldé) vs architecture validée |
+| 3 | tests | Théo | `feature-test-writer` | `red` | non |
+| 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) |
+| 4 | impl | Ivan | `feature-implementer` | `green` | non |
+| 5 | clean | Nina | `feature-cleaner` | `clean` | non |
+| 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) |
+| 6 | review | Romain | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) |
+| 7 | harden | Hugo | `feature-hardener` | `harden` | **oui** : mutants expliqués |
+| 8 | qa | Quentin | `feature-qa` | `qa` | **oui** : captures |
+| 9 | evidence | — | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` |
 
 ---
 
@@ -115,7 +115,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
    dérive un brick projet dans `./bricks/feature/` à partir du brick global, en appliquant les
    différences (dossiers, nommage, imports), et mets `brick = project` dans la config. Sinon
    `brick = global`. Dans les deux cas : `mason add -g <nom> --path <chemin>` si `mason` est installé.
-   S'il ne l'est pas, donne la commande `dart pub global activate mason_cli` et continue : l'architect
+   S'il ne l'est pas, donne la commande `dart pub global activate mason_cli` et continue : Arthur
    sait scaffolder à la main.
 5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html` et `.claude/features/.current`
    s'ils n'y sont pas.
@@ -159,15 +159,15 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 - Écris `<nom>` dans `.claude/features/.current` (secours pour les hooks quand la branche ne suit pas
   la convention).
 
-### 1. Spec — `feature-specifier`
+### 1. Spec — Sophie (`feature-specifier`)
 
 Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), racine, chemin de sortie,
 et la phrase : « Tu proposes l'architecture, l'humain la tranche : chaque décision structurante va en §9
 avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
 
-### 1b. Critique — `feature-spec-critic`
+### 1b. Critique — Camille (`feature-spec-critic`)
 
-Lance `feature-spec-critic` (prompt : nom, `spec.md`, `create_feature_rules.md`, template de spec).
+Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `create_feature_rules.md`, template de spec).
 Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
 `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
 `loops.spec`, max 2, puis tu montres les bloquants restants à l'humain avec la spec.
@@ -195,30 +195,30 @@ nouveau **pour les seules lignes encore `proposée`** (une décision tranchée n
 specifier, notes non bloquantes du critique. Le rapport est déjà ouvert : renvoie à ses sections
 « Spec » et « Tests » plutôt que de les recopier.
 Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance
-le specifier avec la spec existante + le retour, puis 1b ; repasse par 1a si §9 a bougé).
+Sophie avec la spec existante + le retour, puis 1b ; repasse par 1a si §9 a bougé).
 Validation → `human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon »
 par « validée le <date> » dans l'en-tête de la spec.
 
-### 2. Contrats — `feature-architect`
+### 2. Contrats — Arthur (`feature-architect`)
 
 Prompt : nom, **mode**, `spec.md`, `create_feature_rules.md`, package, valeur de `brick`. En mode
 `extend`, ajoute : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ». Au retour, vérifie
 `stages.contracts` dans `pipeline.json` (le hook l'a écrit).
 Le rapport mentionne un écart avec la spec → **arrêt humain hors plan** : montre l'écart, propose
-« corriger la spec et relancer l'architect » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
+« corriger la spec et relancer Arthur » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
 
-### 2b. Roue réinventée — `feature-dedup`
+### 2b. Roue réinventée — Denis (`feature-dedup`)
 
 Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
 1. `gauntlet.sh dedup_candidates <nom>` → `.claude/features/<nom>/dedup_candidates.json`.
    S'il n'y a aucune entrée, saute l'agent : `stages.dedup = PASSED`.
-2. Lance `feature-dedup` (prompt : nom, package, chemin des candidats, `spec.md`).
+2. Lance Denis (`feature-dedup`, prompt : nom, package, chemin des candidats, `spec.md`).
 3. `gauntlet.sh dedup_verdict <nom>` : vert → `stages.dedup = PASSED`. À ce stade le verdict ne
    bloque que les entrées `fix_by: architect` (un choix de contrat : réutiliser un type, un use case).
    Les entrées `fix_by: cleaner` (factoriser du code existant, extraire un widget porteur de rendu)
-   demandent du vrai code, que l'architect ne peut pas écrire sous le gate des stubs : le script les
-   affiche « reportées au cleaner » sans bloquer, tu les transmets à l'étape 5, et 5b les revérifie
-   en bloquant. Ne relance jamais l'architect sur une entrée `cleaner`. Rouge → relance l'**architect**
+   demandent du vrai code, qu'Arthur ne peut pas écrire sous le gate des stubs : le script les
+   affiche « reportées à Nina » sans bloquer, tu les transmets à l'étape 5, et 5b les revérifie
+   en bloquant. Ne relance jamais Arthur sur une entrée `cleaner`. Rouge → relance **Arthur**
    avec `dedup.md` (« ces déclarations existent déjà : utilise / étends l'existant », entrées
    `architect` seulement), puis 2b à nouveau ; `loops.dedup_contracts`, max 2, puis arrêt humain hors plan. L'humain peut **accepter**
    un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
@@ -234,7 +234,7 @@ non nommée en §8, classe domain/presentation hors §5).
 
 En 5 lignes : le nombre de classes par couche, les dépendances inter-features, les écarts (tous, un
 par ligne). `AskUserQuestion` : « Valider l'architecture » / « Corriger : … » (texte libre).
-- Correction qui reste dans la spec validée (nommage, découpage, placement) → relance l'**architect**
+- Correction qui reste dans la spec validée (nommage, découpage, placement) → relance **Arthur**
   avec le retour, puis 2b et 2c à nouveau.
 - Correction qui change une décision de §9 ou un contrat de §5 → retour au **specifier** (décision
   imposée, statut `modifiée`), 1b, 1a pour cette ligne seulement, puis 2 depuis le début.
@@ -242,15 +242,15 @@ Validation → `human_gates.contracts = {at, by: "user"}`.
 
 Puis commit : `git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold and contracts"`.
 
-### 3. Tests — `feature-test-writer`
+### 3. Tests — Théo (`feature-test-writer`)
 
 Prompt : nom, `spec.md`, package, la liste des chemins autorisés en lecture (`lib/src/domain/**`,
 `lib/src/presentation/keys.dart`, `**/*_event.dart`, `**/*_state.dart`, `lib/src/data/model/*.dart`),
 `~/.claude/commands/create_test.md`. Au retour, `stages.red` doit être `PASSED`.
 
-### 3b. Revue des tests — `feature-test-reviewer`
+### 3b. Revue des tests — Gaëlle (`feature-test-reviewer`)
 
-Lance `feature-test-reviewer` (prompt : nom, `spec.md`, package, `tests.md`, `create_test.md`).
+Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, package, `tests.md`, `create_test.md`).
 Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writer** avec
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
 `gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis arrêt humain avec les bloquants restants.
@@ -260,7 +260,7 @@ Vert → **Arrêt humain 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` d
 `.claude/features/<nom>/tests.md` (le fichier entier : c'est
 court et c'est fait pour être lu), la table de couverture de `tests_review.md`, les tests « passe
 déjà » avec la justification de l'agent, et les contrats manquants s'il y en a. `AskUserQuestion` :
-« Valider les tests » / « Il manque des scénarios » (texte libre → relance le test-writer avec le
+« Valider les tests » / « Il manque des scénarios » (texte libre → relance Théo avec le
 retour, puis 3b ; ses fichiers existants restent, il complète).
 
 Validation → **gel** :
@@ -268,39 +268,39 @@ Validation → **gel** :
 git add <package>/test <package>/pubspec.yaml && git commit -m "test(<nom>): acceptance and unit tests (frozen)"
 ```
 Enregistre le SHA dans `pipeline.json → tests_freeze_sha`, `human_gates.tests`, `stages.red = PASSED`.
-À partir d'ici, `test/` ne change plus, sauf ajouts du hardener.
+À partir d'ici, `test/` ne change plus, sauf ajouts de Hugo.
 
-### 4. Implémentation — `feature-implementer`
+### 4. Implémentation — Ivan (`feature-implementer`)
 
 Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntlet/last_red.log`
 (ou `last_green.log` en reprise/boucle) — la sortie rouge. Au retour :
 - `stages.green = PASSED` → continue.
 - `FAILED` (5 tentatives) → **arrêt humain hors plan** : montre le rapport de l'agent (ce qui bloque,
-  tests suspects), les 40 dernières lignes du log, et propose : relancer l'implementer avec une
+  tests suspects), les 40 dernières lignes du log, et propose : relancer Ivan avec une
   consigne / corriger un test suspect (toi, sur instruction explicite de l'humain, **et tu re-gèles** :
   nouveau commit, nouveau `tests_freeze_sha`) / revenir à la spec.
 - Le rapport contient `Décision d'architecture requise` → **arrêt humain hors plan**, comme en 1a :
   rapport HTML, une question avec les deux options. La réponse va en §9 (nouvelle ligne, statut
-  `validée` ou `modifiée`), puis `SendMessage` à l'implementer avec la décision.
+  `validée` ou `modifiée`), puis `SendMessage` à Ivan avec la décision.
 - Le rapport liste des « tests suspects » alors que le gate est vert → transmets-les tel quel à
   l'arrêt humain 4, ne bloque pas.
 
-### 5. Nettoyage — `feature-cleaner`
+### 5. Nettoyage — Nina (`feature-cleaner`)
 
 Prompt : nom, package, `last_clean.log` si présent, et `dedup.md` s'il porte des entrées
 `fix_by: cleaner` reportées depuis 2b (« applique ces factorisations ; 5b les revérifie et bloque »).
 `stages.clean = PASSED` → continue ; `FAILED` → même traitement qu'en 4.
 
-### 5b. Roue réinventée, second passage — `feature-dedup`
+### 5b. Roue réinventée, second passage — Denis (`feature-dedup`)
 
 Même mécanique qu'en 2b, sur le code implémenté (helpers, widgets, extensions apparus pendant 4 et 5).
 Rouge → relance le **cleaner** avec `dedup.md`, puis 5b ; `loops.dedup_clean`, max 2.
 
-### 6. Revue — `feature-reviewer`
+### 6. Revue — Romain (`feature-reviewer`)
 
 D'abord les scripts : `~/.claude/scripts/gauntlet.sh maintain <nom>` (dépendances inter-features
 justifiées, santé des packages pub.dev, design system, l10n, code mort, périmètre, secrets…). Son
-verdict n'arrête rien ici : le log est une **entrée** du reviewer, qui transforme chaque échec en finding.
+verdict n'arrête rien ici : le log est une **entrée** de Romain, qui transforme chaque échec en finding.
 
 Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
 `.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/features/<nom>/dedup.md`,
@@ -311,29 +311,29 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
 - vert → `stages.review = PASSED`. Affiche **tout de suite** à l'humain chaque entrée de
   `review.json → suggestions` (une ligne : fichier, problème, correctif), et demande en un
   `AskUserQuestion` multiSelect lesquelles appliquer dans la feature. Les retenues repartent à
-  l'implementer puis au cleaner, avant le hardener ; les autres vont en « Suggestions non appliquées »
+  Ivan puis à Nina, avant Hugo ; les autres vont en « Suggestions non appliquées »
   dans l'evidence. Ne jamais résumer les suggestions en un simple nombre.
-- rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance l'**implementer** (prompt : la liste
+- rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance **Ivan** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
   Au-delà de 2 : arrêt humain hors plan avec la liste des critiques persistantes.
 
-### 7. Durcissement — `feature-hardener`
+### 7. Durcissement — Hugo (`feature-hardener`)
 
 Prompt : nom, package, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
 `stages.harden = PASSED` → **arrêt humain 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
 (`display: render`). Montre `mutants.md` en entier, le score, le nombre de
 tests ajoutés, les tests existants signalés suspects (4 et 7), et `review.json → suggestions` en
 résumé. `AskUserQuestion` : « Valider » / « Ces explications ne tiennent pas : … » (texte libre →
-relance le hardener avec le retour). Validation → `human_gates.mutants`.
+relance Hugo avec le retour). Validation → `human_gates.mutants`.
 
-### 8. QA — `feature-qa`
+### 8. QA — Quentin (`feature-qa`)
 
 Prompt : nom, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
 **arrêt humain 5.** `gauntlet.sh report <nom> qa` (les captures y sont intégrées). Montre `qa.md` en
 entier et envoie le rapport puis les captures avec `SendUserFile`
 (`.claude/features/<nom>/qa/*/*.png`, toutes, en un appel par plateforme) — l'humain regarde des
 images, pas des chemins. `AskUserQuestion` : « Valider » / « Défauts bloquants : … » (→ relance
-l'implementer avec les défauts, puis cleaner, reviewer, hardener sont **sautés** si `lib/` n'a changé
+Ivan avec les défauts, puis Nina, Romain et Hugo sont **sautés** si `lib/` n'a changé
 que dans `presentation/**/view/**` — sinon rejoue 5→7 — puis QA à nouveau ; `loops.qa`, max 2).
 Validation → `human_gates.qa`.
 
@@ -372,7 +372,7 @@ Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
 | Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md
 
 ## Mesures
-Tests : <n> (dont <n> ajoutés par le hardener) · Couverture lignes modifiées : <n>%
+Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) · Complexité max : <n> · Dépendances : ✓
 Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/7
 
@@ -411,6 +411,8 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 
 ## Règles de conduite
 
+- **Les agents ont un prénom.** Dans tes messages à l'humain, tes rapports et tes prompts de lancement,
+  désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
   Le prompt de lancement tient en 15 lignes.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
