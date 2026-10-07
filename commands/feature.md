@@ -167,7 +167,7 @@ avec le statut `proposée`, une alternative réelle et la raison. Tu ne la prés
 
 ### 1b. Critique — Camille (`feature-spec-critic`)
 
-Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `create_feature_rules.md`, template de spec).
+Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `archi.json`, `create_feature_rules.md`, template de spec).
 Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
 `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
 `loops.spec`, max 2, puis tu montres les bloquants restants à l'humain avec la spec.
@@ -175,19 +175,24 @@ Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier*
 Vert → **Arrêt humain 1 : architecture, puis spec.** L'humain garde la main sur l'archi : rien
 n'est scaffoldé tant qu'il n'a pas tranché chaque décision.
 
-**1a. Architecture.** `gauntlet.sh report <nom> spec`, puis `SendUserFile` du `report.html`
-(`display: render`, légende « décisions d'architecture à trancher »). Le rapport montre les cartes §9
-et les diagrammes §8. Puis `AskUserQuestion`, **une question par ligne de §9 au statut `proposée`**
-(par paquets de 4 questions max par appel) :
+**1a. Architecture.** `gauntlet.sh report <nom> spec`. Si la section « Architecture » porte le badge
+« incohérence(s) » (archi.json ne colle pas à la spec), relance Sophie avec la liste affichée, sans
+montrer le rapport, puis 1b ; ce compteur partage `loops.spec`. Sinon `SendUserFile` du `report.html`
+(`display: render`, légende « décisions d'architecture à trancher »). Le rapport est interactif : un
+résumé, les décisions (clic = surligner où elles s'appliquent ; « Voir l'alternative » redessine la
+carte et l'arborescence), la carte de ce qui change par couche (squelette standard masqué), les
+parcours en séquence, l'arborescence des fichiers ajoutés et modifiés. Dis-le en une ligne. Puis
+`AskUserQuestion`, **une question par ligne de §9 au statut `proposée`** (par paquets de 4 questions
+max par appel) :
 - `header` : l'ID et le sujet (`A1 Package`) ; `question` : la décision en une phrase et son enjeu ;
 - option 1 : la décision proposée, suffixée « (Recommandé) », avec la raison en description ;
-- option 2 : l'alternative de §9, avec ce qu'elle changerait concrètement en description ;
+- option 2 : l'alternative de §9, avec en description son `impact` tiré de `archi.json → decisions` ;
 - « Other » reste ouvert pour une troisième voie.
 
 Toutes acceptées → passe la colonne Statut de ces lignes à `validée` (édition de `spec.md`, seule
 écriture que tu fais dans la spec avec l'en-tête). Au moins une changée → relance le **specifier** avec
 la spec existante et les décisions imposées (« A2 : <choix de l'humain> — statut `modifiée`, répercute
-sur §5, §6, §8 et les scénarios concernés ; ne touche pas aux autres décisions »), puis 1b, puis 1a à
+sur §5, §6, §8, les scénarios concernés et `archi.json` ; ne touche pas aux autres décisions »), puis 1b, puis 1a à
 nouveau **pour les seules lignes encore `proposée`** (une décision tranchée ne se repose pas).
 `human_gates.architecture = {at, by: "user", decisions: {"A1": "validée", "A2": "modifiée"}}`.
 
@@ -227,10 +232,12 @@ Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
 ### 2c. Arrêt humain 2 : architecture réelle
 
 L'architecture existe maintenant en code. `gauntlet.sh report <nom> contracts`, puis `SendUserFile` du
-`report.html` (`display: render`). La section « Architecture réelle » est générée depuis le package :
-diagramme des classes par couche (ajoutées en bleu, existantes en gris), dépendances du pubspec,
-providers, et les **écarts** avec la spec validée (contrat de §5 absent du code, dépendance du pubspec
-non nommée en §8, classe domain/presentation hors §5).
+`report.html` (`display: render`). La section « Architecture » s'ouvre en mode « Plan vs code » : la
+même carte que celle validée en 1a, où chaque classe prévue absente du code apparaît en pointillé rouge
+et chaque classe ajoutée hors plan en rouge plein ; l'arborescence s'ouvre sur « Écarts » (prévu absent,
+non prévu, conforme, d'après git). La section « Code scaffoldé » liste les autres écarts (contrat de §5
+absent du code, dépendance du pubspec non nommée en §8, classe domain/presentation hors §5), les
+dépendances et les providers.
 
 En 5 lignes : le nombre de classes par couche, les dépendances inter-features, les écarts (tous, un
 par ligne). `AskUserQuestion` : « Valider l'architecture » / « Corriger : … » (texte libre).
@@ -365,7 +372,7 @@ Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîch
 # Evidence — <nom>
 Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
 
-## Architecture                      ← spec §8 (diagrammes mermaid) + §9 avec le statut final de chaque décision
+## Architecture                      ← archi.json → summary + §9 avec le statut final de chaque décision
 | ID | Décision | Statut (validée / modifiée par l'humain) |
 
 ## Acceptation

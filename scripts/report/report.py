@@ -11,6 +11,8 @@ Usage :
 Aucun LLM : le rapport est assemblé à partir des fichiers que le pipeline produit déjà (spec.md,
 pipeline.json, tests.md, repro.json, diagnosis.md, review.json…) et du code du package. Les blocs
 Markdown et Mermaid sont rendus côté navigateur (marked + mermaid via CDN). Imprime le chemin écrit.
+Si .claude/features/<nom>/archi.json existe (écrit par Sophie), la section Architecture est la vue
+interactive d'archi.js / archi.css : résumé, décisions ↔ carte ↔ parcours ↔ fichiers, plan vs code.
 """
 from __future__ import annotations
 
@@ -101,7 +103,12 @@ class Page:
             for i, t in enumerate(self.md_blocks)
         )
         return TEMPLATE.format(title=esc(self.title), header=header, nav=nav, sections=secs,
-                               blocks=blocks, marked=MARKED, mermaid=MERMAID)
+                               blocks=blocks, marked=MARKED, mermaid=MERMAID,
+                               archi_css=asset("archi.css"), archi_js=asset("archi.js").replace("</script", "<\\/script"))
+
+
+def asset(name: str) -> str:
+    return read(os.path.join(os.path.dirname(os.path.abspath(__file__)), name)) or ""
 
 
 def badge(text: str, kind: str = "") -> str:
@@ -371,6 +378,115 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
 
 
+# --- archi.json : vue interactive de l'architecture ----------------------------------------------
+
+ARCHI_LAYERS = ("presentation", "domain", "data", "injection", "external")
+CONTRACT_SUFFIX = re.compile(r"(Page|Bloc|Cubit|UseCase|Repository|RepositoryImpl|DataSource|DataSourceImpl|"
+                             r"Entity|DataModel|Mapper)$")
+
+
+def decisions_rows(sec9: str | None) -> list[dict]:
+    head, rows = parse_md_table(sec9 or "")
+    h = [c.lower() for c in head]
+
+    def col(row: list[str], *names: str) -> str:
+        for n in names:
+            for i, c in enumerate(h):
+                if n in c and i < len(row):
+                    return row[i]
+        return ""
+
+    return [{"id": col(r, "id"), "subject": col(r, "sujet", "domaine"),
+             "proposed": col(r, "décision", "decision", "choix"), "alternative": col(r, "alternative"),
+             "reason": col(r, "raison"), "status": col(r, "statut") or "—"} for r in rows]
+
+
+def changed_files(root: str, base: str) -> list[dict]:
+    """Fichiers touchés par la branche (commits + working tree + non suivis), hors .claude/."""
+    mb = sh("git", "merge-base", base, "HEAD", cwd=root).strip() or base
+    out: dict[str, str] = {}
+    for ln in sh("git", "diff", "--name-status", "-M", mb, cwd=root).splitlines():
+        parts = ln.split("\t")
+        if len(parts) < 2:
+            continue
+        code, path = parts[0][0], parts[-1]
+        out[path] = {"A": "new", "D": "deleted", "R": "new"}.get(code, "modified")
+    for path in sh("git", "ls-files", "--others", "--exclude-standard", cwd=root).split("\n"):
+        if path:
+            out[path] = "new"
+    return [{"path": p, "status": s} for p, s in sorted(out.items()) if not p.startswith(".claude/")]
+
+
+def archi_payload(archi: dict, decisions: list[dict], sec5: str | None, root: str, state: dict,
+                  scan: dict | None) -> dict:
+    nodes = archi.get("nodes") or []
+    ids = {n.get("id") for n in nodes}
+    alt_ids = {a.get("id") for d in (archi.get("decisions") or {}).values()
+               for a in ((d or {}).get("alternative") or {}).get("add") or []}
+    warnings = []
+    for n in nodes:
+        if n.get("layer") not in ARCHI_LAYERS:
+            warnings.append(f"{n.get('id')} : layer « {n.get('layer')} » inconnu ({', '.join(ARCHI_LAYERS)})")
+        if n.get("status") in ("new", "modified") and not n.get("file"):
+            warnings.append(f"{n.get('id')} : statut {n.get('status')} sans « file »")
+    for e in archi.get("edges") or []:
+        for k in ("from", "to"):
+            if e.get(k) not in ids:
+                warnings.append(f"arête {e.get('from')} → {e.get('to')} : {e.get(k)} n'est pas un nœud")
+    for f in archi.get("flows") or []:
+        for s in f.get("steps") or []:
+            for k in ("from", "to"):
+                if s.get(k) != "user" and s.get(k) not in ids:
+                    warnings.append(f"parcours « {f.get('title')} » : {s.get(k)} n'est pas un nœud")
+    anchored = {d for n in nodes for d in n.get("decisions") or []}
+    anchored |= {d for f in archi.get("files") or [] for d in f.get("decisions") or []}
+    anchored |= {s.get("decision") for f in archi.get("flows") or [] for s in f.get("steps") or []}
+    anchored |= set((archi.get("decisions") or {}).keys())
+    for d in decisions:
+        if d["id"] and d["id"] not in anchored:
+            warnings.append(f"{d['id']} ({d['subject']}) n'est rattachée à aucun nœud, fichier ou étape")
+    contracts = {c for c in spec_class_names(sec5) if CONTRACT_SUFFIX.search(c)}
+    for c in sorted(contracts - ids - alt_ids):
+        warnings.append(f"{c} est un contrat de §5 absent de la carte")
+
+    planned = {}
+    for n in nodes:
+        if n.get("file") and n.get("status") in ("new", "modified"):
+            planned[n["file"]] = {"path": n["file"], "status": n["status"], "node": n["id"],
+                                  "decisions": n.get("decisions") or [], "why": n.get("note", "")}
+    for f in archi.get("files") or []:
+        planned.setdefault(f.get("path"), {**f, "decisions": f.get("decisions") or []})
+
+    real = None
+    files_real = changed_files(root, state.get("base") or "HEAD")
+    if scan is not None or files_real:
+        real = {"files": files_real, "present": [], "unplanned": [], "edges": []}
+        if scan is not None:
+            cls = scan["classes"]
+            sealed = {k for k, v in cls.items() if v["sealed"]}
+            real["present"] = sorted(n for n in ids if n in cls)
+            extra = [k for k, v in cls.items() if v["new"] and k not in ids and not k.startswith("_")
+                     and v["extends"] not in sealed and v["layer"] in ("presentation", "domain", "data", "injection")]
+            real["unplanned"] = [{"id": k, "layer": cls[k]["layer"], "file": cls[k]["file"],
+                                  "kind": "interface" if cls[k]["abstract"] and not cls[k]["sealed"] else ""}
+                                 for k in sorted(extra)]
+            known = ids | set(extra)
+            for k in extra:
+                c = cls[k]
+                for t in sorted(c["fields"]) + c["implements"]:
+                    if t in known and t != k:
+                        real["edges"].append({"from": k, "to": t,
+                                              "kind": "implements" if t in c["implements"] else ""})
+    return {"archi": archi, "decisions": decisions, "planned_files": list(planned.values()),
+            "real": real, "warnings": warnings}
+
+
+def archi_section(payload: dict, stage: str | None) -> str:
+    data = json.dumps({**payload, "stage": stage or ""}, ensure_ascii=False).replace("</", "<\\/")
+    return (f'<script type="application/json" id="archi-data">{data}</script>'
+            '<div id="archi-app"><p class="muted">chargement…</p></div>')
+
+
 # --- feature -------------------------------------------------------------------------------------
 
 def feature_report(root: str, name: str, focus: str | None) -> str:
@@ -380,18 +496,11 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     mode = state.get("mode", "create")
     spec = read(os.path.join(fdir, "spec.md")) or ""
     secs = spec_sections(spec)
-    page = Page(f"{name} · feature", {"spec": "archi", "contracts": "real", "tests": "tests",
+    archi = read_json(os.path.join(fdir, "archi.json"))
+    page = Page(f"{name} · feature", {"spec": "archi", "contracts": "archi" if archi else "real", "tests": "tests",
                                       "mutants": "mutants", "qa": "qa", "evidence": "archi"}.get(focus or "", focus))
 
-    # Architecture proposée / validée
-    page.add("archi", "Architecture : décisions",
-             '<p class="hint">Chaque ligne de §9 est une décision que tu valides ou modifies. '
-             "Statut <i>proposée</i> = pas encore tranchée par toi.</p>"
-             + decisions_html(secs.get("9")) + "<h3>§8 Architecture (proposée par le specifier)</h3>"
-             + page.md(secs.get("8")),
-             badge(f"{sum(1 for r in parse_md_table(secs.get('9', ''))[1])} décisions"))
-
-    # Architecture réelle (après le scaffold de l'architect)
+    scan = None
     if os.path.isdir(os.path.join(root, pkg_rel, "lib")):
         scope = None
         if mode == "extend":
@@ -400,7 +509,28 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
             scope = set(sh("git", "diff", "--name-only", mb, "--", pkg_rel, cwd=root).split()) | \
                 set(sh("git", "ls-files", "--others", "--exclude-standard", "--", pkg_rel, cwd=root).split())
         scan = scan_package(root, pkg_rel, scope)
-        diagram = arch_mermaid(scan)
+
+    # Architecture proposée / validée
+    n_dec = len(parse_md_table(secs.get("9", ""))[1])
+    if archi:
+        payload = archi_payload(archi, decisions_rows(secs.get("9")), secs.get("5"), root, state, scan)
+        page.add("archi", "Architecture",
+                 archi_section(payload, focus)
+                 + "<details class='sub'><summary><h3>§8 en détail (dépendances, routes, l10n, machines d'états)</h3>"
+                 "</summary>" + page.md(secs.get("8")) + "</details>",
+                 badge(f"{n_dec} décisions") + (badge(f"{len(payload['warnings'])} incohérence(s)", "ko")
+                                               if payload["warnings"] else ""))
+    else:
+        page.add("archi", "Architecture : décisions",
+                 '<p class="hint">Chaque ligne de §9 est une décision que tu valides ou modifies. '
+                 "Statut <i>proposée</i> = pas encore tranchée par toi. (Pas d'archi.json : vue simple.)</p>"
+                 + decisions_html(secs.get("9")) + "<h3>§8 Architecture (proposée par le specifier)</h3>"
+                 + page.md(secs.get("8")),
+                 badge(f"{n_dec} décisions"))
+
+    # Architecture réelle (après le scaffold de l'architect)
+    if scan is not None:
+        diagram = "" if archi else arch_mermaid(scan)
         in_code = set(scan["classes"])
         expected = spec_class_names(secs.get("5"))
         missing = sorted(expected - in_code)
@@ -420,11 +550,12 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
             gaps.append(f"<li>{badge('hors spec', 'warn')} classes domain/presentation non nommées en §5 : {esc(', '.join(extra))}</li>")
         gap_html = (f'<ul class="gaps">{"".join(gaps)}</ul>' if gaps
                     else f'<p>{badge("aucun écart détecté avec la spec", "ok")}</p>')
-        legend = ('<p class="hint">Généré depuis le code de <code>' + esc(pkg_rel) + "</code>. "
+        legend = ("" if archi else
+                  '<p class="hint">Généré depuis le code de <code>' + esc(pkg_rel) + "</code>. "
                   "Bleu : ajouté par cette feature. Gris pointillé : existant. Flèche pleine : dépendance "
                   "injectée (champ). Pointillée : implements/extends. Events/states repliés dans leur sealed.</p>")
         prov = table(["provider", "fichier"], [[p, f] for p, f in scan["providers"]])
-        page.add("real", "Architecture réelle (code)",
+        page.add("real", "Code scaffoldé : écarts, dépendances, providers" if archi else "Architecture réelle (code)",
                  gap_html + legend + (f'<pre class="mermaid">{esc(diagram)}</pre>' if diagram else "")
                  + "<h3>Dépendances du package</h3>"
                  + table(["type", "packages"], [["workspace (path)", ", ".join(deps) or "—"],
@@ -612,9 +743,11 @@ th {{ color:var(--muted); font-weight:600; }}
 .gaps {{ padding-left:18px; }} .gaps li {{ margin:4px 0; }}
 pre {{ background:var(--code); padding:12px; border-radius:8px; overflow-x:auto; font-size:13px; }}
 pre.mermaid {{ background:#fff; text-align:center; overflow:auto; max-height:80vh; }}
+{archi_css}
 pre.diff span {{ display:block; }} pre.diff .add {{ background:var(--ok-bg); color:var(--ok); }} pre.diff .del {{ background:var(--ko-bg); color:var(--ko); }} pre.diff .hunk {{ color:var(--accent); }}
 .gallery {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }}
 .gallery img {{ width:100%; border-radius:6px; border:1px solid var(--line); }} figcaption {{ font-size:12px; color:var(--muted); }}
+details.sub {{ margin-top:18px; border-top:1px solid var(--line); }} details.sub > summary {{ padding:10px 0; }}
 .md table {{ margin:8px 0; }} .md blockquote {{ border-left:3px solid var(--line); margin:0; padding-left:12px; color:var(--muted); }}
 </style></head><body><main>
 {header}
@@ -624,6 +757,7 @@ pre.diff span {{ display:block; }} pre.diff .add {{ background:var(--ok-bg); col
 {blocks}
 <script src="{marked}"></script>
 <script src="{mermaid}"></script>
+<script>{archi_js}</script>
 <script>
 (function () {{
   const renderer = {{ code(code, lang) {{

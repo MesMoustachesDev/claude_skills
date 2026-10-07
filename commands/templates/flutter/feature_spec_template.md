@@ -263,35 +263,12 @@ N/A
 - **Services existants réutilisés** (ne pas réinventer) : 
 
 <!--
-  Trois diagrammes Mermaid, rendus dans le rapport HTML que l'humain lit pour trancher l'archi.
-  Ils nomment les VRAIES classes de la section 5. Le rapport les comparera au code scaffoldé.
+  La vue que l'humain lit pour trancher (carte de ce qui change, parcours, arborescence des fichiers)
+  ne vit PAS ici : elle est dans `archi.json`, à côté de cette spec (format :
+  ~/.claude/commands/templates/flutter/feature_archi_example.json). Le rapport HTML la rend
+  interactive et la compare au code scaffoldé. Seul diagramme gardé dans la spec : la machine
+  d'états de chaque BLoC, que les agents suivants consomment.
 -->
-
-**Dépendances du package**
-
-```mermaid
-flowchart LR
-  feature["{feature_name}"] --> core
-  feature --> l10n
-  feature --> design
-```
-
-**Flux de données**
-
-```mermaid
-flowchart LR
-  subgraph presentation
-    Page["{Name}Page"] --> Bloc["{Name}Bloc"]
-  end
-  subgraph domain
-    UC["Fetch{Name}UseCase"] --> Repo["«interface» {Name}Repository"]
-  end
-  subgraph data
-    RepoImpl["{Name}RepositoryImpl"] --> Remote["{Name}RemoteDataSourceImpl"]
-  end
-  Bloc --> UC
-  RepoImpl -. implements .-> Repo
-```
 
 **États du BLoC** (un diagramme par BLoC)
 

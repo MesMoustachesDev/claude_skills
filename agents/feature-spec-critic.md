@@ -24,7 +24,7 @@ devineront différemment. Ton travail est de trouver ces endroits **avant** que 
 
 ## Ce que tu reçois
 
-Le nom de la feature, `spec.md`, `.claude/rules/create_feature_rules.md`, le template
+Le nom de la feature, `spec.md`, `archi.json`, `.claude/rules/create_feature_rules.md`, le template
 `~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les exigences
 par section).
 
@@ -41,8 +41,15 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
 - §6 : un payload d'exemple par `DataModel` de §5, tous les champs, et la table de mapping couvre
   chaque champ de l'entity.
 - §8 : chaque dépendance inter-features nommée ; chaque route, clé l10n, event analytics de §3-§4 listé.
-- §8 : les trois diagrammes Mermaid sont présents et nomment les classes de §5 (pas de boîte
-  générique, pas de classe absente de §5, pas de flèche qui contredit la direction des couches).
+- §8 : une machine d'états Mermaid par BLoC de §5, dont les events et states sont ceux de §5.
+- `archi.json` (format : `~/.claude/commands/templates/flutter/feature_archi_example.json`) dit la
+  même chose que la spec : chaque nœud `new` est une classe de §5 ; chaque fichier hors package
+  correspond à une route, une clé l10n ou une dépendance de §8 ; chaque parcours suit un scénario de
+  §4 (`scenario` = son titre) avec les events, use cases et states de §5 ; aucune arête ne contredit
+  la direction des couches ; chaque décision de §9 est rattachée à un nœud, un fichier ou une étape ;
+  un `standard: true` ne cache pas une classe qui s'écarte de la feature de référence. Un écart est
+  un **bloquant** : l'humain tranchera l'archi sur cette vue, pas sur la spec. `archi.json` absent :
+  bloquant.
 - §9 : chaque décision structurante visible dans §5-§8 (package, data sources, Stream/Future,
   découpage des BLoCs, dépendance, logique à cheval sur deux couches) y a une ligne au format
   `ID | Sujet | Décision proposée | Alternative | Raison | Statut`. Une alternative-épouvantail

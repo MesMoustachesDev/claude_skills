@@ -1,0 +1,96 @@
+/* archi.css — vue interactive de l'architecture (report.py, section « Architecture »). */
+#archi-app { --new:var(--accent); --mod:var(--warn); --reused:var(--muted); --sel:var(--human); --sel-bg:var(--human-bg); }
+#archi-app h3 { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+#archi-app h3 .tools { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; font-weight:400; }
+.ax-summary { margin:4px 0 6px; padding-left:20px; } .ax-summary li { margin:2px 0; }
+.ax-counts { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 4px; }
+.ax-warn { border:1px solid var(--ko); background:var(--ko-bg); color:var(--ko); border-radius:8px; padding:8px 12px; font-size:13px; margin:10px 0; }
+.ax-warn ul { margin:4px 0 0; padding-left:18px; }
+.ax-btn { font:inherit; font-size:12px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+.ax-btn:hover { border-color:var(--accent); } .ax-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.ax-seg { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+.ax-seg .ax-btn { border:0; border-radius:0; } .ax-seg .ax-btn + .ax-btn { border-left:1px solid var(--line); }
+.ax-hint { color:var(--muted); font-size:12px; margin:2px 0 8px; }
+.ax-sel-bar { position:sticky; top:38px; z-index:3; background:var(--sel-bg); color:var(--sel); border-radius:8px; padding:6px 12px; font-size:13px; display:flex; gap:10px; align-items:center; margin:8px 0; }
+.ax-sel-bar button { margin-left:auto; }
+
+/* décisions */
+.ax-decisions { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+.ax-dec { border:1px solid var(--line); border-left:4px solid var(--c, var(--line)); border-radius:8px; padding:9px 12px; cursor:pointer; background:var(--card); transition:box-shadow .15s; }
+.ax-dec:hover { box-shadow:0 0 0 2px color-mix(in srgb, var(--sel) 25%, transparent); }
+.ax-dec.sel { box-shadow:0 0 0 2px var(--sel); }
+.ax-dec .dh { display:flex; gap:8px; align-items:center; margin-bottom:4px; } .ax-dec .dt { flex:1; color:var(--muted); }
+.ax-dec .row { margin:3px 0; font-size:14px; } .ax-dec .lbl { min-width:82px; }
+.ax-dec .impact { font-size:13px; color:var(--muted); margin-top:4px; }
+.ax-dec .alt-on { color:var(--ok); }
+.ax-dbadge { display:inline-block; font-size:11px; font-weight:600; padding:0 6px; border-radius:999px; background:var(--sel-bg); color:var(--sel); cursor:pointer; margin-left:3px; }
+
+/* carte */
+.ax-map-wrap { position:relative; overflow-x:auto; }
+.ax-map { position:relative; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(150px,1fr); gap:36px; padding:6px 4px 12px; min-width:min-content; }
+.ax-col { display:flex; flex-direction:column; gap:12px; position:relative; z-index:1; }
+.ax-col > .ax-col-title { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); border-bottom:1px solid var(--line); padding-bottom:4px; }
+.ax-pkg { font-size:11px; color:var(--muted); margin:4px 0 -6px; }
+.ax-node { border:1.5px solid var(--sc); border-radius:8px; padding:7px 10px; background:var(--card); cursor:pointer; font-size:13px; line-height:1.35; transition:opacity .15s, box-shadow .15s; }
+.ax-node .nm { font-weight:600; overflow-wrap:anywhere; } .ax-node .kd { font-size:11px; color:var(--muted); }
+.ax-node .nt { font-size:12px; color:var(--muted); margin-top:3px; }
+.ax-node .st { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--sc); font-weight:700; }
+.ax-node.new { --sc:var(--new); } .ax-node.modified { --sc:var(--mod); } .ax-node.reused { --sc:var(--reused); border-style:dashed; }
+.ax-node.unplanned { --sc:var(--ko); background:var(--ko-bg); }
+.ax-node.missing { --sc:var(--ko); border-style:dashed; opacity:.75; }
+.ax-node.alt-add { --sc:var(--ok); border-style:dashed; background:var(--ok-bg); }
+.ax-node.alt-gone { opacity:.35; text-decoration:line-through; }
+.ax-node.hl { box-shadow:0 0 0 3px var(--sel); }
+.ax-dim .ax-node:not(.hl) { opacity:.3; }
+.ax-std { font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; }
+.ax-edges { position:absolute; inset:0; pointer-events:none; z-index:0; overflow:visible; }
+.ax-edges path { fill:none; stroke:var(--muted); stroke-width:1.3; opacity:.65; }
+.ax-edges path.impl { stroke-dasharray:4 3; }
+.ax-edges path.alt { stroke:var(--ok); stroke-dasharray:5 3; opacity:1; stroke-width:1.6; }
+.ax-edges path.gone { stroke:var(--ko); stroke-dasharray:2 3; opacity:.6; }
+.ax-edges path.real { stroke:var(--ko); }
+.ax-edges path.hl { stroke:var(--sel); opacity:1; stroke-width:2; }
+.ax-dim .ax-edges path:not(.hl) { opacity:.15; }
+.ax-edges text { font-size:10px; fill:var(--muted); paint-order:stroke; stroke:var(--card); stroke-width:3px; }
+.ax-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:6px; }
+.ax-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; border:1.5px solid; vertical-align:-2px; margin-right:4px; }
+
+/* parcours */
+.ax-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.ax-seq-wrap { overflow-x:auto; }
+.ax-seq { position:relative; display:grid; min-width:min-content; padding-bottom:8px; }
+.ax-life { position:absolute; top:34px; bottom:0; width:0; border-left:1.5px dashed var(--line); }
+.ax-part { text-align:center; padding:0 4px 10px; position:relative; z-index:1; }
+.ax-part span { display:inline-block; border:1.5px solid var(--sc, var(--line)); border-radius:6px; padding:3px 8px; font-size:12px; font-weight:600; background:var(--card); cursor:pointer; overflow-wrap:anywhere; }
+.ax-part.user span { border-radius:999px; background:var(--code); }
+.ax-part.new { --sc:var(--new); } .ax-part.modified { --sc:var(--mod); } .ax-part.reused { --sc:var(--reused); }
+.ax-part.hl span { box-shadow:0 0 0 3px var(--sel); }
+.ax-msg { position:relative; height:34px; z-index:1; }
+.ax-msg .ln { position:absolute; bottom:9px; height:0; border-top:1.5px solid var(--fg); }
+.ax-msg.ret .ln { border-top-style:dashed; border-color:var(--muted); }
+.ax-msg .ln::after { content:""; position:absolute; top:-5.5px; border:5px solid transparent; }
+.ax-msg.r .ln::after { right:-2px; border-left:7px solid var(--fg); border-right:0; }
+.ax-msg.l .ln::after { left:-2px; border-right:7px solid var(--fg); border-left:0; }
+.ax-msg.ret.r .ln::after { border-left-color:var(--muted); } .ax-msg.ret.l .ln::after { border-right-color:var(--muted); }
+.ax-msg .tx { position:absolute; bottom:13px; transform:translateX(-50%); font-size:12px; white-space:nowrap; background:var(--card); padding:0 4px; }
+.ax-msg.self .tx { transform:none; }
+.ax-msg .n { color:var(--muted); font-size:10px; margin-right:4px; }
+.ax-msg.hl .ln { border-color:var(--sel); border-top-width:2.5px; } .ax-msg.hl .tx { color:var(--sel); font-weight:600; }
+.ax-msg.hl.r .ln::after { border-left-color:var(--sel); } .ax-msg.hl.l .ln::after { border-right-color:var(--sel); }
+
+/* arborescence */
+.ax-tree { font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.ax-tree ul { list-style:none; margin:0; padding-left:18px; border-left:1px dotted var(--line); }
+.ax-tree > ul { padding-left:0; border:0; }
+.ax-tree .dir { cursor:pointer; color:var(--muted); user-select:none; }
+.ax-tree .dir::before { content:"▾ "; } .ax-tree li.closed > .dir::before { content:"▸ "; } .ax-tree li.closed > ul { display:none; }
+.ax-tree .dir .cnt { font-family:-apple-system,system-ui,sans-serif; font-size:11px; }
+.ax-tree .file { cursor:pointer; border-radius:4px; padding:0 4px; margin-left:-4px; }
+.ax-tree .file.hl { background:var(--sel-bg); }
+.ax-tree .mk { display:inline-block; width:16px; font-weight:700; text-align:center; }
+.ax-tree .new .mk { color:var(--new); } .ax-tree .modified .mk { color:var(--mod); } .ax-tree .deleted .mk { color:var(--ko); }
+.ax-tree .gap-missing { color:var(--ko); text-decoration:line-through; } .ax-tree .gap-unplanned .nm { color:var(--ko); }
+.ax-tree .gap-alt { color:var(--ok); } .ax-tree .gap-gone { opacity:.4; text-decoration:line-through; }
+.ax-tree .why { color:var(--muted); font-family:-apple-system,system-ui,sans-serif; font-size:12px; margin-left:8px; }
+.ax-tree .tag { font-family:-apple-system,system-ui,sans-serif; font-size:11px; margin-left:6px; }
+@media (max-width:640px) { .ax-map { grid-auto-columns:minmax(160px,1fr); gap:36px; } }

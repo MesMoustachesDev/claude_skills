@@ -1,0 +1,314 @@
+{
+  "summary": [
+    "Nouveau package features/meal_plan : planning des repas de la semaine, un écran.",
+    "Lecture du planning en Stream depuis Firestore, écriture en Future.",
+    "Réutilise RecipeRepository (features/recipes) via core pour afficher les recettes du planning.",
+    "Touche hors package : une route dans features/router, 6 clés l10n, un event analytics.",
+    "Écart au pattern : pas de data source locale, le cache Firestore suffit (A2)."
+  ],
+  "standard_as": "features/shopping_list",
+  "nodes": [
+    {
+      "id": "MealPlanPage",
+      "layer": "presentation",
+      "status": "new",
+      "standard": true,
+      "file": "features/meal_plan/lib/src/presentation/view/meal_plan_page.dart"
+    },
+    {
+      "id": "MealPlanBloc",
+      "layer": "presentation",
+      "status": "new",
+      "file": "features/meal_plan/lib/src/presentation/bloc/meal_plan_bloc.dart",
+      "note": "un seul BLoC : lecture du planning et déplacement d'un repas",
+      "decisions": [
+        "A3"
+      ]
+    },
+    {
+      "id": "WatchMealPlanUseCase",
+      "layer": "domain",
+      "status": "new",
+      "standard": true,
+      "file": "features/meal_plan/lib/src/domain/usecase/watch_meal_plan_usecase.dart",
+      "decisions": [
+        "A2"
+      ]
+    },
+    {
+      "id": "MoveMealUseCase",
+      "layer": "domain",
+      "status": "new",
+      "file": "features/meal_plan/lib/src/domain/usecase/move_meal_usecase.dart",
+      "note": "valide qu'un créneau n'a qu'un repas"
+    },
+    {
+      "id": "MealPlanRepository",
+      "layer": "domain",
+      "status": "new",
+      "standard": true,
+      "kind": "interface",
+      "file": "features/meal_plan/lib/src/domain/repository/meal_plan_repository.dart"
+    },
+    {
+      "id": "MealPlanRepositoryImpl",
+      "layer": "data",
+      "status": "new",
+      "standard": true,
+      "file": "features/meal_plan/lib/src/data/repository/meal_plan_repository_impl.dart"
+    },
+    {
+      "id": "MealPlanRemoteDataSourceImpl",
+      "layer": "data",
+      "status": "new",
+      "file": "features/meal_plan/lib/src/data/datasource/meal_plan_remote_data_source_impl.dart",
+      "note": "snapshots() Firestore, collection users/{uid}/meal_plans",
+      "decisions": [
+        "A2"
+      ]
+    },
+    {
+      "id": "MealPlanDi",
+      "layer": "injection",
+      "status": "new",
+      "standard": true,
+      "file": "features/meal_plan/lib/src/injection/meal_plan_di.dart"
+    },
+    {
+      "id": "RecipeRepository",
+      "layer": "external",
+      "package": "core",
+      "status": "reused",
+      "decisions": [
+        "A4"
+      ]
+    },
+    {
+      "id": "AppRouter",
+      "layer": "external",
+      "package": "features/router",
+      "status": "modified",
+      "file": "features/router/lib/src/app_router.dart",
+      "note": "route /meal-plan"
+    }
+  ],
+  "edges": [
+    {
+      "from": "MealPlanPage",
+      "to": "MealPlanBloc"
+    },
+    {
+      "from": "MealPlanBloc",
+      "to": "WatchMealPlanUseCase",
+      "label": "watch"
+    },
+    {
+      "from": "MealPlanBloc",
+      "to": "MoveMealUseCase",
+      "label": "move"
+    },
+    {
+      "from": "MealPlanBloc",
+      "to": "RecipeRepository",
+      "label": "recettes"
+    },
+    {
+      "from": "WatchMealPlanUseCase",
+      "to": "MealPlanRepository"
+    },
+    {
+      "from": "MoveMealUseCase",
+      "to": "MealPlanRepository"
+    },
+    {
+      "from": "MealPlanRepositoryImpl",
+      "to": "MealPlanRepository",
+      "kind": "implements"
+    },
+    {
+      "from": "MealPlanRepositoryImpl",
+      "to": "MealPlanRemoteDataSourceImpl"
+    },
+    {
+      "from": "AppRouter",
+      "to": "MealPlanPage",
+      "label": "/meal-plan"
+    }
+  ],
+  "flows": [
+    {
+      "title": "Ouvrir le planning",
+      "scenario": "shows the meal plan of the current week",
+      "steps": [
+        {
+          "from": "user",
+          "to": "MealPlanPage",
+          "msg": "ouvre l'onglet Planning"
+        },
+        {
+          "from": "MealPlanPage",
+          "to": "MealPlanBloc",
+          "msg": "WatchMealPlan(week)"
+        },
+        {
+          "from": "MealPlanBloc",
+          "to": "WatchMealPlanUseCase",
+          "msg": "call(week)"
+        },
+        {
+          "from": "WatchMealPlanUseCase",
+          "to": "MealPlanRepositoryImpl",
+          "msg": "watch(week)",
+          "decision": "A2"
+        },
+        {
+          "from": "MealPlanRepositoryImpl",
+          "to": "MealPlanRemoteDataSourceImpl",
+          "msg": "snapshots()"
+        },
+        {
+          "from": "MealPlanRemoteDataSourceImpl",
+          "to": "MealPlanRepositoryImpl",
+          "msg": "Stream<MealPlanDataModel>",
+          "return": true
+        },
+        {
+          "from": "MealPlanRepositoryImpl",
+          "to": "MealPlanBloc",
+          "msg": "Right(MealPlanEntity)",
+          "return": true
+        },
+        {
+          "from": "MealPlanBloc",
+          "to": "MealPlanPage",
+          "msg": "MealPlanLoaded",
+          "return": true
+        }
+      ]
+    },
+    {
+      "title": "Réseau coupé",
+      "scenario": "shows an error when the network fails",
+      "steps": [
+        {
+          "from": "user",
+          "to": "MealPlanPage",
+          "msg": "ouvre l'onglet Planning"
+        },
+        {
+          "from": "MealPlanPage",
+          "to": "MealPlanBloc",
+          "msg": "WatchMealPlan(week)"
+        },
+        {
+          "from": "MealPlanBloc",
+          "to": "WatchMealPlanUseCase",
+          "msg": "call(week)"
+        },
+        {
+          "from": "WatchMealPlanUseCase",
+          "to": "MealPlanBloc",
+          "msg": "Left(NetworkError)",
+          "return": true
+        },
+        {
+          "from": "MealPlanBloc",
+          "to": "MealPlanPage",
+          "msg": "MealPlanError + retry",
+          "return": true
+        },
+        {
+          "from": "user",
+          "to": "MealPlanPage",
+          "msg": "tape Réessayer"
+        },
+        {
+          "from": "MealPlanPage",
+          "to": "MealPlanBloc",
+          "msg": "WatchMealPlan(week)"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "features/meal_plan/lib/meal_plan.dart",
+      "status": "new",
+      "why": "barrel"
+    },
+    {
+      "path": "features/meal_plan/lib/src/presentation/keys.dart",
+      "status": "new"
+    },
+    {
+      "path": "features/meal_plan/pubspec.yaml",
+      "status": "new"
+    },
+    {
+      "path": "features/l10n/lib/arb/app_fr.arb",
+      "status": "modified",
+      "why": "6 clés meal_plan_*"
+    },
+    {
+      "path": "features/l10n/lib/arb/app_en.arb",
+      "status": "modified",
+      "why": "6 clés meal_plan_*"
+    },
+    {
+      "path": "pubspec.yaml",
+      "status": "modified",
+      "why": "workspace : ajoute features/meal_plan"
+    }
+  ],
+  "decisions": {
+    "A2": {
+      "alternative": {
+        "impact": "ajoute un cache Isar : lecture hors ligne garantie, mais 2 classes, un mapper et une migration de plus",
+        "add": [
+          {
+            "id": "MealPlanLocalDataSourceImpl",
+            "layer": "data",
+            "status": "new",
+            "file": "features/meal_plan/lib/src/data/datasource/meal_plan_local_data_source_impl.dart"
+          }
+        ],
+        "add_edges": [
+          {
+            "from": "MealPlanRepositoryImpl",
+            "to": "MealPlanLocalDataSourceImpl"
+          }
+        ],
+        "remove": []
+      }
+    },
+    "A3": {
+      "alternative": {
+        "impact": "deux BLoCs (lecture / édition) : chacun plus simple, mais la page doit coordonner deux états",
+        "add": [
+          {
+            "id": "MealPlanEditBloc",
+            "layer": "presentation",
+            "status": "new",
+            "file": "features/meal_plan/lib/src/presentation/bloc/meal_plan_edit_bloc.dart"
+          }
+        ],
+        "add_edges": [
+          {
+            "from": "MealPlanPage",
+            "to": "MealPlanEditBloc"
+          },
+          {
+            "from": "MealPlanEditBloc",
+            "to": "MoveMealUseCase"
+          }
+        ],
+        "remove_edges": [
+          {
+            "from": "MealPlanBloc",
+            "to": "MoveMealUseCase"
+          }
+        ]
+      }
+    }
+  }
+}
