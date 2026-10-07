@@ -230,6 +230,33 @@
       ]
     }
   ],
+  "scenarios": [
+    {
+      "title": "shows the meal plan of the current week",
+      "kind": "nominal",
+      "fr": "À l'ouverture, on voit les repas de la semaine en cours, jour par jour."
+    },
+    {
+      "title": "moves a meal to another day",
+      "kind": "nominal",
+      "fr": "Glisser un repas sur un autre jour le déplace, et le changement est enregistré."
+    },
+    {
+      "title": "refuses to drop a meal on a slot that is already taken",
+      "kind": "limite",
+      "fr": "Un créneau déjà occupé refuse le dépôt : le repas revient à sa place."
+    },
+    {
+      "title": "shows an empty state when no meal is planned",
+      "kind": "limite",
+      "fr": "Semaine vide : un message invite à ajouter un premier repas."
+    },
+    {
+      "title": "shows an error when the network fails",
+      "kind": "erreur",
+      "fr": "Sans réseau : message d'erreur et bouton Réessayer, qui relance le chargement."
+    }
+  ],
   "files": [
     {
       "path": "features/meal_plan/lib/meal_plan.dart",

@@ -47,7 +47,10 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
   correspond à une route, une clé l10n ou une dépendance de §8 ; chaque parcours suit un scénario de
   §4 (`scenario` = son titre) avec les events, use cases et states de §5 ; aucune arête ne contredit
   la direction des couches ; chaque décision de §9 est rattachée à un nœud, un fichier ou une étape ;
-  un `standard: true` ne cache pas une classe qui s'écarte de la feature de référence. Un écart est
+  un `standard: true` ne cache pas une classe qui s'écarte de la feature de référence ; chaque
+  entrée de `scenarios` reprend un titre exact de §4, sa phrase `fr` dit ce que le scénario vérifie
+  vraiment (pas plus, pas autre chose), et la sélection couvre nominal, limite et erreur quand §4
+  les contient. Un écart est
   un **bloquant** : l'humain tranchera l'archi sur cette vue, pas sur la spec. `archi.json` absent :
   bloquant.
 - §9 : chaque décision structurante visible dans §5-§8 (package, data sources, Stream/Future,

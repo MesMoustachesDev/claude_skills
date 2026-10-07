@@ -111,6 +111,13 @@ dit la même chose que §5, §8 et §9, sous une forme qu'on lit en deux minutes
   exact) : le nominal et l'erreur la plus importante, au minimum. Chaque étape : `from`, `to`
   (`"user"` pour l'utilisateur), `msg` (event, appel, `Right(...)`/`Left(...)`, state émis),
   `return: true` pour un retour, `decision` si l'étape dépend d'une décision de §9.
+- **`scenarios`** : 4 à 8 scénarios de §4 qui, lus seuls, disent ce que fait la feature et où elle
+  peut casser. Chacun : `title` (titre exact du scénario en §4), `kind` (`nominal` | `limite` |
+  `erreur`) et `fr` : une phrase en français, côté utilisateur, qui dit ce que le scénario garantit
+  (« Un créneau déjà occupé refuse le dépôt : le repas revient à sa place. »), pas une traduction
+  mot à mot du Gherkin. Au moins un de chaque `kind` quand §4 en contient. Préfère les cas limites
+  qui révèlent une règle métier aux états génériques (loading). Le rapport les met en tête, les
+  autres scénarios restent consultables.
 - **`files`** : les fichiers qui ne portent pas de nœud : barrel, `keys.dart`, `pubspec.yaml`, ARB,
   pubspec racine, tout fichier modifié hors du package. Chacun avec `status`, `why` (une ligne) et
   `decisions` s'il y a lieu. Les fichiers des nœuds sont ajoutés par le rapport : ne les répète pas.

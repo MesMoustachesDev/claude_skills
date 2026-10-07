@@ -76,6 +76,7 @@ class Page:
     def __init__(self, title: str, focus: str | None):
         self.title = title
         self.focus = focus
+        self.also_open: list[str] = []  # sections ouvertes et remontées juste après le focus
         self.sections: list[tuple[str, str, str, str]] = []  # (id, titre, badge, html)
         self.md_blocks: list[str] = []
 
@@ -90,11 +91,14 @@ class Page:
         self.sections.append((sid, title, badge, body))
 
     def render(self, header: str) -> str:
-        order = sorted(self.sections, key=lambda s: 0 if s[0] == self.focus else 1)
+        rank = lambda sid: 0 if sid == self.focus else 1 + self.also_open.index(sid) if sid in self.also_open \
+            else 1 + len(self.also_open)
+        order = sorted(self.sections, key=lambda s: rank(s[0]))
+        opened = {self.focus, *self.also_open}
         nav = "".join(f'<a href="#{sid}">{esc(t)}</a>' for sid, t, _, _ in order)
         secs = "".join(
             f'<details id="{sid}" class="sec{" focus" if sid == self.focus else ""}"'
-            f'{" open" if sid == self.focus or self.focus is None else ""}>'
+            f'{" open" if sid in opened or self.focus is None else ""}>'
             f'<summary><h2>{esc(t)}</h2>{b}</summary><div class="body">{body}</div></details>'
             for sid, t, b, body in order
         )
@@ -242,6 +246,39 @@ def decisions_html(sec9: str | None) -> str:
             f'<div class="da"><span class="lbl">Alternative</span>{esc(col(r, "alternative"))}</div>'
             f'<div class="dr"><span class="lbl">Raison</span>{esc(col(r, "raison"))}</div></div>')
     return f'<div class="decisions">{"".join(cards)}</div>'
+
+
+GHERKIN_STEP = re.compile(r"^(Given|When|Then|And|But|\*)\s+(.*)$")
+
+
+def parse_gherkin(text: str) -> dict:
+    """{background: [(mot-clé, texte)], scenarios: [{title, outline, steps, examples}]} — §4 ou un .feature."""
+    out: dict = {"background": [], "scenarios": []}
+    cur = None
+    for raw in text.splitlines():
+        ln = raw.strip()
+        if not ln or ln.startswith(("#", "@", "```", "Feature:")):
+            continue
+        if ln.startswith("Background:"):
+            cur = {"steps": out["background"]}
+            continue
+        m = re.match(r"^Scenario( Outline)?:\s*(.*)$", ln)
+        if m:
+            cur = {"title": m.group(2).strip(), "outline": bool(m.group(1)), "steps": [], "examples": []}
+            out["scenarios"].append(cur)
+            continue
+        if cur is None:
+            continue
+        if ln.startswith("Examples:"):
+            cur["in_examples"] = True
+            continue
+        if ln.startswith("|") and cur.get("in_examples"):
+            cur["examples"].append([c.strip() for c in ln.strip("|").split("|")])
+            continue
+        m = GHERKIN_STEP.match(ln)
+        if m:
+            cur["steps"].append((m.group(1), m.group(2)))
+    return out
 
 
 def spec_scenarios(spec: str) -> list[str]:
@@ -417,7 +454,7 @@ def changed_files(root: str, base: str) -> list[dict]:
     return [{"path": p, "status": s} for p, s in sorted(out.items()) if not p.startswith(".claude/")]
 
 
-def archi_payload(archi: dict, decisions: list[dict], sec5: str | None, root: str, state: dict,
+def archi_payload(archi: dict, decisions: list[dict], sec4: str | None, sec5: str | None, root: str, state: dict,
                   scan: dict | None) -> dict:
     nodes = archi.get("nodes") or []
     ids = {n.get("id") for n in nodes}
@@ -445,6 +482,12 @@ def archi_payload(archi: dict, decisions: list[dict], sec5: str | None, root: st
     for d in decisions:
         if d["id"] and d["id"] not in anchored:
             warnings.append(f"{d['id']} ({d['subject']}) n'est rattachée à aucun nœud, fichier ou étape")
+    titles = {norm(sc["title"]) for sc in parse_gherkin(sec4 or "")["scenarios"]}
+    for p in archi.get("scenarios") or []:
+        if norm(p.get("title", "")) not in titles:
+            warnings.append(f"scénario « {p.get('title')} » : titre absent de §4")
+        if p.get("kind") not in ("nominal", "limite", "erreur"):
+            warnings.append(f"scénario « {p.get('title')} » : kind « {p.get('kind')} » inconnu (nominal, limite, erreur)")
     contracts = {c for c in spec_class_names(sec5) if CONTRACT_SUFFIX.search(c)}
     for c in sorted(contracts - ids - alt_ids):
         warnings.append(f"{c} est un contrat de §5 absent de la carte")
@@ -481,6 +524,68 @@ def archi_payload(archi: dict, decisions: list[dict], sec5: str | None, root: st
             "real": real, "warnings": warnings}
 
 
+SC_KINDS = (("nominal", "Parcours nominaux", "ok"), ("limite", "Cas limites", "warn"), ("erreur", "Erreurs", "ko"))
+
+
+def gherkin_steps_html(steps: list) -> str:
+    def fmt(t: str) -> str:
+        return re.sub(r"(&quot;.*?&quot;|&#x27;.*?&#x27;|\{[^}]*\}|&lt;[^&]*&gt;)", r"<code>\1</code>", esc(t))
+    return "".join(f'<div class="gk"><span class="kw">{esc(k)}</span> {fmt(t)}</div>' for k, t in steps)
+
+
+def scenarios_section(sec4: str | None, picks: list | None, covered: set | None) -> tuple[str, str]:
+    """(html, badge) — scénarios §4 : les représentatifs choisis dans archi.json, puis tous, repliés."""
+    g = parse_gherkin(sec4 or "")
+    scen = g["scenarios"]
+    if not scen:
+        return '<p class="muted">aucun scénario en §4</p>', badge("0 scénario", "ko")
+    by_title = {norm(s["title"]): s for s in scen}
+
+    def cov(title: str) -> str:
+        if covered is None:
+            return ""
+        return badge("dans un .feature", "ok") if norm(title) in covered else badge("absent des .feature", "ko")
+
+    def body(s: dict) -> str:
+        ex = ""
+        if s["examples"]:
+            ex = table(s["examples"][0], s["examples"][1:])
+        return gherkin_steps_html(s["steps"]) + ex
+
+    out = []
+    if g["background"]:
+        out.append('<p class="hint">Contexte commun à tous les scénarios :</p>'
+                   f'<div class="sc-bg">{gherkin_steps_html(g["background"])}</div>')
+    picked = {}
+    for p in picks or []:
+        s = by_title.get(norm(p.get("title", "")))
+        if s:
+            picked[norm(s["title"])] = p
+    if picked:
+        out.append('<p class="hint">Une sélection représentative, résumée en français. Tous les scénarios sont plus bas.</p>')
+        for kind, label, k in SC_KINDS:
+            items = [(p, by_title[t]) for t, p in picked.items() if p.get("kind") == kind]
+            if not items:
+                continue
+            cards = "".join(
+                f'<div class="sc-card {k}"><div class="sc-fr">{esc(p.get("fr", ""))}</div>'
+                f'<div class="sc-title">{esc(s["title"])} {cov(s["title"])}</div>{body(s)}</div>'
+                for p, s in items)
+            out.append(f'<h3>{label} <span class="badge {k}">{len(items)}</span></h3><div class="sc-grid">{cards}</div>')
+    kinds = {kind: (label, k) for kind, label, k in SC_KINDS}
+
+    def kind_badge(title: str) -> str:
+        kind = (picked.get(norm(title)) or {}).get("kind")
+        return " " + badge(*kinds[kind]) if kind in kinds else ""
+
+    rows = "".join(f'<details class="sc-row"><summary>{esc(s["title"])}{kind_badge(s["title"])} {cov(s["title"])}'
+                   f'</summary>{body(s)}</details>' for s in scen)
+    out.append(f"<details class='sub'{'' if picked else ' open'}><summary><h3>Tous les scénarios ({len(scen)})</h3></summary>{rows}</details>")
+    missing = 0 if covered is None else sum(1 for s in scen if norm(s["title"]) not in covered)
+    b = badge(f"{len(scen)} scénarios", "") + (badge(f"{missing} sans .feature", "ko") if missing else "")
+    return "".join(out), b
+
+
 def archi_section(payload: dict, stage: str | None) -> str:
     data = json.dumps({**payload, "stage": stage or ""}, ensure_ascii=False).replace("</", "<\\/")
     return (f'<script type="application/json" id="archi-data">{data}</script>'
@@ -513,7 +618,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     # Architecture proposée / validée
     n_dec = len(parse_md_table(secs.get("9", ""))[1])
     if archi:
-        payload = archi_payload(archi, decisions_rows(secs.get("9")), secs.get("5"), root, state, scan)
+        payload = archi_payload(archi, decisions_rows(secs.get("9")), secs.get("4"), secs.get("5"), root, state, scan)
         page.add("archi", "Architecture",
                  archi_section(payload, focus)
                  + "<details class='sub'><summary><h3>§8 en détail (dépendances, routes, l10n, machines d'états)</h3>"
@@ -527,6 +632,14 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
                  + decisions_html(secs.get("9")) + "<h3>§8 Architecture (proposée par le specifier)</h3>"
                  + page.md(secs.get("8")),
                  badge(f"{n_dec} décisions"))
+
+    # Scénarios d'acceptation : ce qui sera testé, lisible avant la spec entière
+    feat_scen = test_inventory(root, pkg_rel)[1] if scan is not None else []
+    sc_html, sc_badge = scenarios_section(secs.get("4"), (archi or {}).get("scenarios"),
+                                          {norm(x) for x in feat_scen} if feat_scen else None)
+    page.add("scenarios", "Scénarios : ce qui sera testé", sc_html, sc_badge)
+    if focus in ("spec", "tests"):
+        page.also_open.append("scenarios")
 
     # Architecture réelle (après le scaffold de l'architect)
     if scan is not None:

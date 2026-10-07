@@ -200,9 +200,12 @@ sur §5, §6, §8, les scénarios concernés et `archi.json` ; ne touche pas aux
 nouveau **pour les seules lignes encore `proposée`** (une décision tranchée ne se repose pas).
 `human_gates.architecture = {at, by: "user", decisions: {"A1": "validée", "A2": "modifiée"}}`.
 
-**1b. Spec.** En 10 lignes max : objectif, périmètre, nombre de scénarios, points signalés par le
-specifier, notes non bloquantes du critique. Le rapport est déjà ouvert : renvoie à ses sections
-« Spec » et « Tests » plutôt que de les recopier.
+**1b. Spec.** En 10 lignes max : objectif, périmètre, points signalés par le specifier, notes non
+bloquantes du critique. Puis **ce qui sera testé**, tiré de `archi.json → scenarios` : le nombre total
+de scénarios de §4, puis une ligne par scénario sélectionné, groupée et dans cet ordre (« Nominal : »,
+« Limite : », « Erreur : »), avec sa phrase `fr`. C'est ce que l'humain valide vraiment : ce que la
+feature fera et où elle peut casser. La section « Scénarios » du rapport montre le Gherkin de chacun
+et la liste complète ; renvoie-y plutôt que de recopier les steps.
 Puis `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre → relance
 Sophie avec la spec existante + le retour, puis 1b ; repasse par 1a si §9 a bougé).
 Validation → `human_gates.spec = {at, by: "user"}`, `stages.spec = PASSED`, et remplace « brouillon »
@@ -270,7 +273,9 @@ Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writ
 `gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis arrêt humain avec les bloquants restants.
 
 Vert → **Arrêt humain 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
-(`display: render`) : matrice scénarios §4 × `.feature`, inventaire des tests par fichier. Puis montre
+(`display: render`) : section « Scénarios » ouverte (sélection en français, chaque scénario marqué
+présent ou absent des `.feature`), matrice scénarios §4 × `.feature`, inventaire des tests par
+fichier. Rappelle en une ligne les scénarios sélectionnés absents des `.feature` s'il y en a. Puis montre
 `.claude/features/<nom>/tests.md` (le fichier entier : c'est
 court et c'est fait pour être lu), la table de couverture de `tests_review.md`, les tests « passe
 déjà » avec la justification de l'agent, et les contrats manquants s'il y en a. `AskUserQuestion` :
