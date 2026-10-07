@@ -59,6 +59,7 @@ le trouvera, et ce sera plus long à défaire.
 
 ## Interdits
 
+- Un `try/catch` hors de `lib/src/data/`. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
 - `test/**`, `*.feature`, `maestro/**` : gelés.
 - Changer une signature de §5. Si c'est nécessaire, rapporte-le.
 - `print(`, `debugPrint(` de travail, marqueurs `TEMP`, `TODO` sans ticket.

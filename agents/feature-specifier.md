@@ -68,6 +68,7 @@ fois la section remplie.
 
 ## Exigences non négociables
 
+- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Ne la mets jamais en §9 comme décision ou alternative.
 - **§4 Gherkin** : chaque item de §2 « Inclus » a un scénario ; chaque état de §3 (Loading, Error,
   Empty, Loaded) a un scénario ; les steps désignent les widgets par leur clé de §5, jamais par leur
   texte. Formulation en anglais, courte, compatible `bdd_widget_test`.

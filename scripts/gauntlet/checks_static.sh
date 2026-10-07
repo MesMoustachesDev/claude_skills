@@ -57,6 +57,40 @@ check_no_temp_markers() {
   return 1
 }
 
+# error_handling — règle de base : un try/catch n'existe que dans lib/src/data/ (I/O). Partout ailleurs
+# (domain, presentation, injection), l'échec circule en Either<ErrorEntity, T> rendu par la couche data.
+# Périmètre : lignes ajoutées en mode extend, plus les lignes ajoutées depuis la base dans les packages
+# feature de writes.extra (`<chemin>/lib/**`, appelants adaptés par la feature).
+# `// gauntlet-ignore: <raison>` exempte une ligne.
+ERROR_HANDLING_RE='(^|[^a-zA-Z_])try[[:space:]]*\{|(^|[^a-zA-Z_])catch[[:space:]]*\('
+check_error_handling() {
+  local hits="" extra g dir base
+  if [ -d "$PKG_DIR/lib/src" ]; then
+    hits="$(grep -rnE --include='*.dart' --exclude='*.g.dart' --exclude='*.freezed.dart' \
+              "$ERROR_HANDLING_RE" "$PKG_DIR/lib/src" 2>/dev/null \
+            | grep -v "^$PKG_DIR/lib/src/data/" | grep -v 'gauntlet-ignore' \
+            | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  fi
+  # writes.extra : seules les zones `<pkg>/lib/**` d'un package à couches (lib/src/) sont scannées.
+  base="$(merge_base)"
+  extra="$(cfg_list writes.extra | while IFS= read -r g; do
+      case "$g" in */lib/\*\*) dir="${g%/\*\*}/src" ;; *) continue ;; esac
+      [ -d "$PROJECT_ROOT/$dir" ] || continue
+      { git -C "$PROJECT_ROOT" diff -U0 "$base" -- "$dir" \
+          | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); n=substr(a[1],2)} /^\+[^+]/{print f":"n": "substr($0,2); n++}'
+        git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$dir" | grep '\.dart$' \
+          | while IFS= read -r f; do grep -nE "" "$PROJECT_ROOT/$f" | sed "s#^#$f:#"; done
+      } | grep '\.dart:' | grep -v '/lib/src/data/' | grep -vE '\.(g|freezed)\.dart:' \
+        | grep -E "$ERROR_HANDLING_RE" | grep -v 'gauntlet-ignore'
+    done)"
+  hits="$(printf '%s\n%s\n' "$hits" "$extra" | grep -v '^$')"
+  [ -z "$hits" ] && return 0
+  printf '%s\n' "$hits"
+  printf '\ntry/catch hors de lib/src/data/ : l'"'"'I/O et son try/catch vivent en data, qui rend Either<ErrorEntity, T> ;\n'
+  printf 'domain et presentation composent ou déplient des Either, sans try/catch.\n'
+  return 1
+}
+
 # deps — direction des couches : lib/src/<couche>/ n'importe que les couches listées dans deps.<couche>.
 # Règles supplémentaires : imports package:/dart: uniquement (pas de relatif) ; domain sans packages interdits.
 check_deps() {

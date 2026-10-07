@@ -46,7 +46,8 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
 
 - **Architecture** : les couches de `create_feature_rules.md` sont respectées ; aucune logique métier
   dans un widget ; aucun `DataModel` en présentation ; les `Either` sont dépliés dans le BLoC, pas
-  ailleurs ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
+  ailleurs ; aucun `try/catch` hors de `lib/src/data/` (l'I/O est attrapée en data et rendue en
+  `Either<ErrorEntity, T>`, règle non négociable) ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
 - **Roue réinventée par la responsabilité** : ouvre `dedup_candidates.json`. Pour chaque paire
   (déclaration nouvelle ↔ candidate existante) : lis les deux corps et tranche — doublon (utiliser
   l'existant), à étendre (l'existant fait 80 %, on l'étend, on ne crée pas un jumeau), distinct. Pour

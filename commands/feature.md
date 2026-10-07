@@ -411,6 +411,7 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 
 ## Règles de conduite
 
+- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question à l'humain.
 - **Les agents ont un prénom.** Dans tes messages à l'humain, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.

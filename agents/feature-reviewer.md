@@ -61,7 +61,7 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 - Toute méthode de use case, repository ou data source qui fait de l'I/O faillible (réseau,
   stockage, secure storage, Crashlytics, canal plateforme), directement ou via un autre use case,
   renvoie `Either<ErrorEntity, T>`. Un `Future<void>`, ou un `try/catch` ajouté chez l'appelant
-  pour compenser, est un **critique**.
+  pour compenser, est un **critique**. Tout `try/catch` hors de `lib/src/data/` (domain, presentation, injection) est un **critique**, même si une décision §9 l'autorise : la règle n'est pas négociable. En data, un catch qui laisse passer une `Error` levée par un plugin (`on Exception` face à `CompressError extends Error`) est un **critique**.
 - Chaque dépendance inter-features est **nécessaire** : pourrait-elle passer par `core` ? Crée-t-elle
   un couplage que la feature d'en face ne sait pas ? Un cycle se profile-t-il ?
 - Ce qui a été mis dans `core`, `router`, `l10n` par cette feature y a-t-il sa place, ou est-ce une

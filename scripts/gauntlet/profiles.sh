@@ -10,16 +10,16 @@ MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strin
 profile_checks() {
   case "$1" in
     spec_review)  echo "spec_review_report" ;;
-    contracts) echo "build_runner analyze deps stub_check reinvented package_readme" ;;
+    contracts) echo "build_runner analyze deps error_handling stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
     tests_review) echo "tests_review_report" ;;
     red)       echo "build_runner analyze red_check test_names" ;;
-    green)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict" ;;
-    clean)     echo "test analyze format no_stubs no_temp_markers deps test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
+    green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
+    clean)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
     # Revue de PR (pr_gauntlet.sh, mode extend sur chaque package touché) : pas de gel, pas de stubs,
     # pas de footprint (une PR peut toucher plusieurs packages). Mutation en option.
-    pr)          echo "analyze format test deps metrics deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
+    pr)          echo "analyze format test deps error_handling metrics deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
     pr_mutation) echo "$(profile_checks pr) mutation" ;;
     review)    echo "review_report" ;;
     harden)    echo "test analyze test_freeze_check:additive mutation" ;;
@@ -32,11 +32,11 @@ profiles_list() {
   cat <<'EOF'
 Profils (étape → checks) :
   spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
-  contracts  build_runner analyze deps stub_check reinvented package_readme
+  contracts  build_runner analyze deps error_handling stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
   red        build_runner analyze red_check test_names
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
-  green      test analyze format no_stubs no_temp_markers deps test_freeze_check:strict
+  green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
   pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation
@@ -49,6 +49,7 @@ Checks individuels :
   format             dart format --set-exit-if-changed lib test
   build_runner       build_runner build si le package le déclare (json_serializable, bdd_widget_test)
   deps               direction des dépendances entre couches + pureté du domain
+  error_handling     try/catch uniquement dans lib/src/data/ (I/O) ; ailleurs, Either<ErrorEntity, T>
   stub_check         après ARCHITECT : chaque méthode d'impl est un throw UnimplementedError
   no_stubs           après IMPLEMENTER : plus aucun UnimplementedError dans lib/
   no_temp_markers    aucun marqueur TEMP / print( dans lib/ et test/

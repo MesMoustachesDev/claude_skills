@@ -58,7 +58,7 @@ un bloquant, parce que Théo choisira l'une et Ivan l'autre.
 Stream/Future, sealed, Equatable) ; en particulier, chaque use case, repository ou data source dont
 une méthode fait de l'I/O qui peut échouer (réseau, stockage, secure storage, Crashlytics, canal
 plateforme), directement ou via un autre use case, renvoie `Either<ErrorEntity, T>` : un
-`Future<void>` sur une telle méthode est un **bloquant**, pas une note ; rien n'exige un service qui n'existe pas dans `core` sans que §8
+`Future<void>` sur une telle méthode est un **bloquant**, pas une note. Même chose pour tout contrat qui place une I/O ou un `try/catch` hors de la couche data (un use case qui lit/écrit des fichiers, garde un appel natif, etc.) : la règle « try/catch seulement en data, Either partout ailleurs » est non négociable, une ligne §9 qui y déroge est elle-même un **bloquant**, jamais un écart acté ; rien n'exige un service qui n'existe pas dans `core` sans que §8
 le dise ; les payloads de §6 sont plausibles pour le backend nommé.
 
 *Oublis classiques* — pagination, doublons, hors-ligne, concurrence (deux actions rapides), retour
