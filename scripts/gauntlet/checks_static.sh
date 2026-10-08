@@ -41,7 +41,15 @@ check_build_runner() {
 
 check_no_stubs() {
   local hits
-  hits="$(grep -rn --include='*.dart' 'UnimplementedError' "$PKG_DIR/lib" 2>/dev/null | sed "s#^$PKG_DIR/##")"
+  # A provider that must be overridden at the app root throws by design: mark it `// gauntlet-ignore`,
+  # on the same line or on the next one (dart format moves a trailing comment inside the argument list).
+  local mark="${IGNORE_MARK:-gauntlet-ignore}" f
+  hits="$(grep -rl --include='*.dart' 'UnimplementedError' "$PKG_DIR/lib" 2>/dev/null | while IFS= read -r f; do
+      awk -v mark="$mark" -v file="${f#$PKG_DIR/}" '
+        { line[NR]=$0 }
+        END { for (i=1;i<=NR;i++) if (line[i] ~ /UnimplementedError/ && index(line[i], mark)==0 && index(line[i+1], mark)==0) print file":"i":"line[i] }
+      ' "$f"
+    done)"
   [ -z "$hits" ] && return 0
   printf '%s\n' "$hits"; printf '\n%d stub(s) restant(s) dans lib/\n' "$(printf '%s\n' "$hits" | wc -l | tr -d ' ')"
   return 1

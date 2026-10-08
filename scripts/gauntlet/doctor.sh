@@ -17,10 +17,11 @@ run_doctor() {
   need "git"  git --version
   need "jq"   jq --version
   need "bash ≥ 4 ($BASH_VERSION)" ver_ge "${BASH_VERSION%%(*}" 4.0
-  # shellcheck disable=SC2086
-  need "flutter ($FLUTTER)" $FLUTTER --version
-  # shellcheck disable=SC2086
-  need "dart ($DART)" $DART --version
+  # fvm resolves the SDK from the app's .fvmrc: run the SDK checks from app_dir, not the repo root.
+  local app_root
+  app_root="$PROJECT_ROOT/$(cfg app_dir .)"
+  need "flutter ($FLUTTER)" sh -c "cd '$app_root' && $FLUTTER --version"
+  need "dart ($DART)" sh -c "cd '$app_root' && $DART --version"
   local dcl mt
   dcl="$($DART pub global list 2>/dev/null | awk '/^dart_code_linter /{print $2}')"
   need "dart_code_linter ≥ 4.0 (${dcl:-absent}) — $DART pub global activate dart_code_linter" ver_ge "${dcl:-0}" 4.0
@@ -30,8 +31,7 @@ run_doctor() {
   warn_if "mason (scaffold sans IA) — $DART pub global activate mason_cli" mason --version
 
   section "outils dart du gauntlet"
-  # shellcheck disable=SC2086
-  need "pub get dans scripts/gauntlet/dart_tools" sh -c "cd '$PROJECT_ROOT' && $DART pub get -C '$GAUNTLET_ROOT/dart_tools'"
+  need "pub get dans scripts/gauntlet/dart_tools" sh -c "cd '$app_root' &&$DART pub get -C '$GAUNTLET_ROOT/dart_tools'"
 
   section "configuration ($CFG_FILE)"
   need "package_path défini" test -n "$(cfg package_path)"

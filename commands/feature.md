@@ -494,3 +494,38 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   ajoute `{stage, at, reason}` à `pipeline.json → accepted`, relance le verdict. Toujours sur
   instruction explicite du dev, jamais de ta propre initiative ; chaque acceptation apparaît
   dans l'evidence.
+
+---
+
+## Dépannage — causes déjà identifiées
+
+À lire avant de chercher. Chaque entrée : symptôme → cause → ce qui est en place / quoi faire.
+
+- **`test` ou `red_check` : « aucun test exécuté » alors que `flutter test` passe à la main.**
+  Cause : le moteur Flutter écrit parfois une ligne de log natif sur stdout au milieu du rapport
+  `--reporter json` (ex. `Shell: [ERROR:flutter/runtime/dart_isolate.cc(…)] Callbacks into the Dart VM
+  are currently prohibited…`, vu avec `ui.ImageDescriptor` / `compute`). `jq -s` échoue sur toute la
+  ligne et le gauntlet lit 0 test. En place : `test_results` (`checks_test.sh`) ne passe à `jq` que les
+  lignes qui commencent par `{`. Si ça revient : `grep -vn '^{' .gauntlet/test_report.jsonl`.
+- **Deux gates en même temps sur la même feature** (le hook de fin d'un agent + un run lancé à la main) :
+  rapports écrasés, `.gauntlet/` incohérent. Attends la fin de l'un avant l'autre. La mutation a un
+  verrou (`.gauntlet/mutation.lock`, avec pid) ; les autres profils n'en ont pas encore.
+- **Un `mutation_test` tué laisse un mutant dans le code source** (en mode en place, `app_dir = .`).
+  En place : restauration garantie (`mutation_restore`), et avec `app_dir` ≠ `.` la mutation tourne
+  dans des clones APFS, le dépôt n'est jamais muté. En cas de doute : `git diff -- <package>/lib`.
+- **Mutation très lente (~60 s par mutant).** Cause : un mutant fait bloquer un test (flux qui n'émet
+  plus) jusqu'au timeout de 30 s, pas la compilation (3 à 8 s). En place : `--fail-fast --timeout
+  <mutation.test_timeout>`, tests ciblés `foo_test.dart` + `foo_*_test.dart`, file partagée,
+  tranches de `mutation.shard_lines` lignes, `mutation.workers` clones.
+- **Mutation : tous les fichiers en `BASELINE_KO`.** Les clones ont disparu (un autre run a nettoyé
+  `.gauntlet/mutation-clones`) ou les tests échouent déjà sans mutant sous charge (monter
+  `mutation.test_timeout`). Voir `mutation-worker-*.log`.
+- **Une commande en arrière-plan qui dure plus d'environ 1 h 30 peut être tuée sans trace.** Garde
+  chaque gate sous ce budget, et surveille un run long (Monitor) au lieu d'attendre sa notification.
+- **Un agent bloqué ne notifie rien.** Un sous-agent figé (stream coupé, attente d'un gate) reste
+  « en cours » sans processus. Si un gate dure, vérifie qu'un `flutter test` / `mutation_test` tourne
+  vraiment (`ps`), sinon arrête l'agent et relance.
+- **Hook d'écriture qui refuse un fichier attendu.** `writes.extra` est un glob : un dossier ou un
+  submodule s'écrit `x/**` (pas `x`). Les `test/` et `pubspec.yaml` des packages `<pkg>/lib/**` de
+  `writes.extra` sont autorisés aux tests. Ne jamais contourner le hook par le shell : corriger la
+  config, avec l'accord du dev.

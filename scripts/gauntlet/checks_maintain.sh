@@ -276,7 +276,9 @@ check_footprint() {
   local -; set -f
   base="$(merge_base)"
   app="$(cfg app_dir .)"; app="${app%/}"; [ "$app" = . ] && app="" || app="$app/"
-  allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .fvmrc ${app}.fvmrc .claude/features/* .claude/rules/* $(cfg_list writes.extra | tr '\n' ' ')"
+  allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .fvmrc ${app}.fvmrc .claude/features/* .claude/rules/* ${app}.claude/rules/* $(cfg_list writes.extra | tr '\n' ' ')"
+  # A submodule zone `x/**` also covers its gitlink `x` (a submodule shows up as one changed path).
+  allowed="$allowed $(cfg_list writes.extra | sed -n 's#/\*\*$##p' | tr '\n' ' ')"
   changed="$( { git -C "$PROJECT_ROOT" diff --name-only "$base"; git -C "$PROJECT_ROOT" ls-files --others --exclude-standard; } | sort -u)"
   bad="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do
       ok_=0; for g in $allowed; do g="${g//\*\*/\*}"; case "$f" in $g) ok_=1; break;; esac; done; [ "$ok_" = 0 ] && printf '%s\n' "$f"; done)"

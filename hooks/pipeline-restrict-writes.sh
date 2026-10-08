@@ -54,7 +54,11 @@ extra="$(cfg_list writes.extra | tr '\n' ' ')"   # zones supplémentaires (route
 # match <chemin> <glob>... — case avec * traversant /
 match() { local p="$1"; shift; local g; for g in "$@"; do g="${g//\*\*/\*}"; case "$p" in $g) return 0;; esac; done; return 1; }
 
-is_test_path() { match "$rel" "$PKG_REL/test/*" "*.feature"; }
+# Les packages ouverts par writes.extra (`<pkg>/lib/**`, appelants adaptés par la feature) ont aussi leurs
+# tests dans le périmètre : `<pkg>/test/**`, et leur pubspec.yaml pour une dev_dependency de test.
+extra_tests="$(printf '%s\n' $extra | sed -n -e 's#/lib/\*\*$#/test/*#p' -e 's#/test/\*\*$#/test/*#p' | tr '\n' ' ')"
+extra_pubspecs="$(printf '%s\n' $extra | sed -n 's#/lib/\*\*$#/pubspec.yaml#p' | tr '\n' ' ')"
+is_test_path() { match "$rel" "$PKG_REL/test/*" "*.feature" $extra_tests; }
 
 case "$agent" in
   feature-specifier)
@@ -66,8 +70,8 @@ case "$agent" in
       || deny "architect : zone autorisée = $PKG_REL/lib/**, $PKG_REL/README.md, pubspec.yaml${extra:+, $extra}. Refusé : $rel"
     ;;
   feature-test-writer)
-    match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" \
-      || deny "test-writer : tu n'écris que dans $PKG_REL/test/** (et pubspec.yaml pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel"
+    match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" "$FEAT_REL/tests.md" $extra_tests $extra_pubspecs \
+      || deny "test-writer : tu n'écris que dans $PKG_REL/test/**${extra_tests:+, $extra_tests} (et pubspec.yaml pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel"
     ;;
   feature-implementer|feature-cleaner)
     is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel"
@@ -80,8 +84,8 @@ case "$agent" in
       [ -e "$abs" ] && deny "hardener : $rel existe déjà. Les tests gelés ne se réécrivent pas ; crée un nouveau fichier *_mutation_test.dart."
       exit 0
     fi
-    match "$rel" "$PKG_REL/lib/*" "$FEAT_REL/mutants.md" \
-      || deny "hardener : zone autorisée = nouveaux fichiers de test, $PKG_REL/lib/** (rare), $FEAT_REL/mutants.md. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/*" "$FEAT_REL/mutants.md" $extra_pubspecs \
+      || deny "hardener : zone autorisée = nouveaux fichiers de test, $PKG_REL/lib/** (rare), $FEAT_REL/mutants.md, pubspec.yaml des packages de writes.extra. Refusé : $rel"
     ;;
   feature-reviewer)
     match "$rel" "$FEAT_REL/review.md" "$FEAT_REL/review.json" \
