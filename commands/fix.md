@@ -91,7 +91,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   ```json
   { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
     "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
-    "stages": {}, "attempts": {}, "freeze_sha": null, "loops": {}, "human_gates": {},
+    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "loops": {}, "human_gates": {},
     "arbitrations": [], "agents": {}, "accepted": [], "issue": null }
   ```
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
@@ -139,6 +139,13 @@ git commit -m "test(<nom>): reproduce <bug en une phrase> (frozen)"
 ```
 (+ `shots/red/` pour un bug d'UI, + tout test existant corrigé par Bastien). `freeze_sha` = ce
 commit, `human_gates.repro = {at, by: "user"}`, `phase = "impl"`. Le plan est gelé avec `repro.json`.
+
+**Tout re-gel** (arbitrage, second passage de Bastien sur un diagnostic incomplet ou des
+`missing_tests`) : commit `test(<nom>): <ce qui change> (refrozen)`, nouveau `freeze_sha`, et ajoute à
+`fix.json → refreezes` `{at, sha, cause, files}` où `cause` est l'une de : `hygiene` (format, lint,
+fixture), `technique` (test faux techniquement : async, pump, harness), `diagnostic` (cause racine
+incomplète, second défaut trouvé), `couverture` (tests ajoutés sur un cas déjà corrigé). C'est la
+mesure qu'on suit d'un fix à l'autre pour savoir où le pipeline perd du temps.
 
 **Issue GitLab.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit fix
 (`repro.json` et `diagnosis.md` gelés). Puis lance Fanny.
@@ -214,6 +221,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Correction               fichiers, en une ligne chacun, marqués prévu / écart accepté ; même défaut corrigé ailleurs
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
+## Re-gels                  n, par cause (fix.json → refreezes)
 ## Non traité               suggestions, missing_tests, hors périmètre signalé, acceptations (raisons)
 ## Captures                 avant / après (ui)
 ```

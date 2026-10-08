@@ -257,6 +257,21 @@ group('{FeatureName}Mapper', () {
 });
 ```
 
+### Pour les widgets alimentés par un stream
+
+Après avoir émis sur un `StreamController` (ou fait échouer le flux), utiliser
+`await tester.pump(Duration.zero)`, jamais un `pump()` nu. Quand aucun frame n'est planifié, un
+`pump()` nu traite l'événement **après** le frame : le `setState` du builder n'apparaît qu'au pump
+suivant, et le test échoue contre une implémentation correcte. Mettre ce pump dans les helpers
+d'émission (`emit`, `fail`) plutôt que dans chaque test.
+
+```dart
+Future<void> emit(WidgetTester tester, List<Item> items) async {
+  controller.add(items);
+  await tester.pump(Duration.zero);
+}
+```
+
 ---
 
 ## Étape 4 — Emplacement du fichier test

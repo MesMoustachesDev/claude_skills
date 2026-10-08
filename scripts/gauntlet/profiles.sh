@@ -13,7 +13,8 @@ profile_checks() {
     contracts) echo "build_runner analyze deps error_handling stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
     tests_review) echo "tests_review_report" ;;
-    red)       echo "build_runner analyze red_check test_names" ;;
+    # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
+    red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
@@ -34,7 +35,7 @@ Profils (étape → checks) :
   spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
   contracts  build_runner analyze deps error_handling stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
-  red        build_runner analyze red_check test_names
+  red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
   green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
   clean      green + metrics + maintenabilité fixable + coverage

@@ -24,10 +24,12 @@ check_analyze() {
   return 1
 }
 
-# format — seuls les fichiers du périmètre doivent être formatés.
+# format [test] — seuls les fichiers du périmètre doivent être formatés.
+#   test : test/ seulement (profil red : le test-writer ne peut pas corriger lib/).
 check_format() {
-  local files
-  files="$(scope_files "$PKG_REL/" | grep -E '^(lib|test)/' | while IFS= read -r f; do [ -f "$PKG_DIR/$f" ] && printf '%s\n' "$f"; done)"
+  local files dirs='lib|test'
+  [ "${1:-}" = test ] && dirs='test'
+  files="$(scope_files "$PKG_REL/" | grep -E "^($dirs)/" | while IFS= read -r f; do [ -f "$PKG_DIR/$f" ] && printf '%s\n' "$f"; done)"
   [ -n "$files" ] || { info "aucun fichier dart dans le périmètre"; return 0; }
   # shellcheck disable=SC2086
   capture $DART format --set-exit-if-changed --output=none $files

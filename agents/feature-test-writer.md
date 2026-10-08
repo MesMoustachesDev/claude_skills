@@ -65,6 +65,12 @@ Les widgets sous test reçoivent des BLoCs/use cases mockés ; tu ne lances pas 
 - Edge cases > happy path. Les bugs vivent dans null, vide, erreur réseau, données invalides.
 - Assertions sur le **contenu**, pas le type. `expect(x, isNotNull)` seul est un déchet.
 - Pas de `verify()` sauf side-effect critique listé dans la spec (analytics, écriture).
+- Widget alimenté par un stream : après chaque émission ou erreur, `await tester.pump(Duration.zero)`,
+  jamais un `pump()` nu (l'événement arrive après le frame, le test rougit contre un code correct).
+  Mets-le dans les helpers d'émission. Voir `create_test.md`, « widgets alimentés par un stream ».
+- Pas de secret en clair dans les fixtures : une valeur factice qui ressemble à un token ou un mot
+  de passe porte `// gauntlet-ignore` sur sa ligne. Le gate `red` vérifie `format`, `no_secrets`
+  et `test_hygiene` sur `test/` : tout ce qui reste après le gel coûte un re-gel.
 - Ne crée aucun contrat manquant. Si la spec référence un type ou une clé absente de `lib/`,
   **arrête-toi et rapporte** : c'est Arthur qui doit corriger.
 - Tu ne commites rien. L'orchestrateur gèle tes tests après le skim du dev.

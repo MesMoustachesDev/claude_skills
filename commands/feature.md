@@ -155,7 +155,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
-    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "loops": {}, "accepted": [],
+    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "loops": {}, "accepted": [],
     "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
@@ -325,6 +325,15 @@ git add <package>/test <package>/pubspec.yaml && git commit -m "test(<nom>): acc
 Enregistre le SHA dans `pipeline.json → tests_freeze_sha`, `human_gates.tests`, `stages.red = PASSED`.
 À partir d'ici, `test/` ne change plus, sauf ajouts de Hugo.
 
+**Re-gel** (test corrigé sur instruction du dev, à n'importe quelle étape) : avant le commit,
+`gauntlet.sh format:test <nom>`, `no_secrets:test` et `test_hygiene` doivent être verts — une
+correction qui casse le formatage ou un marqueur coûte sinon un re-gel de plus. Commit
+`test(<nom>): <quoi> (refrozen)`, nouveau `tests_freeze_sha`, et ajoute à `pipeline.json → refreezes`
+`{at, sha, cause, files, stage}` où `cause` est l'une de : `hygiene` (format, secrets, hygiène),
+`technique` (test faux techniquement : pump, async, fixture), `contrat` (signature de §5 changée),
+`spec` (amendement de spec, nouvelle décision §9), `interne` (test couplé à une classe interne que
+l'implémentation a découpée autrement). C'est la mesure qui décidera d'un passage au double-loop.
+
 ### 4. Implémentation — Ivan (`feature-implementer`)
 
 Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntlet/last_red.log`
@@ -446,6 +455,7 @@ Exemptions gauntlet-ignore : <n> (<où>)
 
 ## Qualité des entrées               ← spec_review.json, tests_review.json
 Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> scénarios couverts, <n> bloquants corrigés avant gel
+Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · interne <n>)   ← pipeline.json → refreezes
 
 ## Suggestions non appliquées        ← review.json
 ## Mutants expliqués                 ← mutants.md

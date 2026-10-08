@@ -287,16 +287,19 @@ check_footprint() {
   return 1
 }
 
-# no_secrets — pas d'identifiant, de clé ou d'email de test en clair.
+# no_secrets [test] — pas d'identifiant, de clé ou d'email de test en clair.
+#   test : test/ seulement (profil red : un marqueur posé après le gel force un re-gel).
 check_no_secrets() {
-  local dirs="$PKG_DIR/lib" hits
+  local dirs="$PKG_DIR/lib $PKG_DIR/maestro" hits mail=""
+  [ "${1:-}" = test ] && dirs=""
   [ -d "$PKG_DIR/test" ] && dirs="$dirs $PKG_DIR/test"
+  [ -n "${dirs// /}" ] || { info "rien à inspecter"; return 0; }
   # shellcheck disable=SC2086
   hits="$(grep -rnEi --include='*.dart' --include='*.yaml' --include='*.json' \
       -e "(password|passwd|secret|api[_-]?key|token)[[:space:]]*[:=][[:space:]]*['\"][^'\"$]{6,}" \
       -e "AKIA[0-9A-Z]{16}" -e "sk_(live|test)_[0-9a-zA-Z]{10,}" -e "ghp_[0-9a-zA-Z]{20,}" -e "glpat-[0-9a-zA-Z_-]{10,}" \
-      -e "BEGIN (RSA|EC|OPENSSH) PRIVATE KEY" $dirs "$PKG_DIR/maestro" 2>/dev/null | grep -v "$IGNORE_MARK")"
-  local mail; mail="$(grep -rnE --include='*.yaml' "inputText:[[:space:]]*['\"]?[^\$[:space:]'\"]+@[^[:space:]'\"]+" "$PKG_DIR/maestro" 2>/dev/null)"
+      -e "BEGIN (RSA|EC|OPENSSH) PRIVATE KEY" $dirs 2>/dev/null | grep -v "$IGNORE_MARK")"
+  [ "${1:-}" = test ] || mail="$(grep -rnE --include='*.yaml' "inputText:[[:space:]]*['\"]?[^\$[:space:]'\"]+@[^[:space:]'\"]+" "$PKG_DIR/maestro" 2>/dev/null)"
   hits="$(printf '%s\n%s\n' "$hits" "$mail" | grep -v '^$' | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && { info "aucun secret ni identifiant en clair"; return 0; }
   printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "secrets ou identifiants en clair — variables d'environnement (\${VAR}) uniquement"
