@@ -81,6 +81,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après |
 |---|---|---|---|---|---|
+| 0b | cadrage | Sophie (mode cadrage) + toi | `feature-specifier` | — | **oui, interactif** : ce qui existe, le périmètre, les comportements, jusqu'à « c'est ça » |
 | 1 | spec | Sophie | `feature-specifier` | — | non |
 | 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
 | 2 | contracts | Arthur | `feature-architect` | `contracts` | non |
@@ -165,9 +166,42 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 - Écris `<nom>` dans `.claude/features/.current` (secours pour les hooks quand la branche ne suit pas
   la convention).
 
+### 0b. Cadrage fonctionnel — Sophie en mode cadrage, puis toi avec le dev (interactif)
+
+Le dev doit savoir **ce qui va être fait** avant qu'une ligne de spec soit écrite. Un périmètre qui bouge
+pendant les boucles de spec coûte une boucle Sophie + Camille par changement, et un changement qui
+arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi* ; la spec écrit le *comment*.
+
+1. **Sophie, mode cadrage** (`feature-specifier`, prompt : « mode cadrage », nom, description brute,
+   issue s'il y en a une, racine, sortie `.claude/features/<nom>/cadrage.md`). Elle explore et n'écrit
+   pas de spec. `cadrage.md` contient, court :
+   - **Ce qui existe déjà** : le code actuel qui fait tout ou partie du besoin, dans ce repo **et
+     ailleurs** (autre plateforme, web, backend, autre feature), avec les valeurs en dur relevées
+     (seuils, formats, limites) et les écarts entre eux. C'est souvent là que se cache la bonne réponse.
+   - **Ce que je comprends du besoin** en 3 à 5 phrases, dans les mots du dev.
+   - **Périmètre** : inclus / exclu, chaque ligne avec un exemple concret.
+   - **Comportements visibles** : 5 à 10 exemples « quand … alors … » en français, sur des cas réels
+     (« une photo portrait 4032×3024 prise à la caméra → stockée en 1920×2560 JPEG q85 »).
+   - **Questions ouvertes** : chacune avec 2 à 3 options concrètes, une recommandée et pourquoi,
+     et ce que chaque option change pour l'utilisateur.
+   - **Règles non négociables** qui s'appliquent (`create_feature_rules.md`, gestion d'erreur…) :
+     rappelées, jamais posées comme question.
+2. **Toi, avec le dev.** `SendUserFile` de `cadrage.md` (`display: render`). Résume en 5 lignes ce qui
+   existe et le périmètre proposé, puis pose les questions ouvertes par `AskUserQuestion` (4 max par
+   appel, options concrètes, recommandée en premier). Le dev peut corriger le périmètre ou un exemple en
+   texte libre : relance Sophie en mode cadrage avec ses réponses (« intègre, ne réécris pas le reste »),
+   renvoie le cadrage, et recommence tant qu'il reste une question ou qu'un exemple le surprend.
+3. **Fin du cadrage** : `AskUserQuestion` « C'est bien ça qu'on fait ? » (Oui / Non, je précise).
+   Oui → `human_gates.cadrage = {at, by: "user"}`, `stages.cadrage = PASSED`.
+
+**Le cadrage validé est l'entrée verrouillée de la spec.** Sophie le reprend en §1-§2 tel quel ; une
+décision de §9 ne le contredit jamais. Un changement de périmètre demandé plus tard repasse par 0b
+(cadrage mis à jour et revalidé) avant toute relance de la spec.
+
 ### 1. Spec — Sophie (`feature-specifier`)
 
-Prompt de lancement : nom, description brute (ou « aucune, à découvrir »), l'issue GitLab existante
+Prompt de lancement : nom, `cadrage.md` validé (« périmètre et comportements figés : ne les rediscute
+pas »), description brute (ou « aucune, à découvrir »), l'issue GitLab existante
 entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, et la phrase : « Tu proposes l'architecture, le dev la tranche : chaque décision structurante va en §9
 avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
 

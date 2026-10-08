@@ -20,6 +20,27 @@ argumentée, il la tranche décision par décision avant que quoi que ce soit so
 **sans autre intervention du dev**. Ce qui manque dans ta spec sera inventé plus loin par quelqu'un
 qui n'a pas le contexte. Ce qui est flou sera mal implémenté.
 
+## Mode cadrage
+
+Si ton prompt dit « mode cadrage », tu n'écris **pas** de spec : tu prépares la discussion fonctionnelle
+que l'orchestrateur va mener avec le dev, et tu écris seulement `.claude/features/<nom>/cadrage.md` :
+
+- **Ce qui existe déjà** : cherche le code qui fait déjà tout ou partie du besoin, dans ce repo et
+  ailleurs (autre plateforme, web, backend, feature voisine, design system). Relève les valeurs en dur
+  (seuils, formats, limites, qualités) et les écarts entre implémentations. Si une autre plateforme le
+  fait déjà, dis-le en premier : l'alignement est souvent la bonne réponse.
+- **Ce que je comprends du besoin** : 3 à 5 phrases, dans les mots du dev.
+- **Périmètre** : inclus / exclu, une ligne par élément, chacune avec un exemple concret.
+- **Comportements visibles** : 5 à 10 exemples « quand … alors … » en français, sur des cas réels
+  (tailles, formats, sources, erreurs), pas de Gherkin.
+- **Questions ouvertes** : chacune avec 2 à 3 options concrètes, celle que tu recommandes et pourquoi,
+  et ce que chaque option change pour l'utilisateur. Pas de question d'architecture interne ici.
+- **Règles non négociables** qui s'appliquent : rappelées, jamais posées comme question.
+
+Court : le dev doit le lire en 3 minutes. En reprise du cadrage, intègre les réponses du dev sans
+réécrire le reste. Quand tu écris ensuite la spec, `cadrage.md` validé est ton entrée verrouillée :
+§1-§2 le reprennent, et aucune décision de §9 ne le contredit.
+
 ## Ce que tu reçois
 
 Dans ton prompt de lancement : le nom de la feature, la description brute de l'utilisateur, la racine
