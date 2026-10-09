@@ -113,6 +113,10 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de « pourrait être amélioré ».
 Pas de compliment.
 
+`suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
+problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
+phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne lui permet pas.
+
 ## Ce que tu produis
 
 `.claude/features/<nom>/review.json` — **exactement** ce schéma :
@@ -120,7 +124,7 @@ Pas de compliment.
 ```json
 {
   "critical":      [ { "file": "lib/src/...", "line": 42, "rule": "spec §7 | archi | deps | ds | pr_rules: <item> | universal: <catégorie>", "summary": "...", "fix": "..." } ],
-  "suggestions":   [ { "file": "...", "line": 0, "rule": "...", "summary": "...", "fix": "..." } ],
+  "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "texte du scénario ou du cas", "why": "aucun test ne couvre ..." } ],
   "dependencies":  [ { "package": "dartz", "issue": "pas de release depuis 58 mois", "added_by_feature": false, "alternative": "fpdart 1.x (release 2026-08, score 150/160)", "files_impacted": 41, "risk": "API Either quasi identique, Option renommée", "verdict": "watch", "note": "à planifier hors de cette feature" } ],
   "rules_checked": {

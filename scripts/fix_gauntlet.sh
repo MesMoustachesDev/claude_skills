@@ -181,6 +181,8 @@ check_review_report() {
   [ -f "$f" ] || { ko "review.json absent — le reviewer doit produire ${f#$PROJECT_ROOT/}"; return 1; }
   jq -e '(.critical|type=="array") and (.suggestions|type=="array") and (.missing_tests|type=="array") and (.root_cause_addressed|IN("yes","no","partial")) and (.plan_respected|IN("yes","no","partial"))' "$f" >/dev/null 2>&1 \
     || { ko "review.json invalide : critical[], suggestions[], missing_tests[], root_cause_addressed (yes|no|partial), plan_respected (yes|no|partial)"; return 1; }
+  local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
+  [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
   info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), cause racine traitée : $(jq -r .root_cause_addressed "$f"), plan respecté : $(jq -r .plan_respected "$f")"
 }
 

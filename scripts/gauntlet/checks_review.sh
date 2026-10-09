@@ -8,7 +8,8 @@
 #   *_verdict : aucun finding bloquant non accepté. C'est l'orchestrateur qui le lit, et qui boucle
 #               vers l'implementer / l'architect / le cleaner.
 #
-# review.json : { critical:[{file,line,rule,summary,fix}], suggestions:[...], missing_tests:[{scenario,why}], rules_checked:{} }
+# review.json : { critical:[{file,line,rule,summary,fix}], suggestions:[{id,summary,file,line,rule,problem,why,cause,
+#                 consequences,fix,pros,cons,effort}] (pipeline/suggestions.md), missing_tests:[{scenario,why}], rules_checked:{} }
 # dedup.json  : { verdicts:[{target:{name,file,line}, existing:{name,file,line,package}, verdict:"duplicate|extend|distinct", reason, accepted?}] }
 
 check_review_report() {
@@ -16,6 +17,8 @@ check_review_report() {
   [ -f "$f" ] || { ko "review.json absent — le reviewer doit produire ${f#$PROJECT_ROOT/}"; return 1; }
   jq -e 'has("critical") and has("suggestions") and has("missing_tests") and (.critical|type=="array")' "$f" >/dev/null 2>&1 \
     || { ko "review.json invalide : clés attendues critical, suggestions, missing_tests"; return 1; }
+  local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
+  [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
   info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f")"
 }
 

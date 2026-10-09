@@ -155,7 +155,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
-    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "loops": {}, "accepted": [],
+    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "suggestions": {}, "loops": {}, "accepted": [],
     "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
@@ -372,11 +372,14 @@ Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
 `~/.claude/commands/reviewPR.md`.
 Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un
 reviewer qui trouve des critiques doit pouvoir rendre la main) :
-- vert → `stages.review = PASSED`. Affiche **tout de suite** au dev chaque entrée de
-  `review.json → suggestions` (une ligne : fichier, problème, correctif), et demande en un
-  `AskUserQuestion` multiSelect lesquelles appliquer dans la feature. Les retenues repartent à
-  Ivan puis à Nina, avant Hugo ; les autres vont en « Suggestions non appliquées »
-  dans l'evidence. Ne jamais résumer les suggestions en un simple nombre.
+- vert → `stages.review = PASSED`. Montre **tout de suite** au dev chaque entrée de
+  `review.json → suggestions` au format de `~/.claude/pipeline/suggestions.md` (problème, pourquoi,
+  cause, si on ne fait rien, correctif, pour / contre, effort), puis le choix en `AskUserQuestion`
+  multiSelect décrit dans ce fichier. Note chaque choix dans `pipeline.json → suggestions`
+  (`{"S1": {"decision": "applied|skipped", "note": "<nuance du dev>"}}`). Les retenues repartent à
+  Ivan (bloc complet + nuance) puis à Nina, avant Hugo ; les autres vont, avec leur bloc, en
+  « Suggestions non appliquées » dans l'evidence. Une suggestion déjà tranchée (même fichier, même
+  problème) qui revient dans une revue suivante ne se repose pas.
 - rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance **Ivan** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
   Au-delà de 2 : point imprévu avec la liste des critiques persistantes.
@@ -386,8 +389,8 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
 Prompt : nom, package, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
 `stages.harden = PASSED` → **point d'étape 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
 (`display: render`). Montre `mutants.md` en entier, le score, le nombre de
-tests ajoutés, les tests existants signalés suspects (4 et 7), et `review.json → suggestions` en
-résumé. `AskUserQuestion` : « Valider » / « Ces explications ne tiennent pas : … » (texte libre →
+tests ajoutés, et les tests existants signalés suspects (4 et 7). Les suggestions ont été tranchées
+à l'étape 6 : ne les remontre pas. `AskUserQuestion` : « Valider » / « Ces explications ne tiennent pas : … » (texte libre →
 relance Hugo avec le retour). Validation → `human_gates.mutants`.
 
 ### 8. QA — Quentin (`feature-qa`)
@@ -457,7 +460,7 @@ Exemptions gauntlet-ignore : <n> (<où>)
 Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> scénarios couverts, <n> bloquants corrigés avant gel
 Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · interne <n>)   ← pipeline.json → refreezes
 
-## Suggestions non appliquées        ← review.json
+## Suggestions non appliquées        ← review.json + pipeline.json → suggestions : un bloc par suggestion (problème, si on ne fait rien, correctif, contre)
 ## Mutants expliqués                 ← mutants.md
 ## Défauts visuels mineurs           ← qa.md
 ## Captures                          ← chemins relatifs

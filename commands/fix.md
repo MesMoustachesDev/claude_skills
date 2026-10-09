@@ -91,7 +91,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   ```json
   { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
     "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
-    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "loops": {}, "human_gates": {},
+    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "suggestions": {}, "loops": {}, "human_gates": {},
     "arbitrations": [], "agents": {}, "accepted": [], "issue": null }
   ```
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
@@ -186,7 +186,14 @@ plan_deviations`, `freeze_sha`, `base_sha`, règles projet.
 
 Puis `fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
 propre classification : critique, bloquant, erreur) comptent comme des critiques.
-- Aucun critique → `stages.review = PASSED`.
+- Aucun critique → `stages.review = PASSED`, puis les **suggestions** (celles de Victor et les
+  non-bloquants des reviewers projet) : montre-les au dev au format de
+  `~/.claude/pipeline/suggestions.md` et fais-le choisir en `AskUserQuestion` multiSelect (même
+  fichier). Note chaque choix dans `fix.json → suggestions` (`{"S1": {"decision":
+  "applied|skipped", "note": "…"}}`). Des retenues → ajoute-les à `plan_deviations`
+  (`{at, files, reason: "suggestion S1 retenue par le dev"}` : le plan validé ne les couvrait pas),
+  `SendMessage` à Fanny avec leur bloc complet et la nuance du dev, puis gate green, puis revue à
+  nouveau (`loops.review += 1`). Une suggestion déjà tranchée ne se repose pas.
 - Critiques → `loops.review += 1`. Si ≤ 2 : `SendMessage` à Fanny (ou un neuf si injoignable)
   avec la liste `critical` et leurs `fix`, puis gate green, puis revue à nouveau. Au-delà : point d'étape
   hors plan avec les critiques persistantes.
@@ -222,7 +229,8 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
 ## Re-gels                  n, par cause (fix.json → refreezes)
-## Non traité               suggestions, missing_tests, hors périmètre signalé, acceptations (raisons)
+## Suggestions             appliquées (id, titre) ; non appliquées : un bloc chacune (problème, si on ne fait rien, correctif, contre)
+## Non traité               missing_tests, hors périmètre signalé, acceptations (raisons)
 ## Captures                 avant / après (ui)
 ```
 

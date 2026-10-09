@@ -62,6 +62,10 @@ de convention bloquante, régression probable, même bug laissé ailleurs. `sugg
 `missing_tests` : cas voisins du bug que le test gelé ne couvre pas — ils iront au dev, pas à
 Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
 
+`suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
+problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
+phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne lui permet pas.
+
 ## Ce que tu produis
 
 `.claude/fixes/<nom>/review.json` :
@@ -71,7 +75,7 @@ Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas
   "root_cause_addressed": "yes | no | partial",
   "plan_respected": "yes | no | partial",
   "critical":      [ { "file": "src/...", "line": 42, "rule": "fix: cause | fix: plan | fix: scope | fix: elsewhere | grid: <item> | project: <règle>", "summary": "...", "fix": "..." } ],
-  "suggestions":   [ { "file": "...", "line": 0, "rule": "...", "summary": "...", "fix": "..." } ],
+  "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "...", "why": "..." } ],
   "rules_checked": { "grid": { "<item>": "ok|ko|na" }, "project": { "<règle>": "ok|ko|na" } }
 }
