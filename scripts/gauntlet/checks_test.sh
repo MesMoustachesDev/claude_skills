@@ -245,13 +245,31 @@ mutation_worker() {
     (cd "$pkg" && $DART pub global run mutation_test "$xml" -o "$GAUNTLET_OUT/mutation-report/$slug#$k" -f md -q "${cov[@]}" >>"$log" 2>&1)
   done
 }
+# mutation_files — fichiers de mutation.include (hors mutation.exclude) dans le périmètre de la feature.
+# Mode extend : fichiers du périmètre seulement (dans un fichier modifié, seules les lignes ajoutées
+# seront mutées). Retour 2 si mutation.include ne correspond à aucun fichier du package.
+mutation_files() {
+  local files
+  files="$(expand_globs "$PKG_DIR" $(cfg_list mutation.include | tr '\n' ' ') | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' '))"
+  [ -n "$files" ] || return 2
+  printf '%s\n' "$files" | filter_scope_files "$PKG_REL/"
+}
+# mutation_scope — informatif, toujours vert : la liste des fichiers de logique que la mutation toucherait,
+# dans .gauntlet/mutation_scope.txt. L'orchestrateur la lit en gabarit S pour décider de lancer Hugo.
+check_mutation_scope() {
+  local files n
+  files="$(mutation_files)"; [ $? = 2 ] && files=""
+  printf '%s' "$files" | grep -v '^$' > "$GAUNTLET_OUT/mutation_scope.txt"
+  n="$(wc -l < "$GAUNTLET_OUT/mutation_scope.txt" | tr -d ' ')"
+  info "$n fichier(s) de logique à muter dans le périmètre (gabarit $SIZE) → ${GAUNTLET_OUT#$PROJECT_ROOT/}/mutation_scope.txt"
+  sed 's/^/   /' "$GAUNTLET_OUT/mutation_scope.txt"
+  return 0
+}
 check_mutation() {
   local thr files report
   thr="$(cfg threshold.mutation 85)"
-  files="$(expand_globs "$PKG_DIR" $(cfg_list mutation.include | tr '\n' ' ') | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' '))"
-  [ -n "$files" ] || { ko "aucun fichier ne correspond à mutation.include"; return 1; }
-  # mode extend : fichiers du périmètre seulement, et dans un fichier modifié, seules les lignes ajoutées
-  files="$(printf '%s\n' "$files" | filter_scope_files "$PKG_REL/")"
+  files="$(mutation_files)"
+  [ $? = 2 ] && { ko "aucun fichier ne correspond à mutation.include"; return 1; }
   [ -n "$files" ] || { info "aucun fichier à muter dans le périmètre"; return 0; }
   # Un seul run de mutation par feature : deux runs partagent clones, file et rapports, et le nettoyage de
   # l'un détruit le travail de l'autre. Verrou avec pid ; un verrou dont le pid est mort est repris.

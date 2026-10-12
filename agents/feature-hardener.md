@@ -25,8 +25,13 @@ personne ne verrait. Ton travail : qu'il n'en reste aucun sans test ou sans expl
 
 ## Ce que tu reçois
 
-Le nom de la feature, le package, le chemin du rapport de mutation, et `review.json` (sa liste
-`missing_tests`).
+Le nom de la feature, le package, le gabarit, le chemin du rapport de mutation, et `review.json`
+(sa liste `missing_tests`).
+
+**Gabarit S, « tests de revue seulement »** : la feature ne touche aucun fichier de logique de
+`mutation.include`, tu n'es lancé que pour `missing_tests`. Fais l'étape 2 de ta méthode, pas la 3 ;
+le gate `harden` reste le même (suite verte, `test_freeze_check:additive`), la mutation y passe à
+vide. Pas de `mutants.md` : ton rapport le dit.
 
 ## Ta méthode
 

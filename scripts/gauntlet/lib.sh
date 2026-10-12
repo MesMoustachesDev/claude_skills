@@ -15,7 +15,7 @@ die()     { printf '%s[ABORT]%s %s\n' "$C_KO" "$C_0" "$*" >&2; exit 2; }
 # Contexte projet
 # ---------------------------------------------------------------------------
 # Variables exportées : PROJECT_ROOT CFG_FILE FEATURE PKG_REL PKG_DIR PKG_NAME FEATURE_DIR
-#                       GAUNTLET_OUT FLUTTER DART BASE_BRANCH
+#                       GAUNTLET_OUT FLUTTER DART BASE_BRANCH MODE SIZE
 init_project_context() {
   PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "pas dans un repo git"
   # GAUNTLET_CFG : surcharge de la config (tests du gauntlet lui-même, dry-run sur un projet non initialisé).
@@ -45,6 +45,9 @@ init_project_context() {
     #   create : la feature EST le package, tout le package est dans le périmètre.
     #   extend : la feature ajoute à un package existant, le périmètre = fichiers/lignes modifiés depuis base.
     MODE="${GAUNTLET_MODE:-$(pipeline_get .mode)}"; MODE="${MODE:-create}"
+    # Gabarit (S|M|L, choisi au cadrage) : allège les étapes de jugement (QA sur une plateforme en S),
+    # jamais les gates d'intégrité (compilation, suite verte, gel, deps, error_handling).
+    SIZE="${GAUNTLET_SIZE:-$(pipeline_get .size)}"; SIZE="${SIZE:-M}"
     # Base du diff : pipeline.json > config. Une feature peut partir d'une autre branche que base_branch.
     local pipeline_base; pipeline_base="$(pipeline_get .base)"
     [ -n "$pipeline_base" ] && BASE_BRANCH="$pipeline_base"

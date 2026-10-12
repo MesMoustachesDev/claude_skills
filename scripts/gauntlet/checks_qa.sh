@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # checks_qa.sh — QA Maestro : build, install, flows par plateforme, captures. Sourcé par gauntlet.sh.
 #
-# Flows : <package>/maestro/*.yaml, un par scénario Gherkin. Variables injectées :
+# Flows : <package>/maestro/*.yaml, un par scénario Gherkin. Plateformes : qa.platforms ; en gabarit S
+# (pipeline.json → size), une seule (qa.platform_s, sinon la première). Variables injectées :
 #   APP_ID          appId de la plateforme (android.app_id / ios.app_id)
 #   SCREENSHOT_DIR  dossier absolu des captures (.claude/features/<f>/qa/<platform>/)
 # Un flow écrit ses captures avec : - takeScreenshot: ${SCREENSHOT_DIR}/<scenario>
@@ -50,11 +51,22 @@ qa_prepare_ios() { # → QA_DEVICE
   QA_DEVICE="$udid"
 }
 
+# qa_platforms — qa.platforms ; en gabarit S, une seule : qa.platform_s, sinon la première de la liste.
+qa_platforms() {
+  if [ "$SIZE" = S ]; then
+    local p; p="$(cfg qa.platform_s)"; [ -n "$p" ] || p="$(cfg_list qa.platforms | head -1)"
+    printf '%s\n' "$p"
+  else
+    cfg_list qa.platforms
+  fi
+}
+
 check_qa() {
   local flows_dir="$PKG_DIR/maestro" nflows platform out app_id rc=0 prc failures shots
   nflows="$(find "$flows_dir" -maxdepth 1 -name '*.yaml' 2>/dev/null | wc -l | tr -d ' ')"
   [ "$nflows" -gt 0 ] || { ko "aucun flow dans ${flows_dir#$PROJECT_ROOT/}/"; return 1; }
-  for platform in $(cfg_list qa.platforms); do
+  [ "$SIZE" = S ] && info "gabarit S : QA sur $(qa_platforms) seulement"
+  for platform in $(qa_platforms); do
     section "qa $platform"
     out="$FEATURE_DIR/qa/$platform"; mkdir -p "$out"; rm -f "$out"/*.png "$out"/report.xml
     QA_DEVICE=""

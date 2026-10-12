@@ -3,6 +3,10 @@
 #
 # L'ordre compte : les checks rapides d'abord, les coûteux (coverage, mutation, qa) sont sautés
 # si un rapide a échoué.
+#
+# Les profils ne dépendent pas du gabarit (pipeline.json → size) : un gate d'intégrité (compilation,
+# suite verte, gel, deps, error_handling) est le même en S, M et L. Le gabarit ne décide que des
+# étapes que l'orchestrateur lance, et du nombre de plateformes QA (checks_qa.sh).
 
 # Maintenabilité que le cleaner peut corriger lui-même (voir checks_maintain.sh).
 MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
@@ -61,11 +65,12 @@ Checks individuels :
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
   coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)
   mutation           mutation_test sur les globs configurés, score ≥ seuil
+  mutation_scope     informatif : fichiers de logique que la mutation toucherait (.gauntlet/mutation_scope.txt) ; en gabarit S, vide = Hugo sauté
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
   tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
-  qa                 flows Maestro sur chaque plateforme, captures
+  qa                 flows Maestro sur chaque plateforme (gabarit S : une seule, qa.platform_s ou la première), captures
 
 Maintenabilité (checks_maintain.sh) :
   deps_unused        chaque dépendance déclarée est importée

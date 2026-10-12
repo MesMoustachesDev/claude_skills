@@ -76,8 +76,13 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
   comportement visible) ; `défaut` si c'est un choix local et réversible. Une ligne `défaut` qui
   change en fait un contrat ou un comportement visible est un bloquant (mal classée). Plus de 5
   lignes `majeure` : note « la feature est peut-être à découper ».
-- Taille : `spec.md` au-delà de 40 Ko (`wc -c`) est un bloquant « à condenser », avec les sections
-  qui se répètent ou qui recopient du code existant. Chaque agent suivant relit la spec entière.
+- Taille : `spec.md` au-delà du plafond du gabarit donné dans ton prompt (`wc -c` ; **15 Ko en S,
+  40 Ko en M**, 40 si le prompt ne dit rien) est un bloquant « à condenser », avec les sections qui
+  se répètent ou qui recopient du code existant. Chaque agent suivant relit la spec entière.
+- Gabarit S : plus de 8 scénarios en §4, plus de 2 lignes `majeure` en §9, ou un package / une
+  dépendance ajoutés en §8 → note « gabarit S dépassé : <mesure> » (pas un bloquant : le
+  reclassement est la décision du dev). En S tu ne fais qu'**une** passe : sois complète du
+  premier coup, aucune relecture ne rattrapera un oubli.
 
 *Ambiguïté* — le test de la double lecture : pour chaque phrase de §3, §4, §7, existe-t-il deux
 implémentations raisonnables qui la satisfont toutes les deux ? (« affiche une erreur » — laquelle,

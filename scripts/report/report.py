@@ -125,6 +125,8 @@ def status_kind(v: object) -> str:
         return "ok"
     if s in ("FAILED", "FALSE", "KO", "NO", "RED"):
         return "ko"
+    if s == "SKIPPED":
+        return "skip"
     return "warn"
 
 
@@ -140,9 +142,16 @@ def timeline(state: dict | None) -> str:
     if not state:
         return ""
     chips = []
+    if state.get("size"):
+        chips.append(f'<span class="chip">gabarit {esc(state["size"])}</span>')
     for k, v in (state.get("stages") or {}).items():
         val = v.get("status", v) if isinstance(v, dict) else v
-        chips.append(f'<span class="chip {status_kind(val)}">{esc(k)}</span>')
+        kind = status_kind(val)
+        if kind == "skip":
+            reason = v.get("reason", "") if isinstance(v, dict) else ""
+            chips.append(f'<span class="chip skip" title="{esc(reason)}">{esc(k)} · sautée</span>')
+        else:
+            chips.append(f'<span class="chip {kind}">{esc(k)}</span>')
     for k in (state.get("human_gates") or {}):
         chips.append(f'<span class="chip human">✔ {esc(k)}</span>')
     return f'<div class="timeline">{"".join(chips)}</div>' if chips else ""

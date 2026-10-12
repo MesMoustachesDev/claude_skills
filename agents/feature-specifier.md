@@ -36,6 +36,17 @@ que l'orchestrateur va mener avec le dev, et tu écris seulement `.claude/featur
 - **Questions ouvertes** : chacune avec 2 à 3 options concrètes, celle que tu recommandes et pourquoi,
   et ce que chaque option change pour l'utilisateur. Pas de question d'architecture interne ici.
 - **Règles non négociables** qui s'appliquent : rappelées, jamais posées comme question.
+- **Gabarit proposé** (S / M / L) et ses mesures, une ligne chacune : scénarios estimés, packages
+  touchés, package de feature ou dépendance pub.dev ajoutés, décisions majeures estimées (une ligne
+  par décision : sujet, pourquoi elle change la structure). Critères : **S** ≤ ~8 scénarios, aucun
+  nouveau package, ≤ 2 décisions majeures ; **L** > 5 décisions majeures ou plusieurs packages
+  touchés ; **M** sinon. Dans le doute, le plus lourd. En **L**, ajoute un **découpage proposé** :
+  des sous-features livrables et testables seules (nom snake_case, package, périmètre, gabarit
+  estimé, ordre et dépendances). Découpage validé, l'orchestrateur te relance pour écrire
+  `.claude/features/<nom>/split/<sous>.md` : l'extrait du cadrage propre à chacune (besoin,
+  périmètre, comportements, questions tranchées), lisible sans le reste.
+- Si ton prompt contient le chemin d'un extrait de découpage (sous-feature d'une feature L), pars de
+  lui : ce qui y est tranché ne se repose pas.
 
 Court : le dev doit le lire en 3 minutes. En reprise du cadrage, intègre les réponses du dev sans
 réécrire le reste. Quand tu écris ensuite la spec, `cadrage.md` validé est ton entrée verrouillée :
@@ -118,7 +129,7 @@ fois la section remplie.
   et la machine d'états Mermaid de chaque BLoC. Pas d'autre diagramme dans la spec.
 - **§9 Décisions** : le tableau `ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids`,
   IDs `A1`, `A2`… stables (une ligne ne change jamais d'ID). Le rapport et l'orchestrateur le parsent.
-- **Taille : 40 Ko au plus** (`wc -c spec.md`). Chaque agent suivant relit la spec entière, à chaque
+- **Taille : le plafond du gabarit** donné dans ton prompt — **15 Ko en S, 40 Ko en M** (`wc -c spec.md`). Chaque agent suivant relit la spec entière, à chaque
   passe : une spec de 100 Ko coûte des heures sur la chaîne. Pas de répétition entre sections, pas de
   code existant recopié (cite le fichier et la ligne), §6 avec un payload par modèle et les seuls cas
   limites qui changent le mapping. Vérifie la taille avant de rendre la main ; au-delà, condense.
@@ -186,6 +197,7 @@ Package cible : <chemin>  (nouveau | extension de <x>)
 Scénarios Gherkin : <n>  — Contrats : <n> entities, <n> interfaces, <n> use cases, <n> clés
 Décisions d'architecture proposées : <A1 sujet — choix (alternative)>, une par ligne
 Points que le dev doit regarder en priorité : <2-3 lignes max>
-Taille : <n> Ko (plafond 40)
+Taille : <n> Ko (plafond <15|40>, gabarit <S|M>)
+Gabarit tenu : oui | non — <critère dépassé : scénarios, majeures, package ajouté>
 Dette existante (hors feature) : aucune | <fichier — ce qui ne va pas>, une par ligne
 ```

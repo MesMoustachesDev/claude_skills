@@ -121,6 +121,8 @@ pr.copy_untracked =
 # Dossier de l'app Flutter, relatif à la racine du repo : les builds QA y sont lancés.
 app_dir = .
 qa.platforms = android, ios
+# Gabarit S (petite feature, pipeline.json → size) : QA sur une seule plateforme. Vide = la première de qa.platforms.
+qa.platform_s =
 android.avd = Pixel_6
 android.serial = emulator-5554
 android.app_id = com.example.app

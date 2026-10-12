@@ -59,12 +59,13 @@ name: <texte exact du scénario Gherkin>
   ou `maestro studio`. Si une clé de la spec manque à l'écran, c'est un finding, pas un contournement.
 
 **2. Exécute** : `~/.claude/scripts/gauntlet.sh qa <feature>`. Il boote les devices, builde, installe,
-lance tous les flows sur chaque plateforme, et dépose captures + `report.xml` + `maestro.log` dans
+lance tous les flows sur chaque plateforme (en gabarit S, sur une seule : le gauntlet la choisit
+d'après `pipeline.json → size`, ne la force pas), et dépose captures + `report.xml` + `maestro.log` dans
 `.claude/features/<nom>/qa/<plateforme>/`.
 
 **3. Regarde chaque capture.** `Read` le `.png` — c'est l'étape qui compte. Pour chacune :
 mise en page, texte tronqué ou débordant, état attendu réellement affiché, bouton hors écran,
-thème, densité. Compare Android et iOS entre eux. Une capture prise pendant une animation ment :
+thème, densité. Compare Android et iOS entre eux (en gabarit S, une seule plateforme : sans objet). Une capture prise pendant une animation ment :
 en cas de doute, ajoute `- waitForAnimationToEnd` avant la capture et relance.
 
 Pour un défaut de pixel subtil, tu peux charger la skill `android-visual-loop` (diagnostic locale,

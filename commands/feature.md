@@ -58,8 +58,9 @@ Affiche le bloc d'usage ci-dessus, puis ces exemples, tels quels :
 ~/.claude/scripts/gauntlet.sh maintain category
 ```
 
-Puis rappelle en trois lignes : les cinq points d'étape (architecture + spec, contrats, tests, mutants,
-captures), chacun avec un rapport HTML, que rien
+Puis rappelle en quatre lignes : les cinq points d'étape (architecture + spec, contrats, tests, mutants,
+captures), chacun avec un rapport HTML ; le gabarit S / M / L choisi au cadrage, qui allège les
+étapes de jugement d'une petite feature et impose le découpage d'une grosse ; que rien
 n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
 
 ---
@@ -79,22 +80,61 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 
 Étapes, agents et profils de gate :
 
-| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après |
-|---|---|---|---|---|---|
-| 0b | cadrage | Sophie (mode cadrage) + toi | `feature-specifier` | — | **oui, interactif** : ce qui existe, le périmètre, les comportements, jusqu'à « c'est ça » |
-| 1 | spec | Sophie | `feature-specifier` | — | non |
-| 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) |
-| 2 | contracts | Arthur | `feature-architect` | `contracts` | non |
-| 2b | dedup | Denis | `feature-dedup` | `dedup_verdict` | **oui** : architecture réelle (code scaffoldé) vs architecture validée |
-| 3 | tests | Théo | `feature-test-writer` | `red` | non |
-| 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) |
-| 4 | impl | Ivan | `feature-implementer` | `green` | non |
-| 5 | clean | Nina | `feature-cleaner` | `clean` | non |
-| 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) |
-| 6 | review | Romain | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) |
-| 7 | harden | Hugo | `feature-hardener` | `harden` | **oui** : mutants expliqués |
-| 8 | qa | Quentin | `feature-qa` | `qa` | **oui** : captures |
-| 9 | evidence | — | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` |
+| # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après | En S | En L |
+|---|---|---|---|---|---|---|---|
+| 0b | cadrage | Sophie (mode cadrage) + toi | `feature-specifier` | — | **oui, interactif** : ce qui existe, le périmètre, les comportements, le gabarit, jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
+| 1 | spec | Sophie | `feature-specifier` | — | non | plafond 15 Ko | — |
+| 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : décisions d'architecture une par une, puis la spec (boucle vers 1 avant) | une seule passe (`loops.spec` max 0) | — |
+| 2 | contracts | Arthur | `feature-architect` | `contracts` | non | identique | — |
+| 2b | dedup | Denis | `feature-dedup` | `dedup_verdict` | **oui** : architecture réelle (code scaffoldé) vs architecture validée | identique | — |
+| 3 | tests | Théo | `feature-test-writer` | `red` | non | identique | — |
+| 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : skim de `tests.md` + `tests_review.md`, puis gel (boucle vers 3 avant) | identique | — |
+| 4 | impl | Ivan | `feature-implementer` | `green` | non | identique | — |
+| 5 | clean | Nina | `feature-cleaner` | `clean` | non | identique | — |
+| 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) | `SKIPPED`, sauf entrées `cleaner` reportées de 2b | — |
+| 6 | review | Romain | `feature-reviewer` | `review_verdict` | non (boucle vers 4 si critiques) | identique ; `missing_tests` → Hugo | — |
+| 7 | harden | Hugo | `feature-hardener` | `harden` | **oui** : mutants expliqués | seulement si logique modifiée ou `missing_tests` | — |
+| 8 | qa | Quentin | `feature-qa` | `qa` | **oui** : captures | une seule plateforme | — |
+| 9 | evidence | — | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` | gabarit et étapes sautées en tête | arrêt après 0b : pas d'evidence |
+
+« — » en L : la feature n'atteint jamais l'étape 1, chaque sous-feature déroule son propre pipeline
+en S ou en M. Détail en « Gabarits ».
+
+---
+
+## Gabarits S / M / L
+
+La même chaîne de 11 agents pour une bascule d'UI et pour un système d'import, c'est trop pour l'une
+et trop peu découpé pour l'autre. Le gabarit, choisi à la fin du cadrage (0b) et validé par le dev
+avec le reste du cadrage, rend le pipeline proportionnel. Il est écrit dans `pipeline.json → size`.
+
+| Gabarit | Critères (au cadrage) | Ce qui change |
+|---|---|---|
+| **S** | ≤ ~8 scénarios estimés, aucun nouveau package (ni package de feature créé, ni dépendance pub.dev ajoutée), ≤ 2 décisions majeures estimées | spec ≤ 15 Ko ; une passe de Camille ; pas de 5b ; Hugo seulement si `mutation.include` contient des fichiers de logique modifiés (ou si Romain signale des `missing_tests`) ; QA sur une plateforme |
+| **M** | ni S ni L | le pipeline décrit dans ce fichier, sans allègement (spec ≤ 40 Ko, `loops.spec` max 2) |
+| **L** | > 5 décisions majeures estimées, ou la feature touche plusieurs packages | découpage obligatoire en sous-features avant toute spec ; chacune repasse par `/feature` en S ou en M |
+
+Dans le doute entre deux gabarits, prends le plus lourd : un S sous-dimensionné rate des cas, un M
+de trop ne coûte que du temps.
+
+**Ce que le gabarit ne touche jamais** : les gates d'intégrité — compilation (`analyze`,
+`build_runner`), suite verte (`test`, `green`), gel (`test_freeze_check`, re-gels), dépendances
+(`deps`, `deps_features`), `error_handling` — et les profils du gauntlet (`profiles.sh` ne lit pas
+le gabarit). Les points d'étape 1 (architecture + spec), 2 (architecture réelle) et 3 (tests, gel)
+restent en S. Le gabarit allège le jugement (critique, dedup, mutation, QA), jamais la preuve.
+
+**Lu à chaque étape.** Avant de lancer une étape, relis `pipeline.json → size` (une reprise peut
+arriver après un reclassement). Une étape que le gabarit saute n'est pas absente : écris
+`stages.<étape> = {"status": "SKIPPED", "at": "<iso>", "reason": "gabarit S : <pourquoi>"}`. La
+reprise, `status`, le rapport HTML et l'evidence la montrent avec sa raison. Une étape `SKIPPED`
+n'est jamais rejouée à la reprise, sauf reclassement.
+
+**Reclassement.** S → M dès que la spec dépasse un critère de S (plus de 8 scénarios en §4, plus de
+2 lignes `majeure` en §9, un package ou une dépendance ajoutés en §8) : dis-le au dev en une ligne au
+point d'étape 1, avec la mesure, et `AskUserQuestion` « Passer en M (Recommandé) » / « Rester en S :
+<raison> ». En M, une étape déjà `SKIPPED` en S est rejouée avant d'aller plus loin. M → L après la
+spec : point imprévu, le dev décide (découper ou continuer en M). Chaque reclassement va dans
+`pipeline.json → size_changes` (`{at, from, to, reason}`) et dans l'evidence.
 
 ---
 
@@ -150,15 +190,21 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
   un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si, après
   la spec, §8 dit « extension de `features/x` » : tu confirmes avec le dev (« la spec propose
   d'étendre `x` plutôt que de créer un package — d'accord ? ») et tu bascules en `extend`.
-- **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, lis-le, affiche l'état (étape
-  courante, gates passés, points d'étape validés) et reprends à la première étape non `PASSED`.
+- **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, lis-le, affiche l'état (gabarit,
+  étape courante, gates passés, étapes sautées, points d'étape validés) et reprends à la première
+  étape ni `PASSED` ni `SKIPPED`.
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
+    "size": null, "size_reason": null, "size_changes": [], "split": [],
     "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
     "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
+  `size` (`S|M|L`, posé à la fin de 0b) est lu par toi à chaque étape et par le gauntlet (QA) ;
+  absent ou `null`, c'est `M`. La reprise saute les étapes `PASSED` **et** `SKIPPED`, et affiche le
+  gabarit. `size: L` avec `split` rempli : la feature a été découpée, affiche l'état de chaque
+  sous-feature (son `pipeline.json` dans son worktree) et ne lance rien.
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Sophie (nouveau run
   seulement). Une issue existante fait partie de l'entrée de Sophie.
 - **Branche** : déjà en place via le worktree (voir plus haut). Les modifications non commitées du
@@ -186,13 +232,32 @@ arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi*
      et ce que chaque option change pour l'utilisateur.
    - **Règles non négociables** qui s'appliquent (`create_feature_rules.md`, gestion d'erreur…) :
      rappelées, jamais posées comme question.
+   - **Gabarit proposé** (S / M / L) avec les mesures qui le fondent : scénarios estimés, packages
+     touchés, package ou dépendance ajoutés, décisions majeures estimées (chacune en une ligne). En L,
+     un **découpage proposé** : les sous-features (nom, package, périmètre, gabarit estimé, ordre et
+     dépendances entre elles), chacune livrable et testable seule.
 2. **Toi, avec le dev.** `SendUserFile` de `cadrage.md` (`display: render`). Résume en 5 lignes ce qui
    existe et le périmètre proposé, puis pose les questions ouvertes par `AskUserQuestion` (4 max par
    appel, options concrètes, recommandée en premier). Le dev peut corriger le périmètre ou un exemple en
    texte libre : relance Sophie en mode cadrage avec ses réponses (« intègre, ne réécris pas le reste »),
    renvoie le cadrage, et recommence tant qu'il reste une question ou qu'un exemple le surprend.
-3. **Fin du cadrage** : `AskUserQuestion` « C'est bien ça qu'on fait ? » (Oui / Non, je précise).
-   Oui → `human_gates.cadrage = {at, by: "user"}`, `stages.cadrage = PASSED`.
+3. **Gabarit.** Vérifie la proposition de Sophie contre les critères de « Gabarits » (c'est la
+   règle qui tranche, pas l'estimation de l'agent : 3 décisions majeures, c'est M même si elle
+   propose S).
+4. **Fin du cadrage** : un seul `AskUserQuestion` avec deux questions — « C'est bien ça qu'on
+   fait ? » (Oui / Non, je précise) et « Gabarit » (le gabarit retenu suffixé « (Recommandé) », avec
+   en description les mesures et ce qu'il change ; le gabarit voisin en option 2). Oui → `size`,
+   `size_reason` (les mesures, une ligne), `human_gates.cadrage = {at, by: "user", size}`,
+   `stages.cadrage = PASSED`.
+5. **En L : découpage, puis arrêt.** Le découpage proposé se valide comme le reste du cadrage
+   (texte libre pour le corriger, relance de Sophie). Validé → `pipeline.json → split` (`[{name,
+   package, size, depends_on}]`) ; Sophie écrit pour chacune `.claude/features/<nom>/split/<sous>.md`
+   (l'extrait du cadrage qui la concerne). Puis tu t'arrêtes : pas de spec, pas d'issue, pas de
+   worktree de plus. Donne au dev la commande de chaque sous-feature, dans l'ordre de dépendance
+   (`/feature <sous> [--in <package>] "<description>"`) ; au cadrage d'une sous-feature, Sophie reçoit
+   en entrée le chemin absolu de son extrait et ne repart pas de zéro. Une sous-feature qui dépend
+   d'une autre attend son merge, ou part de sa branche (`base` dans son `pipeline.json`). Sors avec
+   `ExitWorktree` `action: "keep"` : le dossier de la feature parente garde le découpage.
 
 **Le cadrage validé est l'entrée verrouillée de la spec.** Sophie le reprend en §1-§2 tel quel ; une
 décision de §9 ne le contredit jamais. Un changement de périmètre demandé plus tard repasse par 0b
@@ -202,12 +267,16 @@ décision de §9 ne le contredit jamais. Un changement de périmètre demandé p
 
 Prompt de lancement : nom, `cadrage.md` validé (« périmètre et comportements figés : ne les rediscute
 pas »), description brute (ou « aucune, à découvrir »), l'issue GitLab existante
-entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, et la phrase : « Tu proposes l'architecture, le dev la tranche : chaque décision structurante va en §9
+entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, le **gabarit** et
+son plafond de taille (« gabarit S : spec ≤ 15 Ko » / « gabarit M : spec ≤ 40 Ko »), et la phrase : « Tu proposes l'architecture, le dev la tranche : chaque décision structurante va en §9
 avec le statut `proposée`, une alternative réelle et la raison. Tu ne la présentes pas comme acquise. »
+
+**Gabarit S :** plafond 15 Ko au lieu de 40. Le reste de la spec (sections, §9, `archi.json`) ne
+change pas : une petite spec n'est pas une spec incomplète. **En L :** l'étape n'a pas lieu (découpée en 0b).
 
 ### 1b. Critique — Camille (`feature-spec-critic`)
 
-Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `archi.json`, `create_feature_rules.md`, template de spec).
+Lance Camille (`feature-spec-critic`, prompt : nom, gabarit et plafond de taille, `spec.md`, `archi.json`, `create_feature_rules.md`, template de spec).
 Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
 `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau.
 Le rapport de Sophie liste une « Dette existante (hors feature) » → ajoute chaque ligne à
@@ -219,10 +288,19 @@ décisions du dev, incohérence d'archi, modifications demandées par le dev), c
 Seule la première passe de Camille lit tout. Les suivantes sont en **mode ciblé** (prompt : « mode
 ciblé », `spec.diff`, le `spec_review.json` précédent) : elle ne relit que ce que le diff touche.
 `loops.spec` compte **toutes** les passes de Camille après la première, quel qu'en soit le
-déclencheur : max 2, soit 3 passes en tout. Au-delà, plus de passe : tu montres les bloquants
+déclencheur : max 2 en M, soit 3 passes en tout. Au-delà, plus de passe : tu montres les bloquants
 restants au dev avec la spec, et il tranche. Regroupe ce qui relance Sophie : toutes les réponses
 du dev à 1a en un seul envoi, avec les bloquants de Camille s'il y en a, jamais une relance par
 réponse.
+
+**Gabarit S : une seule passe de Camille** (`loops.spec` max 0). Ses bloquants relancent Sophie une
+fois, sans nouvelle passe ; toute relance suivante (décisions du dev en 1a, modifications en 1b)
+non plus. À chaque point d'étape qui suit une relance, montre `spec.diff` en plus du reste et
+rappelle en une ligne qu'aucune critique ne l'a relu : le dev est le relecteur. Les bloquants de
+Camille encore ouverts (ceux que la relance n'a pas traités, d'après le diff) sont listés au
+point d'étape 1 ; le dev tranche ou accepte (`accept`). Si Camille note « la feature est
+peut-être à découper » ou que la spec dépasse un critère de S : reclassement (voir « Gabarits »).
+**En L :** l'étape n'a pas lieu.
 
 Vert → **Point d'étape 1 : architecture, puis spec.** Le dev garde la main sur l'archi : rien
 n'est scaffoldé tant qu'il n'a pas tranché chaque décision.
@@ -246,6 +324,10 @@ pour les lignes de §9 au statut `proposée` :
   lesquels, puis une question par ligne retenue, comme une majeure.
 - Ne pose jamais une ligne dont une règle dicte la réponse (gestion d'erreur, `create_feature_rules.md`) :
   Camille l'a déjà renvoyée en bloquant. Si elle est passée, applique la règle et retire la ligne.
+- **Gabarit S** : avant les questions, compte les lignes `majeure` de §9 et les scénarios de §4 ; au-delà
+  des critères de S, la question de reclassement part dans le même `AskUserQuestion` que les
+  premières décisions. **Gabarit M** : plus de 5 lignes `majeure` → la question « découper (L) /
+  continuer en M » part de la même façon.
 
 Toutes acceptées → passe la colonne Statut de ces lignes à `validée` (édition de `spec.md`, seule
 écriture que tu fais dans la spec avec l'en-tête). Au moins une changée → relance le **specifier** avec
@@ -276,6 +358,8 @@ Prompt : nom, **mode**, `spec.md`, `create_feature_rules.md`, package, valeur de
 Le rapport mentionne un écart avec la spec → **point imprévu** : montre l'écart, propose
 « corriger la spec et relancer Arthur » ou « accepter l'écart ». Note la décision dans `pipeline.json`.
 
+**Gabarit S :** identique (gate `contracts` d'intégrité). **En L :** n'a pas lieu.
+
 ### 2b. Roue réinventée — Denis (`feature-dedup`)
 
 Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
@@ -292,6 +376,9 @@ Le script cherche les ressemblances, l'agent juge, le script lit le verdict :
    `architect` seulement), puis 2b à nouveau ; `loops.dedup_contracts`, max 2, puis point imprévu. Le dev peut **accepter**
    un verdict (il a une raison) : tu poses `"accepted": true` sur l'entrée dans `dedup.json` avec sa
    raison, et le verdict repasse au vert. L'exemption apparaîtra dans l'evidence.
+
+**Gabarit S :** identique — c'est le seul passage de Denis en S (5b est sauté), il juge donc aussi
+ce qui sera reporté à Nina. **En L :** n'a pas lieu.
 
 ### 2c. Point d'étape 2 : architecture réelle
 
@@ -311,6 +398,8 @@ par ligne). `AskUserQuestion` : « Valider l'architecture » / « Corriger : …
   imposée, statut `modifiée`), 1b, 1a pour cette ligne seulement, puis 2 depuis le début.
 Validation → `human_gates.contracts = {at, by: "user"}`.
 
+**Gabarit S :** identique, point d'étape compris. **En L :** n'a pas lieu.
+
 Puis commit : `git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold and contracts"`.
 
 ### 3. Tests — Théo (`feature-test-writer`)
@@ -319,12 +408,15 @@ Prompt : nom, `spec.md`, package, la liste des chemins autorisés en lecture (`l
 `lib/src/presentation/keys.dart`, `**/*_event.dart`, `**/*_state.dart`, `lib/src/data/model/*.dart`),
 `~/.claude/commands/create_test.md`. Au retour, `stages.red` doit être `PASSED`.
 
+**Gabarit S :** identique — les tests sont l'actif durable, ils ne s'allègent pas. **En L :** n'a pas lieu.
+
 ### 3b. Revue des tests — Gaëlle (`feature-test-reviewer`)
 
 Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, package, `tests.md`, `create_test.md`).
 Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writer** avec
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
 `gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis point d'étape avec les bloquants restants.
+**Gabarit S :** identique, gel compris. **En L :** n'a pas lieu.
 
 Vert → **Point d'étape 3.** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
 (`display: render`) : section « Scénarios » ouverte (sélection en français, chaque scénario marqué
@@ -365,18 +457,28 @@ Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntl
   rapport HTML, une question avec les deux options. La réponse va en §9 (nouvelle ligne, statut
   `validée` ou `modifiée`), puis `SendMessage` à Ivan avec la décision.
 - Le rapport liste des « tests suspects » alors que le gate est vert → transmets-les tel quel à
-  le point d'étape 4, ne bloque pas.
+  le point d'étape 4 (en S sans Hugo : au point d'étape 5), ne bloque pas.
+
+**Gabarit S :** identique (gate `green` d'intégrité). **En L :** n'a pas lieu.
 
 ### 5. Nettoyage — Nina (`feature-cleaner`)
 
 Prompt : nom, package, `last_clean.log` si présent, et `dedup.md` s'il porte des entrées
 `fix_by: cleaner` reportées depuis 2b (« applique ces factorisations ; 5b les revérifie et bloque »).
 `stages.clean = PASSED` → continue ; `FAILED` → même traitement qu'en 4.
+**Gabarit S :** identique. **En L :** n'a pas lieu.
 
 ### 5b. Roue réinventée, second passage — Denis (`feature-dedup`)
 
 Même mécanique qu'en 2b, sur le code implémenté (helpers, widgets, extensions apparus pendant 4 et 5).
-Rouge → relance le **cleaner** avec `dedup.md`, puis 5b ; `loops.dedup_clean`, max 2.
+Vert → `stages.dedup_clean = PASSED`. Rouge → relance le **cleaner** avec `dedup.md`, puis 5b ;
+`loops.dedup_clean`, max 2.
+
+**Gabarit S : sautée** — `stages.dedup_clean = {status: "SKIPPED", reason: "gabarit S : un seul
+passage de Denis (2b)"}`. Exception : si `dedup.json` porte des entrées `fix_by: cleaner` reportées
+de 2b, 5b a lieu (c'est là qu'elles bloquent), mais seulement `gauntlet.sh dedup_verdict` après
+Nina, sans relancer Denis ; rouge → Nina, comme en M. Le check `reinvented` du profil `clean`
+reste actif. **En L :** n'a pas lieu.
 
 ### 6. Revue — Romain (`feature-reviewer`)
 
@@ -401,10 +503,27 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
 - rouge → **boucle** : `loops.review += 1`. Si ≤ 2 : relance **Ivan** (prompt : la liste
   `critical` avec `fix`, plus le contexte habituel), puis le **cleaner**, puis le **reviewer**.
   Au-delà de 2 : point imprévu avec la liste des critiques persistantes.
+- `review.json → missing_tests` ne déclenche jamais de boucle ni de re-gel : la liste va à Hugo (7),
+  qui ajoute ces tests en fichiers nouveaux.
+
+**Gabarit S :** identique (critiques, suggestions, boucle vers Ivan). Les `missing_tests` vont à
+Hugo, et c'est ce qui le fait lancer même sans logique à muter (voir 7). **En L :** n'a pas lieu.
 
 ### 7. Durcissement — Hugo (`feature-hardener`)
 
-Prompt : nom, package, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
+**Gabarit S, d'abord :** `gauntlet.sh mutation_scope <nom>` → `.gauntlet/mutation_scope.txt`, les
+fichiers de `mutation.include` touchés par la feature (en `create`, tout le package ; en `extend`,
+les fichiers modifiés), et `review.json → missing_tests`.
+- Aucun fichier et aucun `missing_tests` → `stages.harden = {status: "SKIPPED", reason: "gabarit S :
+  aucun fichier de logique modifié dans mutation.include, aucun missing_tests"}`, pas de point
+  d'étape 4, passe à 8.
+- Aucun fichier mais des `missing_tests` → Hugo, prompt « gabarit S, tests de revue seulement » :
+  il n'écrit que ces tests (le check `mutation` passe à vide, rien à muter). Pas de point d'étape 4 :
+  les tests ajoutés sont montrés au point d'étape 5.
+- Des fichiers → comme en M.
+**En L :** n'a pas lieu.
+
+Prompt : nom, package, gabarit, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
 `stages.harden = PASSED` → **point d'étape 4.** `gauntlet.sh report <nom> mutants` et `SendUserFile`
 (`display: render`). Montre `mutants.md` en entier, le score, le nombre de
 tests ajoutés, et les tests existants signalés suspects (4 et 7). Les suggestions ont été tranchées
@@ -413,7 +532,11 @@ relance Hugo avec le retour). Validation → `human_gates.mutants`.
 
 ### 8. QA — Quentin (`feature-qa`)
 
-Prompt : nom, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
+**Gabarit S : une seule plateforme** — le gauntlet la choisit (`qa.platform_s`, sinon la première de
+`qa.platforms`) en lisant `pipeline.json → size` ; un flow par scénario, comme en M. Dis au dev
+laquelle au point d'étape 5. **En L :** n'a pas lieu.
+
+Prompt : nom, gabarit, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
 **point d'étape 5.** `gauntlet.sh report <nom> qa` (les captures y sont intégrées). Montre `qa.md` en
 entier et envoie le rapport puis les captures avec `SendUserFile`
 (`.claude/features/<nom>/qa/*/*.png`, toutes, en un appel par plateforme) — le dev regarde des
@@ -449,17 +572,21 @@ Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîch
 ```
 # Evidence — <nom>
 Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
+Gabarit : <S|M> (<size_reason>)      ← pipeline.json → size ; reclassements : size_changes (de → vers, raison)
 Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue.md, partie C)
+
+## Étapes sautées (gabarit)          ← pipeline.json → stages, status SKIPPED ; omise en M sans étape sautée
+| Étape | Raison |
 
 ## Architecture                      ← archi.json → summary + §9 avec le statut final de chaque décision
 | ID | Décision | Statut (validée / modifiée par le dev) |
 
 ## Acceptation
-| Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md
+| Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md ; en S, « — (gabarit S) » sur la plateforme non jouée
 
 ## Mesures
 Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
-Mutation : <n>% (<n> mutants, <n> survivants expliqués) · Complexité max : <n> · Dépendances : ✓
+Mutation : <n>% (<n> mutants, <n> survivants expliqués) | sautée (gabarit S) · Complexité max : <n> · Dépendances : ✓
 Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/7
 
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
@@ -536,8 +663,9 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   (package, couches, data sources, Stream/Future, dépendances, découpage des BLoCs). Un agent qui en
   rencontre une nouvelle en cours de route la remonte ; tu la poses au dev comme en 1a.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
-- **`status`** : affiche `pipeline.json` sous forme de tableau (mode, package, étape, statut,
-  tentatives, date), l'issue (iid et URL) et les points d'étape validés. Rien d'autre.
+- **`status`** : affiche `pipeline.json` sous forme de tableau (gabarit, mode, package, étape, statut
+  — `SKIPPED` avec sa raison —, tentatives, date), l'issue (iid et URL) et les points d'étape
+  validés. En L, le découpage (`split`) et l'état de chaque sous-feature. Rien d'autre.
 - **`accept <étape> "<raison>"`** : pose `"accepted": true` et la raison sur les entrées bloquantes
   du rapport de l'étape (`dedup.json`, `review.json`, `spec_review.json`, `tests_review.json`),
   ajoute `{stage, at, reason}` à `pipeline.json → accepted`, relance le verdict. Toujours sur
