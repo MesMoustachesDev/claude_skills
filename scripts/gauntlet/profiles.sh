@@ -49,7 +49,7 @@ Checks individuels :
   analyze            flutter analyze --fatal-warnings sur le package
   format             dart format --set-exit-if-changed lib test
   build_runner       build_runner build si le package le déclare (json_serializable, bdd_widget_test)
-  deps               direction des dépendances entre couches + pureté du domain
+  deps               direction des dépendances entre couches + pureté du domain (extend : dette existante signalée, pas bloquante)
   error_handling     try/catch uniquement dans lib/src/data/ (I/O) ; ailleurs, Either<ErrorEntity, T>
   stub_check         après ARCHITECT : chaque méthode d'impl est un throw UnimplementedError
   no_stubs           après IMPLEMENTER : plus aucun UnimplementedError dans lib/
@@ -59,7 +59,7 @@ Checks individuels :
   test_names         écrit .claude/features/<f>/tests.md (liste lisible pour le skim du dev)
   test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
-  coverage           couverture des lignes modifiées depuis base_branch
+  coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)
   mutation           mutation_test sur les globs configurés, score ≥ seuil
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté

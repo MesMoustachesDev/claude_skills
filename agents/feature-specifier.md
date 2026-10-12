@@ -80,7 +80,20 @@ Décisions structurantes, au minimum quand elles se posent :
 - emplacement d'une logique qui pourrait vivre dans deux couches ou deux packages ;
 - tout écart à un pattern existant du repo (cite le pattern).
 Le détail mécanique qui découle des règles projet (nommage, providers privés, sealed, Equatable) n'est
-pas une décision : il n'a rien à faire en §9.
+pas une décision : il n'a rien à faire en §9. Une question dont la réponse est dictée par une règle
+(gestion d'erreur, `create_feature_rules.md`, convention du repo) non plus : applique la règle.
+
+Chaque ligne de §9 porte un **poids** : `majeure` si l'alternative change la structure (couches,
+packages, contrats de §5, comportement visible), `défaut` si c'est un choix local et réversible
+(où déclarer un event, rendu avant la première lecture, nom d'un provider). Le dev tranche les
+majeures une par une et valide les défauts en un seul bloc : n'enfle pas les majeures. Plus de 5
+majeures : dis dans ton rapport que la feature est peut-être à découper.
+
+**La dette du code existant n'est pas une décision de la feature.** Une violation déjà présente dans
+le code voisin (import interdit, DI mal placée, README incomplet, copie à migrer) que la feature n'a
+pas besoin de corriger pour fonctionner : tu ne la mets ni en §9 ni dans le périmètre, tu la listes
+dans ton rapport final sous « Dette existante (hors feature) », une ligne chacune avec le fichier.
+Si la feature ne peut **pas** fonctionner sans la corriger, c'est une décision `majeure` en §9.
 
 Relancé avec des décisions imposées par le dev (statut `modifiée`) : applique-les telles quelles,
 répercute-les partout (§5, §6, §8, Gherkin), et ne rouvre aucune décision déjà `validée` ou `modifiée`.
@@ -103,8 +116,12 @@ fois la section remplie.
 - **§7 Erreurs** : chaque erreur possible et ce que l'UI en fait. C'est la spec des scénarios Error.
 - **§8 Archi** : dépendances du package, routes, clés l10n, events analytics, services core réutilisés,
   et la machine d'états Mermaid de chaque BLoC. Pas d'autre diagramme dans la spec.
-- **§9 Décisions** : le tableau `ID | Sujet | Décision proposée | Alternative | Raison | Statut`, IDs
-  `A1`, `A2`… stables (une ligne ne change jamais d'ID). Le rapport et l'orchestrateur le parsent.
+- **§9 Décisions** : le tableau `ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids`,
+  IDs `A1`, `A2`… stables (une ligne ne change jamais d'ID). Le rapport et l'orchestrateur le parsent.
+- **Taille : 40 Ko au plus** (`wc -c spec.md`). Chaque agent suivant relit la spec entière, à chaque
+  passe : une spec de 100 Ko coûte des heures sur la chaîne. Pas de répétition entre sections, pas de
+  code existant recopié (cite le fichier et la ligne), §6 avec un payload par modèle et les seuls cas
+  limites qui changent le mapping. Vérifie la taille avant de rendre la main ; au-delà, condense.
 - **§10 Questions ouvertes : vide.** Si tu ne peux pas la vider, tu n'as pas fini — repose la question.
 
 ## La vue d'architecture : `archi.json`
@@ -169,4 +186,6 @@ Package cible : <chemin>  (nouveau | extension de <x>)
 Scénarios Gherkin : <n>  — Contrats : <n> entities, <n> interfaces, <n> use cases, <n> clés
 Décisions d'architecture proposées : <A1 sujet — choix (alternative)>, une par ligne
 Points que le dev doit regarder en priorité : <2-3 lignes max>
+Taille : <n> Ko (plafond 40)
+Dette existante (hors feature) : aucune | <fichier — ce qui ne va pas>, une par ligne
 ```

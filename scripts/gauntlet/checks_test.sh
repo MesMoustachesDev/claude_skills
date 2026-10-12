@@ -100,9 +100,32 @@ check_test_freeze_check() {
   return $rc
 }
 
-# coverage — couverture des lignes modifiées depuis base_branch (fichiers suivis : diff ; nouveaux : toutes les lignes).
+# new_lines <base> <chemin> — « fichier:ligne » des lignes ajoutées depuis <base>, fichiers non suivis compris,
+# SANS les lignes seulement déplacées (code existant découpé, extrait dans un widget ou un autre fichier,
+# réindenté) : git --color-moved les reconnaît. Index temporaire (intent-to-add des non-suivis), le vrai
+# index n'est pas touché. Écrit le nombre de lignes déplacées écartées dans $GAUNTLET_OUT/moved_lines.count.
+new_lines() {
+  local base="$1" path="$2" idx
+  idx="$(mktemp)"
+  cp "$(git -C "$PROJECT_ROOT" rev-parse --path-format=absolute --git-path index)" "$idx"
+  git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -z -- "$path" \
+    | GIT_INDEX_FILE="$idx" xargs -0 git -C "$PROJECT_ROOT" add -N -- 2>/dev/null
+  GIT_INDEX_FILE="$idx" git -C "$PROJECT_ROOT" \
+      -c color.diff.new=green -c color.diff.old=red -c color.diff.newMoved=blue -c color.diff.newMovedAlternative=blue \
+      -c color.diff.newMovedDimmed=blue -c color.diff.newMovedAlternativeDimmed=blue \
+      diff --color=always --color-moved=plain --color-moved-ws=allow-indentation-change -U0 "$base" -- "$path" \
+    | awk -v out="$GAUNTLET_OUT/moved_lines.count" '
+        { raw=$0; plain=$0; gsub(/\033\[[0-9;]*m/, "", plain) }
+        plain ~ /^\+\+\+ b\// { f=substr(plain,7); next }
+        plain ~ /^@@/ { split(plain, h, " "); split(h[3], a, ","); n=substr(a[1],2)+0; next }
+        plain ~ /^\+/ { if (raw ~ /^\033\[34m/) moved++; else print f":"n; n++ }
+        END { print moved+0 > out }'
+  rm -f "$idx"
+}
+
+# coverage — couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (new_lines).
 check_coverage() {
-  local thr lcov base changed rc
+  local thr lcov base changed rc moved
   thr="$(cfg threshold.coverage_changed 90)"
   # shellcheck disable=SC2086
   (cd "$PKG_DIR" && $FLUTTER test --coverage --no-pub >/dev/null 2>&1) || { ko "flutter test --coverage a échoué"; return 1; }
@@ -110,13 +133,9 @@ check_coverage() {
   [ -f "$lcov" ] || { ko "pas de $lcov"; return 1; }
   base="$(merge_base)"
   changed="$GAUNTLET_OUT/changed_lines.txt"
-  {
-    git -C "$PROJECT_ROOT" diff -U0 "$base" -- "$PKG_REL/lib" \
-      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}'
-    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$PKG_REL/lib" | while IFS= read -r f; do
-      awk -v f="$f" '{print f":"NR}' "$PROJECT_ROOT/$f"
-    done
-  } | grep -vE '\.g\.dart:|\.freezed\.dart:' | sort -u > "$changed"
+  new_lines "$base" "$PKG_REL/lib" | grep -vE '\.g\.dart:|\.freezed\.dart:' | sort -u > "$changed"
+  moved="$(cat "$GAUNTLET_OUT/moved_lines.count" 2>/dev/null)"
+  [ "${moved:-0}" -gt 0 ] && info "$moved ligne(s) seulement déplacée(s) (code existant découpé ou extrait) : hors couverture"
   if [ ! -s "$changed" ]; then info "aucune ligne modifiée dans lib/ depuis $base"; return 0; fi
   awk -v pkg="$PKG_REL" -v thr="$thr" -v changed="$changed" '
     BEGIN { while ((getline l < changed) > 0) ch[l]=1 }
@@ -180,6 +199,8 @@ mutation_plan() {
   fi
   [ -n "$lines" ] || return 0
   tests="$(mutation_tests_for "$f" | tr '\n' ' ')"
+  # A trailing space becomes an empty argument in mutation_test's command: flutter test then loads every test.
+  tests="${tests% }"
   printf '%s\n' "$tests" > "$GAUNTLET_OUT/mutation-tests-$slug.txt"
   for k in $(printf '%s\n' "$lines" | awk -v s="$shard" '{print int(($1-1)/s)}' | sort -un); do
     xml="$GAUNTLET_OUT/mutation-$slug#$k.xml"

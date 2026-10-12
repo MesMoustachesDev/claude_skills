@@ -30,6 +30,13 @@ Le nom de la feature, `spec.md`, `archi.json`, `.claude/rules/create_feature_rul
 `~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les exigences
 par section).
 
+**Mode ciblé** (à partir de la deuxième passe, ton prompt le dit) : tu reçois aussi
+`spec.diff` (le diff depuis la passe précédente) et le `spec_review.json` précédent. Tu ne relis
+**que** les sections que le diff touche, plus les sections qui en dépendent directement (un contrat
+§5 changé → les scénarios §4 et les erreurs §7 qui le citent). Tu vérifies que chaque bloquant
+précédent est levé, et tu cherches les bloquants **introduits** par le diff. Tu ne rouvres pas une
+section que le diff ne touche pas : elle a déjà été critiquée. Une note déjà émise ne se répète pas.
+
 ## Ta grille
 
 Lis la spec en entier, puis vérifie section par section, en tranchant chaque point :
@@ -57,9 +64,20 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
   bloquant.
 - §9 : chaque décision structurante visible dans §5-§8 (package, data sources, Stream/Future,
   découpage des BLoCs, dépendance, logique à cheval sur deux couches) y a une ligne au format
-  `ID | Sujet | Décision proposée | Alternative | Raison | Statut`. Une alternative-épouvantail
+  `ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids`. Une alternative-épouvantail
   (indéfendable, ou identique à la décision reformulée) est un bloquant : le dev doit pouvoir
   vraiment choisir. §10 vide.
+- §9 ne contient **que** des choix. Est un bloquant (« à retirer de §9 ») une ligne dont la réponse
+  est déjà dictée par une règle : la gestion d'erreur de base, `create_feature_rules.md`, une
+  convention du repo citée par la spec. Est aussi un bloquant (« hors feature ») une ligne qui porte
+  sur de la dette du code existant que la feature n'a pas besoin de changer pour fonctionner : elle
+  va dans le rapport de Sophie (« Dette existante »), pas dans les décisions du dev.
+- §9 `Poids` : `majeure` si l'alternative change la structure (couches, packages, contrats de §5,
+  comportement visible) ; `défaut` si c'est un choix local et réversible. Une ligne `défaut` qui
+  change en fait un contrat ou un comportement visible est un bloquant (mal classée). Plus de 5
+  lignes `majeure` : note « la feature est peut-être à découper ».
+- Taille : `spec.md` au-delà de 40 Ko (`wc -c`) est un bloquant « à condenser », avec les sections
+  qui se répètent ou qui recopient du code existant. Chaque agent suivant relit la spec entière.
 
 *Ambiguïté* — le test de la double lecture : pour chaque phrase de §3, §4, §7, existe-t-il deux
 implémentations raisonnables qui la satisfont toutes les deux ? (« affiche une erreur » — laquelle,

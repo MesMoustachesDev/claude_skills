@@ -294,12 +294,15 @@ stateDiagram-v2
   - Statut : proposée (specifier) → validée | modifiée (écrit après la décision du dev).
   - Uniquement les décisions structurantes (package, data sources, Stream/Future, découpage
     des BLoCs, dépendances, emplacement d'une logique ambiguë, écart à un pattern du repo).
+  - Jamais une question qu'une règle tranche déjà, jamais la dette du code existant.
+  - Poids : majeure (change la structure, un contrat de §5 ou le comportement visible) | défaut
+    (choix local et réversible). Les défauts sont validés en un seul bloc.
   Pour que le cleaner et l'implementer ne re-décident pas.
 -->
 
-| ID | Sujet | Décision proposée | Alternative | Raison | Statut |
-|---|---|---|---|---|---|
-| A1 | Package | | | | proposée |
+| ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids |
+|---|---|---|---|---|---|---|
+| A1 | Package | | | | proposée | majeure |
 
 ## 10. Questions ouvertes
 

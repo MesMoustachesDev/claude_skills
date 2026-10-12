@@ -43,13 +43,21 @@ check_build_runner() {
 
 check_no_stubs() {
   local hits
-  # A provider that must be overridden at the app root throws by design: mark it `// gauntlet-ignore`,
-  # on the same line or on the next one (dart format moves a trailing comment inside the argument list).
+  # Not a stub: a port provider that must be overridden at the app root throws by design with a
+  # "... must be overridden" message (same line or the next one once formatted). A line marked
+  # `// gauntlet-ignore` (same line or the next one) is exempted too.
   local mark="${IGNORE_MARK:-gauntlet-ignore}" f
   hits="$(grep -rl --include='*.dart' 'UnimplementedError' "$PKG_DIR/lib" 2>/dev/null | while IFS= read -r f; do
       awk -v mark="$mark" -v file="${f#$PKG_DIR/}" '
         { line[NR]=$0 }
-        END { for (i=1;i<=NR;i++) if (line[i] ~ /UnimplementedError/ && index(line[i], mark)==0 && index(line[i+1], mark)==0) print file":"i":"line[i] }
+        END {
+          for (i=1;i<=NR;i++) {
+            if (line[i] !~ /UnimplementedError/) continue
+            near = line[i] "\n" line[i+1]
+            if (index(near, mark) || near ~ /must be overridden/) continue
+            print file":"i":"line[i]
+          }
+        }
       ' "$f"
     done)"
   [ -z "$hits" ] && return 0
@@ -104,7 +112,9 @@ check_error_handling() {
 # deps — direction des couches : lib/src/<couche>/ n'importe que les couches listées dans deps.<couche>.
 # Règles supplémentaires : imports package:/dart: uniquement (pas de relatif) ; domain sans packages interdits.
 check_deps() {
-  local layer allowed forbidden f line imp target g exempt rc=0 self="$PKG_NAME"
+  local layer allowed forbidden f ln line imp target g exempt rc=0 self="$PKG_NAME" viol="" mine debt
+  # Mode extend : une violation sur une ligne que la feature n'a pas touchée est de la dette existante —
+  # listée dans .gauntlet/debt_deps.txt (reprise dans l'evidence), pas bloquante.
   forbidden="$(cfg_list deps.domain_forbidden_packages)"
   # deps.exempt : globs relatifs au package, exemptés (dette existante assumée, tracée dans la config).
   exempt="$(cfg_list deps.exempt)"
@@ -112,28 +122,37 @@ check_deps() {
     [ -d "$PKG_DIR/lib/src/$layer" ] || continue
     allowed="$(cfg_list "deps.$layer" | tr '\n' ' ')"
     while IFS= read -r line; do
-      f="${line%%:*}"; imp="$(printf '%s' "$line" | sed -E "s/^[^:]*:[0-9]+:[[:space:]]*import[[:space:]]+['\"]([^'\"]+)['\"].*/\1/")"
+      f="${line%%:*}"; ln="${line#*:}"; ln="${ln%%:*}"
+      imp="$(printf '%s' "$line" | sed -E "s/^[^:]*:[0-9]+:[[:space:]]*import[[:space:]]+['\"]([^'\"]+)['\"].*/\1/")"
       for g in $exempt; do
         # shellcheck disable=SC2053
         [[ "$f" == $g ]] && continue 2
       done
       case "$imp" in
         package:*|dart:*) ;;
-        *) ko "$f : import relatif '$imp' (imports package: uniquement)"; rc=1; continue ;;
+        *) viol+="$f:$ln: import relatif '$imp' (imports package: uniquement)"$'\n'; continue ;;
       esac
       if [[ "$imp" == package:$self/src/* ]]; then
         target="${imp#package:$self/src/}"; target="${target%%/*}"
         if [ "$target" != "$layer" ] && ! grep -qw "$target" <<<"$allowed"; then
-          ko "$f : $layer → $target interdit (autorisé : ${allowed:-rien})"; rc=1
+          viol+="$f:$ln: $layer → $target interdit (autorisé : ${allowed:-rien})"$'\n'
         fi
       fi
       if [ "$layer" = domain ] && [ -n "$forbidden" ]; then
         for p in $forbidden; do
-          if [[ "$imp" == "package:$p/"* ]]; then ko "$f : domain importe $p (domaine impur)"; rc=1; fi
+          if [[ "$imp" == "package:$p/"* ]]; then viol+="$f:$ln: domain importe $p (domaine impur)"$'\n'; fi
         done
       fi
     done < <(grep -rnE --include='*.dart' --exclude='*.g.dart' "^[[:space:]]*import[[:space:]]" "$PKG_DIR/lib/src/$layer" | sed "s#^$PKG_DIR/##")
   done
+  mine="$(printf '%s\n' "$viol" | grep -v '^$' | filter_scope_lines "$PKG_REL/")"
+  printf '%s\n' "$viol" | grep -v '^$' \
+    | awk -v m="$mine" 'BEGIN { n=split(m, a, "\n"); for (i=1; i<=n; i++) own[a[i]]=1 } !($0 in own)' > "$GAUNTLET_OUT/debt_deps.txt"
+  if [ -s "$GAUNTLET_OUT/debt_deps.txt" ]; then
+    info "dette existante (lignes que la feature n'a pas touchées, non bloquant, voir debt_deps.txt) :"
+    sed 's/^/   · /' "$GAUNTLET_OUT/debt_deps.txt" | head -15
+  fi
+  if [ -n "$mine" ]; then printf '%s\n' "$mine" | sed 's/^/   ✗ /'; ko "dépendances entre couches violées par la feature"; rc=1; fi
   [ "$rc" = 0 ] && info "couches : $(for l in domain data presentation injection; do [ -d "$PKG_DIR/lib/src/$l" ] && printf '%s ' "$l"; done)"
   return $rc
 }

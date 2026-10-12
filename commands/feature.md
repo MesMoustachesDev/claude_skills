@@ -155,7 +155,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
-    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "suggestions": {}, "loops": {}, "accepted": [],
+    "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "tests_freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
     "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
@@ -209,8 +209,20 @@ avec le statut `proposée`, une alternative réelle et la raison. Tu ne la prés
 
 Lance Camille (`feature-spec-critic`, prompt : nom, `spec.md`, `archi.json`, `create_feature_rules.md`, template de spec).
 Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec
-`spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
-`loops.spec`, max 2, puis tu montres les bloquants restants au dev avec la spec.
+`spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau.
+Le rapport de Sophie liste une « Dette existante (hors feature) » → ajoute chaque ligne à
+`pipeline.json → debt` (`{source: "spec", file, issue}`) : elle n'entre ni dans §9 ni dans le périmètre.
+
+**Critique ciblée, plafond global.** Avant **chaque** relance de Sophie (bloquants de Camille,
+décisions du dev, incohérence d'archi, modifications demandées par le dev), copie `spec.md` en
+`.claude/features/<nom>/.spec_prev.md` ; à son retour, `diff -u .spec_prev.md spec.md > spec.diff`.
+Seule la première passe de Camille lit tout. Les suivantes sont en **mode ciblé** (prompt : « mode
+ciblé », `spec.diff`, le `spec_review.json` précédent) : elle ne relit que ce que le diff touche.
+`loops.spec` compte **toutes** les passes de Camille après la première, quel qu'en soit le
+déclencheur : max 2, soit 3 passes en tout. Au-delà, plus de passe : tu montres les bloquants
+restants au dev avec la spec, et il tranche. Regroupe ce qui relance Sophie : toutes les réponses
+du dev à 1a en un seul envoi, avec les bloquants de Camille s'il y en a, jamais une relance par
+réponse.
 
 Vert → **Point d'étape 1 : architecture, puis spec.** Le dev garde la main sur l'archi : rien
 n'est scaffoldé tant qu'il n'a pas tranché chaque décision.
@@ -221,13 +233,19 @@ montrer le rapport, puis 1b ; ce compteur partage `loops.spec`. Sinon `SendUserF
 (`display: render`, légende « décisions d'architecture à trancher »). Le rapport est interactif : un
 résumé, les décisions (clic = surligner où elles s'appliquent ; « Voir l'alternative » redessine la
 carte et l'arborescence), la carte de ce qui change par couche (squelette standard masqué), les
-parcours en séquence, l'arborescence des fichiers ajoutés et modifiés. Dis-le en une ligne. Puis
-`AskUserQuestion`, **une question par ligne de §9 au statut `proposée`** (par paquets de 4 questions
-max par appel) :
-- `header` : l'ID et le sujet (`A1 Package`) ; `question` : la décision en une phrase et son enjeu ;
-- option 1 : la décision proposée, suffixée « (Recommandé) », avec la raison en description ;
-- option 2 : l'alternative de §9, avec en description son `impact` tiré de `archi.json → decisions` ;
-- « Other » reste ouvert pour une troisième voie.
+parcours en séquence, l'arborescence des fichiers ajoutés et modifiés. Dis-le en une ligne. Puis,
+pour les lignes de §9 au statut `proposée` :
+- **Poids `majeure`** : `AskUserQuestion`, **une question par ligne** (par paquets de 4 questions max
+  par appel). `header` : l'ID et le sujet (`A1 Package`) ; `question` : le problème concret que la
+  décision règle, puis la décision en une phrase ; option 1 : la décision proposée, suffixée
+  « (Recommandé) », avec la raison en description ; option 2 : l'alternative de §9, avec en
+  description son `impact` tiré de `archi.json → decisions` ; « Other » reste ouvert.
+- **Poids `défaut`** : en texte, une ligne par décision (`A6 Event — déclaré dans X (sinon Y)`), puis
+  **une seule** question : « Appliquer ces <n> choix par défaut ? » — « Oui, tous (Recommandé) » /
+  « J'en revois certains ». Dans le second cas, un `AskUserQuestion` multiSelect pour choisir
+  lesquels, puis une question par ligne retenue, comme une majeure.
+- Ne pose jamais une ligne dont une règle dicte la réponse (gestion d'erreur, `create_feature_rules.md`) :
+  Camille l'a déjà renvoyée en bloquant. Si elle est passée, applique la règle et retire la ligne.
 
 Toutes acceptées → passe la colonne Statut de ces lignes à `validée` (édition de `spec.md`, seule
 écriture que tu fais dans la spec avec l'en-tête). Au moins une changée → relance le **specifier** avec
@@ -453,6 +471,11 @@ Exemptions gauntlet-ignore : <n> (<où>)
 ## Impact (graphify)                  ← 9a, seulement si le projet a un graphe
 | Package consommateur | Symboles touchés |
 
+## Dette existante (hors feature)       ← pipeline.json → debt + .gauntlet/debt_deps.txt
+| Fichier | Problème | Vu par (spec, gate, revue) |
+Puis propose au dev une session séparée par lot cohérent (start_session, own_initiative) : la dette
+n'est pas corrigée dans la feature, mais elle ne se perd pas.
+
 ## Dépendances à traiter hors feature   ← review.json → dependencies
 | Package | Problème | Alternative | Fichiers | Risque | Verdict |
 
@@ -481,6 +504,19 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 ## Règles de conduite
 
 - **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question au dev.
+- **Filtre avant toute question imprévue.** Une question coûte l'attention du dev et souvent une
+  boucle d'agents. Avant de la poser, dans l'ordre :
+  1. **Une règle tranche** (règles de base, `create_feature_rules.md`, `pr_rules.md`, convention du
+     repo) → applique-la, dis-le en une ligne, ne demande pas.
+  2. **Opérationnel et réversible** (restaurer un fichier généré ou un lockfile, relancer un agent
+     bloqué, régénérer un rapport) → fais-le et dis-le en une ligne.
+  3. **Dette du code existant** que la feature n'a pas besoin de corriger (check rouge sur une ligne
+     non touchée, DI ou README d'un package voisin, copie à migrer) → `pipeline.json → debt`, rien
+     d'autre ; elle sort à l'evidence. Si un gate bloque *uniquement* sur cette dette, c'est un bug
+     du périmètre du gate : exempte-la (`deps.exempt`, `gauntlet-ignore: dette existante`) et note-le.
+  4. Seuls restent des questions : le périmètre, un comportement visible, une décision
+     d'architecture, ou abaisser un gate (seuil, acceptation). Groupe-les : un seul `AskUserQuestion`
+     par arrêt, jamais une question par message.
 - **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
