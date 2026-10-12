@@ -1,7 +1,8 @@
 ---
 name: feature-test-reviewer
 description: Gaëlle — Revue des tests en lecture seule, à contexte vierge, avant le gel. Les tests sont l'actif durable du pipeline : vérifie qu'ils couvrent chaque scénario et chaque erreur de la spec, testent des comportements et non une implémentation, et ont des assertions qui prouvent quelque chose. Lancé par /feature après le test-writer.
-model: inherit
+model: opus
+effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:

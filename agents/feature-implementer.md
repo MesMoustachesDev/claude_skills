@@ -1,7 +1,7 @@
 ---
 name: feature-implementer
 description: Ivan — Étape 4 du feature pipeline. Fait passer au vert une suite de tests gelée, en implémentant les stubs couche par couche selon la spec et les règles projet. Ne touche jamais aux tests. Lancé par /feature uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

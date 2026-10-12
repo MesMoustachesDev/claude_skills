@@ -1,7 +1,8 @@
 ---
 name: feature-reviewer
 description: Romain — Étape 6 du feature pipeline. Revue adversariale en lecture seule — conformité à la spec, aux règles projet (pr_rules.md), aux règles de la grille partagée (pipeline/review_grid.md), et maintenabilité à long terme (architecture respectée, dépendances justifiées, packages sains, design system, cohérence avec le reste de l'app). Produit review.json. Lancé par /feature uniquement.
-model: inherit
+model: opus
+effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:

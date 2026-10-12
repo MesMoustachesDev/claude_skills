@@ -1,7 +1,8 @@
 ---
 name: fix-reproducer
 description: Bastien — Étape 1 du pipeline /fix — et arbitre des tests jusqu'à la fin. Trouve la cause racine d'un bug (log first), explique pourquoi les tests l'ont laissé passer, et écrit le test qui passe au rouge pour la bonne raison (ou un flow Maestro avec capture si le bug n'est visible qu'à l'écran). Ne corrige jamais le code. Lancé par /fix uniquement.
-model: inherit
+model: opus
+effort: high
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

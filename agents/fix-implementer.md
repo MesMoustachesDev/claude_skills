@@ -1,7 +1,7 @@
 ---
 name: fix-implementer
 description: Fanny — Étape 2 du pipeline /fix. Corrige la cause racine d'un bug jusqu'à faire passer au vert un test de reproduction gelé, sans jamais toucher aux tests, en respectant les conventions du projet. Lancé par /fix uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

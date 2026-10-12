@@ -1,7 +1,7 @@
 ---
 name: feature-hardener
 description: Hugo — Étape 7 du feature pipeline. Mutation testing — tue les mutants survivants avec de nouveaux tests (fichiers ajoutés, jamais modifiés), ajoute les tests des scénarios signalés par la revue, explique les mutants équivalents dans mutants.md. Lancé par /feature uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

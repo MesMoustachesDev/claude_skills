@@ -1,7 +1,8 @@
 ---
 name: feature-specifier
 description: Sophie — Étape 1 du feature pipeline. Tech lead de la feature — explore le repo, pose les questions produit, propose l'architecture (le dev la tranche) et écrit la spec (fonctionnel, Gherkin, contrats, données, erreurs, archi) dans .claude/features/<nom>/spec.md. Lancé par /feature uniquement.
-model: inherit
+model: opus
+effort: high
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

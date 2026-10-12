@@ -1,7 +1,8 @@
 ---
 name: feature-spec-critic
 description: Camille — Critique de spec en lecture seule, à contexte vierge. Relit spec.md comme le feront les agents suivants — contradictions entre sections, ambiguïtés qui feront diverger tests et implémentation, cas d'erreur et états oubliés, contrats incomplets — avant que le dev la valide. Lancé par /feature après le specifier.
-model: inherit
+model: opus
+effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:

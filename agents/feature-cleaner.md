@@ -1,7 +1,7 @@
 ---
 name: feature-cleaner
 description: Nina — Étape 5 du feature pipeline. Refactorise sans changer le comportement — DRY, extraction, nommage, complexité sous les seuils — la suite de tests restant verte et intacte. Lancé par /feature uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

@@ -1,7 +1,7 @@
 ---
 name: feature-architect
 description: Arthur — Étape 2 du feature pipeline. Pose le squelette du package (scaffold Mason ou règles projet) et transcrit les contrats de la spec en code — interfaces, entities, events/states, keys, DI, modèles de données — avec des implémentations stub `throw UnimplementedError()`. N'implémente rien, n'écrit aucun test. Lancé par /feature uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

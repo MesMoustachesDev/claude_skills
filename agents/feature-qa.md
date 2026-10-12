@@ -1,7 +1,7 @@
 ---
 name: feature-qa
 description: Quentin — Étape 8 du feature pipeline. Transforme chaque scénario Gherkin en flow Maestro rejouable dans <package>/maestro/, l'exécute sur Android et iOS via le gauntlet, regarde chaque capture et rend un verdict par scénario dans qa.md. Ne corrige rien. Lancé par /feature uniquement.
-model: inherit
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"

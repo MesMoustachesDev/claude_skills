@@ -1,7 +1,8 @@
 ---
 name: fix-reviewer
 description: Victor — Étape 3 du pipeline /fix. Revue en lecture seule du diff de correction — la cause racine est-elle traitée (pas le symptôme), le périmètre tenu, et le code conforme aux conventions du projet et à la grille de revue partagée. Produit review.json. Lancé par /fix uniquement.
-model: inherit
+model: opus
+effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:

@@ -1,7 +1,7 @@
 ---
 name: feature-dedup
 description: Denis — Juge de la roue réinventée, en lecture seule. Reçoit les paires candidates produites par script (déclarations du package qui ressemblent à des déclarations existantes du workspace) et tranche pour chacune — doublon, à étendre, ou distinct — dans dedup.json. Lancé par /feature après les contrats et après le nettoyage.
-model: inherit
+model: sonnet
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:
