@@ -94,9 +94,9 @@ check_error_handling() {
   extra="$(cfg_list writes.extra | while IFS= read -r g; do
       case "$g" in */lib/\*\*) dir="${g%/\*\*}/src" ;; *) continue ;; esac
       [ -d "$PROJECT_ROOT/$dir" ] || continue
-      { git -C "$PROJECT_ROOT" diff -U0 "$base" -- "$dir" \
+      { diff_u0 "$base" "$dir" \
           | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); n=substr(a[1],2)} /^\+[^+]/{print f":"n": "substr($0,2); n++}'
-        git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$dir" | grep '\.dart$' \
+        untracked "$dir" | grep '\.dart$' \
           | while IFS= read -r f; do grep -nE "" "$PROJECT_ROOT/$f" | sed "s#^#$f:#"; done
       } | grep '\.dart:' | grep -v '/lib/src/data/' | grep -vE '\.(g|freezed)\.dart:' \
         | grep -E "$ERROR_HANDLING_RE" | grep -v 'gauntlet-ignore'
@@ -158,27 +158,33 @@ check_deps() {
 }
 
 DART_TOOLS="$GAUNTLET_ROOT/dart_tools"
-# Les commandes dart tournent depuis PROJECT_ROOT pour que `fvm dart` résolve le SDK du projet ;
-# le package d'outils est ciblé explicitement (-C / --packages).
+# Les commandes dart tournent depuis APP_ROOT (app_dir, là où vit .fvmrc) pour que `fvm dart` résolve le
+# SDK du projet : depuis la racine du repo, fvm retombe sur son SDK global. Le package d'outils est ciblé
+# explicitement (-C / --packages).
 ensure_dart_tools() {
   [ -f "$DART_TOOLS/.dart_tool/package_config.json" ] && return 0
   # shellcheck disable=SC2086
-  (cd "$PROJECT_ROOT" && $DART pub get -C "$DART_TOOLS" >/dev/null 2>&1) || { ko "dart pub get a échoué dans $DART_TOOLS"; return 1; }
+  (cd "$APP_ROOT" && $DART pub get -C "$DART_TOOLS" >/dev/null 2>&1) || { ko "dart pub get a échoué dans $DART_TOOLS (lancé depuis $APP_ROOT)"; return 1; }
 }
 run_dart_tool() { # run_dart_tool <script.dart> <args...>
   local script="$1"; shift
   # shellcheck disable=SC2086
-  (cd "$PROJECT_ROOT" && $DART --packages="$DART_TOOLS/.dart_tool/package_config.json" "$DART_TOOLS/bin/$script" "$@")
+  (cd "$APP_ROOT" && $DART --packages="$DART_TOOLS/.dart_tool/package_config.json" "$DART_TOOLS/bin/$script" "$@")
 }
 
 # stub_check — après ARCHITECT : chaque méthode des fichiers stub.include est `throw UnimplementedError()`.
 check_stub_check() {
   ensure_dart_tools || return 1
-  local files
+  # Périmètre de la passe : lors d'un rejeu (pass_base), le code implémenté par une passe validée n'est
+  # plus un stub et n'a pas à l'être.
+  local files SCOPE_FILE SCOPE_ALL; use_pass_scope
   files="$(expand_globs "$PKG_DIR" $(cfg_list stub.include | tr '\n' ' ') | filter_excluded '*.g.dart' '*.freezed.dart')"
   if [ -z "$files" ]; then ko "aucun fichier ne correspond à stub.include"; return 1; fi
   # mode extend : seules les méthodes ajoutées doivent être des stubs
   files="$(printf '%s\n' "$files" | filter_scope_files "$PKG_REL/")"
+  if [ -z "$files" ] && [ -n "${PASS_BASE:-}" ]; then
+    info "aucun fichier d'implémentation du package modifié $(pass_label) : le rejeu ne pose pas de contrat ici"; return 0
+  fi
   if [ -z "$files" ]; then ko "aucun fichier d'implémentation dans le périmètre — l'architect n'a posé aucun contrat"; return 1; fi
   info "$(printf '%s\n' "$files" | wc -l | tr -d ' ') fichier(s) inspecté(s)"
   scope_for_tool "$PKG_REL/" "$GAUNTLET_OUT/scope_pkg.txt"

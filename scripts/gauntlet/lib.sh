@@ -26,14 +26,16 @@ init_project_context() {
   DART="$(cfg dart 'dart')"
   BASE_BRANCH="$(cfg base_branch 'develop')"
 
+  # APP_ROOT : le dossier de l'app Flutter (app_dir), là où vit .fvmrc. Toute commande dart/flutter lancée
+  # hors d'un package (outils Dart du gauntlet, pub global) tourne depuis APP_ROOT : depuis la racine du
+  # repo, `fvm dart` ne trouve pas de .fvmrc et retombe sur le SDK global (Dart 2.18 sur cette machine).
+  APP_ROOT="$PROJECT_ROOT/$(cfg app_dir .)"; APP_ROOT="${APP_ROOT%/}"; APP_ROOT="${APP_ROOT%/.}"
   # Les exécutables pub (mason, metrics, mutation_test) et leur `dart` doivent être ceux du SDK du
   # projet : avec fvm, on met le SDK épinglé en tête de PATH. Sans ça, un vieux `dart` système
   # (celui de /usr/local/bin) casse tout silencieusement.
   export PATH="$HOME/.pub-cache/bin:$PATH"
-  if [[ "$DART" == fvm* ]] && [ -f "$PROJECT_ROOT/.fvmrc" ]; then
-    local fv; fv="$(jq -r '.flutter // empty' "$PROJECT_ROOT/.fvmrc" 2>/dev/null)"
-    [ -n "$fv" ] && [ -d "$HOME/fvm/versions/$fv/bin" ] && export PATH="$HOME/fvm/versions/$fv/bin:$PATH"
-  fi
+  local fv; fv="$(fvm_pinned_version)"
+  [ -n "$fv" ] && [ -d "$HOME/fvm/versions/$fv/bin" ] && export PATH="$HOME/fvm/versions/$fv/bin:$PATH"
 
   FEATURE="$1"
   if [ -n "$FEATURE" ]; then
@@ -61,6 +63,114 @@ init_project_context() {
   fi
 }
 
+# fvmrc_path — le .fvmrc que fvm lit depuis APP_ROOT (APP_ROOT ou un parent jusqu'à PROJECT_ROOT), vide sinon.
+fvmrc_path() {
+  local d="$APP_ROOT"
+  while :; do
+    [ -f "$d/.fvmrc" ] && { printf '%s' "$d/.fvmrc"; return 0; }
+    [ "$d" = "$PROJECT_ROOT" ] || [ "$d" = / ] && return 1
+    d="$(dirname "$d")"
+  done
+}
+# fvm_pinned_version — la version Flutter épinglée par ce .fvmrc (vide hors fvm ou sans .fvmrc).
+fvm_pinned_version() {
+  [[ "$DART" == fvm* ]] || return 0
+  local rc; rc="$(fvmrc_path)" || return 0
+  jq -r '.flutter // empty' "$rc" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Git, submodules compris
+# ---------------------------------------------------------------------------
+# Un package peut vivre dans un submodule (flutter_app/hades) : le repo parent n'en voit que le gitlink.
+# Les helpers ci-dessous lancent git dans le bon repo et rendent des chemins relatifs à PROJECT_ROOT.
+# submodules — chemins des submodules (relatifs à PROJECT_ROOT), un par ligne.
+submodules() {
+  [ -f "$PROJECT_ROOT/.gitmodules" ] || return 0
+  git -C "$PROJECT_ROOT" config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}'
+}
+# submodule_of <chemin> — le submodule qui contient <chemin> (relatif à PROJECT_ROOT), vide sinon.
+submodule_of() {
+  local p="${1%/}" s best=""
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    case "$p/" in "$s"/*) [ ${#s} -gt ${#best} ] && best="$s" ;; esac
+  done < <(submodules)
+  printf '%s' "$best"
+}
+# sub_rev <submodule> <rev> — <rev> traduit pour le submodule : un commit du submodule tel quel, sinon le
+# gitlink que le commit <rev> du parent enregistre. Absent (submodule ajouté après <rev>) : l'arbre vide.
+sub_rev() {
+  local sub="$1" rev="$2" r
+  if git -C "$PROJECT_ROOT/$sub" cat-file -e "$rev^{commit}" 2>/dev/null; then printf '%s' "$rev"; return; fi
+  r="$(git -C "$PROJECT_ROOT" rev-parse -q --verify "$rev:$sub" 2>/dev/null)"
+  printf '%s' "${r:-4b825dc642cb6eb9a060e54bf8d69288fbee4904}"
+}
+# git_sites <rev> <chemin> — où lancer git pour couvrir <chemin>, un site par repo, champs séparés par \036 :
+# repo, préfixe (chemin du submodule + /, vide pour le parent), rev traduite, chemin dans ce repo, puis les
+# exclusions (gitlinks des submodules, pour le parent). <chemin> dans un submodule → ce submodule seul ;
+# sinon le parent et chaque submodule initialisé sous <chemin>.
+git_sites() {
+  local rev="$1" path="${2%/}" sub s excl=()
+  [ -n "$path" ] || path=.
+  sub="$(submodule_of "$path")"
+  if [ -n "$sub" ]; then
+    local inner="${path#"$sub"}"; inner="${inner#/}"
+    printf '%s\036%s\036%s\036%s\n' "$PROJECT_ROOT/$sub" "$sub/" "$(sub_rev "$sub" "$rev")" "${inner:-.}"
+    return
+  fi
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    [ "$path" = . ] || case "$s/" in "$path"/*) ;; *) continue ;; esac
+    excl+=(":(exclude)$s")
+    [ -e "$PROJECT_ROOT/$s/.git" ] || continue
+    printf '%s\036%s\036%s\036%s\n' "$PROJECT_ROOT/$s" "$s/" "$(sub_rev "$s" "$rev")" .
+  done < <(submodules)
+  local IFS=$'\036'
+  printf '%s\n' "$PROJECT_ROOT"$'\036'$'\036'"$rev"$'\036'"$path${excl[*]:+$'\036'}${excl[*]}"
+}
+# Chaque helper lit un site : SITE_DIR, SITE_PRE, SITE_REV et le tableau SITE_PATHS (chemin + exclusions).
+_read_site() {
+  local IFS=$'\036' f
+  read -r -a f || return 1
+  SITE_DIR="${f[0]}"; SITE_PRE="${f[1]}"; SITE_REV="${f[2]}"; SITE_PATHS=("${f[@]:3}")
+}
+# diff_names <rev> <chemin> [args…] — fichiers modifiés depuis <rev> (arbre de travail compris).
+diff_names() {
+  local rev="$1" path="$2"; shift 2
+  while _read_site; do
+    git -C "$SITE_DIR" diff --name-only --ignore-submodules=all "$@" "$SITE_REV" -- "${SITE_PATHS[@]}" | sed "s#^#$SITE_PRE#"
+  done < <(git_sites "$rev" "$path")
+}
+# diff_name_status <rev> <chemin> — comme diff_names, en --name-status.
+diff_name_status() {
+  while _read_site; do
+    git -C "$SITE_DIR" diff --name-status --ignore-submodules=all "$SITE_REV" -- "${SITE_PATHS[@]}" \
+      | awk -v pre="$SITE_PRE" 'BEGIN { FS=OFS="\t" } { for (i=2; i<=NF; i++) $i=pre $i; print }'
+  done < <(git_sites "$1" "$2")
+}
+# diff_u0 <rev> <chemin> [args…] — patch -U0 depuis <rev>, chemins `b/…` relatifs à PROJECT_ROOT.
+diff_u0() {
+  local rev="$1" path="$2"; shift 2
+  while _read_site; do
+    git -C "$SITE_DIR" diff -U0 --ignore-submodules=all --src-prefix="a/$SITE_PRE" --dst-prefix="b/$SITE_PRE" "$@" "$SITE_REV" -- "${SITE_PATHS[@]}"
+  done < <(git_sites "$rev" "$path")
+}
+# untracked <chemin> — fichiers non suivis (hors .gitignore), submodules compris.
+untracked() {
+  while _read_site; do
+    git -C "$SITE_DIR" ls-files --others --exclude-standard -- "${SITE_PATHS[@]}" | sed "s#^#$SITE_PRE#"
+  done < <(git_sites HEAD "$1")
+}
+# show_at <rev> <fichier> — contenu de <fichier> (relatif à PROJECT_ROOT) au commit <rev>.
+show_at() {
+  local sub; sub="$(submodule_of "$2")"
+  if [ -n "$sub" ]; then git -C "$PROJECT_ROOT/$sub" show "$(sub_rev "$sub" "$1"):${2#"$sub"/}" 2>/dev/null
+  else git -C "$PROJECT_ROOT" show "$1:$2" 2>/dev/null; fi
+}
+# git_in <chemin> <args…> — git lancé dans le repo qui contient <chemin> (le submodule s'il y en a un).
+git_in() { local sub; sub="$(submodule_of "$1")"; shift; git -C "$PROJECT_ROOT${sub:+/$sub}" "$@"; }
+
 # ---------------------------------------------------------------------------
 # Périmètre modifié (mode extend)
 # ---------------------------------------------------------------------------
@@ -68,18 +178,41 @@ init_project_context() {
 #   "chemin"        fichier entier (ajouté ou non suivi)
 #   "chemin:ligne"  ligne ajoutée dans un fichier modifié
 # SCOPE_ALL=1 en mode create : tout le package est dans le périmètre.
+# Package dans un submodule : le diff tourne dans le submodule, depuis le gitlink que la base enregistre.
+#
+# Périmètre de la passe (PASS_SCOPE_FILE, PASS_SCOPE_ALL) : les gates qui jugent le travail de l'étape en
+# cours (stub_check : les nouveaux contrats sont des stubs ; red_check : les nouveaux tests sont rouges)
+# ne doivent pas rejuger le code d'une passe déjà validée. Lors d'un rejeu (amendement de spec, nouvelle
+# passe sur une feature déjà implémentée), pipeline.json → pass_base (ou GAUNTLET_PASS_BASE) donne le commit
+# où la passe en cours a commencé : ces gates ne voient que ce qui a changé depuis. Sans pass_base, le
+# périmètre de la passe est celui de la feature.
 scope_init() {
   SCOPE_FILE="$GAUNTLET_OUT/scope.txt"
-  if [ "$MODE" != extend ]; then SCOPE_ALL=1; : > "$SCOPE_FILE"; return; fi
-  SCOPE_ALL=0
-  local base; base="$(merge_base)"
-  {
-    git -C "$PROJECT_ROOT" diff --name-only --diff-filter=A "$base" -- "$PKG_REL"
-    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$PKG_REL"
-    git -C "$PROJECT_ROOT" diff -U0 --diff-filter=M "$base" -- "$PKG_REL" \
-      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}'
-  } | sort -u > "$SCOPE_FILE"
+  PASS_SCOPE_FILE="$SCOPE_FILE"
+  if [ "$MODE" != extend ]; then SCOPE_ALL=1; : > "$SCOPE_FILE"
+  else SCOPE_ALL=0; scope_compute "$(merge_base)" > "$SCOPE_FILE"; fi
+  PASS_SCOPE_ALL="$SCOPE_ALL"
+  PASS_BASE="${GAUNTLET_PASS_BASE:-$(pipeline_get .pass_base)}"
+  if [ -n "$PASS_BASE" ]; then
+    git -C "$PROJECT_ROOT" rev-parse -q --verify "$PASS_BASE^{commit}" >/dev/null || die "pass_base introuvable : $PASS_BASE"
+    PASS_SCOPE_FILE="$GAUNTLET_OUT/scope_pass.txt"; PASS_SCOPE_ALL=0
+    scope_compute "$PASS_BASE" > "$PASS_SCOPE_FILE"
+  fi
 }
+# scope_compute <base> — le périmètre du package depuis <base>, au format de SCOPE_FILE.
+scope_compute() {
+  local base="$1"
+  {
+    diff_names "$base" "$PKG_REL" --diff-filter=A
+    untracked "$PKG_REL"
+    diff_u0 "$base" "$PKG_REL" --diff-filter=M \
+      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}'
+  } | sort -u
+}
+# use_pass_scope — à appeler en tête d'un check, après `local SCOPE_FILE SCOPE_ALL` : ce check (et les
+# helpers qu'il appelle, portée dynamique de bash) jugent la passe en cours, pas toute la feature.
+use_pass_scope() { SCOPE_FILE="$PASS_SCOPE_FILE"; SCOPE_ALL="$PASS_SCOPE_ALL"; }
+pass_label() { [ -n "${PASS_BASE:-}" ] && printf 'depuis pass_base %s' "${PASS_BASE:0:10}" || printf 'depuis %s' "$BASE_BRANCH"; }
 scope_summary() { [ "$SCOPE_ALL" = 1 ] && echo "package entier (create)" || echo "$(grep -vc ':' "$SCOPE_FILE") fichier(s) nouveau(x), $(grep -c ':' "$SCOPE_FILE") ligne(s) ajoutée(s) dans $(grep ':' "$SCOPE_FILE" | cut -d: -f1 | sort -u | wc -l | tr -d ' ') fichier(s) modifié(s) (extend)"; }
 # in_scope_file <chemin relatif à PROJECT_ROOT> — fichier nouveau ou touché
 in_scope_file() { [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }

@@ -216,6 +216,11 @@ est décrit en 0e. Chaque reclassement va dans
     "issue": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
+  **Rejeu** (amendement de spec, nouvelle passe contracts → red → green sur du code déjà implémenté) :
+  avant de relancer la première étape rejouée, pose `pass_base` = le SHA de `HEAD` (le travail de la
+  passe validée). `stub_check` et `red_check` ne jugent alors que ce qui a changé depuis : le code et
+  les tests de la passe précédente ne sont plus « non-stub » ni « tout vert » à tort. Les gates
+  d'intégrité gardent le périmètre de la feature. Retire `pass_base` (`null`) une fois le rejeu vert.
   `size` (`S|M|L`, posé à la fin de 0b) est lu par toi à chaque étape et par le gauntlet (QA) ;
   absent ou `null`, c'est `M`. La reprise saute les étapes `PASSED` **et** `SKIPPED`, et affiche le
   gabarit. `size: L` avec `split` rempli : la feature a été découpée, affiche l'état de chaque
@@ -885,6 +890,19 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 - **Le test-writer ne peut pas écrire dans `test/` d'un package ouvert en `<pkg>/**`.** En place : un
   `<pkg>/**` de `writes.extra` (dossier avec `pubspec.yaml`) compte comme `<pkg>/lib/**` : ses `test/`
   et `pubspec.yaml` sont ouverts au test-writer et au hardener, et ses tests sont gelés pour Ivan et Nina.
+- **`stub_check` / `red_check` rouges sur du code ou des tests d'une passe déjà validée** (rejeu après
+  amendement). En place : `pipeline.json → pass_base` (voir « Rejeu » en 0, Préconditions) restreint ces deux gates
+  à ce qui a changé depuis. Ne pas `accept` : poser `pass_base`.
+- **`deps_features` rouge sur une dépendance ou un cycle déjà présents sur la base** (mode extend).
+  En place : seuls une dépendance absente du pubspec de la base et un cycle qui emprunte une arête
+  ajoutée bloquent ; le reste sort en `[WARN] … préexistant`, à reporter en dette.
+- **Package dans un submodule (`flutter_app/hades`) invisible au gauntlet.** En place : les diffs
+  (périmètre, gel, couverture, `writes.extra`, empreinte QA) tournent dans le submodule, depuis le
+  gitlink que la base enregistre. Un `tests_freeze_sha` peut être un commit du parent ou du submodule.
+- **`stub_check` / `dup_check` cassés, « Dart 2.18 ».** Cause : `fvm dart` lancé depuis la racine du
+  repo, sans `.fvmrc` (il vit dans `app_dir`) → SDK global. En place : les outils Dart tournent depuis
+  `app_dir` ; `gauntlet.sh doctor` vérifie que `.fvmrc` est lisible depuis `app_dir` et que le SDK
+  résolu est celui épinglé.
 - **Session isolée en worktree : « this command runs rtk with a git command… Refusing to run it ».**
   Cause : le hook rtk réécrit `git …` en `rtk git …`, que le garde-fou du worktree refuse (de même pour
   un glob ou une variable passés à rtk). Le hook rtk reste tel quel : dans ce cas seulement, appeler

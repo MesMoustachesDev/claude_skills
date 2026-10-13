@@ -42,7 +42,9 @@ check_test() {
 # Les tests qui passent déjà contre les stubs sont listés (information), pas bloquants.
 check_red_check() {
   run_tests_json || true
-  local total green_files passing
+  # Périmètre de la passe : lors d'un rejeu (pass_base), les tests d'une passe déjà implémentée sont verts
+  # et doivent l'être (non-régressions gelées) ; seuls les tests écrits depuis doivent être rouges.
+  local total green_files passing SCOPE_FILE SCOPE_ALL; use_pass_scope
   total="$(test_results | wc -l | tr -d ' ')"
   if [ "$total" = 0 ]; then
     ko "aucun test exécuté — la suite ne compile probablement pas"; tail -30 "$GAUNTLET_OUT/test_stderr.log"; return 1
@@ -50,6 +52,9 @@ check_red_check() {
   # mode extend : seuls les fichiers de test nouveaux ou modifiés doivent être rouges
   local scoped_files
   scoped_files="$(test_results | jq -r '.file' | sort -u | filter_scope_files "$PKG_REL/")"
+  if [ -z "$scoped_files" ] && [ -n "${PASS_BASE:-}" ]; then
+    info "$total test(s), aucun fichier de test du package modifié $(pass_label) : le rejeu n'ajoute pas de test ici"; return 0
+  fi
   if [ -z "$scoped_files" ]; then ko "aucun fichier de test dans le périmètre — le test-writer n'a rien ajouté"; return 1; fi
   green_files="$(test_results | jq -r -s 'group_by(.file) | map(select(all(.[]; .result=="success")) | .[0].file) | .[]' | grep -xF -f <(printf '%s\n' "$scoped_files"))"
   passing="$(test_results | jq -r 'select(.result=="success") | "\(.file):0 — \(.name)"' | filter_scope_lines "$PKG_REL/" | sed 's/^/  · /; s/:0 —/ —/')"
@@ -81,8 +86,8 @@ check_test_freeze_check() {
   local mode="${1:-strict}" sha changes untracked rc=0
   sha="$(pipeline_get .tests_freeze_sha)"
   [ -n "$sha" ] || { ko "pas de gel enregistré (pipeline.json → tests_freeze_sha)"; return 1; }
-  changes="$(git -C "$PROJECT_ROOT" diff --name-status "$sha" -- "$PKG_REL/test" 2>/dev/null)"
-  untracked="$(git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$PKG_REL/test" 2>/dev/null)"
+  changes="$(diff_name_status "$sha" "$PKG_REL/test" 2>/dev/null)"
+  untracked="$(untracked "$PKG_REL/test" 2>/dev/null)"
   case "$mode" in
     strict)
       [ -n "$changes" ]   && { printf '%s\n' "$changes" | sed 's/^/  /'; rc=1; }
@@ -105,22 +110,27 @@ check_test_freeze_check() {
 # réindenté) : git --color-moved les reconnaît. Index temporaire (intent-to-add des non-suivis), le vrai
 # index n'est pas touché. Écrit le nombre de lignes déplacées écartées dans $GAUNTLET_OUT/moved_lines.count.
 new_lines() {
-  local base="$1" path="$2" idx
-  idx="$(mktemp)"
-  cp "$(git -C "$PROJECT_ROOT" rev-parse --path-format=absolute --git-path index)" "$idx"
-  git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -z -- "$path" \
-    | GIT_INDEX_FILE="$idx" xargs -0 git -C "$PROJECT_ROOT" add -N -- 2>/dev/null
-  GIT_INDEX_FILE="$idx" git -C "$PROJECT_ROOT" \
-      -c color.diff.new=green -c color.diff.old=red -c color.diff.newMoved=blue -c color.diff.newMovedAlternative=blue \
-      -c color.diff.newMovedDimmed=blue -c color.diff.newMovedAlternativeDimmed=blue \
-      diff --color=always --color-moved=plain --color-moved-ws=allow-indentation-change -U0 "$base" -- "$path" \
-    | awk -v out="$GAUNTLET_OUT/moved_lines.count" '
-        { raw=$0; plain=$0; gsub(/\033\[[0-9;]*m/, "", plain) }
-        plain ~ /^\+\+\+ b\// { f=substr(plain,7); next }
-        plain ~ /^@@/ { split(plain, h, " "); split(h[3], a, ","); n=substr(a[1],2)+0; next }
-        plain ~ /^\+/ { if (raw ~ /^\033\[34m/) moved++; else print f":"n; n++ }
-        END { print moved+0 > out }'
-  rm -f "$idx"
+  local base="$1" path="$2" idx moved_total=0 m
+  while _read_site; do
+    idx="$(mktemp)"
+    cp "$(git -C "$SITE_DIR" rev-parse --path-format=absolute --git-path index)" "$idx"
+    git -C "$SITE_DIR" ls-files --others --exclude-standard -z -- "${SITE_PATHS[@]}" \
+      | GIT_INDEX_FILE="$idx" xargs -0 git -C "$SITE_DIR" add -N -- 2>/dev/null
+    GIT_INDEX_FILE="$idx" git -C "$SITE_DIR" \
+        -c color.diff.new=green -c color.diff.old=red -c color.diff.newMoved=blue -c color.diff.newMovedAlternative=blue \
+        -c color.diff.newMovedDimmed=blue -c color.diff.newMovedAlternativeDimmed=blue \
+        diff --color=always --color-moved=plain --color-moved-ws=allow-indentation-change -U0 --ignore-submodules=all \
+        --src-prefix="a/$SITE_PRE" --dst-prefix="b/$SITE_PRE" "$SITE_REV" -- "${SITE_PATHS[@]}" \
+      | awk -v out="$GAUNTLET_OUT/moved_lines.count" '
+          { raw=$0; plain=$0; gsub(/\033\[[0-9;]*m/, "", plain) }
+          plain ~ /^\+\+\+ b\// { f=substr(plain,7); next }
+          plain ~ /^@@/ { split(plain, h, " "); split(h[3], a, ","); n=substr(a[1],2)+0; next }
+          plain ~ /^\+/ { if (raw ~ /^\033\[34m/) moved++; else print f":"n; n++ }
+          END { print moved+0 > out }'
+    rm -f "$idx"
+    m="$(cat "$GAUNTLET_OUT/moved_lines.count" 2>/dev/null)"; moved_total=$((moved_total + ${m:-0}))
+  done < <(git_sites "$base" "$path")
+  printf '%s\n' "$moved_total" > "$GAUNTLET_OUT/moved_lines.count"
 }
 
 # coverage — couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (new_lines).
@@ -273,8 +283,7 @@ mutation_extra_report() {
   base="$(merge_base)"
   while IFS= read -r pkg; do
     [ -n "$pkg" ] && [ -d "$PROJECT_ROOT/$pkg/lib" ] || continue
-    changed="$( { git -C "$PROJECT_ROOT" diff --name-only --diff-filter=AM "$base" -- "$pkg/lib"
-                  git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$pkg/lib"; } | sed "s#^$pkg/##" | sort -u)"
+    changed="$( { diff_names "$base" "$pkg/lib" --diff-filter=AM; untracked "$pkg/lib"; } | sed "s#^$pkg/##" | sort -u)"
     [ -n "$changed" ] || continue
     logic="$(expand_globs "$PROJECT_ROOT/$pkg" $(cfg_list mutation.include | tr '\n' ' ') \
       | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' ') | grep -Fx -f <(printf '%s\n' "$changed"))"

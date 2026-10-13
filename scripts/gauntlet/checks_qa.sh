@@ -85,8 +85,9 @@ qa_fingerprint() {
   local app f; app="$(cfg app_dir .)"
   {
     git -C "$PROJECT_ROOT" rev-parse HEAD
-    git -C "$PROJECT_ROOT" diff HEAD -- "$app" ':(exclude,glob)**/.claude/**'
-    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$app" ':(exclude,glob)**/.claude/**' \
+    # --submodule=diff : a submodule (hades) changes the state through its content, not only its gitlink.
+    git -C "$PROJECT_ROOT" diff --submodule=diff HEAD -- "$app" ':(exclude,glob)**/.claude/**'
+    untracked "$app" | grep -v '/\.claude/' | grep -v '^\.claude/' \
       | while IFS= read -r f; do shasum "$PROJECT_ROOT/$f"; done
   } 2>/dev/null | shasum | cut -d' ' -f1
 }

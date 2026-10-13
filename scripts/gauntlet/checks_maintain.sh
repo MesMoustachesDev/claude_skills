@@ -54,47 +54,80 @@ check_deps_unused() {
 
 # deps_features — les dépendances vers d'autres features sont justifiées dans la spec (§8) et
 # n'introduisent aucun cycle dans le graphe des packages du workspace.
+# Mode extend : seul ce que la feature ajoute bloque — une dépendance absente du pubspec à la base, un
+# cycle qui emprunte une arête ajoutée depuis la base. Les dépendances et cycles préexistants sont de la
+# dette du package : signalés (WARN), jamais bloquants. Mode create : tout est ajouté par la feature.
 check_deps_features() {
-  local shared rc=0 dep kind spec="$FEATURE_DIR/spec.md" arch fanout=0
+  local shared rc=0 dep kind spec="$FEATURE_DIR/spec.md" arch fanout=0 base="" base_pubspec="" pre=0
   shared="$(cfg_list deps.shared_packages | tr '\n' ' ')"
   arch="$( [ -f "$spec" ] && awk '/^## 8/{f=1;next} /^## 9/{f=0} f' "$spec" )"
+  if [ "$MODE" = extend ]; then base="$(merge_base)"; base_pubspec="$(show_at "$base" "$PKG_REL/pubspec.yaml")"; fi
   while IFS=$'\t' read -r dep kind; do
     [ "$kind" = path ] || continue
     grep -qw "$dep" <<<"$shared" && continue
     fanout=$((fanout+1))
+    if [ -n "$base" ] && pubspec_path_deps <<<"$base_pubspec" | grep -qx "$dep"; then
+      grep -qw "$dep" <<<"$arch" || { printf '[WARN] dépendance inter-features %s préexistante (déjà sur %s), non justifiée en §8 — dette du package, hors de la feature\n' "$dep" "$BASE_BRANCH"; pre=$((pre+1)); }
+      continue
+    fi
     if [ ! -f "$spec" ]; then
       # hors pipeline (revue de PR, audit) : pas de spec → on liste, on ne bloque pas
       if [ -f "$FEATURE_DIR/pipeline.json" ]; then ko "dépendance inter-features $dep : pas de spec pour la justifier"; rc=1
       else printf '[WARN] dépendance inter-features %s — pas de spec pour la justifier (à vérifier en revue)\n' "$dep"; fi
-    elif ! grep -qw "$dep" <<<"$arch"; then ko "dépendance inter-features $dep absente de la spec §8 Architecture — à justifier ou à retirer"; rc=1
+    elif ! grep -qw "$dep" <<<"$arch"; then ko "dépendance inter-features $dep$( [ -n "$base" ] && printf ' (ajoutée par la feature)') absente de la spec §8 Architecture — à justifier ou à retirer"; rc=1
     fi
   done < <(pkg_deps dependencies)
-  # cycles : graphe name → deps(path) sur tous les pubspec du dossier des features
-  local root; root="$PROJECT_ROOT/$(cfg features_root features)"
-  local graph; graph="$(find "$root" -name pubspec.yaml -not -path '*/build/*' 2>/dev/null | while read -r p; do
+  # Graphe "package dépendance nouvelle(0|1)" sur tous les pubspec du dossier des features. Une arête est
+  # nouvelle si le pubspec de la base ne la déclare pas (tout est nouveau en create).
+  local root p n deps_base graph
+  root="$PROJECT_ROOT/$(cfg features_root features)"
+  graph="$(find "$root" -name pubspec.yaml -not -path '*/build/*' -not -path '*/.dart_tool/*' 2>/dev/null | while read -r p; do
       n="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$p" | head -1)"
-      awk '/^dependencies:/{f=1;next} /^[^ ]/{f=0} f && /^  [a-zA-Z_0-9]+:/{cur=$1; sub(/:$/,"",cur)} f && /^    path:/{print cur}' "$p" | sed "s/^/$n /"
+      deps_base=""; [ -n "$base" ] && deps_base="$(show_at "$base" "${p#"$PROJECT_ROOT"/}" | pubspec_path_deps | tr '\n' ' ')"
+      pubspec_path_deps < "$p" | while read -r d; do
+        if [ -n "$base" ] && grep -qw -- "$d" <<<"$deps_base"; then echo "$n $d 0"; else echo "$n $d 1"; fi
+      done
     done)"
-  # Un cycle qui passe par un package partagé (core, router…) est un fait préexistant du projet, pas
-  # celui de la feature : warning. Un cycle entre features non partagées reste bloquant.
-  local cyc; cyc="$(awk -v start="$PKG_NAME" -v shared="$shared" '
-    BEGIN { n=split(shared, s, " "); for (i=1;i<=n;i++) if (s[i]!="") sh[s[i]]=1 }
-    { adj[$1]=adj[$1]" "$2 }
-    function dfs(n, path,   i, k, arr) {
-      if (n == start && path != "") { print path" → "start; found=1; return }
-      if (seen[n]++) return
-      k=split(adj[n], arr, " "); for (i=1;i<=k;i++) if (arr[i]!="") dfs(arr[i], path (path==""?"":" → ") n)
+  # Un cycle qui passe par le package est celui de la feature s'il emprunte une arête nouvelle u → v :
+  # start ⇝ u → v ⇝ start. Sinon il préexiste (WARN). Un cycle de la feature qui passe par un package
+  # partagé (core, router…) reste un warning ; entre features non partagées, il bloque.
+  local cycles; cycles="$(awk -v start="$PKG_NAME" '
+    { adj[$1]=adj[$1]" "$2; if ($3==1) { nu[++k]=$1; nv[k]=$2 } }
+    function path(a, b,   q, h, t, x, i, m, arr, par, seen, out) {   # chemin le plus court a ⇝ b, "" sinon
+      if (a == b) return a
+      h=1; t=1; q[1]=a; seen[a]=1
+      while (h <= t) {
+        x=q[h++]; m=split(adj[x], arr, " ")
+        for (i=1; i<=m; i++) {
+          if (arr[i] in seen) continue
+          seen[arr[i]]=1; par[arr[i]]=x; q[++t]=arr[i]
+          if (arr[i] == b) { out=b; x=b; while (x != a) { x=par[x]; out=x" → "out } return out }
+        }
+      }
+      return ""
     }
-    END { dfs(start, ""); if (!found) exit 0 }' <<<"$graph")"
-  if [ -n "$cyc" ]; then
-    local viashared=0 node
-    for node in $(printf '%s' "$cyc" | head -1 | tr '→' '\n'); do grep -qw "$node" <<<"$shared" && viashared=1; done
-    if [ "$viashared" = 1 ]; then printf '[WARN] cycle via un package partagé (préexistant, hors de la feature) : %s\n' "$(printf '%s' "$cyc" | head -1)"
-    else ko "cycle de dépendances entre features : $cyc"; rc=1; fi
-  fi
-  [ "$rc" = 0 ] && info "inter-features : $fanout dépendance(s) hors packages partagés, toutes justifiées, aucun cycle"
+    END {
+      for (i=1; i<=k; i++) {
+        a=path(start, nu[i]); if (a == "") continue
+        b=path(nv[i], start); if (b == "") continue
+        c=a" → "b; if (!(c in done)) { done[c]=1; found++; print "new\t"c }
+      }
+      if (!found) { m=split(adj[start], arr, " "); for (i=1; i<=m; i++) { b=path(arr[i], start); if (b != "") { print "old\t"start" → "b; break } } }
+    }' <<<"$graph")"
+  local kind_ cyc viashared node
+  while IFS=$'\t' read -r kind_ cyc; do
+    [ -n "$cyc" ] || continue
+    if [ "$kind_" = old ]; then printf '[WARN] cycle préexistant (déjà sur %s, aucune arête ajoutée par la feature) : %s\n' "$BASE_BRANCH" "$cyc"; pre=$((pre+1)); continue; fi
+    viashared=0
+    for node in $(printf '%s' "$cyc" | tr '→' '\n'); do grep -qw "$node" <<<"$shared" && viashared=1; done
+    if [ "$viashared" = 1 ]; then printf '[WARN] cycle via un package partagé (hors de la feature) : %s\n' "$cyc"
+    else ko "cycle de dépendances entre features$( [ -n "$base" ] && printf ' introduit par la feature') : $cyc"; rc=1; fi
+  done <<<"$cycles"
+  [ "$rc" = 0 ] && info "inter-features : $fanout dépendance(s) hors packages partagés, celles de la feature justifiées, aucun cycle ajouté$( [ "$pre" -gt 0 ] && printf ' ; %d préexistant(s) signalé(s)' "$pre")"
   return $rc
 }
+# pubspec_path_deps — stdin : un pubspec ; stdout : ses dependencies en path, une par ligne.
+pubspec_path_deps() { awk '/^dependencies:/{f=1;next} /^[^ ]/{f=0} f && /^  [a-zA-Z_0-9]+:/{cur=$1; sub(/:$/,"",cur)} f && /^    path:/{print cur}'; }
 
 # pub_health — dépendances hébergées : abandonnées, majeure en retard, ou non publiées depuis trop longtemps.
 # Bloquant pour les dépendances AJOUTÉES par la feature ; informatif (warn) pour les préexistantes.
@@ -104,7 +137,7 @@ check_pub_health() {
   out="$GAUNTLET_OUT/outdated.json"
   # --show-all : sinon les packages déjà à jour sont omis du JSON.
   (cd "$PKG_DIR" && $DART pub outdated --json --show-all > "$out" 2>/dev/null) || { printf '[WARN] dart pub outdated indisponible (hors ligne ?) — check sauté\n'; return 0; }
-  base_pubspec="$(git -C "$PROJECT_ROOT" show "$(merge_base):$PKG_REL/pubspec.yaml" 2>/dev/null || true)"
+  base_pubspec="$(show_at "$(merge_base)" "$PKG_REL/pubspec.yaml" || true)"
   printf '   %-28s %-10s %-10s %-10s %s\n' "package" "actuel" "résolvable" "dernier" "état"
   while IFS=$'\t' read -r dep kind; do
     [ "$kind" = hosted ] || continue
@@ -181,7 +214,7 @@ check_l10n_arb() {
   base="$(merge_base)"
   # Top-level keys only: nested @meta keys (placeholders, type, example…) are not translations.
   added="$( { for f in $files; do
-      old="$(git -C "$PROJECT_ROOT" show "$base:$f" 2>/dev/null | jq -c 'keys' 2>/dev/null)"
+      old="$(show_at "$base" "$f" | jq -c 'keys' 2>/dev/null)"
       jq -n -r --argjson cur "$(jq -c 'keys' "$PROJECT_ROOT/$f")" --argjson old "${old:-[]}" \
         '($cur - $old)[] | select(startswith("@") | not)'
     done; } | sort -u)"
@@ -272,7 +305,7 @@ check_generated_fresh() {
   has_dev_dep build_runner || { info "pas de build_runner"; return 0; }
   # shellcheck disable=SC2086
   (cd "$PKG_DIR" && $DART run build_runner build --delete-conflicting-outputs >/dev/null 2>&1) || { ko "build_runner a échoué"; return 1; }
-  local dirty; dirty="$(git -C "$PROJECT_ROOT" status --porcelain -- "$PKG_REL" | grep -E '\.(g|freezed)\.dart$')"
+  local dirty; dirty="$(git_in "$PKG_REL" status --porcelain -- "$PKG_DIR" | grep -E '\.(g|freezed)\.dart$')"
   [ -z "$dirty" ] && { info "fichiers générés à jour et commités"; return 0; }
   printf '%s\n' "$dirty" | sed 's/^/   ✗ /'; ko "fichiers générés modifiés ou non commités : relancer build_runner et commiter"
   return 1
