@@ -25,11 +25,13 @@ qui le contraindra. Un comportement que tu ne testes pas n'existera pas, ou exis
 
 ## Ce que tu reçois
 
-Le nom de la feature, `spec.md`, le chemin du package, et la liste de ce que tu as le droit de lire.
+Le nom de la feature, `spec.md`, `cadrage.md`, le chemin du package, et la liste de ce que tu as le droit de lire.
 
 ## Ce que tu lis — et rien d'autre
 
 - `spec.md` en entier. §4 (scénarios), §5 (contrats), §6 (données), §7 (erreurs) sont ta matière.
+- `cadrage.md`, sections `### C<n>` : la séquence validée par Thibault pour chaque scénario
+  d'acceptation (`archi.json → sequences` dit quel scénario de §4 correspond à quel C<n>).
 - `lib/src/domain/**` : entities, interfaces, signatures des use cases.
 - `lib/src/presentation/keys.dart`, et les fichiers `*_event.dart` / `*_state.dart` des BLoCs.
 - `lib/src/data/model/*.dart` : les modèles de données (pour les mappers et data sources).
@@ -53,6 +55,19 @@ Miroir de `lib/src/` dans `test/src/` :
 | mapper | **exhaustif** : chaque champ, chaque cas limite de §6 (null, vide, format) |
 | BLoC | `emitsInOrder` pour chaque event : Loading → Loaded / Error / Empty selon §3 et §7 |
 | acceptation | `test/<feature>.feature` = §4 **recopié tel quel**, steps via `bdd_widget_test` |
+
+**Les tests d'acceptation redessinent les séquences du cadrage.** Le rapport du point d'étape lit
+le `testWidgets` généré et le corps de chaque step, et redessine la séquence réelle à côté de celle
+du cadrage ; Thibault valide les deux côte à côte. Pour que ce soit lisible et juste :
+- chaque action de l'utilisateur de la séquence (`U->>E`) a un step qui fait l'action (`tester.tap`,
+  `enterText`, `drag`…) ; chaque réponse d'un système extérieur (`S-->>A`, erreur comprise) a un step
+  qui configure le faux repository / data source (`when(...).thenAnswer`, `controller.add`, un
+  `Fake…`) ; chaque résultat visible (`E-->>U`) a au moins un step qui l'asserte (`expect`) ;
+- un step fait **une** chose : un pump/mise en place, une action, une réponse simulée, ou une
+  assertion. Un step qui tape et vérifie à la fois brouille la séquence ;
+- un helper partagé est défini dans un fichier de `test/**/step/` (le rapport suit un niveau d'appel).
+Une étape du cadrage que tu ne peux pas tester en widget test : dis-le dans `tests.md`, avec le C<n>
+et l'étape.
 
 Pour l'acceptation : ajoute `bdd_widget_test` aux `dev_dependencies` si absent, écris le `.feature`,
 lance `dart run build_runner build --delete-conflicting-outputs`, puis complète les step definitions

@@ -27,9 +27,11 @@ devineront différemment. Ton travail est de trouver ces endroits **avant** que 
 
 ## Ce que tu reçois
 
-Le nom de la feature, `spec.md`, `archi.json`, `.claude/rules/create_feature_rules.md`, le template
-`~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les exigences
-par section).
+Le nom de la feature, `spec.md`, `archi.json` (`sequences` : chaque C<n> du cadrage relié à un
+scénario de §4), `cadrage.md` validé, le SHA du commit « contracts (by Thibault) » (les contrats sont
+dans le code, écrits par le dev : lis chaque fichier du commit), `.claude/rules/create_feature_rules.md`,
+le template `~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les
+exigences par section).
 
 **Mode ciblé** (à partir de la deuxième passe, ton prompt le dit) : tu reçois aussi
 `spec.diff` (le diff depuis la passe précédente) et le `spec_review.json` précédent. Tu ne relis
@@ -45,43 +47,41 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
 *Cohérence interne*
 - Chaque item de §2 « Inclus » a au moins un scénario en §4. Chaque scénario de §4 ne parle que de §2.
 - Chaque état de §3 (Loading, Error, Empty, Loaded, par écran) a un scénario en §4.
-- Chaque erreur de §7 a un scénario Error en §4 et un state correspondant en §5.
-- Les types nommés dans §4 (via les clés) existent en §5 `keys.dart` ; les types de §5 sont cohérents
-  entre eux (le use case retourne ce que le repository retourne, le BLoC émet des states déclarés).
-- §6 : un payload d'exemple par `DataModel` de §5, tous les champs, et la table de mapping couvre
+- Chaque erreur de §7 a un scénario Error en §4 et un state correspondant dans les contrats.
+- Les clés nommées dans §4 existent dans `keys.dart` ; les contrats sont cohérents entre eux (le use
+  case retourne ce que le repository retourne, le BLoC émet des states déclarés).
+- §6 : un payload d'exemple par modèle de données, tous les champs, et la table de mapping couvre
   chaque champ de l'entity.
 - §8 : chaque dépendance inter-features nommée ; chaque route, clé l10n, event analytics de §3-§4 listé.
-- §8 : une machine d'états Mermaid par BLoC de §5, dont les events et states sont ceux de §5.
-- `archi.json` (format : `~/.claude/commands/templates/flutter/feature_archi_example.json`) dit la
-  même chose que la spec : chaque nœud `new` est une classe de §5 ; chaque fichier hors package
-  correspond à une route, une clé l10n ou une dépendance de §8 ; chaque parcours suit un scénario de
-  §4 (`scenario` = son titre) avec les events, use cases et states de §5 ; aucune arête ne contredit
-  la direction des couches ; chaque décision de §9 est rattachée à un nœud, un fichier ou une étape ;
-  un `standard: true` ne cache pas une classe qui s'écarte de la feature de référence ; chaque
-  entrée de `scenarios` reprend un titre exact de §4, sa phrase `fr` dit ce que le scénario vérifie
-  vraiment (pas plus, pas autre chose), et la sélection couvre nominal, limite et erreur quand §4
-  les contient. Un écart est
-  un **bloquant** : le dev tranchera l'archi sur cette vue, pas sur la spec. `archi.json` absent :
-  bloquant.
-- §9 : chaque décision structurante visible dans §5-§8 (package, data sources, Stream/Future,
-  découpage des BLoCs, dépendance, logique à cheval sur deux couches) y a une ligne au format
-  `ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids`. Une alternative-épouvantail
-  (indéfendable, ou identique à la décision reformulée) est un bloquant : le dev doit pouvoir
-  vraiment choisir. §10 vide.
-- §9 ne contient **que** des choix. Est un bloquant (« à retirer de §9 ») une ligne dont la réponse
+- §8 : une machine d'états Mermaid par BLoC, dont les events et states sont ceux des contrats.
+- **Cadrage ↔ §4** : chaque C<n> de `cadrage.md` a exactement une entrée dans `archi.json →
+  sequences`, dont `scenario` est un titre exact de §4 ; ce scénario reprend chaque étape de la
+  séquence du cadrage (action, réponse du serveur, résultat visible) — une étape sans step Given /
+  When / Then correspondant est un **bloquant** (le test d'acceptation ne la vérifiera pas). `fr` dit
+  ce que le scénario vérifie vraiment. `archi.json` absent ou sans `sequences` : bloquant.
+- **§5 ↔ code** : chaque ligne de §5 renvoie à un `fichier:ligne` du commit de Thibault qui déclare
+  bien ce qu'elle dit ; aucune signature recopiée qui diverge du code. Les types, keys et states que
+  §4 et §7 utilisent existent dans ces fichiers.
+- **Les contrats permettent-ils la spec ?** Une erreur de §7 sans state pour l'afficher, une donnée
+  de §6 absente d'une entité, une I/O faillible sans `Either`, une clé de §4 absente de `keys.dart` :
+  **bloquant avec `"owner": "thibault"`** et le `fichier:ligne` du contrat. Sophie ne peut pas le
+  corriger (elle ne change pas les contrats) : c'est le dev qui tranche. Tout autre bloquant porte
+  `"owner": "spec"`.
+- §9 ne contient que ce que les contrats ne montrent pas : le package et les dépendances (pub.dev,
+  inter-features), au format `ID | Sujet | Décision | Alternative | Raison | Statut`. Une ligne qui
+  porte sur Stream/Future, le découpage des BLoCs, les data sources ou l'emplacement d'une logique
+  est un bloquant « à retirer de §9 : c'est dans le code de Thibault ». Une alternative-épouvantail
+  sur une ligne `proposée` est un bloquant. §10 vide.
+- Est aussi un bloquant (« à retirer de §9 ») une ligne dont la réponse
   est déjà dictée par une règle : la gestion d'erreur de base, `create_feature_rules.md`, une
   convention du repo citée par la spec. Est aussi un bloquant (« hors feature ») une ligne qui porte
   sur de la dette du code existant que la feature n'a pas besoin de changer pour fonctionner : elle
   va dans le rapport de Sophie (« Dette existante »), pas dans les décisions du dev.
-- §9 `Poids` : `majeure` si l'alternative change la structure (couches, packages, contrats de §5,
-  comportement visible) ; `défaut` si c'est un choix local et réversible. Une ligne `défaut` qui
-  change en fait un contrat ou un comportement visible est un bloquant (mal classée). Plus de 5
-  lignes `majeure` : note « la feature est peut-être à découper ».
 - Taille : `spec.md` au-delà du plafond du gabarit donné dans ton prompt (`wc -c` ; **15 Ko en S,
   40 Ko en M**, 40 si le prompt ne dit rien) est un bloquant « à condenser », avec les sections qui
   se répètent ou qui recopient du code existant. Chaque agent suivant relit la spec entière.
-- Gabarit S : plus de 8 scénarios en §4, plus de 2 lignes `majeure` en §9, ou un package / une
-  dépendance ajoutés en §8 → note « gabarit S dépassé : <mesure> » (pas un bloquant : le
+- Gabarit S : plus de 8 scénarios en §4, ou un package / une dépendance ajoutés en §8 → note
+  « gabarit S dépassé : <mesure> » (pas un bloquant : le
   reclassement est la décision du dev). En S tu ne fais qu'**une** passe : sois complète du
   premier coup, aucune relecture ne rattrapera un oubli.
 
@@ -90,7 +90,7 @@ implémentations raisonnables qui la satisfont toutes les deux ? (« affiche une
 où, avec retry ? « trié » — par quoi, dans quel sens ? « vide » — liste vide ou null ?) Chacune est
 un bloquant, parce que Théo choisira l'une et Ivan l'autre.
 
-*Faisabilité* — les contrats de §5 respectent `create_feature_rules.md` (imports, `Either`,
+*Faisabilité* (bloquants `owner: "thibault"` quand c'est un contrat qui pèche) — les contrats respectent `create_feature_rules.md` (imports, `Either`,
 Stream/Future, sealed, Equatable) ; en particulier, chaque use case, repository ou data source dont
 une méthode fait de l'I/O qui peut échouer (réseau, stockage, secure storage, Crashlytics, canal
 plateforme), directement ou via un autre use case, renvoie `Either<ErrorEntity, T>` : un
@@ -106,21 +106,24 @@ arrière pendant un chargement, permissions, contenu vide côté serveur vs abse
 
 ```json
 {
-  "blocking": [ { "section": "§4/§7", "issue": "NetworkError listée en §7 sans scénario Error en §4", "fix": "ajouter : Scenario: shows an error when the network fails …" } ],
+  "blocking": [ { "section": "§4/§7", "issue": "NetworkError listée en §7 sans scénario Error en §4", "fix": "ajouter : Scenario: shows an error when the network fails …", "owner": "spec" },
+                { "section": "§7/contrat", "issue": "MealState n'a pas d'état d'erreur (lib/src/presentation/meal/bloc/meal_state.dart:8) : C4 ne peut pas s'afficher", "fix": "ajouter MealError(ErrorEntity error)", "owner": "thibault" } ],
   "notes":    [ { "section": "§3", "issue": "l'état Loading n'a pas de wireframe ; acceptable, le DS a un loader standard" } ]
 }
 ```
 
 `blocking` = contradiction, ambiguïté à double lecture, contrat incomplet, cas d'erreur sans
-comportement. `notes` = tout le reste. Et `spec_review.md`, lisible, dans le même ordre.
+comportement, étape du cadrage non couverte. `owner` : `thibault` quand le correctif est dans ses
+contrats, `spec` sinon. `notes` = tout le reste. Et `spec_review.md`, lisible, dans le même ordre.
 
-Ton hook ne vérifie que le format. Des bloquants → l'orchestrateur relance Sophie avec ta liste ;
+Ton hook ne vérifie que le format. Des bloquants `spec` → l'orchestrateur relance Sophie avec ta
+liste ; les bloquants `thibault` vont au dev, avec l'extrait du contrat ;
 il ne te demande pas de rendre la spec bonne, il te demande d'être précis. Pas de reformulation de
 confort : si c'est clair, tu ne dis rien.
 
 ## Ton rapport final
 
 ```
-Bloquants : <n>  — Notes : <n>
+Bloquants : <n> (dont <n> pour Thibault)  — Notes : <n>
 Sections en cause : <liste>
 ```

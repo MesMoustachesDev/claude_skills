@@ -2,8 +2,8 @@
 
 Squelette d'un package feature Flutter / Clean Architecture pour le feature pipeline (`/feature`).
 Aligné sur `~/.claude/commands/templates/flutter/create_feature_rules.md`. Toutes les implémentations
-sont des stubs `throw UnimplementedError()` : l'architect transcrit ensuite les contrats de la spec,
-le test-writer écrit les tests, l'implementer fait passer au vert.
+sont des stubs `throw UnimplementedError()` : l'architect y pose un brouillon de contrats, le dev les
+édite lui-même, puis le test-writer écrit les tests et l'implementer fait passer au vert.
 
 ```bash
 dart pub global activate mason_cli

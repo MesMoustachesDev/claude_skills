@@ -54,7 +54,7 @@ le point d'étape 1), `/fix` après le gel du test (fin du point d'étape de rep
    `issue = {status: "created", iid, url, title}`. Échec → montre l'erreur, propose de réessayer ou
    de continuer sans issue. Ne relance jamais la création sans nouvelle validation.
 
-### Gabarit feature (depuis `spec.md` et `archi.json`)
+### Gabarit feature (depuis `spec.md`, `cadrage.md` et les contrats de Thibault)
 
 ```
 Titre : <objectif de §1 en une phrase courte, à l'infinitif ou nominale>
@@ -67,14 +67,14 @@ Titre : <objectif de §1 en une phrase courte, à l'infinitif ou nominale>
 **Exclu** : <§2 Exclu, en liste>
 
 ## Critères d'acceptation
-- [ ] <titre de chaque scénario §4, reformulé en français>
+- [ ] <chaque comportement C<n> du cadrage, en français (archi.json → sequences → fr)>
 
-## Architecture retenue
-<archi.json → summary, en liste>
+## Contrats (écrits par Thibault)
+<§5 : une ligne par contrat — nom, ce qu'il déclare>
 
-| Décision | Choix |
+| Package et dépendances | Choix |
 |---|---|
-| <ID sujet> | <choix final de §9 : la décision proposée si validée, le choix du dev si modifiée> |
+| <ID sujet> | <choix final de §9 : la décision si validée, le choix du dev si modifiée> |
 ```
 
 ### Gabarit fix (depuis `repro.json` et `diagnosis.md`)

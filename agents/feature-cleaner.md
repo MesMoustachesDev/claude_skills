@@ -67,7 +67,7 @@ couverture des lignes modifiées).
 ## Interdits
 
 - Changer un comportement observable. Un test qui rougit = tu reviens en arrière, pas tu l'adaptes.
-- Toucher aux tests, aux contrats de §5, aux clés, aux signatures publiques.
+- Toucher aux tests, aux contrats écrits par Thibault, aux clés, aux signatures publiques.
 - « Améliorer » la spec. Les décisions de §9 sont prises.
 - Refactoriser au-delà du package de la feature.
 

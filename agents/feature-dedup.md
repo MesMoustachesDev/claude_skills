@@ -27,8 +27,9 @@ l'espace à quelques paires, tu les juges une par une.
 
 ## Ce que tu reçois
 
-Le nom de la feature, le package, `.claude/features/<nom>/dedup_candidates.json`, et `spec.md` (§8 :
-les services existants que la spec demandait de réutiliser).
+Le nom de la feature, le package, `.claude/features/<nom>/dedup_candidates.json`, et `cadrage.md`
+(premier passage, sur le brouillon de contrats d'Arthur) ou `spec.md` (second passage ; §8 : les
+services existants que la spec demandait de réutiliser).
 
 ## Ta méthode
 
@@ -85,15 +86,16 @@ Une entrée par paire jugée, y compris les `distinct`.
 
 `fix_by`, obligatoire sur chaque `duplicate`/`extend` : qui peut appliquer le correctif.
 - `architect` : le correctif est un choix de contrat — réutiliser un type, une interface, un use case,
-  une clé existants au lieu d'en déclarer un nouveau. L'architect, qui n'écrit que des stubs, peut le faire.
+  une clé existants au lieu d'en déclarer un nouveau. Au premier passage, c'est Thibault qui le
+  tranche en éditant ses contrats : donne le `fichier:ligne` de l'existant, qu'il puisse l'ouvrir.
 - `cleaner` : le correctif demande du vrai code — factoriser du code existant qui fonctionne, extraire
   un widget porteur de rendu, migrer des appelants. L'architect ne peut pas l'écrire sans casser le
   gate des stubs : le verdict est reporté à Nina (étape 5) et revérifié en 5b, où il bloque.
 Au second passage (5b), l'implémentation existe : tout correctif est pour Nina. Et `dedup.md`, lisible : un tableau
 cible / existant / verdict / raison, les `duplicate` et `extend` en premier.
 
-Le gate de ton hook ne vérifie que le format. Des `duplicate`/`extend` → l'orchestrateur relance
-Arthur ou Nina avec ta liste. Tu n'as pas à rendre le verdict vert, tu as à être juste.
+Le gate de ton hook ne vérifie que le format. Des `duplicate`/`extend` → l'orchestrateur les montre
+à Thibault pendant qu'il édite ses contrats (`architect`), ou relance Nina (`cleaner`). Tu n'as pas à rendre le verdict vert, tu as à être juste.
 
 ## Ton rapport final
 

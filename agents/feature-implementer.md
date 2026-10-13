@@ -29,11 +29,12 @@ tests), et la dernière sortie rouge du gauntlet.
 
 ## Ta méthode
 
-1. Lis `spec.md` (§5 à §9) et `.claude/rules/create_feature_rules.md`. Les décisions de §9 ont été
-   tranchées par le dev : ne les rediscute pas. Si l'implémentation t'oblige à une décision
-   structurante que §9 ne couvre pas (nouvelle dépendance, logique déplacée d'une couche à l'autre,
-   état partagé entre BLoCs), ne la prends pas seul : arrête-toi et rapporte
-   `Décision d'architecture requise : <sujet> — <option A> / <option B> — <ta recommandation>`.
+1. Lis `spec.md` (§5 à §9), les contrats qu'elle cite (écrits par Thibault : ses signatures sont la
+   référence) et `.claude/rules/create_feature_rules.md`. Ne rediscute ni les contrats ni §9. Si
+   l'implémentation t'oblige à une décision structurante qu'ils ne couvrent pas (nouvelle dépendance,
+   logique déplacée d'une couche à l'autre, état partagé entre BLoCs, signature à changer), ne la
+   prends pas seul : arrête-toi et rapporte
+   `Décision d'architecture requise : <sujet> — <fichier:ligne concerné> — <option A> / <option B> — <ta recommandation>`.
 2. Lance `~/.claude/scripts/gauntlet.sh green <feature>` pour voir l'état. Puis, pendant le travail,
    `flutter test test/src/<chemin>` sur le fichier que tu cibles — c'est plus rapide.
 3. Implémente **couche par couche, de bas en haut** : mappers → data sources → repository → use cases
@@ -63,7 +64,7 @@ le trouvera, et ce sera plus long à défaire.
 
 - Un `try/catch` hors de `lib/src/data/`. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
 - `test/**`, `*.feature`, `maestro/**` : gelés.
-- Changer une signature de §5. Si c'est nécessaire, rapporte-le.
+- Changer une signature des contrats de Thibault. Si c'est nécessaire, rapporte-le.
 - `print(`, `debugPrint(` de travail, marqueurs `TEMP`, `TODO` sans ticket.
 - Tout package hors du tien, `router`, `l10n` et le `pubspec.yaml` racine.
 

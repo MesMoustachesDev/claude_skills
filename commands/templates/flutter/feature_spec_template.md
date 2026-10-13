@@ -1,14 +1,14 @@
 # Spec — {feature_name}
 
 <!--
-  Ce document est écrit par l'agent feature-specifier et validé par le dev, en deux temps :
-  d'abord chaque décision d'architecture de la section 9 (une par une), puis la spec entière.
-  Tout ce qui suit (contrats, tests, implémentation, QA) en découle.
+  Ce document est écrit par l'agent feature-specifier APRÈS que le dev a écrit les contrats dans le
+  code (commit « contracts (by Thibault) »), à partir du cadrage validé. Il décrit ces contrats sans
+  les changer et écrit tout ce qu'ils ne disent pas. Tests, implémentation et QA en découlent.
 
   Règles d'écriture :
   - Les sections 4 à 8 sont CONSOMMÉES PAR DES AGENTS ET DES SCRIPTS. Elles doivent
     être précises, complètes et non ambiguës. Pas de "à définir", pas de "etc.".
-  - Les blocs de code Dart sont des CONTRATS : signatures exactes, noms définitifs.
+  - Les contrats sont dans le code du dev : la section 5 y renvoie (fichier:ligne), sans recopier.
   - Les payloads sont des EXEMPLES RÉELS : valeurs plausibles, tous les champs, y compris
     les nullables et les cas limites.
   - La section 10 doit être VIDE à la validation. Une question ouverte = spec pas finie.
@@ -78,6 +78,8 @@
   exécutés via bdd_widget_test, puis rejoués sur device via Maestro.
 
   - Un scénario = un comportement observable par l'utilisateur.
+  - Un scénario par comportement C<n> du cadrage, qui reprend chaque étape de sa séquence
+    (action, réponse du serveur, résultat visible) ; archi.json → sequences les relie.
   - Couvrir chaque item de la section 2 "Inclus".
   - Couvrir chaque état de la section 3 (au moins un scénario Error, un Empty).
   - Les steps référencent les widgets par leur clé de la section 5 (keys.dart),
@@ -110,90 +112,27 @@ Feature: {Feature name}
 ## 5. Contrats
 
 <!--
-  Signatures Dart EXACTES. L'architect les recopie, le test-writer teste contre elles,
-  l'implementer les respecte. Un changement ici après validation = retour à la spec.
-
-  Conventions : voir .claude/rules/create_feature_rules.md (nommage, imports package:core/...,
-  Either<ErrorEntity, T> pour tout ce qui peut échouer, Stream pour les lectures locales).
+  Écrits par le dev dans le code (commit « contracts (by Thibault) » — {sha}). Cette section ne
+  recopie aucune signature : une ligne par contrat, fichier:ligne, ce qu'il déclare, le C<n> qu'il
+  sert. Le test-writer lit les fichiers, l'implementer les respecte. Un contrat qui empêche un
+  comportement du cadrage n'est pas contourné ici : il va dans « Contrats à revoir par Thibault »
+  du rapport du specifier.
 -->
 
-### Entities (`lib/src/domain/model/`)
-
-```dart
-class {Name}Entity extends Equatable {
-  const {Name}Entity({required this.id});
-  final String id;
-  @override
-  List<Object?> get props => [id];
-}
-```
-
-### Repository (`lib/src/domain/repository/{feature_name}_repository.dart`)
-
-```dart
-abstract class {Name}Repository {
-  Future<Either<ErrorEntity, {Name}Entity>> fetch(String id);
-}
-```
-
-### Data sources (`lib/src/domain/repository/`)
-
-<!-- Remote (Appwrite/HTTP) → Future<Either<...>>. Local (Isar) → Stream<T> / Future<void>. Supprimer ce qui n'existe pas. -->
-
-```dart
-abstract class {Name}RemoteDataSource {
-}
-
-abstract class {Name}LocalDataSource {
-}
-```
-
-### Use cases (`lib/src/domain/usecase/`)
-
-<!-- Un use case = une action métier. Signature du call() uniquement. -->
-
-```dart
-class Fetch{Name}UseCase {
-  Future<Either<ErrorEntity, {Name}Entity>> call(String id);
-}
-```
-
-### BLoC (`lib/src/presentation/{screen}/bloc/`)
-
-<!-- Events = verbes à l'infinitif. States = noms/adjectifs. Sealed. Le test-writer teste emitsInOrder contre ces states. -->
-
-```dart
-sealed class {Name}Event extends Equatable {}
-final class Load{Name} extends {Name}Event { const Load{Name}(this.id); final String id; }
-
-sealed class {Name}State extends Equatable {}
-final class {Name}Initial extends {Name}State {}
-final class {Name}Loading extends {Name}State {}
-final class {Name}Loaded extends {Name}State { const {Name}Loaded(this.entity); final {Name}Entity entity; }
-final class {Name}Empty extends {Name}State {}
-final class {Name}Error extends {Name}State { const {Name}Error(this.error); final ErrorEntity error; }
-```
-
-### Clés de widgets (`lib/src/presentation/keys.dart`)
+| Contrat | Fichier:ligne | Déclare | Sert |
+|---|---|---|---|
+| `{Name}Repository.fetch` | `lib/src/domain/repository/{feature_name}_repository.dart:5` | `Future<Either<ErrorEntity, {Name}Entity>> fetch(String id)` | C1, C3 |
+| `{Name}State` | `lib/src/presentation/{screen}/bloc/{name}_state.dart:4` | sealed : Initial, Loading, Loaded, Empty, Error | C1–C4 |
+| `{Name}Keys` | `lib/src/presentation/keys.dart:1` | page, loading, error, errorRetry, empty | §4 |
 
 <!--
-  TOUTES les clés, sous forme de String. Trois consommateurs :
+  Clés de widgets (keys.dart) — trois consommateurs :
   - widget tests   : find.byKey(ValueKey({Name}Keys.errorRetry))
   - flows Maestro  : tapOn: { id: "{feature_name}_error_retry" }  (Semantics identifier)
   - implémentation : Semantics(identifier: {Name}Keys.errorRetry, child: X(key: ValueKey({Name}Keys.errorRetry)))
   Maestro ne voit PAS les Key Flutter, seulement les Semantics identifiers : l'implémentation pose les deux.
-  Nommage : {feature}_{screen}_{element}.
+  Chaque clé citée en §4 doit exister dans keys.dart.
 -->
-
-```dart
-abstract final class {Name}Keys {
-  static const String page = '{feature_name}_page';
-  static const String loading = '{feature_name}_loading';
-  static const String error = '{feature_name}_error';
-  static const String errorRetry = '{feature_name}_error_retry';
-  static const String empty = '{feature_name}_empty';
-}
-```
 
 ## 6. Données
 
@@ -263,11 +202,10 @@ N/A
 - **Services existants réutilisés** (ne pas réinventer) : 
 
 <!--
-  La vue que le dev lit pour trancher (carte de ce qui change, parcours, arborescence des fichiers)
-  ne vit PAS ici : elle est dans `archi.json`, à côté de cette spec (format :
-  ~/.claude/commands/templates/flutter/feature_archi_example.json). Le rapport HTML la rend
-  interactive et la compare au code scaffoldé. Seul diagramme gardé dans la spec : la machine
-  d'états de chaque BLoC, que les agents suivants consomment.
+  Pas de vue d'architecture : la structure est dans les contrats du dev. Les séquences par scénario
+  sont dans cadrage.md ; `archi.json` (à côté de cette spec, format :
+  ~/.claude/commands/templates/flutter/feature_archi_example.json) relie seulement chaque C<n> à son
+  scénario de §4. Seul diagramme gardé ici : la machine d'états de chaque BLoC.
 -->
 
 **États du BLoC** (un diagramme par BLoC)
@@ -282,27 +220,24 @@ stateDiagram-v2
   Error --> Loading: Retry
 ```
 
-## 9. Décisions d'architecture
+## 9. Package et dépendances
 
 <!--
-  Le specifier PROPOSE, le dev TRANCHE. Chaque ligne devient une question posée au dev
-  (option recommandée = la décision proposée, option 2 = l'alternative). Format parsé par le
-  rapport HTML et l'orchestrateur : ne pas changer les colonnes.
+  Ce que les contrats ne montrent pas, et seulement ça. Format parsé par le rapport HTML et
+  l'orchestrateur : ne pas changer les colonnes.
 
+  - Package (nouveau / extension de …) et dépendances (pub.dev, inter-features) : tranchés au
+    cadrage, statut `validée`.
+  - Une dépendance découverte en écrivant la spec : statut `proposée`, avec une alternative RÉELLE ;
+    le dev la tranche au point d'étape « spec ».
+  - Jamais Stream/Future, découpage des BLoCs, data sources, emplacement d'une logique : c'est dans
+    le code du dev. Jamais une question qu'une règle tranche, jamais la dette du code existant.
   - ID stable (A1, A2…), jamais renuméroté.
-  - Alternative RÉELLE : une option défendable, avec ce qu'elle changerait.
-  - Statut : proposée (specifier) → validée | modifiée (écrit après la décision du dev).
-  - Uniquement les décisions structurantes (package, data sources, Stream/Future, découpage
-    des BLoCs, dépendances, emplacement d'une logique ambiguë, écart à un pattern du repo).
-  - Jamais une question qu'une règle tranche déjà, jamais la dette du code existant.
-  - Poids : majeure (change la structure, un contrat de §5 ou le comportement visible) | défaut
-    (choix local et réversible). Les défauts sont validés en un seul bloc.
-  Pour que le cleaner et l'implementer ne re-décident pas.
 -->
 
-| ID | Sujet | Décision proposée | Alternative | Raison | Statut | Poids |
-|---|---|---|---|---|---|---|
-| A1 | Package | | | | proposée | majeure |
+| ID | Sujet | Décision | Alternative | Raison | Statut |
+|---|---|---|---|---|---|
+| A1 | Package | | | | validée |
 
 ## 10. Questions ouvertes
 

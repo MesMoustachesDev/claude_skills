@@ -28,8 +28,9 @@ sait pas lire la spec.
 
 ## Ce que tu reçois
 
-Le nom de la feature, `spec.md`, le package, `tests.md` (la liste), et
-`~/.claude/commands/create_test.md` (la doctrine de test de l'utilisateur).
+Le nom de la feature, `spec.md`, `cadrage.md` et `archi.json` (chaque C<n> et son scénario), le
+package, `tests.md` (la liste), et `~/.claude/commands/create_test.md` (la doctrine de test de
+l'utilisateur).
 
 ## Ta grille
 
@@ -56,6 +57,15 @@ edge cases (null, vide, erreur, limites). Une violation nette est un bloquant ; 
 
 *Gherkin* — `test/<feature>.feature` est §4 **à l'identique** ; les steps utilisent `find.byKey`
 avec les clés de §5, jamais `find.text`.
+
+*Séquences du cadrage* — pour chaque C<n>, compare la séquence de `cadrage.md` au test d'acceptation
+réel (le `testWidgets` généré et le corps de ses steps) : chaque action de l'utilisateur a un step qui
+la fait, chaque réponse d'un serveur ou d'un stockage (erreur comprise) a un step qui configure le
+faux, chaque résultat visible a une assertion. Une étape du cadrage absente du test est un
+**bloquant** (« C3, étape 4 : la réponse 409 n'est jamais simulée ») ; une action du test absente du
+cadrage, une note. Le rapport du dev signale ces écarts par heuristique : écris dans `notes` ceux que
+tu juges justifiés (« C2 : 3 résultats visibles, 2 assertions — la 2e assertion couvre les deux »),
+pour que le dev ne les retraite pas.
 
 ## Ce que tu produis
 

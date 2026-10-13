@@ -9,7 +9,8 @@
 #               vers l'implementer / l'architect / le cleaner.
 #
 # review.json : { critical:[{file,line,rule,summary,fix}], suggestions:[{id,summary,file,line,rule,problem,why,cause,
-#                 consequences,fix,pros,cons,effort}] (pipeline/suggestions.md), missing_tests:[{scenario,why}], rules_checked:{} }
+#                 consequences,fix,pros,cons,effort}] (pipeline/suggestions.md), missing_tests:[{scenario,why}], rules_checked:{},
+#                 tour:[{layer,file,symbol,line,what,implements}] (visite guidée, 2 à 8 étapes) }
 # dedup.json  : { verdicts:[{target:{name,file,line}, existing:{name,file,line,package}, verdict:"duplicate|extend|distinct", reason, accepted?}] }
 
 check_review_report() {
@@ -19,7 +20,9 @@ check_review_report() {
     || { ko "review.json invalide : clés attendues critical, suggestions, missing_tests"; return 1; }
   local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
   [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
-  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f")"
+  jq -e '(.tour|type=="array") and (.tour|length>=2 and length<=8) and all(.tour[]; (.file|type=="string") and (.what|type=="string") and (.what|length>0))' "$f" >/dev/null 2>&1 \
+    || { ko "review.json : tour absent ou invalide — 2 à 8 étapes {layer, file, symbol, line, what, implements} dans l'ordre du flux de données"; return 1; }
+  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f"), visite : $(jq '.tour|length' "$f") étapes"
 }
 
 check_review_verdict() {
@@ -61,7 +64,7 @@ check_dedup_verdict() {
   return 1
 }
 
-# spec_review.json  : { blocking:[{section,issue,fix}], notes:[{section,issue}] }   (agent feature-spec-critic)
+# spec_review.json  : { blocking:[{section,issue,fix,owner?:"spec|thibault"}], notes:[{section,issue}] }   (agent feature-spec-critic)
 # tests_review.json : { blocking:[{file,line,test,issue,fix}], notes:[...], coverage:{scenario:"tested|missing"} }  (agent feature-test-reviewer)
 
 _report_ok() { # _report_ok <file> <label> <jq-schema>
@@ -77,7 +80,18 @@ _verdict_ok() { # _verdict_ok <file> <label> <message>
 }
 
 check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_review.json" '(.blocking|type=="array") and (.notes|type=="array")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/spec_review.json"), notes : $(jq '.notes|length' "$FEATURE_DIR/spec_review.json")"; }
-check_spec_review_verdict() { check_spec_review_report || return 1; _verdict_ok "$FEATURE_DIR/spec_review.json" "spec_review" "retour au specifier"; }
+check_spec_review_verdict() {
+  check_spec_review_report || return 1
+  local f="$FEATURE_DIR/spec_review.json" n
+  # owner "thibault" : le correctif est un contrat écrit par le dev — il le tranche au point d'étape 1,
+  # ça ne relance pas le specifier.
+  jq -r '.blocking[] | select(.accepted != true and .owner == "thibault") | "   → pour Thibault [\(.section // "-")] \(.issue)"' "$f"
+  n="$(jq '[.blocking[] | select(.accepted != true and .owner != "thibault")] | length' "$f")"
+  [ "$n" = 0 ] && return 0
+  jq -r '.blocking[] | select(.accepted != true and .owner != "thibault") | "   ✗ [\(.section // "-")] \(.issue)"' "$f"
+  ko "$n point(s) bloquant(s) — retour au specifier"
+  return 1
+}
 
 check_tests_review_report()  { _report_ok "$FEATURE_DIR/tests_review.json" "tests_review.json" '(.blocking|type=="array") and (.notes|type=="array") and (.coverage|type=="object")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/tests_review.json"), scénarios sans test : $(jq '[.coverage[]|select(.=="missing")]|length' "$FEATURE_DIR/tests_review.json")"; }
 check_tests_review_verdict() { check_tests_review_report || return 1; _verdict_ok "$FEATURE_DIR/tests_review.json" "tests_review" "retour au test-writer"; }

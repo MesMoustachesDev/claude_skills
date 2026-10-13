@@ -5,14 +5,18 @@ Usage :
   report.py feature <nom> [étape]   → .claude/features/<nom>/report.html
   report.py fix <nom> [étape]       → .claude/fixes/<nom>/report.html
 
-Étapes feature : spec | contracts | tests | mutants | qa | evidence (section ouverte en premier).
+Étapes feature : cadrage | contracts | spec | tests | tour | evidence (section ouverte en premier ;
+                 mutants et qa restent acceptés et ouvrent la visite guidée quand elle existe).
 Étapes fix     : repro | review | ui | evidence.
 
 Aucun LLM : le rapport est assemblé à partir des fichiers que le pipeline produit déjà (spec.md,
 pipeline.json, tests.md, repro.json, diagnosis.md, review.json…) et du code du package. Les blocs
 Markdown et Mermaid sont rendus côté navigateur (marked + mermaid via CDN). Imprime le chemin écrit.
-Si .claude/features/<nom>/archi.json existe (écrit par Sophie), la section Architecture est la vue
-interactive d'archi.js / archi.css : résumé, décisions ↔ carte ↔ parcours ↔ fichiers, plan vs code.
+Pas de vue d'architecture : l'architecture est dans les contrats que le dev écrit lui-même. Le rapport
+montre une séquence par scénario d'acceptation — celle du cadrage (cadrage.md, `### C<n>` + sequenceDiagram)
+et, après les tests, la même redessinée depuis le test d'acceptation réel, avec les écarts — et, à la fin,
+la visite guidée du code (review.json → tour) avec mutants, captures et suggestions rattachés à chaque étape.
+archi.json ne sert plus qu'à relier chaque C<n> à son scénario de §4 (`sequences`).
 """
 from __future__ import annotations
 
@@ -66,10 +70,6 @@ def mm_label(s: str) -> str:
     return s.replace('"', "'").replace("<", "‹").replace(">", "›").replace("\n", "<br/>")
 
 
-def mm_id(s: str) -> str:
-    return "n_" + re.sub(r"[^A-Za-z0-9_]", "_", s)
-
-
 class Page:
     """Accumule les sections ; chaque bloc Markdown est stocké brut et rendu par marked."""
 
@@ -107,12 +107,7 @@ class Page:
             for i, t in enumerate(self.md_blocks)
         )
         return TEMPLATE.format(title=esc(self.title), header=header, nav=nav, sections=secs,
-                               blocks=blocks, marked=MARKED, mermaid=MERMAID,
-                               archi_css=asset("archi.css"), archi_js=asset("archi.js").replace("</script", "<\\/script"))
-
-
-def asset(name: str) -> str:
-    return read(os.path.join(os.path.dirname(os.path.abspath(__file__)), name)) or ""
+                               blocks=blocks, marked=MARKED, mermaid=MERMAID)
 
 
 def badge(text: str, kind: str = "") -> str:
@@ -188,8 +183,8 @@ def diff_block(diff: str) -> str:
         cls = "add" if ln.startswith("+") and not ln.startswith("+++") else \
               "del" if ln.startswith("-") and not ln.startswith("---") else \
               "hunk" if ln.startswith("@@") else ""
-        lines.append(f'<span class="{cls}">{esc(ln)}</span>')
-    return f'<pre class="diff">{chr(10).join(lines)}</pre>'
+        lines.append(f'<span class="{cls}">{esc(ln) or " "}</span>')
+    return f'<pre class="diff">{"".join(lines)}</pre>'
 
 
 def layer_of(path: str) -> str:
@@ -230,11 +225,10 @@ def parse_md_table(md: str) -> tuple[list[str], list[list[str]]]:
 
 
 def decisions_html(sec9: str | None) -> str:
-    if not sec9:
-        return '<p class="muted">§9 absente</p>'
-    head, rows = parse_md_table(sec9)
+    """§9 : ce que les contrats ne montrent pas (package, dépendances), en table."""
+    head, rows = parse_md_table(sec9 or "")
     if not rows:
-        return '<p class="muted">aucune décision</p>'
+        return '<p class="muted">aucune ligne en §9</p>'
     h = [c.lower() for c in head]
 
     def col(row: list[str], *names: str) -> str:
@@ -244,17 +238,13 @@ def decisions_html(sec9: str | None) -> str:
                     return row[i]
         return ""
 
-    cards = []
+    out = []
     for r in rows:
         st = col(r, "statut") or "—"
         kind = "ok" if "valid" in st.lower() else "human" if "modif" in st.lower() else "warn"
-        cards.append(
-            f'<div class="decision {kind}"><div class="dh"><b>{esc(col(r, "id"))}</b> '
-            f'<span class="dt">{esc(col(r, "sujet", "domaine"))}</span>{badge(st, kind)}</div>'
-            f'<div class="dp"><span class="lbl">Proposé</span>{esc(col(r, "décision", "decision", "choix"))}</div>'
-            f'<div class="da"><span class="lbl">Alternative</span>{esc(col(r, "alternative"))}</div>'
-            f'<div class="dr"><span class="lbl">Raison</span>{esc(col(r, "raison"))}</div></div>')
-    return f'<div class="decisions">{"".join(cards)}</div>'
+        out.append([esc(col(r, "id")), esc(col(r, "sujet", "domaine")), esc(col(r, "décision", "decision", "choix")),
+                    esc(col(r, "alternative")), esc(col(r, "raison")), badge(st, kind)])
+    return table(["ID", "Sujet", "Décision", "Alternative", "Raison", "Statut"], out, raw=True)
 
 
 GHERKIN_STEP = re.compile(r"^(Given|When|Then|And|But|\*)\s+(.*)$")
@@ -294,98 +284,9 @@ def spec_scenarios(spec: str) -> list[str]:
     return [m.strip() for m in re.findall(r"^\s*Scenario(?: Outline)?:\s*(.+)$", spec, re.M)]
 
 
-def spec_class_names(sec5: str | None) -> set[str]:
-    if not sec5:
-        return set()
-    names = set()
-    for block in re.findall(r"```dart\n(.*?)```", sec5, re.S):
-        names |= set(re.findall(r"\bclass\s+(\w+)", block))
-    return {n for n in names if "{" not in n}
-
-
 # --- code Dart -----------------------------------------------------------------------------------
 
-CLASS_RE = re.compile(
-    r"^\s*((?:abstract|sealed|final|base|interface|mixin)\s+)*class\s+(\w+)(?:<[^{]*?>)?"
-    r"(?:\s+extends\s+(\w+)(?:<[^{]*?>)?)?(?:\s+with\s+[\w\s,<>]+?)?"
-    r"(?:\s+implements\s+([\w\s,<>]+?))?\s*\{", re.M)
-FIELD_RE = re.compile(r"^\s*(?:final|late final|late)\s+([A-Z]\w*)(?:<[^;=]*>)?\??\s+_?\w+\s*;", re.M)
-PROVIDER_RE = re.compile(r"^final\s+(_?\w+Provider)\b\s*=", re.M)
 TEST_RE = re.compile(r"\b(test|testWidgets|blocTest(?:<[^>]*>)?|group)\(\s*\n?\s*(['\"])(.+?)\2", re.S)
-
-
-def scan_package(root: str, pkg_rel: str, scope: set[str] | None) -> dict:
-    pkg = os.path.join(root, pkg_rel)
-    classes: dict[str, dict] = {}
-    providers: list[tuple[str, str]] = []
-    for path in sorted(glob.glob(os.path.join(pkg, "lib", "**", "*.dart"), recursive=True)):
-        if path.endswith((".g.dart", ".freezed.dart")):
-            continue
-        rel = os.path.relpath(path, root)
-        src = read(path) or ""
-        is_new = scope is None or rel in scope
-        for m in CLASS_RE.finditer(src):
-            mods, name, ext, impl = m.group(1) or "", m.group(2), m.group(3), m.group(4)
-            classes[name] = {
-                "file": rel, "layer": layer_of(os.path.relpath(path, pkg)), "abstract": bool(
-                    re.search(r"abstract|interface|sealed", mods)), "sealed": "sealed" in mods,
-                "extends": ext, "implements": [re.sub(r"<.*", "", i).strip() for i in (impl or "").split(",") if i.strip()],
-                "fields": set(FIELD_RE.findall(src[m.end():_class_end(src, m.end())])), "new": is_new}
-        for p in PROVIDER_RE.findall(src):
-            providers.append((p, os.path.relpath(path, pkg)))
-    return {"classes": classes, "providers": providers}
-
-
-def _class_end(src: str, start: int) -> int:
-    depth = 1
-    i = start
-    while i < len(src) and depth:
-        depth += {"{": 1, "}": -1}.get(src[i], 0)
-        i += 1
-    return i
-
-
-def arch_mermaid(scan: dict) -> str:
-    cls = scan["classes"]
-    sealed = {n for n, c in cls.items() if c["sealed"]}
-    # Les sous-classes d'un sealed (events, states) sont repliées dans le parent.
-    sub_count: dict[str, int] = {}
-    shown = {}
-    for n, c in cls.items():
-        if n.startswith("_"):
-            continue
-        if c["extends"] in sealed:
-            sub_count[c["extends"]] = sub_count.get(c["extends"], 0) + 1
-        else:
-            shown[n] = c
-    if not shown:
-        return ""
-    lines = ["flowchart LR"]
-    for layer in LAYERS + sorted({c["layer"] for c in shown.values()} - set(LAYERS)):
-        members = [n for n, c in shown.items() if c["layer"] == layer]
-        if not members:
-            continue
-        lines.append(f'  subgraph {mm_id("L_" + layer)}["{layer}"]')
-        for n in members:
-            c = shown[n]
-            label = f"«interface»\n{n}" if c["abstract"] and not c["sealed"] else n
-            if n in sub_count:
-                label += f"\n+{sub_count[n]} variantes"
-            lines.append(f'    {mm_id(n)}["{mm_label(label)}"]')
-            lines.append(f'    class {mm_id(n)} {"fresh" if c["new"] else "old"}')
-        lines.append("  end")
-    for n, c in shown.items():
-        for i in c["implements"]:
-            if i in shown:
-                lines.append(f"  {mm_id(n)} -.->|implements| {mm_id(i)}")
-        if c["extends"] in shown and c["extends"] not in sealed:
-            lines.append(f"  {mm_id(n)} -.->|extends| {mm_id(c['extends'])}")
-        for f in sorted(c["fields"]):
-            if f in shown and f != n:
-                lines.append(f"  {mm_id(n)} --> {mm_id(f)}")
-    lines.append("  classDef fresh fill:#dbeafe,stroke:#2563eb,color:#0b1d3a")
-    lines.append("  classDef old fill:#f3f4f6,stroke:#9ca3af,color:#4b5563,stroke-dasharray:3 3")
-    return "\n".join(lines)
 
 
 def path_deps(root: str, pkg_rel: str) -> list[str]:
@@ -424,114 +325,59 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
 
 
-# --- archi.json : vue interactive de l'architecture ----------------------------------------------
-
-ARCHI_LAYERS = ("presentation", "domain", "data", "injection", "external")
-CONTRACT_SUFFIX = re.compile(r"(Page|Bloc|Cubit|UseCase|Repository|RepositoryImpl|DataSource|DataSourceImpl|"
-                             r"Entity|DataModel|Mapper)$")
-
-
-def decisions_rows(sec9: str | None) -> list[dict]:
-    head, rows = parse_md_table(sec9 or "")
-    h = [c.lower() for c in head]
-
-    def col(row: list[str], *names: str) -> str:
-        for n in names:
-            for i, c in enumerate(h):
-                if n in c and i < len(row):
-                    return row[i]
-        return ""
-
-    return [{"id": col(r, "id"), "subject": col(r, "sujet", "domaine"),
-             "proposed": col(r, "décision", "decision", "choix"), "alternative": col(r, "alternative"),
-             "reason": col(r, "raison"), "status": col(r, "statut") or "—"} for r in rows]
-
-
-def changed_files(root: str, base: str) -> list[dict]:
+def changed_files(root: str, base: str, *paths: str) -> list[dict]:
     """Fichiers touchés par la branche (commits + working tree + non suivis), hors .claude/."""
     mb = sh("git", "merge-base", base, "HEAD", cwd=root).strip() or base
     out: dict[str, str] = {}
-    for ln in sh("git", "diff", "--name-status", "-M", mb, cwd=root).splitlines():
+    for ln in sh("git", "diff", "--name-status", "-M", mb, "--", *paths, cwd=root).splitlines():
         parts = ln.split("\t")
         if len(parts) < 2:
             continue
         code, path = parts[0][0], parts[-1]
         out[path] = {"A": "new", "D": "deleted", "R": "new"}.get(code, "modified")
-    for path in sh("git", "ls-files", "--others", "--exclude-standard", cwd=root).split("\n"):
+    for path in sh("git", "ls-files", "--others", "--exclude-standard", "--", *paths, cwd=root).split("\n"):
         if path:
             out[path] = "new"
     return [{"path": p, "status": s} for p, s in sorted(out.items()) if not p.startswith(".claude/")]
 
 
-def archi_payload(archi: dict, decisions: list[dict], sec4: str | None, sec5: str | None, root: str, state: dict,
-                  scan: dict | None) -> dict:
-    nodes = archi.get("nodes") or []
-    ids = {n.get("id") for n in nodes}
-    alt_ids = {a.get("id") for d in (archi.get("decisions") or {}).values()
-               for a in ((d or {}).get("alternative") or {}).get("add") or []}
-    warnings = []
-    for n in nodes:
-        if n.get("layer") not in ARCHI_LAYERS:
-            warnings.append(f"{n.get('id')} : layer « {n.get('layer')} » inconnu ({', '.join(ARCHI_LAYERS)})")
-        if n.get("status") in ("new", "modified") and not n.get("file"):
-            warnings.append(f"{n.get('id')} : statut {n.get('status')} sans « file »")
-    for e in archi.get("edges") or []:
-        for k in ("from", "to"):
-            if e.get(k) not in ids:
-                warnings.append(f"arête {e.get('from')} → {e.get('to')} : {e.get(k)} n'est pas un nœud")
-    for f in archi.get("flows") or []:
-        for s in f.get("steps") or []:
-            for k in ("from", "to"):
-                if s.get(k) != "user" and s.get(k) not in ids:
-                    warnings.append(f"parcours « {f.get('title')} » : {s.get(k)} n'est pas un nœud")
-    anchored = {d for n in nodes for d in n.get("decisions") or []}
-    anchored |= {d for f in archi.get("files") or [] for d in f.get("decisions") or []}
-    anchored |= {s.get("decision") for f in archi.get("flows") or [] for s in f.get("steps") or []}
-    anchored |= set((archi.get("decisions") or {}).keys())
-    for d in decisions:
-        if d["id"] and d["id"] not in anchored:
-            warnings.append(f"{d['id']} ({d['subject']}) n'est rattachée à aucun nœud, fichier ou étape")
-    titles = {norm(sc["title"]) for sc in parse_gherkin(sec4 or "")["scenarios"]}
-    for p in archi.get("scenarios") or []:
-        if norm(p.get("title", "")) not in titles:
-            warnings.append(f"scénario « {p.get('title')} » : titre absent de §4")
-        if p.get("kind") not in ("nominal", "limite", "erreur"):
-            warnings.append(f"scénario « {p.get('title')} » : kind « {p.get('kind')} » inconnu (nominal, limite, erreur)")
-    contracts = {c for c in spec_class_names(sec5) if CONTRACT_SUFFIX.search(c)}
-    for c in sorted(contracts - ids - alt_ids):
-        warnings.append(f"{c} est un contrat de §5 absent de la carte")
+def resolve(root: str, pkg_rel: str, path: str) -> str | None:
+    """Chemin relatif à la racine d'un fichier cité relatif au package ou à la racine."""
+    for cand in (os.path.join(pkg_rel, path), path):
+        if os.path.isfile(os.path.join(root, cand)):
+            return cand
+    return None
 
-    planned = {}
-    for n in nodes:
-        if n.get("file") and n.get("status") in ("new", "modified"):
-            planned[n["file"]] = {"path": n["file"], "status": n["status"], "node": n["id"],
-                                  "decisions": n.get("decisions") or [], "why": n.get("note", "")}
-    for f in archi.get("files") or []:
-        planned.setdefault(f.get("path"), {**f, "decisions": f.get("decisions") or []})
 
-    real = None
-    files_real = changed_files(root, state.get("base") or "HEAD")
-    if scan is not None or files_real:
-        real = {"files": files_real, "present": [], "unplanned": [], "edges": []}
-        if scan is not None:
-            cls = scan["classes"]
-            sealed = {k for k, v in cls.items() if v["sealed"]}
-            real["present"] = sorted(n for n in ids if n in cls)
-            extra = [k for k, v in cls.items() if v["new"] and k not in ids and not k.startswith("_")
-                     and v["extends"] not in sealed and v["layer"] in ("presentation", "domain", "data", "injection")]
-            real["unplanned"] = [{"id": k, "layer": cls[k]["layer"], "file": cls[k]["file"],
-                                  "kind": "interface" if cls[k]["abstract"] and not cls[k]["sealed"] else ""}
-                                 for k in sorted(extra)]
-            known = ids | set(extra)
-            for k in extra:
-                c = cls[k]
-                for t in sorted(c["fields"]) + c["implements"]:
-                    if t in known and t != k:
-                        real["edges"].append({"from": k, "to": t,
-                                              "kind": "implements" if t in c["implements"] else ""})
-    return {"archi": archi, "decisions": decisions, "planned_files": list(planned.values()),
-            "real": real, "warnings": warnings}
+def symbol_line(src: str, symbol: str) -> int | None:
+    """Ligne (1-based) de la définition d'un symbole Dart (`Classe.methode`, `methode`, `Classe`)."""
+    name = re.escape(symbol.split(".")[-1])
+    owner = symbol.split(".")[0] if "." in symbol else None
+    lines = src.splitlines()
+    start = 0
+    if owner:
+        for i, ln in enumerate(lines):
+            if re.search(rf"\b(class|mixin|extension)\s+{re.escape(owner)}\b", ln):
+                start = i
+                break
+    for i in range(start, len(lines)):
+        ln = lines[i].strip()
+        if ln.startswith("//"):
+            continue
+        if re.search(rf"\b(class|mixin|enum|extension)\s+{name}\b", ln) or \
+                (re.search(rf"\b{name}\s*(<[^>]*>)?\s*\(", ln) and not re.match(r"(return|await|if|final|var)\b", ln)
+                 and not ln.rstrip().endswith(";")):
+            return i + 1
+    return None
 
+
+def excerpt(root: str, rel: str, line: int, before: int = 1, after: int = 9) -> str:
+    lines = (read(os.path.join(root, rel)) or "").splitlines()
+    lo, hi = max(0, line - 1 - before), min(len(lines), line + after)
+    return "\n".join(f"{i + 1:>4}  {lines[i]}" for i in range(lo, hi))
+
+
+# --- scénarios -----------------------------------------------------------------------------------
 
 SC_KINDS = (("nominal", "Parcours nominaux", "ok"), ("limite", "Cas limites", "warn"), ("erreur", "Erreurs", "ko"))
 
@@ -595,10 +441,409 @@ def scenarios_section(sec4: str | None, picks: list | None, covered: set | None)
     return "".join(out), b
 
 
-def archi_section(payload: dict, stage: str | None) -> str:
-    data = json.dumps({**payload, "stage": stage or ""}, ensure_ascii=False).replace("</", "<\\/")
-    return (f'<script type="application/json" id="archi-data">{data}</script>'
-            '<div id="archi-app"><p class="muted">chargement…</p></div>')
+# --- séquences : cadrage (comportement) ↔ test d'acceptation (réel) ------------------------------
+
+SEQ_HEAD = re.compile(r"^#{2,4}\s+(C\d+)\b\s*[—:.\-–]*\s*(.*)$", re.M)
+SEQ_MSG = re.compile(r"^\s*([\w]+)\s*(--?>>|--?x|--?\)|--?>)[+-]?\s*([\w]+)\s*:\s*(.*)$")
+SEQ_PART = re.compile(r"^\s*(participant|actor)\s+(\w+)(?:\s+as\s+(.*))?$")
+CADRAGE_ROLES = {"U": "Utilisateur", "E": "Écran", "A": "App"}   # tout autre id = serveur, stockage, plateforme
+
+
+def cadrage_sequences(cadrage: str | None) -> list[dict]:
+    """Les comportements C1…Cn de cadrage.md, chacun avec son sequenceDiagram Mermaid."""
+    if not cadrage:
+        return []
+    heads = list(SEQ_HEAD.finditer(cadrage))
+    out = []
+    for i, h in enumerate(heads):
+        body = cadrage[h.end(): heads[i + 1].start() if i + 1 < len(heads) else len(cadrage)]
+        m = re.search(r"```mermaid\s*\n(.*?)```", body, re.S)
+        if not m or "sequenceDiagram" not in m.group(1):
+            continue
+        mermaid = m.group(1).strip()
+        steps = []
+        for ln in mermaid.splitlines():
+            mm = SEQ_MSG.match(ln)
+            if not mm:
+                continue
+            a, b, msg = mm.group(1), mm.group(3), mm.group(4).strip()
+            if a == "U" and b == "E":
+                kind = "action"
+            elif a == "E" and b == "U":
+                kind = "visible"
+            elif a not in CADRAGE_ROLES and b in CADRAGE_ROLES:
+                kind = "response"
+            elif a in CADRAGE_ROLES and b not in CADRAGE_ROLES:
+                kind = "request"
+            else:
+                kind = "internal"
+            steps.append({"from": a, "to": b, "msg": msg, "kind": kind, "n": len(steps) + 1})
+        out.append({"id": h.group(1), "title": h.group(2).strip(), "mermaid": mermaid, "steps": steps})
+    return out
+
+
+ACTION_RE = re.compile(r"\btester\.(tap|tapAt|longPress|enterText|drag|dragFrom|fling|press|sendKeyEvent|"
+                       r"sendKeyDownEvent|showKeyboard|testTextInput)\b|\benterText\(")
+RESPONSE_RE = re.compile(r"\bwhen\(|\.thenAnswer\(|\.thenReturn\(|\.thenThrow\(|\b\w*(?:[cC]ontroller|sink)\.add(?:Error)?\(|"
+                         r"\bFake\w*\(|\bwhenListen\(")
+ASSERT_RE = re.compile(r"\bexpect(?:Later)?\(")
+FUNC_DEF = re.compile(r"^(?:Future<void>|void|Future<\w+>)\s+(\w+)\s*\(", re.M)
+
+
+def _dart_functions(paths: list[str]) -> dict[str, tuple[str, int, str]]:
+    """{nom: (fichier, ligne de définition, corps)} des fonctions de haut niveau de ces fichiers."""
+    out = {}
+    for p in paths:
+        src = read(p) or ""
+        for m in FUNC_DEF.finditer(src):
+            i = src.find("{", m.end())
+            arrow = src.find("=>", m.end())
+            if arrow != -1 and (i == -1 or arrow < i):
+                j = src.find(";", arrow)
+                body = src[arrow:j + 1]
+            elif i != -1:
+                body = src[i:_block_end(src, i + 1)]
+            else:
+                continue
+            out[m.group(1)] = (p, src[:m.start()].count("\n") + 1, body, src[:m.start()].count("\n") + 1)
+    return out
+
+
+def _block_end(src: str, start: int) -> int:
+    depth = 1
+    i = start
+    while i < len(src) and depth:
+        depth += {"{": 1, "}": -1}.get(src[i], 0)
+        i += 1
+    return i
+
+
+def test_sequences(root: str, pkg_rel: str) -> dict[str, dict]:
+    """{titre normalisé: {title, file, steps}} — séquence réelle de chaque scénario d'acceptation, lue dans
+    le test généré par bdd_widget_test (testWidgets('''titre''') → appels de steps) et le corps de chaque step."""
+    test_dir = os.path.join(root, pkg_rel, "test")
+    feats = {}
+    for f in glob.glob(os.path.join(test_dir, "**", "*.feature"), recursive=True):
+        g = parse_gherkin(read(f) or "")
+        for sc in g["scenarios"]:
+            feats[norm(sc["title"])] = g["background"] + sc["steps"]
+    out: dict[str, dict] = {}
+    # bdd_widget_test génère <x>_test.dart à côté de <x>.feature ; à défaut, tout test qui importe ./step/
+    generated = [f[: -len(".feature")] + "_test.dart" for f in glob.glob(os.path.join(test_dir, "**", "*.feature"), recursive=True)]
+    candidates = [f for f in generated if os.path.isfile(f)] or [
+        f for f in glob.glob(os.path.join(test_dir, "**", "*_test.dart"), recursive=True)
+        if re.search(r"^import\s+'\./step/", read(f) or "", re.M)]
+    for tf in candidates:
+        src = read(tf) or ""
+        if "testWidgets(" not in src:
+            continue
+        here = os.path.dirname(tf)
+        imports = [os.path.normpath(os.path.join(here, i))
+                   for i in re.findall(r"^import\s+'(\.[^']+)';", src, re.M)]
+        step_files = sorted({*imports, *glob.glob(os.path.join(here, "step", "*.dart"))})
+        funcs = _dart_functions([p for p in step_files if os.path.isfile(p)])
+        local = _dart_functions([tf])
+        for m in re.finditer(r"testWidgets\(\s*(?:'''|\"\"\"|'|\")(.+?)(?:'''|\"\"\"|'|\")\s*,\s*\(tester\)\s*async\s*\{", src, re.S):
+            title = m.group(1).strip()
+            body = src[m.end():_block_end(src, m.end())]
+            calls = []
+            for c in re.finditer(r"await\s+(\w+)\(tester(?:,\s*(.*?))?\);", body):
+                if c.group(1) in local and c.group(1) not in funcs:   # bddSetUp (Background) : on déplie
+                    calls += re.findall(r"await\s+(\w+)\(tester(?:,\s*(.*?))?\);", local[c.group(1)][2])
+                else:
+                    calls.append((c.group(1), c.group(2) or ""))
+            texts = feats.get(norm(title), [])
+            steps = []
+            for i, (fn, args) in enumerate(calls):
+                kw, text = texts[i] if i < len(texts) and len(texts) == len(calls) else ("", f"{fn}({args})")
+                path, line, fbody, _ = funcs.get(fn, (None, 0, "", 0))
+                # un niveau de helpers (pumpX, tabFinder…) définis dans les fichiers de steps
+                full = fbody + "".join(funcs[h][2] for h in set(re.findall(r"\b(\w+)\(", fbody))
+                                       if h in funcs and h != fn)
+                kind = ("action" if ACTION_RE.search(full) else "response" if RESPONSE_RE.search(full)
+                        else "assert" if ASSERT_RE.search(full) else "setup")
+                at = line
+                if path:
+                    rx = {"action": ACTION_RE, "response": RESPONSE_RE, "assert": ASSERT_RE}.get(kind)
+                    fsrc = read(path) or ""
+                    hit = rx.search(fsrc) if rx else None
+                    if hit:
+                        at = fsrc[:hit.start()].count("\n") + 1
+                steps.append({"kw": kw, "text": text, "fn": fn, "kind": kind,
+                              "at": f"{os.path.relpath(path, os.path.join(root, pkg_rel))}:{at}" if path else ""})
+            out[norm(title)] = {"title": title, "file": os.path.relpath(tf, os.path.join(root, pkg_rel)),
+                                "steps": steps}
+    return out
+
+
+def seq_text(s: str, n: int = 80) -> str:
+    """Texte sûr pour un message de sequenceDiagram."""
+    s = re.sub(r"[;#]", lambda m: {";": ",", "#": "n°"}[m.group(0)], s).replace("\n", " ").strip()
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def test_mermaid(seq: dict) -> str:
+    kinds = {s["kind"] for s in seq["steps"]}
+    lines = ["sequenceDiagram", "  actor T as Test (utilisateur simulé)", "  participant E as Écran (widget)"]
+    if "response" in kinds:
+        lines.append("  participant F as Faux repository / serveur")
+    for s in seq["steps"]:
+        txt = seq_text(s["text"], 56)
+        if s["kind"] == "action":
+            lines.append(f"  T->>E: {txt}")
+        elif s["kind"] == "response":
+            lines.append(f"  F-->>E: {txt}")
+        elif s["kind"] == "assert":
+            lines.append(f"  E-->>T: ✓ {txt}")
+        else:
+            lines.append(f"  T->>E: pump · {txt}")
+    if len(lines) == 3:
+        lines.append("  Note over T,E: aucun step trouvé")
+    return "\n".join(lines)
+
+
+def seq_gaps(cad: dict | None, test: dict | None) -> list[tuple[str, str]]:
+    """Écarts (sens, texte) entre la séquence du cadrage et celle du test. Heuristique, à confirmer."""
+    if cad is None or test is None:
+        return []
+    c = {k: [s for s in cad["steps"] if s["kind"] == k] for k in ("action", "request", "response", "visible")}
+    t = {k: [s for s in test["steps"] if s["kind"] == k] for k in ("action", "response", "assert")}
+    gaps = []
+    for s in c["action"][len(t["action"]):]:
+        gaps.append(("cadrage", f"action « {s['msg']} » (étape {s['n']}) : aucune action correspondante dans le test"))
+    for s in t["action"][len(c["action"]):]:
+        gaps.append(("test", f"action « {s['text']} » ({s['at']}) : absente du cadrage"))
+    if c["response"] and not t["response"]:
+        for s in c["response"]:
+            gaps.append(("cadrage", f"réponse « {s['msg']} » (étape {s['n']}) : le test ne configure aucun faux repository / serveur"))
+    elif t["response"] and not (c["response"] or c["request"]):
+        for s in t["response"]:
+            gaps.append(("test", f"réponse simulée « {s['text']} » ({s['at']}) : le cadrage ne parle d'aucun serveur"))
+    if c["visible"] and not t["assert"]:
+        gaps.append(("cadrage", f"{len(c['visible'])} résultat(s) visible(s) au cadrage, aucune assertion dans le test"))
+    elif len(t["assert"]) < len(c["visible"]):
+        for s in c["visible"][len(t["assert"]):]:
+            gaps.append(("cadrage", f"résultat « {s['msg']} » (étape {s['n']}) : peut-être non vérifié "
+                                    f"({len(c['visible'])} résultats, {len(t['assert'])} assertions)"))
+    return gaps
+
+
+def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dict] | None,
+                      sec4: str | None) -> tuple[str, str, list[str]]:
+    """(html, badge, avertissements) — un bloc par scénario d'acceptation : cadrage | test réel, écarts."""
+    by_id = {m.get("id"): m for m in mapping if m.get("id")}
+    titles = {norm(s["title"]) for s in parse_gherkin(sec4 or "")["scenarios"]}
+    warnings = []
+    if mapping:
+        for c in cad:
+            if c["id"] not in by_id:
+                warnings.append(f"{c['id']} : aucun scénario de §4 ne lui correspond (archi.json → sequences)")
+        for m in mapping:
+            if titles and norm(m.get("scenario", "")) not in titles:
+                warnings.append(f"{m.get('id')} : scénario « {m.get('scenario')} » absent de §4")
+            if cad and m.get("id") not in {c["id"] for c in cad}:
+                warnings.append(f"{m.get('id')} : absent des séquences de cadrage.md")
+    blocks = []
+    n_gaps = 0
+    items = [(c, by_id.get(c["id"])) for c in cad]
+    if not cad:   # format antérieur : pas de séquence au cadrage, on montre au moins les tests
+        items = [(None, m) for m in mapping]
+    for c, m in items:
+        title = (m or {}).get("scenario")
+        t = (tests or {}).get(norm(title)) if title and tests is not None else None
+        gaps = seq_gaps(c, t)
+        n_gaps += len(gaps)
+        head = (f'<b>{esc(c["id"] if c else (m or {}).get("id", ""))}</b> {esc(c["title"] if c else "")}'
+                + (f' {badge((m or {}).get("kind"), {"nominal": "ok", "limite": "warn", "erreur": "ko"}.get((m or {}).get("kind"), ""))}'
+                   if (m or {}).get("kind") else ""))
+        sub = (f'<div class="sc-fr">{esc(m.get("fr", ""))}</div>' if m and m.get("fr") else "") + \
+              (f'<div class="sc-title">§4 : {esc(title)}</div>' if title else
+               '<div class="hint">pas encore relié à un scénario de §4 (écrit avec la spec)</div>')
+        left = (f'<div><div class="seq-h">Cadrage (comportement attendu)</div><pre class="mermaid">{esc(c["mermaid"])}</pre></div>'
+                if c else '<div><div class="seq-h">Cadrage</div><p class="muted">pas de séquence au cadrage (format antérieur)</p></div>')
+        if t:
+            loc = "".join(f'<li><code>{esc(s["at"])}</code> {esc(s["kind"])} — {esc(s["text"])}</li>' for s in t["steps"])
+            right = (f'<div><div class="seq-h">Test réel <code>{esc(t["file"])}</code></div>'
+                     f'<pre class="mermaid">{esc(test_mermaid(t))}</pre>'
+                     f'<details class="sub"><summary>steps et fichiers</summary><ul class="loc">{loc}</ul></details></div>')
+        elif tests is not None and title:
+            right = '<div><div class="seq-h">Test réel</div>' + badge("aucun testWidgets pour ce scénario", "ko") + "</div>"
+            n_gaps += 1
+        else:
+            right = ""
+        g = ""
+        if gaps:
+            g = '<ul class="gaps">' + "".join(
+                f'<li>{badge("au cadrage, pas au test" if side == "cadrage" else "au test, pas au cadrage", "ko" if side == "cadrage" else "warn")} {esc(txt)}</li>'
+                for side, txt in gaps) + "</ul>"
+        elif t and c:
+            g = f'<p>{badge("aucun écart détecté", "ok")}</p>'
+        blocks.append(f'<div class="seq-block"><div class="seq-head">{head}</div>{sub}'
+                      f'<div class="seq-pair{" one" if not right else ""}">{left}{right}</div>{g}</div>')
+    if not blocks:
+        return '<p class="muted">aucune séquence (cadrage.md sans comportement C1…Cn)</p>', "", warnings
+    warn_html = ('<ul class="gaps">' + "".join(f'<li>{badge("incohérence", "ko")} {esc(w)}</li>' for w in warnings)
+                 + "</ul>") if warnings else ""
+    hint = ('<p class="hint">À gauche, le comportement validé au cadrage. À droite, le même scénario redessiné '
+            "depuis le test d'acceptation réel (steps bdd_widget_test : pump, tap/saisie, réponse du faux, assertion). "
+            "Les écarts sont détectés par script : à confirmer en lisant les deux.</p>") if tests is not None else ""
+    b = badge(f"{len(blocks)} séquence(s)") + (badge(f"{n_gaps} écart(s)", "ko") if n_gaps else "") + \
+        (badge(f"{len(warnings)} incohérence(s)", "ko") if warnings else "")
+    return warn_html + hint + "".join(blocks), b, warnings
+
+
+# --- contrats écrits par le dev -----------------------------------------------------------------
+
+DECISION_MARK = "DÉCISION (Thibault)"
+
+
+def contracts_section(root: str, pkg_rel: str, state: dict, fdir: str, page: "Page") -> tuple[str, str]:
+    c = state.get("contracts") or {}
+    draft, mine = c.get("draft_sha"), c.get("sha")
+    out = []
+    marks = []
+    for p in sorted(glob.glob(os.path.join(root, pkg_rel, "lib", "**", "*.dart"), recursive=True)):
+        for i, ln in enumerate((read(p) or "").splitlines(), 1):
+            if DECISION_MARK in ln:
+                marks.append([f"<code>{esc(os.path.relpath(p, root))}:{i}</code>", esc(ln.strip().lstrip("/ "))])
+    if marks:
+        out.append(f"<h3>Décisions encore ouvertes dans le code ({len(marks)})</h3>"
+                   '<p class="hint">Chaque commentaire <code>' + esc(DECISION_MARK) + "</code> est une question d'Arthur : "
+                   "garde, change, puis efface le commentaire.</p>" + table(["où", "question"], marks, raw=True))
+    if draft:
+        files = sh("git", "diff", "--name-only", f"{draft}~1", draft, "--", pkg_rel, cwd=root).split()
+    else:
+        files = [f["path"] for f in changed_files(root, state.get("base") or "HEAD", pkg_rel)
+                 if re.search(r"/domain/|keys\.dart$|_event\.dart$|_state\.dart$", f["path"])]
+    if files:
+        out.append("<h3>Fichiers de contrats</h3><ul class='loc'>" + "".join(f"<li><code>{esc(f)}</code></li>" for f in files) + "</ul>")
+    if draft and mine:
+        d = sh("git", "diff", draft, mine, "--", pkg_rel, cwd=root)
+        out.append(f"<h3>Ce que tu as changé dans le brouillon d'Arthur</h3>"
+                   f"<p class='hint'>{esc(draft[:8])} (brouillon) → {esc(mine[:8])} (contracts by Thibault)</p>" + diff_block(d))
+    elif draft:
+        d = sh("git", "diff", draft, "--", pkg_rel, cwd=root)
+        out.append("<h3>Tes modifications en cours (non commitées)</h3>" + diff_block(d))
+    deps, hosted = path_deps(root, pkg_rel), hosted_deps(root, pkg_rel)
+    out.append("<h3>Dépendances du package</h3>" + table(["type", "packages"], [
+        ["workspace (path)", ", ".join(deps) or "—"], ["hébergées (pub.dev)", ", ".join(hosted) or "—"]]))
+    dd = read(os.path.join(fdir, "dedup.md"))
+    if dd:
+        out.append("<h3>Déjà existant ailleurs (Denis)</h3>" + page.md(dd))
+    b = (badge(f"{len(marks)} décision(s) ouverte(s)", "ko") if marks else "") + \
+        (badge("écrits par Thibault", "human") if mine else badge("brouillon", "warn") if draft else "")
+    return "".join(out) or '<p class="muted">aucun contrat</p>', b
+
+
+# --- visite guidée -------------------------------------------------------------------------------
+
+def slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+
+
+def mutants_rows(md: str | None) -> list[dict]:
+    head, rows = parse_md_table(md or "")
+    if not head:
+        return []
+    h = [c.lower() for c in head]
+    idx = lambda *ns: next((i for i, c in enumerate(h) for n in ns if n in c), None)
+    fi, mi, vi, ei = idx("fichier"), idx("mutation"), idx("verdict"), idx("explication")
+    out = []
+    for r in rows:
+        loc = r[fi] if fi is not None and fi < len(r) else ""
+        out.append({"loc": loc.strip("` "), "mutation": r[mi] if mi is not None and mi < len(r) else "",
+                    "verdict": r[vi] if vi is not None and vi < len(r) else "",
+                    "why": r[ei] if ei is not None and ei < len(r) else ""})
+    return out
+
+
+def tour_section(root: str, pkg_rel: str, fdir: str, state: dict, review: dict,
+                 mapping: list[dict]) -> tuple[str, str]:
+    tour = review.get("tour") or []
+    if not tour:
+        return '<p class="muted">pas de visite guidée (review.json → tour absent)</p>', badge("absente", "ko")
+    c2s = {m.get("id"): m.get("scenario") for m in mapping}
+    muts = mutants_rows(read(os.path.join(fdir, "mutants.md")))
+    sugg = review.get("suggestions") or []
+    decided = state.get("suggestions") or {}
+    shots = sorted(glob.glob(os.path.join(fdir, "qa", "*", "*.png")))
+    used_m, used_s, used_p = set(), set(), set()
+
+    def same_file(a: str, b: str) -> bool:
+        a, b = a.split(":")[0].strip("` "), b.split(":")[0].strip("` ")
+        return bool(a and b) and (a.endswith(b) or b.endswith(a))
+
+    steps_html = []
+    for n, st in enumerate(tour, 1):
+        rel = resolve(root, pkg_rel, st.get("file", ""))
+        line = st.get("line") or 1
+        moved = ""
+        if rel and st.get("symbol"):
+            found = symbol_line(read(os.path.join(root, rel)) or "", st["symbol"])
+            if found and found != line:
+                moved = f" (ligne {line} au moment de la revue)"
+                line = found
+        where = f"{rel or st.get('file', '?')}:{line}"
+        refs = []
+        scen = []
+        for r in st.get("implements") or []:
+            if r in c2s:
+                refs.append(badge(f"{r} · {c2s[r]}", "ok"))
+                scen.append(c2s[r])
+            elif re.match(r"^[A-Z]\d+$", str(r)):
+                refs.append(badge(r, "human"))
+            else:
+                refs.append(badge(r, "ok"))
+                scen.append(r)
+        att = []
+        for i, m in enumerate(muts):
+            if st.get("file") and same_file(m["loc"], st["file"]):
+                used_m.add(i)
+                att.append(f'<li>{badge("mutant " + m["verdict"], "warn")} <code>{esc(m["loc"])}</code> {esc(m["mutation"])} — {esc(m["why"])}</li>')
+        for i, s in enumerate(sugg):
+            if st.get("file") and same_file(s.get("file", ""), st["file"]):
+                used_s.add(i)
+                dec = (decided.get(s.get("id")) or {}).get("decision", "à trancher")
+                att.append(f'<li>{badge(s.get("id", "S?") + " · " + dec, "ok" if dec == "applied" else "human")} '
+                           f'{esc(s.get("summary", ""))} — {esc(s.get("problem", ""))}</li>')
+        pics = []
+        for i, p in enumerate(shots):
+            b = os.path.basename(p).lower()
+            if any(slug(t)[:24] and slug(t)[:24] in b for t in scen):
+                used_p.add(i)
+                r = os.path.relpath(p, fdir)
+                pics.append(f'<figure><a href="{esc(r)}"><img src="{esc(r)}" loading="lazy"></a><figcaption>{esc(r)}</figcaption></figure>')
+        code = f'<pre class="code">{esc(excerpt(root, rel, line))}</pre>' if rel else badge("fichier introuvable", "ko")
+        steps_html.append(
+            f'<div class="tour-step"><div class="tour-h"><span class="tour-n">{n}</span> {badge(st.get("layer", ""), "")} '
+            f'<code>{esc(where)}</code>{esc(moved)} {"".join(refs)}</div>'
+            f'<p>{esc(st.get("what", ""))}</p>{code}'
+            + (f'<ul class="att">{"".join(att)}</ul>' if att else "")
+            + (f'<div class="gallery">{"".join(pics)}</div>' if pics else "") + "</div>")
+    left = [f'<li>{badge("mutant " + m["verdict"], "warn")} <code>{esc(m["loc"])}</code> {esc(m["why"])}</li>'
+            for i, m in enumerate(muts) if i not in used_m]
+    left += [f'<li>{badge(s.get("id", "S?"), "human")} <code>{esc(s.get("file", ""))}</code> {esc(s.get("summary", ""))}</li>'
+             for i, s in enumerate(sugg) if i not in used_s]
+    rest_pics = [p for i, p in enumerate(shots) if i not in used_p]
+    qa = read(os.path.join(fdir, "qa.md")) or ""
+    ko = [l.strip() for l in qa.splitlines() if l.startswith("|") and "✗" in l]
+    head = ""
+    if ko:
+        head = "<h3>Défauts signalés par Quentin</h3><ul class='gaps'>" + "".join(
+            f"<li>{badge('✗', 'ko')} {esc(' · '.join(c.strip() for c in l.strip('|').split('|') if c.strip() not in ('', '—', '-')))}</li>"
+            for l in ko) + "</ul>"
+    tail = ""
+    if left:
+        tail += "<h3>Non rattachés à une étape</h3><ul class='att'>" + "".join(left) + "</ul>"
+    if rest_pics:
+        tail += "<h3>Autres captures</h3>" + images(fdir, "qa/*/*.png") if len(rest_pics) == len(shots) else \
+            "<h3>Autres captures</h3><div class='gallery'>" + "".join(
+                f'<figure><a href="{esc(os.path.relpath(p, fdir))}"><img src="{esc(os.path.relpath(p, fdir))}" loading="lazy"></a>'
+                f'<figcaption>{esc(os.path.relpath(p, fdir))}</figcaption></figure>' for p in rest_pics) + "</div>"
+    hint = ('<p class="hint">Dans l\'ordre du flux de données. Ouvre chaque fichier à la ligne indiquée dans ton IDE ; '
+            "mutants, captures et suggestions sont rattachés à l'étape qu'ils concernent.</p>")
+    b = badge(f"{len(tour)} étapes") + (badge(f"{len(ko)} défaut(s) QA", "ko") if ko else "")
+    return head + hint + "".join(steps_html) + tail, b
 
 
 # --- feature -------------------------------------------------------------------------------------
@@ -610,82 +855,62 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     mode = state.get("mode", "create")
     spec = read(os.path.join(fdir, "spec.md")) or ""
     secs = spec_sections(spec)
-    archi = read_json(os.path.join(fdir, "archi.json"))
-    page = Page(f"{name} · feature", {"spec": "archi", "contracts": "archi" if archi else "real", "tests": "tests",
-                                      "mutants": "mutants", "qa": "qa", "evidence": "archi"}.get(focus or "", focus))
+    archi = read_json(os.path.join(fdir, "archi.json")) or {}
+    review = read_json(os.path.join(fdir, "review.json")) or {}
+    cadrage = read(os.path.join(fdir, "cadrage.md"))
+    has_tour = bool(review.get("tour"))
+    first = {"cadrage": "cadrage", "contracts": "contracts", "spec": "scenarios", "tests": "sequences",
+             "tour": "tour", "mutants": "tour" if has_tour else "mutants", "qa": "tour" if has_tour else "qa",
+             "evidence": "tour" if has_tour else "scenarios"}
+    page = Page(f"{name} · feature", first.get(focus or "", focus))
+    has_code = os.path.isdir(os.path.join(root, pkg_rel, "lib"))
+    has_tests = os.path.isdir(os.path.join(root, pkg_rel, "test")) and bool(state.get("tests_freeze_sha")
+                                                                            or (state.get("stages") or {}).get("red"))
 
-    scan = None
-    if os.path.isdir(os.path.join(root, pkg_rel, "lib")):
-        scope = None
-        if mode == "extend":
-            base = state.get("base") or "HEAD"
-            mb = sh("git", "merge-base", base, "HEAD", cwd=root).strip() or base
-            scope = set(sh("git", "diff", "--name-only", mb, "--", pkg_rel, cwd=root).split()) | \
-                set(sh("git", "ls-files", "--others", "--exclude-standard", "--", pkg_rel, cwd=root).split())
-        scan = scan_package(root, pkg_rel, scope)
+    # Cadrage : ce qui va être fait, avec une séquence par comportement
+    if cadrage:
+        page.add("cadrage", "Cadrage", page.md(cadrage))
 
-    # Architecture proposée / validée
-    n_dec = len(parse_md_table(secs.get("9", ""))[1])
-    if archi:
-        payload = archi_payload(archi, decisions_rows(secs.get("9")), secs.get("4"), secs.get("5"), root, state, scan)
-        page.add("archi", "Architecture",
-                 archi_section(payload, focus)
-                 + "<details class='sub'><summary><h3>§8 en détail (dépendances, routes, l10n, machines d'états)</h3>"
-                 "</summary>" + page.md(secs.get("8")) + "</details>",
-                 badge(f"{n_dec} décisions") + (badge(f"{len(payload['warnings'])} incohérence(s)", "ko")
-                                               if payload["warnings"] else ""))
-    else:
-        page.add("archi", "Architecture : décisions",
-                 '<p class="hint">Chaque ligne de §9 est une décision que tu valides ou modifies. '
-                 "Statut <i>proposée</i> = pas encore tranchée par toi. (Pas d'archi.json : vue simple.)</p>"
-                 + decisions_html(secs.get("9")) + "<h3>§8 Architecture (proposée par le specifier)</h3>"
-                 + page.md(secs.get("8")),
-                 badge(f"{n_dec} décisions"))
+    # Séquences : cadrage | test réel, côte à côte
+    cad = cadrage_sequences(cadrage)
+    mapping = archi.get("sequences") or [{"id": f"S{i}", "scenario": p.get("title"), "kind": p.get("kind"),
+                                          "fr": p.get("fr")} for i, p in enumerate(archi.get("scenarios") or [], 1)]
+    tests = test_sequences(root, pkg_rel) if has_tests else None
+    if cad or (mapping and tests):
+        sq_html, sq_badge, _ = sequences_section(cad, mapping, tests, secs.get("4"))
+        page.add("sequences", "Séquences : cadrage ↔ tests d'acceptation" if tests is not None else "Séquences du cadrage",
+                 sq_html, sq_badge)
+        if focus in ("spec",):
+            page.also_open.append("sequences")
 
-    # Scénarios d'acceptation : ce qui sera testé, lisible avant la spec entière
-    feat_scen = test_inventory(root, pkg_rel)[1] if scan is not None else []
-    sc_html, sc_badge = scenarios_section(secs.get("4"), (archi or {}).get("scenarios"),
-                                          {norm(x) for x in feat_scen} if feat_scen else None)
-    page.add("scenarios", "Scénarios : ce qui sera testé", sc_html, sc_badge)
-    if focus in ("spec", "tests"):
-        page.also_open.append("scenarios")
+    # Contrats : écrits par le dev dans le code
+    if has_code and (state.get("contracts") or focus == "contracts"):
+        ct_html, ct_badge = contracts_section(root, pkg_rel, state, fdir, page)
+        page.add("contracts", "Contrats (dans le code)", ct_html, ct_badge)
 
-    # Architecture réelle (après le scaffold de l'architect)
-    if scan is not None:
-        diagram = "" if archi else arch_mermaid(scan)
-        in_code = set(scan["classes"])
-        expected = spec_class_names(secs.get("5"))
-        missing = sorted(expected - in_code)
-        extra = sorted(n for n, c in scan["classes"].items()
-                       if c["new"] and n not in expected and not n.startswith("_") and c["layer"] in ("domain", "presentation")
-                       and not c["extends"] in {k for k, v in scan["classes"].items() if v["sealed"]})
-        sec8 = secs.get("8", "")
-        deps = path_deps(root, pkg_rel)
-        hosted = hosted_deps(root, pkg_rel)
-        undeclared = [d for d in deps + hosted if d not in sec8 and d not in ("flutter",)]
-        gaps = []
-        if missing:
-            gaps.append(f"<li>{badge('spec → code', 'ko')} prévus en §5, absents du code : {esc(', '.join(missing))}</li>")
-        if undeclared:
-            gaps.append(f"<li>{badge('dépendances', 'ko')} dans pubspec, non nommées en §8 : {esc(', '.join(undeclared))}</li>")
-        if extra:
-            gaps.append(f"<li>{badge('hors spec', 'warn')} classes domain/presentation non nommées en §5 : {esc(', '.join(extra))}</li>")
-        gap_html = (f'<ul class="gaps">{"".join(gaps)}</ul>' if gaps
-                    else f'<p>{badge("aucun écart détecté avec la spec", "ok")}</p>')
-        legend = ("" if archi else
-                  '<p class="hint">Généré depuis le code de <code>' + esc(pkg_rel) + "</code>. "
-                  "Bleu : ajouté par cette feature. Gris pointillé : existant. Flèche pleine : dépendance "
-                  "injectée (champ). Pointillée : implements/extends. Events/states repliés dans leur sealed.</p>")
-        prov = table(["provider", "fichier"], [[p, f] for p, f in scan["providers"]])
-        page.add("real", "Code scaffoldé : écarts, dépendances, providers" if archi else "Architecture réelle (code)",
-                 gap_html + legend + (f'<pre class="mermaid">{esc(diagram)}</pre>' if diagram else "")
-                 + "<h3>Dépendances du package</h3>"
-                 + table(["type", "packages"], [["workspace (path)", ", ".join(deps) or "—"],
-                                                ["hébergées (pub.dev)", ", ".join(hosted) or "—"]])
-                 + "<h3>Providers</h3>" + prov,
-                 badge(f"{len(gaps)} écart(s)", "ko" if gaps else "ok"))
+    # Scénarios d'acceptation : ce qui sera testé
+    feat_scen = test_inventory(root, pkg_rel)[1] if has_code else []
+    picks = [{"title": m.get("scenario"), "kind": m.get("kind"), "fr": m.get("fr")} for m in mapping]
+    sc_html, sc_badge = scenarios_section(secs.get("4"), picks, {norm(x) for x in feat_scen} if feat_scen else None)
+    if secs.get("4"):
+        page.add("scenarios", "Scénarios : ce qui sera testé", sc_html, sc_badge)
+        if focus == "tests":
+            page.also_open.append("scenarios")
 
-        # Tests
+    # §9 : ce que les contrats ne montrent pas (package, dépendances)
+    if secs.get("9"):
+        page.add("decisions", "Package et dépendances (§9)", decisions_html(secs.get("9")),
+                 badge(f"{len(parse_md_table(secs['9'])[1])} ligne(s)"))
+        if focus == "spec":
+            page.also_open.append("decisions")
+
+    # Visite guidée (après la QA)
+    if has_tour or focus == "tour":
+        t_html, t_badge = tour_section(root, pkg_rel, fdir, state, review, mapping)
+        page.add("tour", "Visite guidée du code", t_html, t_badge)
+
+    # Tests
+    if has_code and os.path.isdir(os.path.join(root, pkg_rel, "test")):
         rows, feat_scen = test_inventory(root, pkg_rel)
         scen = spec_scenarios(secs.get("4", ""))
         have = {norm(s) for s in feat_scen}
@@ -703,8 +928,9 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
                  badge(f"{len(scen)} scénarios · {total} tests"))
 
     # Spec (le reste)
-    rest = "\n\n".join(v for k, v in sorted(secs.items(), key=lambda kv: int(kv[0])) if k not in ("8", "9"))
-    page.add("spec", "Spec (fonctionnel, contrats, données, erreurs)", page.md(rest or spec or None))
+    rest = "\n\n".join(v for k, v in sorted(secs.items(), key=lambda kv: int(kv[0])) if k != "9")
+    if spec:
+        page.add("spec", "Spec (fonctionnel, contrats, données, erreurs, §8)", page.md(rest or spec))
 
     for sid, title, fname in (("review", "Revue", "review.md"), ("mutants", "Mutants", "mutants.md")):
         txt = read(os.path.join(fdir, fname))
@@ -865,7 +1091,27 @@ th {{ color:var(--muted); font-weight:600; }}
 .gaps {{ padding-left:18px; }} .gaps li {{ margin:4px 0; }}
 pre {{ background:var(--code); padding:12px; border-radius:8px; overflow-x:auto; font-size:13px; }}
 pre.mermaid {{ background:#fff; text-align:center; overflow:auto; max-height:80vh; }}
-{archi_css}
+.seq-block {{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:12px 0; }}
+.seq-head {{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }} .seq-h {{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin:8px 0 4px; }}
+.seq-pair {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }} .seq-pair.one {{ grid-template-columns:1fr; }}
+@media (max-width:760px) {{ .seq-pair {{ grid-template-columns:1fr; }} }}
+.sc-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; }}
+.sc-card {{ border:1px solid var(--line); border-left:4px solid var(--c); border-radius:8px; padding:10px 12px; background:var(--card); }}
+.sc-fr {{ font-weight:600; margin-bottom:2px; }}
+.sc-title {{ font-size:12px; color:var(--muted); margin-bottom:6px; }}
+.sc-bg {{ border:1px dashed var(--line); border-radius:8px; padding:6px 10px; margin-bottom:8px; }}
+.gk {{ font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; padding-left:2px; overflow-wrap:anywhere; }}
+.gk .kw {{ color:var(--accent); font-weight:700; display:inline-block; min-width:44px; }}
+.gk code {{ font-size:12px; }}
+.sc-row {{ border-bottom:1px solid var(--line); padding:4px 0; }}
+.sc-row > summary {{ cursor:pointer; padding:4px 0; font-size:14px; list-style:revert; display:list-item; }}
+.sc-row > .gk:first-of-type {{ margin-top:4px; }}
+.sc-row[open] {{ padding-bottom:8px; }}
+ul.loc, ul.att {{ padding-left:18px; font-size:13px; }} ul.att li {{ margin:4px 0; }}
+.tour-step {{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:12px 0; }}
+.tour-h {{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
+.tour-n {{ display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff; font-size:13px; font-weight:700; }}
+pre.code {{ font-size:12px; line-height:1.45; }}
 pre.diff span {{ display:block; }} pre.diff .add {{ background:var(--ok-bg); color:var(--ok); }} pre.diff .del {{ background:var(--ko-bg); color:var(--ko); }} pre.diff .hunk {{ color:var(--accent); }}
 .gallery {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }}
 .gallery img {{ width:100%; border-radius:6px; border:1px solid var(--line); }} figcaption {{ font-size:12px; color:var(--muted); }}
@@ -879,7 +1125,6 @@ details.sub {{ margin-top:18px; border-top:1px solid var(--line); }} details.sub
 {blocks}
 <script src="{marked}"></script>
 <script src="{mermaid}"></script>
-<script>{archi_js}</script>
 <script>
 (function () {{
   const renderer = {{ code(code, lang) {{
