@@ -91,7 +91,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   ```json
   { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
     "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
-    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "suggestions": {}, "loops": {}, "human_gates": {},
+    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "human_gates": {},
     "arbitrations": [], "agents": {}, "accepted": [], "issue": null }
   ```
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
@@ -231,6 +231,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Re-gels                  n, par cause (fix.json → refreezes)
 ## Suggestions             appliquées (id, titre) ; non appliquées : un bloc chacune (problème, si on ne fait rien, correctif, contre)
 ## Non traité               missing_tests, hors périmètre signalé, acceptations (raisons)
+## Dette existante          fix.json → debt (review.json → debt de Victor) : fichier, ligne, problème
 ## Captures                 avant / après (ui)
 ```
 

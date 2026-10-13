@@ -4,6 +4,26 @@ Partagé par `/feature` (Romain, `feature-reviewer`) et `/fix` (Victor, `fix-rev
 est une amélioration non bloquante : c'est le dev qui décide si on la traite. Pour décider, il a besoin
 du problème, de sa raison d'être et du prix du correctif, pas d'un titre.
 
+## Périmètre : ce qui n'est pas une suggestion
+
+Une suggestion porte sur **ce que le changement a écrit ou modifié** : les lignes ajoutées ou
+changées depuis la base, et le comportement qu'elles produisent. Toucher un fichier n'ouvre pas tout
+le fichier à la revue : la règle est de le laisser au moins aussi bon, pas de le remettre à neuf.
+
+Un problème dans du code que le changement n'a pas écrit (même fichier, fonction voisine, code
+préexistant que le changement n'a fait que déplacer) n'est **pas** une suggestion. Deux cas :
+- le changement l'aggrave ou en dépend pour fonctionner → c'est un `critical` (ou une suggestion
+  sur la ligne du changement qui l'aggrave) ;
+- sinon → `review.json → debt[]` : `{ "file", "line", "issue", "why_later" }`, une ligne chacune.
+  Pas de bloc, pas de pour / contre : ce n'est pas au dev de le trancher maintenant.
+
+Test rapide : si ton correctif touche une ligne que le diff ne contient pas, ou si tu écris « à faire
+hors de ce changement », c'est de la dette.
+
+L'orchestrateur ne montre jamais `debt[]` comme un choix : il l'ajoute à `pipeline.json → debt`
+(`fix.json → debt` pour `/fix`, avec `source: "review"`), et elle sort dans l'evidence sous
+« Dette existante ».
+
 ## Ce que le reviewer écrit — `review.json → suggestions[]`
 
 ```json

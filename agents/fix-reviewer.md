@@ -59,7 +59,9 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
 - Puis la grille partagée et les règles projet, item par item.
 
 **4. Classe.** `critical` : cause non traitée, contournement du test, violation d'une règle projet ou
-de convention bloquante, régression probable, même bug laissé ailleurs. `suggestions` : le reste.
+de convention bloquante, régression probable, même bug laissé ailleurs. `suggestions` : le reste,
+**sur les seules lignes du correctif** ; un problème dans du code que le correctif n'a pas écrit va
+en `debt[]` (voir « Périmètre » dans `~/.claude/pipeline/suggestions.md`).
 `missing_tests` : cas voisins du bug que le test gelé ne couvre pas — ils iront au dev, pas à
 Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
 
