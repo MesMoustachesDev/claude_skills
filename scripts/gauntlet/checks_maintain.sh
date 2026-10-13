@@ -172,7 +172,8 @@ check_l10n_strings() {
   return 1
 }
 
-# l10n_arb — les clés ajoutées par la feature existent dans toutes les locales.
+# l10n_arb — les clés ajoutées par la feature, et les clés existantes que son code modifié utilise,
+# existent dans toutes les locales.
 check_l10n_arb() {
   local glob files added f missing rc=0 base old
   glob="$(cfg l10n.arb_glob)"; [ -n "$glob" ] || { info "l10n.arb_glob non configuré, sauté"; return 0; }
@@ -184,12 +185,21 @@ check_l10n_arb() {
       jq -n -r --argjson cur "$(jq -c 'keys' "$PROJECT_ROOT/$f")" --argjson old "${old:-[]}" \
         '($cur - $old)[] | select(startswith("@") | not)'
     done; } | sort -u)"
-  [ -n "$added" ] || { info "aucune clé l10n ajoutée depuis $base"; return 0; }
+  # Existing keys that the feature's code (scope lines) now reads through `l10n.<key>`: a key missing from a
+  # locale silently falls back to the template language. Only names that are keys of some ARB file count.
+  local all used
+  all="$(for f in $files; do jq -r 'keys[] | select(startswith("@") | not)' "$PROJECT_ROOT/$f" 2>/dev/null; done | LC_ALL=C sort -u)"
+  used="$( (cd "$PKG_DIR" && grep -rnoE --include='*.dart' --exclude='*.g.dart' --exclude='*.freezed.dart' 'l10n\.[A-Za-z_][A-Za-z0-9_]*' lib 2>/dev/null) \
+    | filter_scope_lines "$PKG_REL/" | sed 's/.*l10n\.//' | LC_ALL=C sort -u \
+    | LC_ALL=C comm -12 - <(printf '%s\n' "$all") | LC_ALL=C comm -23 - <(printf '%s\n' "$added" | LC_ALL=C sort -u))"
+  [ -n "$added$used" ] || { info "aucune clé l10n ajoutée depuis $base ni utilisée par le code modifié"; return 0; }
   for f in $files; do
     missing="$(for k in $added; do jq -e --arg k "$k" 'has($k)' "$PROJECT_ROOT/$f" >/dev/null 2>&1 || printf '%s ' "$k"; done)"
     [ -n "$missing" ] && { ko "$f : clés manquantes : $missing"; rc=1; }
+    missing="$(for k in $used; do jq -e --arg k "$k" 'has($k)' "$PROJECT_ROOT/$f" >/dev/null 2>&1 || printf '%s ' "$k"; done)"
+    [ -n "$missing" ] && { ko "$f : clés existantes utilisées par le code modifié, absentes ici : $missing"; rc=1; }
   done
-  [ "$rc" = 0 ] && info "$(printf '%s\n' "$added" | wc -l | tr -d ' ') clé(s) ajoutée(s), présentes dans $(printf '%s\n' "$files" | wc -l | tr -d ' ') locale(s)"
+  [ "$rc" = 0 ] && info "$(printf '%s' "$added" | grep -c .) clé(s) ajoutée(s) et $(printf '%s' "$used" | grep -c .) clé(s) existante(s) utilisée(s), présentes dans $(printf '%s\n' "$files" | wc -l | tr -d ' ') locale(s)"
   return $rc
 }
 

@@ -254,6 +254,38 @@ mutation_files() {
   [ -n "$files" ] || return 2
   printf '%s\n' "$files" | filter_scope_files "$PKG_REL/"
 }
+# extra_packages — packages opened by writes.extra other than the feature package, one path per line relative
+# to PROJECT_ROOT. A glob's fixed prefix is walked up to the nearest folder holding a pubspec.yaml.
+extra_packages() {
+  local g d
+  while IFS= read -r g; do
+    d="${g%%\**}"; d="${d%/}"
+    while [ -n "$d" ] && [ "$d" != . ] && [ ! -f "$PROJECT_ROOT/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done
+    [ -n "$d" ] && [ "$d" != . ] && [ "$d" != "$PKG_REL" ] && printf '%s\n' "$d"
+  done < <(cfg_list writes.extra) | sort -u
+}
+# mutation_extra_report — mutation only runs on the feature package. Logic files (mutation.include) the
+# feature changed in a writes.extra package are listed, never silently dropped: their tests are not proven by
+# mutation, the reviewer and the evidence must say so. Informative, writes .gauntlet/mutation_scope_extra.txt.
+mutation_extra_report() {
+  local pkg base changed logic out="$GAUNTLET_OUT/mutation_scope_extra.txt"
+  : > "$out"
+  base="$(merge_base)"
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] && [ -d "$PROJECT_ROOT/$pkg/lib" ] || continue
+    changed="$( { git -C "$PROJECT_ROOT" diff --name-only --diff-filter=AM "$base" -- "$pkg/lib"
+                  git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- "$pkg/lib"; } | sed "s#^$pkg/##" | sort -u)"
+    [ -n "$changed" ] || continue
+    logic="$(expand_globs "$PROJECT_ROOT/$pkg" $(cfg_list mutation.include | tr '\n' ' ') \
+      | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' ') | grep -Fx -f <(printf '%s\n' "$changed"))"
+    [ -n "$logic" ] || continue
+    printf '%s\n' "$logic" | sed "s#^#$pkg/#" >> "$out"
+    info "non muté : $pkg (writes.extra) — $(printf '%s\n' "$logic" | wc -l | tr -d ' ') fichier(s) de logique modifié(s) par la feature"
+    printf '%s\n' "$logic" | sed 's/^/   /'
+  done < <(extra_packages)
+  [ -s "$out" ] && info "la mutation ne couvre que $PKG_REL : ces fichiers sont à signaler à la revue (${out#$PROJECT_ROOT/})"
+  return 0
+}
 # mutation_scope — informatif, toujours vert : la liste des fichiers de logique que la mutation toucherait,
 # dans .gauntlet/mutation_scope.txt. L'orchestrateur la lit en gabarit S pour décider de lancer Hugo.
 check_mutation_scope() {
@@ -263,6 +295,7 @@ check_mutation_scope() {
   n="$(wc -l < "$GAUNTLET_OUT/mutation_scope.txt" | tr -d ' ')"
   info "$n fichier(s) de logique à muter dans le périmètre (gabarit $SIZE) → ${GAUNTLET_OUT#$PROJECT_ROOT/}/mutation_scope.txt"
   sed 's/^/   /' "$GAUNTLET_OUT/mutation_scope.txt"
+  mutation_extra_report
   return 0
 }
 check_mutation() {
@@ -270,6 +303,7 @@ check_mutation() {
   thr="$(cfg threshold.mutation 85)"
   files="$(mutation_files)"
   [ $? = 2 ] && { ko "aucun fichier ne correspond à mutation.include"; return 1; }
+  mutation_extra_report
   [ -n "$files" ] || { info "aucun fichier à muter dans le périmètre"; return 0; }
   # Un seul run de mutation par feature : deux runs partagent clones, file et rapports, et le nettoyage de
   # l'un détruit le travail de l'autre. Verrou avec pid ; un verrou dont le pid est mort est repris.

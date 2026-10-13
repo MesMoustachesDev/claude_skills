@@ -865,3 +865,27 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   submodule s'écrit `x/**` (pas `x`). Les `test/` et `pubspec.yaml` des packages `<pkg>/lib/**` de
   `writes.extra` sont autorisés aux tests. Ne jamais contourner le hook par le shell : corriger la
   config, avec l'accord du dev.
+- **Captures QA perdues après un second run.** Cause : `gauntlet.sh qa` effaçait `qa/<plateforme>/*.png`
+  à chaque lancement, et le hook de fin de Quentin le relance. En place : le run précédent (captures,
+  `report.xml`, `maestro.log`) est déplacé dans `qa/<plateforme>/_runs/<date>/`, jamais effacé.
+- **Flows Maestro exécutés dans le désordre malgré `config.yaml` (`executionOrder`).** Cause :
+  `maestro test <dossier>` sans `--config`. En place : `<package>/maestro/config.yaml` est passé en
+  `--config` quand il existe, et n'est plus compté comme un flow.
+- **Le hook de fin de Quentin rejoue des flows à usage unique** (ex. « Appliquer ») après un run manuel.
+  En place : le hook réutilise le verdict du dernier `gauntlet.sh qa` fini sur le même état (HEAD +
+  modifications non commitées hors `.claude/`, `.gauntlet/qa_last_run.json`) sans rien rejouer. Un
+  `gauntlet.sh qa` lancé à la main tourne toujours ; un flow modifié change l'état et relance le hook.
+- **Mutation muette sur un autre package modifié par la feature** (`writes.extra`). La mutation ne
+  tourne que sur le package de `pipeline.json`. En place : `mutation` et `mutation_scope` listent les
+  fichiers de logique modifiés dans les packages de `writes.extra` (« non muté »,
+  `.gauntlet/mutation_scope_extra.txt`) : à reporter dans la revue et l'evidence.
+- **Clé l10n existante traduite dans une seule langue** (ex. `labelRetry`, anglais seulement : la VF
+  affiche « Retry »). Cause : `l10n_arb` ne vérifiait que les clés ajoutées. En place : il vérifie aussi
+  les clés existantes que le code modifié lit via `l10n.<clé>`.
+- **Le test-writer ne peut pas écrire dans `test/` d'un package ouvert en `<pkg>/**`.** En place : un
+  `<pkg>/**` de `writes.extra` (dossier avec `pubspec.yaml`) compte comme `<pkg>/lib/**` : ses `test/`
+  et `pubspec.yaml` sont ouverts au test-writer et au hardener, et ses tests sont gelés pour Ivan et Nina.
+- **Session isolée en worktree : « this command runs rtk with a git command… Refusing to run it ».**
+  Cause : le hook rtk réécrit `git …` en `rtk git …`, que le garde-fou du worktree refuse (de même pour
+  un glob ou une variable passés à rtk). Le hook rtk reste tel quel : dans ce cas seulement, appeler
+  `/usr/bin/git` (non réécrit par rtk). Les autres commandes passent toujours par rtk.

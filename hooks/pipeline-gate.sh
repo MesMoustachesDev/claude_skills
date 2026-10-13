@@ -41,6 +41,9 @@ PIPE="$FEATURE_DIR/pipeline.json"
 max="$(cfg pipeline.max_attempts 5)"
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 
+# QA: a run that already finished on the same state (commit + uncommitted changes) is not replayed, its
+# verdict is reused. Flows can be single-use (they change server state) and the agent usually ran them itself.
+[ "$profile" = qa ] && export GAUNTLET_QA_REUSE=1
 if "$GAUNTLET" "$profile" "$feature" >/dev/null 2>&1; then
   tmp="$(mktemp)"; jq --arg p "$profile" '.attempts[$p]=0 | .stages[$p]={status:"PASSED", at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
   exit 0

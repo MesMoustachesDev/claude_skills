@@ -56,8 +56,15 @@ match() { local p="$1"; shift; local g; for g in "$@"; do g="${g//\*\*/\*}"; cas
 
 # Les packages ouverts par writes.extra (`<pkg>/lib/**`, appelants adaptés par la feature) ont aussi leurs
 # tests dans le périmètre : `<pkg>/test/**`, et leur pubspec.yaml pour une dev_dependency de test.
+# A whole package opened as `<pkg>/**` (folder holding a pubspec.yaml) counts the same way: its test/ is a
+# test path (frozen for the implementer and the cleaner, open to the test-writer).
 extra_tests="$(printf '%s\n' $extra | sed -n -e 's#/lib/\*\*$#/test/*#p' -e 's#/test/\*\*$#/test/*#p' | tr '\n' ' ')"
 extra_pubspecs="$(printf '%s\n' $extra | sed -n 's#/lib/\*\*$#/pubspec.yaml#p' | tr '\n' ' ')"
+for g in $extra; do
+  case "$g" in */lib/\*\*|*/test/\*\*) continue ;; */\*\*) ;; *) continue ;; esac
+  [ -f "$PROJECT_ROOT/${g%/\*\*}/pubspec.yaml" ] || continue
+  extra_tests="$extra_tests${g%/\*\*}/test/* "; extra_pubspecs="$extra_pubspecs${g%/\*\*}/pubspec.yaml "
+done
 is_test_path() { match "$rel" "$PKG_REL/test/*" "*.feature" $extra_tests; }
 
 case "$agent" in

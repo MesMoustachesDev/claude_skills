@@ -66,6 +66,7 @@ Checks individuels :
   coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)
   mutation           mutation_test sur les globs configurés, score ≥ seuil
   mutation_scope     informatif : fichiers de logique que la mutation toucherait (.gauntlet/mutation_scope.txt) ; en gabarit S, vide = Hugo sauté
+                     + fichiers de logique modifiés dans les packages de writes.extra, jamais mutés (.gauntlet/mutation_scope_extra.txt)
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
@@ -81,7 +82,7 @@ Maintenabilité (checks_maintain.sh) :
   pub_health         packages abandonnés / sans release depuis pub.max_age_months / majeure en retard
   design_system      pas de valeur visuelle brute (ds.forbidden), chaque vue importe le DS (ds.imports)
   l10n_strings       pas de chaîne utilisateur en dur dans la présentation
-  l10n_arb           les clés ARB ajoutées existent dans toutes les locales (l10n.arb_glob)
+  l10n_arb           les clés ARB ajoutées, et les clés existantes lues par le code modifié (l10n.<clé>), existent dans toutes les locales (l10n.arb_glob)
   barrel_api         le barrel n'exporte ni src/data/ ni *_impl.dart
   unused_code        dart_code_linter check-unused-code
   unused_files       dart_code_linter check-unused-files
