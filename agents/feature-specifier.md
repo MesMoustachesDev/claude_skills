@@ -86,8 +86,8 @@ scénario ne le contredisent.
 
 ## Ce que tu reçois
 
-Dans ton prompt de lancement : le nom de la feature, `cadrage.md` validé, le SHA du commit
-« contracts (by Thibault) » et la liste des fichiers de contrats, le package et les dépendances
+Dans ton prompt de lancement : le nom de la feature, `cadrage.md` validé, `contracts.sha` et
+`contracts.files` (tous les fichiers de contrats, y compris ceux que Thibault a gardés tels quels), le package et les dépendances
 validés au cadrage, la description brute, la racine du projet, et le chemin de sortie
 `.claude/features/<nom>/spec.md`.
 
@@ -107,7 +107,8 @@ validés au cadrage, la description brute, la racine du projet, et le chemin de 
 - `features/router/` : comment une route se déclare.
 - `git log --oneline -30` : ce qui bouge en ce moment.
 
-**2. Lis les contrats de Thibault**, fichier par fichier (`git show --stat <sha>` pour la liste) :
+**2. Lis les contrats de Thibault**, chaque fichier de `contracts.files` (pas seulement ceux qu'il a
+modifiés : un fichier gardé tel quel est aussi un choix) :
 entités, interfaces, use cases, events/states, clés. C'est la structure de la feature, décidée par
 lui. Pas de salve de questions : le cadrage a tranché le produit, les contrats ont tranché la
 structure. S'il reste une question **produit** que ni le cadrage ni le repo ne résolvent, une seule
@@ -142,8 +143,8 @@ fois la section remplie.
 - **§4 Gherkin** : chaque item de §2 « Inclus » a un scénario ; chaque état de §3 (Loading, Error,
   Empty, Loaded) a un scénario ; les steps désignent les widgets par leur clé de §5, jamais par leur
   texte. Formulation en anglais, courte, compatible `bdd_widget_test`.
-- **§5 Contrats** : ils sont dans le code. Une ligne par contrat : `fichier:ligne` de la déclaration,
-  ce qu'il déclare (« `MealRepository.watchWeek` : `Stream<Either<ErrorEntity, List<Meal>>>` »), et
+- **§5 Contrats** : ils sont dans le code. Une ligne par contrat : le fichier et le **symbole**
+  (`Classe.methode` — un numéro de ligne ne survit pas aux éditions), ce qu'il déclare (« `MealRepository.watchWeek` : `Stream<Either<ErrorEntity, List<Meal>>>` »), et
   le C<n> qu'il sert. Pas de signature recopiée : le code de Thibault fait foi, et Théo le lit.
   Chaque clé de widget utilisée par §4 existe dans `keys.dart` (sinon : « Contrats à revoir »).
 - **§6 Données** : un payload d'exemple réel par modèle, tous les champs, plus les cas limites.
@@ -194,7 +195,7 @@ Spec écrite : .claude/features/<nom>/spec.md  (+ archi.json → sequences)
 Package cible : <chemin>  (nouveau | extension de <x>)
 Scénarios Gherkin : <n> (dont <n> reliés à un C<n>)  — Contrats décrits : <n> fichiers de Thibault
 §9 : <n> lignes validées au cadrage, <n> proposées (<A3 sujet — choix (alternative)>)
-Contrats à revoir par Thibault : aucun | <fichier:ligne — le C<n> empêché — le changement minimal>
+Contrats à revoir par Thibault : aucun | <fichier, symbole — le C<n> empêché — le changement minimal>
 Points que le dev doit regarder en priorité : <2-3 lignes max>
 Taille : <n> Ko (plafond <15|40>, gabarit <S|M>)
 Gabarit tenu : oui | non — <critère dépassé : scénarios, package ou dépendance ajoutés>

@@ -26,12 +26,15 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 import sys
 from datetime import datetime
 
 MARKED = "https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"
 MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
 LAYERS = ["presentation", "domain", "data", "injection"]
+FEATURE_STAGES = ("cadrage", "contracts", "spec", "tests", "tour", "evidence", "mutants", "qa")
+FIX_STAGES = ("repro", "review", "ui", "evidence")
 
 
 # --- utilitaires ---------------------------------------------------------------------------------
@@ -91,6 +94,8 @@ class Page:
         self.sections.append((sid, title, badge, body))
 
     def render(self, header: str) -> str:
+        if self.focus and self.focus not in {sid for sid, _, _, _ in self.sections}:
+            raise ValueError(f"section « {self.focus} » absente du rapport : l'étape demandée n'a pas encore ses fichiers")
         rank = lambda sid: 0 if sid == self.focus else 1 + self.also_open.index(sid) if sid in self.also_open \
             else 1 + len(self.also_open)
         order = sorted(self.sections, key=lambda s: rank(s[0]))
@@ -163,7 +168,7 @@ def gauntlet_results(out_dir: str) -> str:
 
 
 def images(base_dir: str, pattern: str, caption_from_dir: bool = True) -> str:
-    files = sorted(glob.glob(os.path.join(base_dir, pattern)))
+    files = sorted(glob.glob(os.path.join(base_dir, pattern), recursive=True))
     if not files:
         return ""
     cells = []
@@ -321,8 +326,17 @@ def test_inventory(root: str, pkg_rel: str) -> tuple[list[list[str]], list[str]]
     return rows, scenarios
 
 
-def norm(s: str) -> str:
-    return re.sub(r"\s+", " ", s.strip().lower())
+def norm(s: object) -> str:
+    return re.sub(r"\s+", " ", str(s or "").strip().lower())
+
+
+def scenario_key(title: object) -> str:
+    """Titre normalisé d'un scénario, Outline compris : bdd_widget_test génère
+    `Outline: <titre> (<exemple>)` pour chaque ligne d'Examples."""
+    t = norm(title)
+    if t.startswith("outline:"):
+        t = re.sub(r"\s*\([^()]*\)$", "", t[len("outline:"):].strip())
+    return t
 
 
 def changed_files(root: str, base: str, *paths: str) -> list[dict]:
@@ -413,7 +427,7 @@ def scenarios_section(sec4: str | None, picks: list | None, covered: set | None)
                    f'<div class="sc-bg">{gherkin_steps_html(g["background"])}</div>')
     picked = {}
     for p in picks or []:
-        s = by_title.get(norm(p.get("title", "")))
+        s = by_title.get(norm(p.get("title")))
         if s:
             picked[norm(s["title"])] = p
     if picked:
@@ -478,7 +492,12 @@ def cadrage_sequences(cadrage: str | None) -> list[dict]:
             else:
                 kind = "internal"
             steps.append({"from": a, "to": b, "msg": msg, "kind": kind, "n": len(steps) + 1})
-        out.append({"id": h.group(1), "title": h.group(2).strip(), "mermaid": mermaid, "steps": steps})
+        # un `;` ou un `#` dans un message coupe ou casse la ligne Mermaid
+        safe = []
+        for ln in mermaid.splitlines():
+            mm = SEQ_MSG.match(ln)
+            safe.append(f"  {mm.group(1)}{mm.group(2)}{mm.group(3)}: {seq_text(mm.group(4), 200)}" if mm else ln)
+        out.append({"id": h.group(1), "title": h.group(2).strip(), "mermaid": "\n".join(safe), "steps": steps})
     return out
 
 
@@ -487,11 +506,13 @@ ACTION_RE = re.compile(r"\btester\.(tap|tapAt|longPress|enterText|drag|dragFrom|
 RESPONSE_RE = re.compile(r"\bwhen\(|\.thenAnswer\(|\.thenReturn\(|\.thenThrow\(|\b\w*(?:[cC]ontroller|sink)\.add(?:Error)?\(|"
                          r"\bFake\w*\(|\bwhenListen\(")
 ASSERT_RE = re.compile(r"\bexpect(?:Later)?\(")
-FUNC_DEF = re.compile(r"^(?:Future<void>|void|Future<\w+>)\s+(\w+)\s*\(", re.M)
+FUNC_DEF = re.compile(r"^\s*(?:Future<void>|void|Future<\w+>)\s+(\w+)\s*\(", re.M)
+STEP_CALL = re.compile(r"await\s+(\w+)\(\s*tester\b\s*(?:,\s*(.*?))?\s*,?\s*\);", re.S)
+TEST_WIDGETS = re.compile(r"""testWidgets\(\s*('''|\"\"\"|'|")(.+?)\1\s*,\s*\(\s*tester\s*,?\s*\)\s*async\s*\{""", re.S)
 
 
-def _dart_functions(paths: list[str]) -> dict[str, tuple[str, int, str]]:
-    """{nom: (fichier, ligne de définition, corps)} des fonctions de haut niveau de ces fichiers."""
+def _dart_functions(paths: list[str]) -> dict[str, tuple[str, int, str, int]]:
+    """{nom: (fichier, ligne de définition, corps, offset du corps dans le fichier)}."""
     out = {}
     for p in paths:
         src = read(p) or ""
@@ -499,14 +520,19 @@ def _dart_functions(paths: list[str]) -> dict[str, tuple[str, int, str]]:
             i = src.find("{", m.end())
             arrow = src.find("=>", m.end())
             if arrow != -1 and (i == -1 or arrow < i):
-                j = src.find(";", arrow)
-                body = src[arrow:j + 1]
+                start, end = arrow, src.find(";", arrow) + 1
             elif i != -1:
-                body = src[i:_block_end(src, i + 1)]
+                start, end = i, _block_end(src, i + 1)
             else:
                 continue
-            out[m.group(1)] = (p, src[:m.start()].count("\n") + 1, body, src[:m.start()].count("\n") + 1)
+            out.setdefault(m.group(1), (p, src[:m.start()].count("\n") + 1, src[start:end], start))
     return out
+
+
+def _relative_imports(path: str) -> list[str]:
+    here = os.path.dirname(path)
+    return [os.path.normpath(os.path.join(here, i))
+            for i in re.findall(r"^import\s+'(\.{1,2}/[^']+)';", read(path) or "", re.M)]
 
 
 def _block_end(src: str, start: int) -> int:
@@ -518,18 +544,38 @@ def _block_end(src: str, start: int) -> int:
     return i
 
 
+def _step_kind(kw: str, prev: str, full: str) -> str:
+    """Nature d'un step : son mot-clé Gherkin (And/But héritent du précédent), précisé par son corps —
+    un tap dans un Given reste une action, un faux configuré dans un When reste une réponse."""
+    k = kw if kw in ("Given", "When", "Then") else prev
+    if k == "Then":
+        return "assert"
+    if ACTION_RE.search(full):
+        return "action"
+    if RESPONSE_RE.search(full):
+        return "response"
+    if k == "When":
+        return "action"
+    if k == "Given":
+        return "setup"
+    return "assert" if ASSERT_RE.search(full) else "setup"
+
+
 def test_sequences(root: str, pkg_rel: str) -> dict[str, dict]:
-    """{titre normalisé: {title, file, steps}} — séquence réelle de chaque scénario d'acceptation, lue dans
-    le test généré par bdd_widget_test (testWidgets('''titre''') → appels de steps) et le corps de chaque step."""
-    test_dir = os.path.join(root, pkg_rel, "test")
+    """{titre normalisé: {title, file, steps, examples}} — séquence réelle de chaque scénario d'acceptation,
+    lue dans le test généré par bdd_widget_test (un testWidgets par scénario → appels de steps) et le
+    corps de chaque step (un niveau de helpers, importés compris)."""
+    pkg = os.path.join(root, pkg_rel)
+    test_dir = os.path.join(pkg, "test")
+    feature_files = glob.glob(os.path.join(test_dir, "**", "*.feature"), recursive=True)
     feats = {}
-    for f in glob.glob(os.path.join(test_dir, "**", "*.feature"), recursive=True):
+    for f in feature_files:
         g = parse_gherkin(read(f) or "")
         for sc in g["scenarios"]:
-            feats[norm(sc["title"])] = g["background"] + sc["steps"]
+            feats[scenario_key(sc["title"])] = g["background"] + sc["steps"]
     out: dict[str, dict] = {}
     # bdd_widget_test génère <x>_test.dart à côté de <x>.feature ; à défaut, tout test qui importe ./step/
-    generated = [f[: -len(".feature")] + "_test.dart" for f in glob.glob(os.path.join(test_dir, "**", "*.feature"), recursive=True)]
+    generated = [f[: -len(".feature")] + "_test.dart" for f in feature_files]
     candidates = [f for f in generated if os.path.isfile(f)] or [
         f for f in glob.glob(os.path.join(test_dir, "**", "*_test.dart"), recursive=True)
         if re.search(r"^import\s+'\./step/", read(f) or "", re.M)]
@@ -537,48 +583,49 @@ def test_sequences(root: str, pkg_rel: str) -> dict[str, dict]:
         src = read(tf) or ""
         if "testWidgets(" not in src:
             continue
-        here = os.path.dirname(tf)
-        imports = [os.path.normpath(os.path.join(here, i))
-                   for i in re.findall(r"^import\s+'(\.[^']+)';", src, re.M)]
-        step_files = sorted({*imports, *glob.glob(os.path.join(here, "step", "*.dart"))})
-        funcs = _dart_functions([p for p in step_files if os.path.isfile(p)])
+        step_files = {*_relative_imports(tf), *glob.glob(os.path.join(os.path.dirname(tf), "step", "*.dart"))}
+        step_files = {p for p in step_files if os.path.isfile(p)}
+        helper_files = {h for p in step_files for h in _relative_imports(p) if os.path.isfile(h)}
+        funcs = _dart_functions(sorted(step_files | helper_files))
         local = _dart_functions([tf])
-        for m in re.finditer(r"testWidgets\(\s*(?:'''|\"\"\"|'|\")(.+?)(?:'''|\"\"\"|'|\")\s*,\s*\(tester\)\s*async\s*\{", src, re.S):
-            title = m.group(1).strip()
+        for m in TEST_WIDGETS.finditer(src):
+            title = re.sub(r"\s+", " ", m.group(2)).strip()
+            key = scenario_key(title)
+            if key in out:                      # Outline : un testWidgets par ligne d'Examples
+                out[key]["examples"] += 1
+                continue
             body = src[m.end():_block_end(src, m.end())]
             calls = []
-            for c in re.finditer(r"await\s+(\w+)\(tester(?:,\s*(.*?))?\);", body):
+            for c in STEP_CALL.finditer(body):
                 if c.group(1) in local and c.group(1) not in funcs:   # bddSetUp (Background) : on déplie
-                    calls += re.findall(r"await\s+(\w+)\(tester(?:,\s*(.*?))?\);", local[c.group(1)][2])
+                    calls += [(d.group(1), d.group(2) or "") for d in STEP_CALL.finditer(local[c.group(1)][2])]
                 else:
                     calls.append((c.group(1), c.group(2) or ""))
-            texts = feats.get(norm(title), [])
+            texts = feats.get(key, [])
             steps = []
+            prev = ""
             for i, (fn, args) in enumerate(calls):
-                kw, text = texts[i] if i < len(texts) and len(texts) == len(calls) else ("", f"{fn}({args})")
-                path, line, fbody, _ = funcs.get(fn, (None, 0, "", 0))
-                # un niveau de helpers (pumpX, tabFinder…) définis dans les fichiers de steps
-                full = fbody + "".join(funcs[h][2] for h in set(re.findall(r"\b(\w+)\(", fbody))
-                                       if h in funcs and h != fn)
-                kind = ("action" if ACTION_RE.search(full) else "response" if RESPONSE_RE.search(full)
-                        else "assert" if ASSERT_RE.search(full) else "setup")
+                args = re.sub(r"\s+", " ", args).strip().rstrip(",")
+                kw, text = texts[i] if len(texts) == len(calls) else ("", f"{fn}({args})")
+                path, line, fbody, start = funcs.get(fn, (None, 0, "", 0))
+                helpers = [funcs[h][2] for h in set(re.findall(r"\b(\w+)\(", fbody)) if h in funcs and h != fn]
+                kind = _step_kind(kw, prev, fbody + "".join(helpers))
+                prev = kw if kw in ("Given", "When", "Then") else prev
                 at = line
-                if path:
-                    rx = {"action": ACTION_RE, "response": RESPONSE_RE, "assert": ASSERT_RE}.get(kind)
-                    fsrc = read(path) or ""
-                    hit = rx.search(fsrc) if rx else None
-                    if hit:
-                        at = fsrc[:hit.start()].count("\n") + 1
+                rx = {"action": ACTION_RE, "response": RESPONSE_RE, "assert": ASSERT_RE}.get(kind)
+                hit = rx.search(fbody) if rx and path else None
+                if hit:
+                    at = (read(path) or "")[:start + hit.start()].count("\n") + 1
                 steps.append({"kw": kw, "text": text, "fn": fn, "kind": kind,
-                              "at": f"{os.path.relpath(path, os.path.join(root, pkg_rel))}:{at}" if path else ""})
-            out[norm(title)] = {"title": title, "file": os.path.relpath(tf, os.path.join(root, pkg_rel)),
-                                "steps": steps}
+                              "at": f"{os.path.relpath(path, pkg)}:{at}" if path else ""})
+            out[key] = {"title": key if title.lower().startswith("outline:") else title,
+                        "file": os.path.relpath(tf, pkg), "steps": steps, "examples": 1}
     return out
 
 
 def seq_text(s: str, n: int = 80) -> str:
     """Texte sûr pour un message de sequenceDiagram."""
-    s = re.sub(r"[;#]", lambda m: {";": ",", "#": "n°"}[m.group(0)], s).replace("\n", " ").strip()
+    s = re.sub(r"[;#]", lambda m: {";": ",", "#": "#35;"}[m.group(0)], s).replace("\n", " ").strip()
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
@@ -629,19 +676,19 @@ def seq_gaps(cad: dict | None, test: dict | None) -> list[tuple[str, str]]:
 
 
 def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dict] | None,
-                      sec4: str | None) -> tuple[str, str, list[str]]:
-    """(html, badge, avertissements) — un bloc par scénario d'acceptation : cadrage | test réel, écarts."""
-    by_id = {m.get("id"): m for m in mapping if m.get("id")}
-    titles = {norm(s["title"]) for s in parse_gherkin(sec4 or "")["scenarios"]}
+                      sec4: str | None) -> tuple[str, str]:
+    """(html, badge) — un bloc par scénario d'acceptation : cadrage | test réel, écarts."""
+    by_id = {str(m.get("id")): m for m in mapping if m.get("id")}
+    titles = {scenario_key(s["title"]) for s in parse_gherkin(sec4 or "")["scenarios"]}
     warnings = []
     if mapping:
         for c in cad:
             if c["id"] not in by_id:
                 warnings.append(f"{c['id']} : aucun scénario de §4 ne lui correspond (archi.json → sequences)")
         for m in mapping:
-            if titles and norm(m.get("scenario", "")) not in titles:
+            if titles and scenario_key(m.get("scenario")) not in titles:
                 warnings.append(f"{m.get('id')} : scénario « {m.get('scenario')} » absent de §4")
-            if cad and m.get("id") not in {c["id"] for c in cad}:
+            if cad and str(m.get("id")) not in {c["id"] for c in cad}:
                 warnings.append(f"{m.get('id')} : absent des séquences de cadrage.md")
     blocks = []
     n_gaps = 0
@@ -650,7 +697,7 @@ def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dic
         items = [(None, m) for m in mapping]
     for c, m in items:
         title = (m or {}).get("scenario")
-        t = (tests or {}).get(norm(title)) if title and tests is not None else None
+        t = (tests or {}).get(scenario_key(title)) if title and tests is not None else None
         gaps = seq_gaps(c, t)
         n_gaps += len(gaps)
         head = (f'<b>{esc(c["id"] if c else (m or {}).get("id", ""))}</b> {esc(c["title"] if c else "")}'
@@ -663,7 +710,8 @@ def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dic
                 if c else '<div><div class="seq-h">Cadrage</div><p class="muted">pas de séquence au cadrage (format antérieur)</p></div>')
         if t:
             loc = "".join(f'<li><code>{esc(s["at"])}</code> {esc(s["kind"])} — {esc(s["text"])}</li>' for s in t["steps"])
-            right = (f'<div><div class="seq-h">Test réel <code>{esc(t["file"])}</code></div>'
+            ex = f' {badge(str(t["examples"]) + " exemples")}' if t.get("examples", 1) > 1 else ""
+            right = (f'<div><div class="seq-h">Test réel <code>{esc(t["file"])}</code>{ex}</div>'
                      f'<pre class="mermaid">{esc(test_mermaid(t))}</pre>'
                      f'<details class="sub"><summary>steps et fichiers</summary><ul class="loc">{loc}</ul></details></div>')
         elif tests is not None and title:
@@ -681,7 +729,7 @@ def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dic
         blocks.append(f'<div class="seq-block"><div class="seq-head">{head}</div>{sub}'
                       f'<div class="seq-pair{" one" if not right else ""}">{left}{right}</div>{g}</div>')
     if not blocks:
-        return '<p class="muted">aucune séquence (cadrage.md sans comportement C1…Cn)</p>', "", warnings
+        return '<p class="muted">aucune séquence (cadrage.md sans comportement C1…Cn)</p>', ""
     warn_html = ('<ul class="gaps">' + "".join(f'<li>{badge("incohérence", "ko")} {esc(w)}</li>' for w in warnings)
                  + "</ul>") if warnings else ""
     hint = ('<p class="hint">À gauche, le comportement validé au cadrage. À droite, le même scénario redessiné '
@@ -689,7 +737,7 @@ def sequences_section(cad: list[dict], mapping: list[dict], tests: dict[str, dic
             "Les écarts sont détectés par script : à confirmer en lisant les deux.</p>") if tests is not None else ""
     b = badge(f"{len(blocks)} séquence(s)") + (badge(f"{n_gaps} écart(s)", "ko") if n_gaps else "") + \
         (badge(f"{len(warnings)} incohérence(s)", "ko") if warnings else "")
-    return warn_html + hint + "".join(blocks), b, warnings
+    return warn_html + hint + "".join(blocks), b
 
 
 # --- contrats écrits par le dev -----------------------------------------------------------------
@@ -710,7 +758,9 @@ def contracts_section(root: str, pkg_rel: str, state: dict, fdir: str, page: "Pa
         out.append(f"<h3>Décisions encore ouvertes dans le code ({len(marks)})</h3>"
                    '<p class="hint">Chaque commentaire <code>' + esc(DECISION_MARK) + "</code> est une question d'Arthur : "
                    "garde, change, puis efface le commentaire.</p>" + table(["où", "question"], marks, raw=True))
-    if draft:
+    if c.get("files"):
+        files = [str(f) for f in c["files"]]
+    elif draft:
         files = sh("git", "diff", "--name-only", f"{draft}~1", draft, "--", pkg_rel, cwd=root).split()
     else:
         files = [f["path"] for f in changed_files(root, state.get("base") or "HEAD", pkg_rel)
@@ -737,8 +787,16 @@ def contracts_section(root: str, pkg_rel: str, state: dict, fdir: str, page: "Pa
 
 # --- visite guidée -------------------------------------------------------------------------------
 
-def slug(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+def slug(s: object) -> str:
+    t = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "_", t).strip("_")
+
+
+def as_int(v: object, default: int = 1) -> int:
+    try:
+        return max(1, int(str(v).split(":")[-1]))
+    except (TypeError, ValueError):
+        return default
 
 
 def mutants_rows(md: str | None) -> list[dict]:
@@ -760,33 +818,41 @@ def mutants_rows(md: str | None) -> list[dict]:
 def tour_section(root: str, pkg_rel: str, fdir: str, state: dict, review: dict,
                  mapping: list[dict]) -> tuple[str, str]:
     tour = review.get("tour") or []
+    if isinstance(tour, dict):
+        tour = tour.get("steps") or list(tour.values())
+    tour = [st for st in tour if isinstance(st, dict)] if isinstance(tour, list) else []
     if not tour:
         return '<p class="muted">pas de visite guidée (review.json → tour absent)</p>', badge("absente", "ko")
-    c2s = {m.get("id"): m.get("scenario") for m in mapping}
+    c2s = {str(m.get("id")): m.get("scenario") for m in mapping}
     muts = mutants_rows(read(os.path.join(fdir, "mutants.md")))
-    sugg = review.get("suggestions") or []
     decided = state.get("suggestions") or {}
-    shots = sorted(glob.glob(os.path.join(fdir, "qa", "*", "*.png")))
-    used_m, used_s, used_p = set(), set(), set()
+    # une suggestion reclassée en dette (hors diff) n'est ni à trancher ni « non appliquée »
+    sugg = [x for x in review.get("suggestions") or [] if isinstance(x, dict)
+            and (decided.get(str(x.get("id"))) or {}).get("decision") != "debt"]
+    suspects = [x for x in state.get("suspect_tests") or [] if isinstance(x, dict)]
+    shots = sorted(glob.glob(os.path.join(fdir, "qa", "**", "*.png"), recursive=True))
+    used_m, used_s, used_p, used_t = set(), set(), set(), set()
 
-    def same_file(a: str, b: str) -> bool:
-        a, b = a.split(":")[0].strip("` "), b.split(":")[0].strip("` ")
+    def same_file(a: object, b: object) -> bool:
+        a, b = str(a or "").split(":")[0].strip("` "), str(b or "").split(":")[0].strip("` ")
         return bool(a and b) and (a.endswith(b) or b.endswith(a))
 
     steps_html = []
     for n, st in enumerate(tour, 1):
-        rel = resolve(root, pkg_rel, st.get("file", ""))
-        line = st.get("line") or 1
+        st_file = str(st.get("file") or "")
+        rel = resolve(root, pkg_rel, st_file) if st_file else None
+        line = as_int(st.get("line"))
         moved = ""
         if rel and st.get("symbol"):
-            found = symbol_line(read(os.path.join(root, rel)) or "", st["symbol"])
+            found = symbol_line(read(os.path.join(root, rel)) or "", str(st["symbol"]))
             if found and found != line:
                 moved = f" (ligne {line} au moment de la revue)"
                 line = found
-        where = f"{rel or st.get('file', '?')}:{line}"
+        where = f"{rel or st_file or '?'}:{line}"
         refs = []
         scen = []
-        for r in st.get("implements") or []:
+        impl = st.get("implements") or []
+        for r in [str(x) for x in (impl if isinstance(impl, list) else [impl])]:
             if r in c2s:
                 refs.append(badge(f"{r} · {c2s[r]}", "ok"))
                 scen.append(c2s[r])
@@ -797,33 +863,41 @@ def tour_section(root: str, pkg_rel: str, fdir: str, state: dict, review: dict,
                 scen.append(r)
         att = []
         for i, m in enumerate(muts):
-            if st.get("file") and same_file(m["loc"], st["file"]):
+            if st_file and same_file(m["loc"], st_file):
                 used_m.add(i)
                 att.append(f'<li>{badge("mutant " + m["verdict"], "warn")} <code>{esc(m["loc"])}</code> {esc(m["mutation"])} — {esc(m["why"])}</li>')
         for i, s in enumerate(sugg):
-            if st.get("file") and same_file(s.get("file", ""), st["file"]):
+            if st_file and same_file(s.get("file"), st_file):
                 used_s.add(i)
-                dec = (decided.get(s.get("id")) or {}).get("decision", "à trancher")
-                att.append(f'<li>{badge(s.get("id", "S?") + " · " + dec, "ok" if dec == "applied" else "human")} '
+                sid = str(s.get("id") or "S?")
+                dec = str((decided.get(sid) or {}).get("decision", "à trancher"))
+                att.append(f'<li>{badge(sid + " · " + dec, "ok" if dec == "applied" else "human")} '
                            f'{esc(s.get("summary", ""))} — {esc(s.get("problem", ""))}</li>')
+        for j, x in enumerate(suspects):
+            if st_file and same_file(x.get("file"), st_file):
+                used_t.add(j)
+                att.append(f'<li>{badge("test suspect · " + str(x.get("by") or "?"), "ko")} '
+                           f'<code>{esc(x.get("file"))}:{esc(x.get("line"))}</code> {esc(x.get("why"))}</li>')
         pics = []
         for i, p in enumerate(shots):
-            b = os.path.basename(p).lower()
+            b = slug(os.path.basename(p))
             if any(slug(t)[:24] and slug(t)[:24] in b for t in scen):
                 used_p.add(i)
                 r = os.path.relpath(p, fdir)
                 pics.append(f'<figure><a href="{esc(r)}"><img src="{esc(r)}" loading="lazy"></a><figcaption>{esc(r)}</figcaption></figure>')
         code = f'<pre class="code">{esc(excerpt(root, rel, line))}</pre>' if rel else badge("fichier introuvable", "ko")
         steps_html.append(
-            f'<div class="tour-step"><div class="tour-h"><span class="tour-n">{n}</span> {badge(st.get("layer", ""), "")} '
+            f'<div class="tour-step"><div class="tour-h"><span class="tour-n">{n}</span> {badge(st.get("layer") or "", "")} '
             f'<code>{esc(where)}</code>{esc(moved)} {"".join(refs)}</div>'
             f'<p>{esc(st.get("what", ""))}</p>{code}'
             + (f'<ul class="att">{"".join(att)}</ul>' if att else "")
             + (f'<div class="gallery">{"".join(pics)}</div>' if pics else "") + "</div>")
     left = [f'<li>{badge("mutant " + m["verdict"], "warn")} <code>{esc(m["loc"])}</code> {esc(m["why"])}</li>'
             for i, m in enumerate(muts) if i not in used_m]
-    left += [f'<li>{badge(s.get("id", "S?"), "human")} <code>{esc(s.get("file", ""))}</code> {esc(s.get("summary", ""))}</li>'
+    left += [f'<li>{badge(str(s.get("id") or "S?"), "human")} <code>{esc(s.get("file"))}</code> {esc(s.get("summary"))}</li>'
              for i, s in enumerate(sugg) if i not in used_s]
+    left += [f'<li>{badge("test suspect · " + str(x.get("by") or "?"), "ko")} <code>{esc(x.get("file"))}:{esc(x.get("line"))}</code> '
+             f'{esc(x.get("why"))}</li>' for j, x in enumerate(suspects) if j not in used_t]
     rest_pics = [p for i, p in enumerate(shots) if i not in used_p]
     qa = read(os.path.join(fdir, "qa.md")) or ""
     ko = [l.strip() for l in qa.splitlines() if l.startswith("|") and "✗" in l]
@@ -836,7 +910,7 @@ def tour_section(root: str, pkg_rel: str, fdir: str, state: dict, review: dict,
     if left:
         tail += "<h3>Non rattachés à une étape</h3><ul class='att'>" + "".join(left) + "</ul>"
     if rest_pics:
-        tail += "<h3>Autres captures</h3>" + images(fdir, "qa/*/*.png") if len(rest_pics) == len(shots) else \
+        tail += "<h3>Autres captures</h3>" + images(fdir, "qa/**/*.png") if len(rest_pics) == len(shots) else \
             "<h3>Autres captures</h3><div class='gallery'>" + "".join(
                 f'<figure><a href="{esc(os.path.relpath(p, fdir))}"><img src="{esc(os.path.relpath(p, fdir))}" loading="lazy"></a>'
                 f'<figcaption>{esc(os.path.relpath(p, fdir))}</figcaption></figure>' for p in rest_pics) + "</div>"
@@ -873,11 +947,13 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
 
     # Séquences : cadrage | test réel, côte à côte
     cad = cadrage_sequences(cadrage)
-    mapping = archi.get("sequences") or [{"id": f"S{i}", "scenario": p.get("title"), "kind": p.get("kind"),
-                                          "fr": p.get("fr")} for i, p in enumerate(archi.get("scenarios") or [], 1)]
+    mapping = [m for m in archi.get("sequences") or [] if isinstance(m, dict)] or [
+        {"id": f"S{i}", "scenario": p.get("title"), "kind": p.get("kind"), "fr": p.get("fr")}
+        for i, p in enumerate(archi.get("scenarios") or [], 1) if isinstance(p, dict)]
     tests = test_sequences(root, pkg_rel) if has_tests else None
-    if cad or (mapping and tests):
-        sq_html, sq_badge, _ = sequences_section(cad, mapping, tests, secs.get("4"))
+    # au cadrage (pas encore de lien avec §4 ni de test), les séquences sont dans la section Cadrage
+    if mapping or tests is not None:
+        sq_html, sq_badge = sequences_section(cad, mapping, tests, secs.get("4"))
         page.add("sequences", "Séquences : cadrage ↔ tests d'acceptation" if tests is not None else "Séquences du cadrage",
                  sq_html, sq_badge)
         if focus in ("spec",):
@@ -889,7 +965,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
         page.add("contracts", "Contrats (dans le code)", ct_html, ct_badge)
 
     # Scénarios d'acceptation : ce qui sera testé
-    feat_scen = test_inventory(root, pkg_rel)[1] if has_code else []
+    inv_rows, feat_scen = test_inventory(root, pkg_rel) if has_code else ([], [])
     picks = [{"title": m.get("scenario"), "kind": m.get("kind"), "fr": m.get("fr")} for m in mapping]
     sc_html, sc_badge = scenarios_section(secs.get("4"), picks, {norm(x) for x in feat_scen} if feat_scen else None)
     if secs.get("4"):
@@ -911,7 +987,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
 
     # Tests
     if has_code and os.path.isdir(os.path.join(root, pkg_rel, "test")):
-        rows, feat_scen = test_inventory(root, pkg_rel)
+        rows = inv_rows
         scen = spec_scenarios(secs.get("4", ""))
         have = {norm(s) for s in feat_scen}
         matrix = [[esc(s), badge("dans un .feature", "ok") if norm(s) in have else badge("absent", "ko")]
@@ -938,7 +1014,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
             page.add(sid, title, page.md(txt))
     qa = read(os.path.join(fdir, "qa.md"))
     if qa:
-        page.add("qa", "QA device", page.md(qa) + images(fdir, "qa/*/*.png"))
+        page.add("qa", "QA device", page.md(qa) + images(fdir, "qa/**/*.png"))
     page.add("gauntlet", "Gauntlet", gauntlet_results(os.path.join(fdir, ".gauntlet")))
 
     header = (f"<h1>{esc(name)}</h1><p class='meta'>feature · mode {esc(mode)} · <code>{esc(pkg_rel)}</code>"
@@ -1083,10 +1159,6 @@ summary::-webkit-details-marker {{ display:none; }}
 .tw {{ overflow-x:auto; }} table {{ border-collapse:collapse; width:100%; font-size:14px; }}
 th,td {{ text-align:left; vertical-align:top; padding:6px 10px; border-bottom:1px solid var(--line); }}
 th {{ color:var(--muted); font-weight:600; }}
-.decisions {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }}
-.decision {{ border:1px solid var(--line); border-left:4px solid var(--c); border-radius:8px; padding:10px 12px; }}
-.decision .dh {{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }} .decision .dt {{ flex:1; color:var(--muted); }}
-.decision div {{ margin:3px 0; }} .lbl {{ display:inline-block; min-width:88px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }}
 .tfile {{ margin:10px 0; }} .tfile ul {{ margin:4px 0 0; padding-left:20px; font-size:14px; }}
 .gaps {{ padding-left:18px; }} .gaps li {{ margin:4px 0; }}
 pre {{ background:var(--code); padding:12px; border-radius:8px; overflow-x:auto; font-size:13px; }}
@@ -1160,6 +1232,10 @@ def main() -> int:
         return 2
     kind, name = sys.argv[1], sys.argv[2]
     focus = sys.argv[3] if len(sys.argv) > 3 else None
+    stages = FEATURE_STAGES if kind == "feature" else FIX_STAGES
+    if focus is not None and focus not in stages:
+        print(f"étape inconnue « {focus} » : {' | '.join(stages)}", file=sys.stderr)
+        return 2
     root = sh("git", "rev-parse", "--show-toplevel").strip()
     if not root:
         print("pas dans un repo git", file=sys.stderr)
@@ -1168,7 +1244,11 @@ def main() -> int:
     if not os.path.isdir(d):
         print(f"inconnu : {d}", file=sys.stderr)
         return 1
-    print(feature_report(root, name, focus) if kind == "feature" else fix_report(root, name, focus))
+    try:
+        print(feature_report(root, name, focus) if kind == "feature" else fix_report(root, name, focus))
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
     return 0
 
 

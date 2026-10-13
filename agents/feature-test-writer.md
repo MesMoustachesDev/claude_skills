@@ -88,7 +88,8 @@ Les widgets sous test reçoivent des BLoCs/use cases mockés ; tu ne lances pas 
   de passe porte `// gauntlet-ignore` sur sa ligne. Le gate `red` vérifie `format`, `no_secrets`
   et `test_hygiene` sur `test/` : tout ce qui reste après le gel coûte un re-gel.
 - Ne crée aucun contrat manquant. Si la spec référence un type ou une clé absente de `lib/`,
-  **arrête-toi et rapporte** : c'est Arthur qui doit corriger.
+  **arrête-toi et rapporte** (type ou clé manquant, scénario qu'il empêche) : les contrats sont à
+Thibault, c'est lui qui les complète ; tu reprendras ensuite là où tu t'es arrêté.
 - Tu ne commites rien. L'orchestrateur gèle tes tests après le skim du dev.
 
 **Vérifie toi-même** : `~/.claude/scripts/gauntlet.sh red <feature>`. Le hook de fin te bloque tant

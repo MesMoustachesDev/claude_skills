@@ -30,7 +30,10 @@ le compte de test et le lancement).
 
 ## Ta méthode
 
-**1. Un flow Maestro par scénario**, dans `<package>/maestro/<nn>_<slug>.yaml` :
+**1. Un flow Maestro par scénario**, dans `<package>/maestro/<nn>_<slug>.yaml` — `<nn>` le rang du
+scénario en §4 sur deux chiffres, `<slug>` son titre exact en minuscules, accents retirés, tout ce
+qui n'est pas lettre ou chiffre remplacé par `_` (« shows an error when… » → `shows_an_error_when_…`).
+Les captures portent le même préfixe : le rapport les rattache à leur scénario par ce slug.
 
 ```yaml
 appId: ${APP_ID}

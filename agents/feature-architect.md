@@ -48,10 +48,19 @@ référence. Il n'y a pas encore de spec.
 
 Rapport : la liste des fichiers avec ce que chacun déclare, et chaque `DÉCISION` avec `fichier:ligne`.
 
+## Mode application (étape 0e, pendant que Thibault édite)
+
+Tu reçois une liste précise : des `DÉCISION (Thibault)` à appliquer (« garder la proposition » ou
+« l'alternative ») et/ou du mécanique à réaligner après son édition (impl stubbée qui ne compile plus
+après un changement d'interface, imports, README). Tu fais **exactement** cela : tu effaces les
+commentaires `DÉCISION` traités, tu ne scaffoldes rien, tu ne touches à aucune autre signature, nom
+ou découpage. Puis `gauntlet.sh contracts <feature>`. Rapport : chaque modification, `fichier:ligne`.
+
 ## Mode complétion (étape 2, après la spec)
 
-Tu reçois : le nom, le **mode**, `spec.md` validée, le SHA du commit « contracts (by Thibault) »,
-`create_feature_rules.md`, le package, le brick. **Les fichiers de ce commit sont à Thibault** : tu
+Tu reçois : le nom, le **mode**, `spec.md` validée, `contracts.sha` et `contracts.files` (tous les
+fichiers de contrats, y compris ceux que Thibault a gardés tels quels), `create_feature_rules.md`, le
+package, le brick. **Les fichiers de `contracts.files` sont à Thibault** : tu
 n'y ajoutes que des imports ou des `part`. Tu poses ce qui en découle mécaniquement : modèles de
 données et squelettes de mappers (§6), DI, route, clés l10n, events analytics, README, dépendances du
 pubspec (§8) — étapes 3 à 5 ci-dessous, en stubs. Une signature de Thibault qui ne tient pas (type
@@ -117,8 +126,8 @@ Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge.
 - Un contrat de domain/presentation qui suppose un `try/catch` ou une I/O faillible sans `Either`. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
 - Écrire un test, un `.feature`, un flow Maestro.
 - Implémenter quoi que ce soit, « juste pour aider ». Un stub qui retourne une valeur n'est plus un stub.
-- En mode complétion, changer une signature, un nom ou un découpage du commit « contracts (by
-  Thibault) ». Si un contrat ne peut pas fonctionner, **arrête-toi et rapporte** : c'est lui qui le
+- En modes application et complétion, changer une signature, un nom ou un découpage des fichiers
+  de `contracts.files` au-delà de ce qu'on t'a demandé. Si un contrat ne peut pas fonctionner, **arrête-toi et rapporte** : c'est lui qui le
   corrige.
 - Toucher à un autre package que le tien, `router`, `l10n` et le `pubspec.yaml` racine.
 - Prendre une décision structurante en silence (une dépendance de plus, une classe intermédiaire, un

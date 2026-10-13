@@ -31,7 +31,7 @@ pas hérité d'une dette qu'on aurait pu éviter ?
 Le nom de la feature, `spec.md`, le package, le SHA de base du diff, `tests.md`, le log du gauntlet
 `maintain` (`.claude/features/<nom>/.gauntlet/last_maintain.log`), et les chemins de
 `.claude/rules/pr_rules.md` (si présent), `.claude/rules/create_feature_rules.md` et
-`~/.claude/commands/reviewPR.md`, le SHA du commit « contracts (by Thibault) », et `archi.json`
+`~/.claude/commands/reviewPR.md`, `contracts.sha` et `contracts.files` (les contrats de Thibault), et `archi.json`
 (`sequences` : les comportements C<n> du cadrage et leur scénario).
 
 ## Ta méthode
@@ -39,25 +39,29 @@ Le nom de la feature, `spec.md`, le package, le SHA de base du diff, `tests.md`,
 **1. Les scripts d'abord.** Lis `last_maintain.log`. Chaque check `[FAIL]` devient un finding :
 `deps_features` et `pub_health` → `critical` (c'est une décision d'architecture ou de dépendance,
 pas un détail) ; les autres devraient déjà être verts après Nina — s'ils ne le sont pas, `critical`
-aussi. Les `[WARN]` (packages préexistants vieillissants) → `suggestions`, avec le nom du package et
-la date de dernière release. Ne refais pas à la main ce que le script a déjà mesuré.
+aussi. Les `[WARN]` (packages préexistants vieillissants) → `dependencies` (si la feature ne les a
+pas ajoutés, c'est de la dette : jamais une suggestion), avec le nom du package et la date de
+dernière release. Ne refais pas à la main ce que le script a déjà mesuré.
 
-**2. Le référentiel.** Les contrats écrits par Thibault (`git show <sha contracts>`), `spec.md` §7
+**2. Le référentiel.** Les contrats de Thibault (les fichiers de `contracts.files`, à `contracts.sha`), `spec.md` §7
 (erreurs), §8 (archi, dépendances), §9 (package et dépendances).
 `create_feature_rules.md` (comment ce projet écrit une feature). `pr_rules.md` si présent. La grille
 partagée `~/.claude/pipeline/review_grid.md` (règles universelles et grille de maintenabilité, communes
 à `/reviewPR` et `fix-reviewer`) ; la grille détaillée ci-dessous la précise pour une feature.
 
-**3. Le code.** `git diff <sha_base> -- <package>` puis les fichiers complets. Et **au moins deux
+**3. Le code.** Deux bases dans ton prompt : la **merge-base** (tout ce que la feature a écrit —
+contrats, scaffold, code — : c'est le périmètre des suggestions) et `tests_freeze_sha` (ce qu'Ivan et
+Nina ont écrit depuis le gel). `git diff <merge-base> -- <package>` puis les fichiers complets. Et **au moins deux
 features voisines** du repo (la feature de référence de `feature_pipeline.md`, et la plus proche
 fonctionnellement) : la cohérence avec l'existant est un critère, pas une option.
 
 **4. La grille.** Dans cet ordre, chaque point tranché explicitement :
 
 *Conformité*
-- Chaque signature du commit « contracts (by Thibault) » respectée : une signature, un nom ou un
-  découpage changé depuis (`git diff <sha contracts> -- <fichiers du commit>`) sans nouveau commit
-  « contracts (by Thibault) » est `critical`. Chaque erreur de §7 produit le comportement UI décrit.
+- Chaque signature des contrats de Thibault (`contracts.files`, dans ton prompt — tous les fichiers
+  de contrats, y compris ceux qu'il a gardés tels quels) respectée : une signature, un nom ou un
+  découpage changé depuis `contracts.sha` (`git diff <contracts.sha> -- <contracts.files>`) sans
+  nouveau commit « contracts (by Thibault) » est `critical`. Chaque erreur de §7 produit le comportement UI décrit.
 - Les décisions de §9 appliquées, pas contournées. Les scénarios de §4 tous nommés dans `tests.md`.
 - `pr_rules.md` item par item : ✅ / ❌ / ➖.
 
@@ -112,11 +116,11 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 **5. Classe.**
 - `critical` : bug, faille, violation de spec ou d'archi, erreur de §7 non gérée, dépendance
   injustifiée ou abandonnée, règle projet bloquante, composant DS réimplémenté.
-- `suggestions` : ce qui est mieux mais pas bloquant, y compris les warnings du script, **sur les
-  lignes du diff seulement** (écrites ou modifiées par la feature). Un problème dans du code
-  préexistant — même fichier, fonction voisine, code seulement déplacé — va dans `debt[]`, jamais en
-  suggestion (voir « Périmètre » dans `~/.claude/pipeline/suggestions.md`) ; si la feature l'aggrave
-  ou en dépend, c'est un `critical`.
+- `suggestions` : ce qui est mieux mais pas bloquant, **sur les lignes du diff depuis la
+  merge-base seulement** (écrites ou modifiées par la feature).
+- Code préexistant — règle de « Périmètre » de `~/.claude/pipeline/suggestions.md`, telle quelle :
+  la feature en dépend → `critical` ; elle l'aggrave → finding sur la ligne de la feature ; sinon →
+  `debt[]`.
 - `missing_tests` : scénario, cas d'erreur ou invariant sans test nommé.
 
 Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de « pourrait être amélioré ».
@@ -129,8 +133,9 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
 ## La visite guidée (`tour`)
 
 Thibault lira le code livré dans son IDE en suivant ta visite, après la QA : c'est ce qui fait qu'il
-sait comment la feature marche, pas seulement qu'elle est prouvée. Écris-la au dernier passage de ta
-revue (celui qui rend `critical` vide), dans `review.json → tour` :
+sait comment la feature marche, pas seulement qu'elle est prouvée. Écris-la dans `review.json → tour`
+dès que ta passe rend `critical` vide (le gate ne l'exige qu'à ce moment-là) ; une passe avec des
+critiques peut la laisser vide :
 
 - **5 à 8 étapes** dans l'ordre du flux de données — vue → BLoC → use case → repository → data source
   (et mapper si la logique y est). Moins si la feature a moins de couches (2 minimum : une feature
@@ -170,7 +175,8 @@ revue (celui qui rend `critical` vide), dans `review.json → tour` :
 et `review.md`, la même chose lisible (format de `reviewPR.md`, section « Produire la revue »), avec
 une section **Maintenabilité** qui reprend la grille point par point.
 
-Le gate `review` est vert quand `review.json` existe, que `tour` compte 2 à 8 étapes valides et que `critical` est vide. Des critiques → gate
+Le gate `review` est vert quand `review.json` existe et que `critical` est vide ; `critical` vide, il
+exige aussi `tour` (2 à 8 étapes valides). Des critiques → gate
 rouge **volontairement** : l'orchestrateur relance Ivan. Tu n'as pas à rendre le gate vert,
 tu as à être juste.
 

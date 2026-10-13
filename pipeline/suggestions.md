@@ -7,22 +7,30 @@ du problème, de sa raison d'être et du prix du correctif, pas d'un titre.
 ## Périmètre : ce qui n'est pas une suggestion
 
 Une suggestion porte sur **ce que le changement a écrit ou modifié** : les lignes ajoutées ou
-changées depuis la base, et le comportement qu'elles produisent. Toucher un fichier n'ouvre pas tout
+changées depuis la base du changement (`/feature` : la merge-base avec la branche de base, contrats et
+scaffold compris, pas le gel des tests ; `/fix` : `base_sha`), et le comportement qu'elles produisent. Toucher un fichier n'ouvre pas tout
 le fichier à la revue : la règle est de le laisser au moins aussi bon, pas de le remettre à neuf.
 
 Un problème dans du code que le changement n'a pas écrit (même fichier, fonction voisine, code
-préexistant que le changement n'a fait que déplacer) n'est **pas** une suggestion. Deux cas :
-- le changement l'aggrave ou en dépend pour fonctionner → c'est un `critical` (ou une suggestion
-  sur la ligne du changement qui l'aggrave) ;
+préexistant que le changement n'a fait que déplacer, autre occurrence d'un même pattern) n'est
+**pas** une suggestion sur ce code. Trois cas, et seulement trois :
+- le changement **en dépend** pour fonctionner (sa correction est nécessaire au comportement
+  attendu) → `critical`, sur la ligne préexistante ;
+- le changement **l'aggrave** (ses nouvelles lignes l'étendent, le recopient ou l'exposent) → le
+  finding porte sur **la ligne du changement**, classé comme tout finding (`critical` ou
+  suggestion) ;
 - sinon → `review.json → debt[]` : `{ "file", "line", "issue", "why_later" }`, une ligne chacune.
   Pas de bloc, pas de pour / contre : ce n'est pas au dev de le trancher maintenant.
 
-Test rapide : si ton correctif touche une ligne que le diff ne contient pas, ou si tu écris « à faire
-hors de ce changement », c'est de la dette.
+Test rapide, hors des deux premiers cas : si ton correctif ne touche que des lignes que le diff ne
+contient pas, ou si tu écris « à faire hors de ce changement », c'est de la dette. Un package
+préexistant vieillissant (`[WARN]` de `pub_health`) va dans `dependencies` (`/feature`) ou `debt[]`,
+jamais en suggestion.
 
 L'orchestrateur ne montre jamais `debt[]` comme un choix : il l'ajoute à `pipeline.json → debt`
 (`fix.json → debt` pour `/fix`, avec `source: "review"`), et elle sort dans l'evidence sous
-« Dette existante ».
+« Dette existante ». Une suggestion qui aurait dû être de la dette (hors diff) est traitée de même et
+notée `suggestions.<id> = {"decision": "debt"}` : ni présentée, ni listée « non appliquée ».
 
 ## Ce que le reviewer écrit — `review.json → suggestions[]`
 

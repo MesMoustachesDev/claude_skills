@@ -53,15 +53,17 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
 - **Périmètre** : aucun changement hors du bug — reformatage, renommage, refacto opportuniste →
   `critical` s'il change un comportement, `suggestion` sinon.
 - **Même défaut ailleurs** : `grep` le pattern fautif dans le repo. Une autre occurrence non corrigée
-  → `critical` si elle produit le même bug, sinon `suggestion`.
+  → `critical` si elle produit le même bug (le correctif en dépend pour être complet), sinon `debt[]`
+  (code que le correctif n'a pas écrit : règle de « Périmètre » de `~/.claude/pipeline/suggestions.md`).
 - **Régressions** : appelants de ce qui a changé (`grep` des usages) ; contrat public, schéma, payload
   modifiés sans le dire.
 - Puis la grille partagée et les règles projet, item par item.
 
 **4. Classe.** `critical` : cause non traitée, contournement du test, violation d'une règle projet ou
 de convention bloquante, régression probable, même bug laissé ailleurs. `suggestions` : le reste,
-**sur les seules lignes du correctif** ; un problème dans du code que le correctif n'a pas écrit va
-en `debt[]` (voir « Périmètre » dans `~/.claude/pipeline/suggestions.md`).
+**sur les seules lignes du correctif** (diff depuis `base_sha`). Code préexistant — règle de
+« Périmètre » de `~/.claude/pipeline/suggestions.md`, telle quelle : le correctif en dépend →
+`critical` ; il l'aggrave → finding sur la ligne du correctif ; sinon → `debt[]`.
 `missing_tests` : cas voisins du bug que le test gelé ne couvre pas — ils iront au dev, pas à
 Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
 
@@ -80,6 +82,7 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
   "critical":      [ { "file": "src/...", "line": 42, "rule": "fix: cause | fix: plan | fix: scope | fix: elsewhere | grid: <item> | project: <règle>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "...", "why": "..." } ],
+  "debt":          [ { "file": "src/...", "line": 12, "issue": "code préexistant : …", "why_later": "hors des lignes du correctif, ni aggravé ni requis" } ],
   "rules_checked": { "grid": { "<item>": "ok|ko|na" }, "project": { "<règle>": "ok|ko|na" } }
 }
 ```

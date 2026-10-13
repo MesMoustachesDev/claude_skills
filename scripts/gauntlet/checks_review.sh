@@ -20,9 +20,12 @@ check_review_report() {
     || { ko "review.json invalide : clés attendues critical, suggestions, missing_tests"; return 1; }
   local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
   [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
-  jq -e '(.tour|type=="array") and (.tour|length>=2 and length<=8) and all(.tour[]; (.file|type=="string") and (.what|type=="string") and (.what|length>0))' "$f" >/dev/null 2>&1 \
-    || { ko "review.json : tour absent ou invalide — 2 à 8 étapes {layer, file, symbol, line, what, implements} dans l'ordre du flux de données"; return 1; }
-  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f"), visite : $(jq '.tour|length' "$f") étapes"
+  # La visite guidée n'est exigée qu'à la passe qui rend critical vide (une passe avec critiques rend la main à Ivan).
+  if jq -e '[.critical[] | select(.accepted != true)] | length == 0' "$f" >/dev/null 2>&1; then
+    jq -e '(.tour|type=="array") and (.tour|length>=2 and length<=8) and all(.tour[]; type=="object" and (.file|type=="string") and (.what|type=="string") and (.what|length>0))' "$f" >/dev/null 2>&1 \
+      || { ko "review.json : tour absent ou invalide — 2 à 8 étapes {layer, file, symbol, line, what, implements} dans l'ordre du flux de données (exigé dès que critical est vide)"; return 1; }
+  fi
+  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f"), dette : $(jq '(.debt // [])|length' "$f"), visite : $(jq '(.tour // [])|length' "$f") étapes"
 }
 
 check_review_verdict() {
@@ -46,7 +49,7 @@ check_dedup_report() {
 check_dedup_verdict() {
   check_dedup_report || return 1
   local f="$FEATURE_DIR/dedup.json" n deferred open
-  # Before the implementation (2b), the architect only writes stubs: a finding whose fix means
+  # Before the implementation (0d), only stubs exist: a finding whose fix means
   # writing real code (fix_by: cleaner) is carried to the cleaner, and blocks again at 5b.
   open='(.verdict=="duplicate" or .verdict=="extend") and .accepted != true'
   if [ "$(pipeline_get .stages.green.status)" != PASSED ]; then
@@ -83,13 +86,16 @@ check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_r
 check_spec_review_verdict() {
   check_spec_review_report || return 1
   local f="$FEATURE_DIR/spec_review.json" n
-  # owner "thibault" : le correctif est un contrat écrit par le dev — il le tranche au point d'étape 1,
-  # ça ne relance pas le specifier.
-  jq -r '.blocking[] | select(.accepted != true and .owner == "thibault") | "   → pour Thibault [\(.section // "-")] \(.issue)"' "$f"
+  # owner "thibault" : le correctif est un contrat écrit par le dev. Il bloque comme les autres, mais
+  # ne relance pas le specifier : le dev le tranche au point d'étape « spec » (accepted + raison).
+  local t
   n="$(jq '[.blocking[] | select(.accepted != true and .owner != "thibault")] | length' "$f")"
-  [ "$n" = 0 ] && return 0
+  t="$(jq '[.blocking[] | select(.accepted != true and .owner == "thibault")] | length' "$f")"
+  [ "$n" = 0 ] && [ "$t" = 0 ] && return 0
   jq -r '.blocking[] | select(.accepted != true and .owner != "thibault") | "   ✗ [\(.section // "-")] \(.issue)"' "$f"
-  ko "$n point(s) bloquant(s) — retour au specifier"
+  jq -r '.blocking[] | select(.accepted != true and .owner == "thibault") | "   ✗ pour Thibault [\(.section // "-")] \(.issue)"' "$f"
+  [ "$n" != 0 ] && ko "$n point(s) bloquant(s) — retour au specifier"
+  [ "$t" != 0 ] && ko "$t contrat(s) à trancher par Thibault au point d'étape « spec »"
   return 1
 }
 

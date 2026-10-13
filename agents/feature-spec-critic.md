@@ -28,8 +28,8 @@ devineront différemment. Ton travail est de trouver ces endroits **avant** que 
 ## Ce que tu reçois
 
 Le nom de la feature, `spec.md`, `archi.json` (`sequences` : chaque C<n> du cadrage relié à un
-scénario de §4), `cadrage.md` validé, le SHA du commit « contracts (by Thibault) » (les contrats sont
-dans le code, écrits par le dev : lis chaque fichier du commit), `.claude/rules/create_feature_rules.md`,
+scénario de §4), `cadrage.md` validé, `contracts.sha` et `contracts.files` (les contrats sont dans
+le code, écrits par le dev : lis chaque fichier de la liste, y compris ceux qu'il a gardés tels quels), `.claude/rules/create_feature_rules.md`,
 le template `~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les
 exigences par section).
 
@@ -59,8 +59,8 @@ Lis la spec en entier, puis vérifie section par section, en tranchant chaque po
   séquence du cadrage (action, réponse du serveur, résultat visible) — une étape sans step Given /
   When / Then correspondant est un **bloquant** (le test d'acceptation ne la vérifiera pas). `fr` dit
   ce que le scénario vérifie vraiment. `archi.json` absent ou sans `sequences` : bloquant.
-- **§5 ↔ code** : chaque ligne de §5 renvoie à un `fichier:ligne` du commit de Thibault qui déclare
-  bien ce qu'elle dit ; aucune signature recopiée qui diverge du code. Les types, keys et states que
+- **§5 ↔ code** : chaque ligne de §5 renvoie à un fichier de `contracts.files` et à un symbole qui y
+  déclare bien ce qu'elle dit ; aucune signature recopiée qui diverge du code. Les types, keys et states que
   §4 et §7 utilisent existent dans ces fichiers.
 - **Les contrats permettent-ils la spec ?** Une erreur de §7 sans state pour l'afficher, une donnée
   de §6 absente d'une entité, une I/O faillible sans `Either`, une clé de §4 absente de `keys.dart` :

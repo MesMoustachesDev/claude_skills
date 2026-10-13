@@ -32,8 +32,8 @@ Seulement sur un nouveau run : en reprise, `issue` est déjà renseigné et tu n
 
 ## B. Création, juste après la validation du dev
 
-`issue.status == "to_create"` seulement. Moment : `/feature` après la validation de la spec (fin de
-le point d'étape 1), `/fix` après le gel du test (fin du point d'étape de reproduction).
+`issue.status == "to_create"` seulement. Moment : `/feature` après la validation de la spec (fin du
+point d’étape « spec »), `/fix` après le gel du test (fin du point d'étape de reproduction).
 
 1. Écris le brouillon dans le dossier du run, `issue.md` : la première ligne est le titre, puis une
    ligne vide, puis la description en Markdown, avec les gabarits plus bas. Le contenu est **tiré**

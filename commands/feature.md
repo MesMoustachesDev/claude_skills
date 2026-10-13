@@ -100,7 +100,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | 6 | review | Romain | `feature-reviewer` | `review_verdict` | **oui** : suggestions à retenir (boucle vers 4 si critiques) ; Romain écrit aussi la visite guidée | identique ; `missing_tests` → Hugo | — |
 | 7 | harden | Hugo | `feature-hardener` | `harden` | non (mutants montrés dans la visite) | seulement si logique modifiée ou `missing_tests` | — |
 | 8 | qa | Quentin | `feature-qa` | `qa` | non (captures montrées dans la visite) | une seule plateforme | — |
-| 8b | visite guidée | toi | — | — | **oui** : 5 à 8 étapes du flux de données, mutants, captures et suggestions rattachés ; il valide ou renvoie une étape | identique | — |
+| 8b | visite guidée | toi | — | — | **oui** : 5 à 8 étapes du flux de données (2 minimum), mutants, captures et suggestions rattachés ; il valide ou renvoie une étape | identique | — |
 | 9 | evidence | — | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` | gabarit et étapes sautées en tête | arrêt après 0b : pas d'evidence |
 
 « — » en L : la feature n'atteint jamais l'étape 1, chaque sous-feature déroule son propre pipeline
@@ -140,8 +140,10 @@ n'est jamais rejouée à la reprise, sauf reclassement.
 `DÉCISION (Thibault)` dans le brouillon d'Arthur (mesuré en 0e), plus de 8 scénarios en §4, un
 package ou une dépendance ajoutés en §8 (mesurés au point d'étape « spec »). Dis-le au dev en une ligne, avec
 la mesure, et `AskUserQuestion` « Passer en M (Recommandé) » / « Rester en S : <raison> », dans le
-même appel que la question de l'arrêt en cours. En M, une étape déjà `SKIPPED` en S est rejouée avant d'aller plus loin. M → L après la
-spec : point imprévu, le dev décide (découper ou continuer en M). Chaque reclassement va dans
+même appel que la question de l'arrêt en cours. En M, une étape déjà `SKIPPED` en S est rejouée avant d'aller plus loin. M → L : plus
+de 5 `DÉCISION (Thibault)` dans le brouillon (mesuré en 0e, avant qu'il édite), ou un imprévu après
+la spec : le dev décide (découper ou continuer en M) ; ce que deviennent les contrats déjà commités
+est décrit en 0e. Chaque reclassement va dans
 `pipeline.json → size_changes` (`{at, from, to, reason}`) et dans l'evidence.
 
 ---
@@ -200,9 +202,12 @@ spec : point imprévu, le dev décide (découper ou continuer en M). Chaque recl
   `extend` avant le brouillon d'Arthur (les contrats s'écrivent dans le bon package).
 - **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, lis-le, affiche l'état (gabarit,
   étape courante, gates passés, étapes sautées, points d'étape validés) et reprends à la première
-  étape ni `PASSED` ni `SKIPPED`, dans l'ordre du tableau (0b, 0c `contracts_draft`, 0d `dedup`,
-  0e `human_gates.contracts`, 1 `spec`, 2 `contracts`, 3 `red`…). Un brouillon commité sans
-  `human_gates.contracts` reprend à 0e : rouvre les fichiers pour Thibault.
+  étape ni `PASSED` ni `SKIPPED`, dans l'ordre du tableau : 0b `cadrage`, 0c `contracts_draft`, 0d
+  `dedup`, 0e `human_gates.contracts`, 1 `spec`, 2 `contracts` (seulement s'il est postérieur à
+  `human_gates.spec.at` : avant, c'est un reste de 0c/0e), 3 `red`, 3b `human_gates.tests`, 4
+  `green`, 5 `clean`, 5b `dedup_clean`, 6 `review` puis `human_gates.suggestions`, 7 `harden`, 8 `qa`,
+  8b `human_gates.tour`, 9 `evidence`. Un brouillon commité sans `human_gates.contracts` reprend à
+  0e : rouvre les fichiers pour Thibault.
   Sinon crée le dossier et `pipeline.json` :
   ```json
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
@@ -302,12 +307,22 @@ brouillon de ce que Thibault doit posséder : entités, interfaces de repository
 signatures des use cases, events/states sealed, `keys.dart`. Chaque choix qu'un dev senior pourrait
 faire autrement (Stream ou Future, un BLoC ou deux, où vit une logique, remote/local) porte au-dessus
 de la ligne un commentaire `// DÉCISION (Thibault) : <question> — proposé : <X>, alternative : <Y>`.
-Rien d'autre : pas de DI, de route, de modèle de données ni de mapper à ce stade (2).
+Rien d'autre à la main : pas de DI, de route, de modèle de données ni de mapper à ce stade (2).
 
-Au retour : `stages.contracts` est `PASSED` (le hook a joué le gate `contracts`). Déplace-le :
-`stages.contracts_draft = stages.contracts`, supprime `stages.contracts` (le hook le réécrira en 2).
+**Le hook d'Arthur écrit `stages.contracts`, qui appartient à l'étape 2.** Après **chaque** retour
+d'Arthur avant l'étape 2 (brouillon, mode application en 0e) : `stages.contracts_draft =
+stages.contracts`, supprime `stages.contracts`, `attempts.contracts = 0`. Brouillon `FAILED` →
+**point imprévu** : le rapport d'Arthur et les 40 dernières lignes de `last_contracts.log`,
+« relancer Arthur avec une consigne » / « je pars de ce qu'il y a et je corrige moi-même en 0e ».
+
 Commit `chore(<nom>): contracts draft (Arthur)` sur les seuls fichiers du package, du pubspec racine
-et de `writes.extra` touchés, et note son SHA dans `pipeline.json → contracts.draft_sha`.
+et de `writes.extra` touchés, puis dans `pipeline.json → contracts` : `draft_sha` et `files`, la liste
+des fichiers de contrats — `git diff --name-only <merge-base> <draft_sha> -- <package>/lib` filtré
+sur `**/domain/**`, `**/keys.dart`, `**/*_event.dart`, `**/*_state.dart`. **`contracts.files` est la
+définition des contrats de Thibault** pour tous les agents : un fichier qu'il n'a pas modifié est
+aussi le sien.
+
+**Gabarit S :** identique. **En L :** n'a pas lieu.
 
 ### 0d. Roue réinventée sur le brouillon — Denis (`feature-dedup`)
 
@@ -317,59 +332,82 @@ et de `writes.extra` touchés, et note son SHA dans `pipeline.json → contracts
    architect` (réutiliser un type, une interface, un use case existant) vont à Thibault en 0e, avec le
    fichier existant ; les entrées `fix_by: cleaner` sont reportées à Nina (5) et revérifiées en 5b.
 
+**Gabarit S :** identique — et, 5b étant sauté, `dedup_candidates` est rejoué après l'édition de
+Thibault (0e) : de nouvelles entrées → Denis les juge, mêmes règles. **En L :** n'a pas lieu.
+
 ### 0e. Point d'étape « contrats » : Thibault les écrit
 
 `gauntlet.sh report <nom> contracts` puis `SendUserFile` du `report.html` (`display: render`) : les
-fichiers du brouillon, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
+fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les séquences du cadrage pour rappel.
 
 **Ouvre les fichiers pour lui.** Si l'outil `open_in_editor` est disponible (`mcp__ccd_host__open_in_editor`,
-à charger par `ToolSearch` s'il est différé), ouvre chaque fichier du brouillon, en commençant par
-l'interface du repository, à la ligne de sa première `DÉCISION`. Sinon, un lien cliquable par fichier
-(`[fichier](chemin:ligne)`). Dans ton message, en 10 lignes max : un fichier par ligne avec ce qu'il
-déclare et le nombre de `DÉCISION` qu'il porte ; les verdicts `architect` de Denis (« `X` existe déjà
-dans `core/…:12` : réutiliser ? ») ; et la consigne : « Édite ces contrats comme tu les veux :
-signatures, découpage, noms. Les corps restent `throw UnimplementedError()`. Efface chaque
-`DÉCISION` une fois tranchée. » Puis **attends** : `AskUserQuestion` « J'ai fini » / « Corrige le
-mécanique (imports, analyse) sans toucher à mes signatures » / « J'ai une question ».
+à charger par `ToolSearch` s'il est différé), ouvre chaque fichier de `contracts.files`, en commençant
+par l'interface du repository, à la ligne de sa première `DÉCISION`. Sinon, un lien cliquable par
+fichier (`[fichier](chemin:ligne)`). Dans ton message, en 12 lignes max : un fichier par ligne avec
+ce qu'il déclare et le nombre de `DÉCISION` qu'il porte ; les verdicts `architect` de Denis (« `X`
+existe déjà dans `core/…:12` : réutiliser ? ») ; et la consigne : « Édite ces contrats comme tu les
+veux : signatures, découpage, noms. Les corps restent exactement `throw UnimplementedError()` (un
+corps "évident" fait échouer `stub_check`). Une interface changée casse son impl stubbée (`analyze`)
+et peut-être le README (`package_readme`) : Arthur peut les réaligner. Efface chaque `DÉCISION` une
+fois tranchée. » Puis **attends** : `AskUserQuestion` « J'ai fini » / « Corrige le mécanique (impls
+stubbées, imports, README) sans toucher à mes signatures » / « J'ai une question ».
 
 - **Question** → réponds avec l'extrait de code (`fichier:ligne`) et ce qui existe ailleurs dans le
   repo, puis repose la même question. Une question n'est jamais un « j'ai fini ».
 - **« J'ai fini »** → `grep -rn "DÉCISION (Thibault)" <package>/lib`. Il en reste : liste-les et pose
   une question par commentaire (« garder la proposition d'Arthur (Recommandé) » / « l'alternative » /
-  « je l'édite »), par paquets de 4 ; une réponse « garder » ou « alternative » est appliquée par
-  Arthur (relance en mode brouillon : « applique ces choix, efface ces commentaires, ne touche à rien
-  d'autre »). Puis `gauntlet.sh contracts <nom>`. Rouge → montre les erreurs (`fichier:ligne`) et
-  propose « je corrige » / « Arthur corrige le mécanique sans changer mes signatures ».
+  « je l'édite »), par paquets de 4. Les « garder » / « alternative » et le mécanique demandé sont
+  appliqués par Arthur en **mode application** (« applique ces choix, efface ces commentaires,
+  réaligne impls stubbées, imports et README ; aucun scaffold, aucune autre signature ») ; à son
+  retour, déplace `stages.contracts` comme en 0c. Puis `gauntlet.sh contracts <nom>`. Rouge → montre
+  les erreurs (`fichier:ligne`) et propose « je corrige » / « Arthur corrige le mécanique ».
 - Verdicts `architect` de Denis : déclaration remplacée par l'existant → `"accepted": true, "reason":
   "remplacé par Thibault"` sur l'entrée ; gardée → Thibault donne sa raison, `accepted` avec elle.
   Puis `gauntlet.sh dedup_verdict <nom>` vert.
-- **Gabarit S** : plus de 2 `DÉCISION` dans le brouillon → question de reclassement (voir « Gabarits »)
-  dans le premier `AskUserQuestion` de cet arrêt.
+- **Gabarit** : plus de 2 `DÉCISION` dans le brouillon en S → question de reclassement en M ; plus
+  de 5 en M → question « découper (L) / continuer en M » (voir « Gabarits »). Dans le premier
+  `AskUserQuestion` de cet arrêt, avant qu'il édite.
 
-Vert → commit `feat(<nom>): contracts (by Thibault)` (`git add -A <package> pubspec.yaml <writes.extra>`),
-SHA dans `pipeline.json → contracts.sha`, `human_gates.contracts = {at, by: "user", sha}`. Ses
-signatures sont désormais la référence : aucun agent ne les change sans lui (Arthur, Théo, Ivan et
-Nina rapportent un contrat qui ne tient pas, ils ne le contournent pas).
+Vert → `contracts.files` mis à jour (même calcul, sur `HEAD` : un fichier de contrat ajouté par
+Thibault en fait partie), puis commit `feat(<nom>): contracts (by Thibault)` avec `git add` des seuls
+fichiers du package, du pubspec et de `writes.extra` modifiés depuis `draft_sha`, et `--allow-empty`
+(Thibault peut garder le brouillon tel quel : c'est un choix, et le commit le date). SHA dans
+`pipeline.json → contracts.sha`, `human_gates.contracts = {at, by: "user", sha}`. Les fichiers de
+`contracts.files` sont désormais la référence : aucun agent ne change une de leurs signatures sans
+lui (Arthur, Théo, Ivan et Nina rapportent un contrat qui ne tient pas, ils ne le contournent pas).
+
+**Réédition plus tard** (contrat à revoir au point d'étape « spec », décision demandée par Ivan…) :
+Thibault édite, puis tu joues `gauntlet.sh contracts <nom>` (avant l'étape 2) ou `gauntlet.sh green
+<nom>` (après : il y a du code autour) ; rouge → montre-le-lui avant tout commit. Vert → commit
+`feat(<nom>): contracts (by Thibault) — <quoi>` avec `git add` des **seuls fichiers qu'il a
+édités** (jamais `-A` : le travail en cours d'un agent ne doit pas y entrer), `contracts.sha` mis à
+jour, `contracts.files` aussi si un fichier s'ajoute. Si un test gelé dépend du contrat changé :
+re-gel, cause `contrat`.
 
 **Gabarit S :** identique — c'est le moment où la feature devient la sienne. **En L :** n'a pas lieu.
+**Découpage décidé ici (M → L)** : le brouillon et les contrats déjà commités restent sur
+`feature/<nom>`. Le découpage se valide comme en 0b (5) ; la première sous-feature part de cette
+branche (`base: feature/<nom>` dans son `pipeline.json`), et son 0c part des fichiers existants au
+lieu de repartir de zéro ; les suivantes suivent l'ordre de dépendance.
 
 ### 1. Spec — Sophie (`feature-specifier`)
 
 Prompt de lancement : nom, `cadrage.md` validé (« périmètre, comportements et séquences figés : ne les
-rediscute pas »), le SHA `contracts.sha` et la liste des fichiers de contrats (« écrits par Thibault :
-la spec les décrit, elle ne les change pas »), description brute (ou « aucune, à découvrir »), l'issue
-GitLab existante entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, le
-**gabarit** et son plafond de taille (« gabarit S : spec ≤ 15 Ko » / « gabarit M : spec ≤ 40 Ko »), le
-package et les dépendances validés au cadrage.
+rediscute pas »), `contracts.sha` et `contracts.files` (« écrits par Thibault : la spec les décrit,
+elle ne les change pas »), description brute (ou « aucune, à découvrir »), l'issue GitLab existante
+entre `<issue>` s'il y en a une (`issue.md`, partie A), racine, chemin de sortie, le **gabarit** et son
+plafond de taille (« gabarit S : spec ≤ 15 Ko » / « gabarit M : spec ≤ 40 Ko »), le package et les
+dépendances validés au cadrage.
 
 Sophie écrit à partir des contrats édités : les scénarios Gherkin (un par comportement C<n>, plus les
-états génériques), les erreurs, les données, §8. §5 renvoie aux fichiers de Thibault (`fichier:ligne`,
-une ligne par contrat) au lieu de recopier les signatures. §9 ne garde que ce que les contrats ne
-montrent pas : package et dépendances (statut `validée`, tranchés au cadrage), plus une ligne
-`proposée` seulement pour une dépendance découverte en écrivant la spec. Un contrat qui ne permet pas
-un scénario du cadrage (erreur sans state, donnée absente d'une entité) n'est pas corrigé par Sophie :
-elle le liste dans son rapport sous « Contrats à revoir par Thibault », avec `fichier:ligne`.
+états génériques), les erreurs, les données, §8. §5 renvoie aux contrats de Thibault par **symbole**
+(`Classe.methode`, avec le fichier) au lieu de recopier les signatures : un symbole survit aux
+éditions, un numéro de ligne non. §9 ne garde que ce que les contrats ne montrent pas : package et
+dépendances (statut `validée`, tranchés au cadrage), plus une ligne `proposée` seulement pour une
+dépendance découverte en écrivant la spec. Un contrat qui ne permet pas un scénario du cadrage (erreur
+sans state, donnée absente d'une entité) n'est pas corrigé par Sophie : elle le liste dans son rapport
+sous « Contrats à revoir par Thibault », avec le fichier et le symbole.
 `archi.json` ne contient que `sequences` : chaque C<n> relié à son scénario de §4.
 
 **Gabarit S :** plafond 15 Ko au lieu de 40. **En L :** l'étape n'a pas lieu (découpée en 0b).
@@ -377,11 +415,13 @@ elle le liste dans son rapport sous « Contrats à revoir par Thibault », avec 
 ### 1b. Critique — Camille (`feature-spec-critic`)
 
 Lance Camille (`feature-spec-critic`, prompt : nom, gabarit et plafond de taille, `spec.md`,
-`archi.json`, `cadrage.md`, le SHA `contracts.sha`, `create_feature_rules.md`, template de spec).
-Puis `gauntlet.sh spec_review_verdict <nom>` : rouge → relance le **specifier** avec les bloquants
-`owner: "spec"` de `spec_review.md` (« corrige ces points, sans réécrire ce qui n'est pas cité »),
-puis 1b à nouveau. Les bloquants `owner: "thibault"` (un contrat à changer) ne relancent personne :
-ils vont au point d'étape « spec », avec les « Contrats à revoir » de Sophie.
+`archi.json`, `cadrage.md`, `contracts.sha` et `contracts.files`, `create_feature_rules.md`, template
+de spec). Puis `gauntlet.sh spec_review_verdict <nom>` :
+- rouge avec des bloquants `owner: "spec"` → relance le **specifier** avec ceux-là (« corrige ces
+  points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
+- rouge avec **seulement** des bloquants `owner: "thibault"` (un contrat à changer) → personne n'est
+  relancé : passe au point d'étape « spec », où Thibault tranche chacun. Le verdict reste rouge tant
+  qu'un seul n'est pas tranché.
 Le rapport de Sophie liste une « Dette existante (hors feature) » → ajoute chaque ligne à
 `pipeline.json → debt` (`{source: "spec", file, issue}`) : elle n'entre ni dans §9 ni dans le périmètre.
 
@@ -415,9 +455,12 @@ avec l'extrait de son fichier (`fichier:ligne`) et le scénario qu'il empêche.
 
 Un seul `AskUserQuestion` : « Valider la spec » / « Demander des modifications » (texte libre →
 relance Sophie avec le retour, puis 1b), plus, dans le même appel :
-- une question par contrat à revoir : « Je modifie mon contrat » (il édite, tu réouvres le fichier,
-  puis nouveau commit `feat(<nom>): contracts (by Thibault) — <quoi>`, `contracts.sha` mis à jour,
-  et Sophie met §5 à jour) / « Le scénario s'adapte » (relance Sophie) / « Accepter : <raison> » ;
+- une question par contrat à revoir (les « Contrats à revoir » de Sophie et les bloquants
+  `owner: "thibault"` de Camille) : « Je modifie mon contrat » (tu réouvres le fichier, il édite, puis
+  « Réédition plus tard » de 0e ; Sophie met §5 à jour) / « Le scénario s'adapte » (relance Sophie) /
+  « Accepter : <raison> ». Chaque bloquant de Camille ainsi tranché reçoit `"accepted": true` et la
+  raison (« contrat modifié : <sha> » ou celle du dev) ; `spec_review_verdict` doit être vert avant
+  la validation ;
 - une question par ligne de §9 encore `proposée` (une dépendance découverte) : la proposition
   « (Recommandé) » avec sa raison, l'alternative avec ce qu'elle change ; précédée dans ton message
   de ce qui existe aujourd'hui (`pubspec.yaml:ligne`, l'usage dans le repo) ;
@@ -431,8 +474,8 @@ feature (spec validée, contrats de Thibault). Sinon rien.
 
 ### 2. Complétion du scaffold — Arthur (`feature-architect`, mode complétion)
 
-Prompt : « mode complétion », nom, **mode**, `spec.md` validée, `contracts.sha` (« fichiers de
-Thibault : n'y ajoute que des imports ou des `part` »), `create_feature_rules.md`, package, valeur de
+Prompt : « mode complétion », nom, **mode**, `spec.md` validée, `contracts.sha` et `contracts.files`
+(« fichiers de Thibault : n'y ajoute que des imports ou des `part` »), `create_feature_rules.md`, package, valeur de
 `brick`. Arthur pose ce qui découle mécaniquement des contrats et de la spec : modèles de données et
 squelettes de mappers (§6), DI, route, clés l10n, events analytics, README, dépendances du pubspec
 (§8), en stubs. Au retour, `stages.contracts` doit être `PASSED` (le hook l'a écrit). Un contrat de
@@ -440,7 +483,7 @@ Thibault qui ne tient pas (type absent, conflit de nom) → **point imprévu** :
 du fichier, « je corrige mon contrat » / « Arthur s'adapte sans toucher à mes signatures ».
 
 Pas de point d'étape : la structure est celle que Thibault a écrite. Commit :
-`git add -A <package> pubspec.yaml features/router features/l10n && git commit -m "feat(<nom>): scaffold"`.
+`git add -A <package> pubspec.yaml <writes.extra de la config> && git commit -m "feat(<nom>): scaffold"`.
 
 **Gabarit S :** identique (gate `contracts` d'intégrité). **En L :** n'a pas lieu.
 
@@ -448,9 +491,15 @@ Pas de point d'étape : la structure est celle que Thibault a écrite. Commit :
 
 Prompt : nom, `spec.md`, package, la liste des chemins autorisés en lecture (`lib/src/domain/**`,
 `lib/src/presentation/keys.dart`, `**/*_event.dart`, `**/*_state.dart`, `lib/src/data/model/*.dart`),
-`~/.claude/commands/create_test.md`, et `cadrage.md` (« chaque séquence C<n> est un scénario d'acceptation :
-chaque action, réponse du serveur et résultat visible qu'elle montre doit avoir son step »). Au
-retour, `stages.red` doit être `PASSED`.
+`~/.claude/commands/create_test.md`, `cadrage.md` et `archi.json` (« chaque séquence C<n> est un
+scénario d'acceptation, relié à son titre de §4 par `archi.json → sequences` : chaque action, réponse
+du serveur et résultat visible qu'elle montre doit avoir son step »). Au retour, `stages.red` doit
+être `PASSED`.
+
+**Contrat manquant** (Théo ou Gaëlle signalent un type, une clé ou un state absent des contrats) :
+ce n'est ni à Théo ni à Arthur de l'inventer. Tu le montres à Thibault avec l'extrait du fichier de
+contrat et le scénario qui en a besoin ; il l'ajoute (« Réédition plus tard » de 0e, puis Arthur en
+mode application si une impl stubbée doit suivre), puis Théo reprend là où il s'était arrêté.
 
 **Gabarit S :** identique — les tests sont l'actif durable, ils ne s'allègent pas. **En L :** n'a pas lieu.
 
@@ -460,6 +509,7 @@ Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, `cadrage.md`, `
 Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance le **test-writer** avec
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
 `gauntlet.sh red`, puis 3b ; `loops.tests`, max 2, puis point d'étape avec les bloquants restants.
+Un bloquant qui est un contrat manquant suit « Contrat manquant » (3) avant la relance de Théo.
 **Gabarit S :** identique, gel compris. **En L :** n'a pas lieu.
 
 Vert → **Point d'étape « tests ».** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
@@ -504,11 +554,11 @@ Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntl
   nouveau commit, nouveau `tests_freeze_sha`) / revenir à la spec.
 - Le rapport contient `Décision d'architecture requise` → **point imprévu** : c'est le code de
   Thibault. Montre l'extrait concerné (`fichier:ligne`) et ce qui existe ailleurs dans le repo, ouvre
-  le fichier pour lui, et une question : « je modifie mon contrat » (nouveau commit `contracts (by
-  Thibault) — <quoi>`, re-gel si un test en dépend) / l'option d'Ivan / l'autre. Puis `SendMessage` à
-  Ivan avec la décision.
-- Le rapport liste des « tests suspects » alors que le gate est vert → transmets-les à la visite
-  guidée (8b), rattachés à l'étape du fichier concerné ; ne bloque pas.
+  le fichier pour lui, et une question : « je modifie mon contrat » (« Réédition plus tard » de 0e)
+  / l'option d'Ivan / l'autre. Puis `SendMessage` à Ivan avec la décision.
+- Le rapport liste des « tests suspects » alors que le gate est vert → ajoute-les à
+  `pipeline.json → suspect_tests` (`{file, line, why, by: "Ivan"}`) : la visite guidée (8b) les
+  montre à l'étape du fichier concerné ; ne bloque pas.
 
 **Gabarit S :** identique (gate `green` d'intégrité). **En L :** n'a pas lieu.
 
@@ -537,10 +587,12 @@ D'abord les scripts : `~/.claude/scripts/gauntlet.sh maintain <nom>` (dépendanc
 justifiées, santé des packages pub.dev, design system, l10n, code mort, périmètre, secrets…). Son
 verdict n'arrête rien ici : le log est une **entrée** de Romain, qui transforme chaque échec en finding.
 
-Prompt : nom, `spec.md`, package, `tests_freeze_sha` (base du diff), `tests.md`,
+Prompt : nom, `spec.md`, package, **deux bases** — la merge-base avec `base_branch` (le périmètre :
+tout ce que la feature a écrit, contrats, scaffold et code ; c'est contre elle que se décide
+suggestion ou dette) et `tests_freeze_sha` (ce qu'Ivan et Nina ont écrit depuis le gel) — `tests.md`,
 `.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/features/<nom>/dedup.md`,
 `.claude/rules/pr_rules.md` si présent, `.claude/rules/create_feature_rules.md`,
-`~/.claude/commands/reviewPR.md`, `contracts.sha` (les contrats de Thibault : la référence), `archi.json`
+`~/.claude/commands/reviewPR.md`, `contracts.sha` et `contracts.files` (les contrats de Thibault : la référence), `archi.json`
 (les C<n> pour la visite guidée). Romain écrit aussi `review.json → tour`, la visite guidée (8b).
 Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un
 reviewer qui trouve des critiques doit pouvoir rendre la main) :
@@ -548,7 +600,8 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
   `review.json → suggestions` au format de `~/.claude/pipeline/suggestions.md` (problème, pourquoi,
   cause, si on ne fait rien, correctif, pour / contre, effort), puis le choix en `AskUserQuestion`
   multiSelect décrit dans ce fichier. Note chaque choix dans `pipeline.json → suggestions`
-  (`{"S1": {"decision": "applied|skipped", "note": "<nuance du dev>"}}`). Les retenues repartent à
+  (`{"S1": {"decision": "applied|skipped", "note": "<nuance du dev>"}}`), puis
+  `human_gates.suggestions = {at, by: "user"}` (aussi quand il n'y avait aucune suggestion à montrer). Les retenues repartent à
   Ivan (bloc complet + nuance) puis à Nina, avant Hugo ; les autres vont, avec leur bloc, en
   « Suggestions non appliquées » dans l'evidence. Une suggestion déjà tranchée (même fichier, même
   problème) qui revient dans une revue suivante ne se repose pas.
@@ -558,7 +611,9 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
 - `review.json → debt` (problèmes du code préexistant, hors des lignes de la feature) : ajoute
   chaque entrée à `pipeline.json → debt` (`{source: "review", file, line, issue}`), **sans la montrer
   au dev** ni la poser en question ; elle sort dans l'evidence sous « Dette existante ». Une
-  suggestion qui porte sur du code préexistant (hors diff) est traitée de même, pas présentée.
+  suggestion qui porte sur du code préexistant (hors du diff depuis la merge-base) est traitée de
+  même : pas présentée, ajoutée à `debt`, et notée `pipeline.json → suggestions.<id> = {"decision":
+  "debt"}` (la visite et l'evidence ne la montrent pas comme « à trancher » ni « non appliquée »).
 - `review.json → missing_tests` ne déclenche jamais de boucle ni de re-gel : la liste va à Hugo (7),
   qui ajoute ces tests en fichiers nouveaux.
 
@@ -580,7 +635,10 @@ les fichiers modifiés), et `review.json → missing_tests`.
 
 Prompt : nom, package, gabarit, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
 `stages.harden = PASSED` → pas d'arrêt : passe à 8. Les mutants expliqués (`mutants.md`), le score et
-les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape du fichier muté.
+les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape du fichier muté. Note les
+tests ajoutés et les tests existants que Hugo signale suspects dans `pipeline.json → hardening`
+(`{tests_added: [...]}`) et `suspect_tests` (`by: "Hugo"`). `FAILED` → pas de point imprévu ici : la
+visite (8b) s'ouvre en le signalant, et ne peut pas être validée tant qu'il l'est.
 
 ### 8. QA — Quentin (`feature-qa`)
 
@@ -589,7 +647,7 @@ les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape 
 laquelle dans la visite guidée. **En L :** n'a pas lieu.
 
 Prompt : nom, gabarit, `spec.md`, package, `feature_pipeline.md`. Au retour, quel que soit le gate :
-pas d'arrêt, passe à 8b. Les captures sont montrées dans la visite guidée, à l'étape qui implémente
+pas d'arrêt, passe à 8b (un `qa` rouge ou `FAILED` bloque la validation de la visite, voir 8b). Les captures sont montrées dans la visite guidée, à l'étape qui implémente
 leur scénario ; les ✗ de `qa.md` sont en tête de la visite.
 
 ### 8b. Point d'étape « visite guidée » du code
@@ -599,7 +657,7 @@ Elle remplace les anciens arrêts mutants et captures : tout ce qu'il devait val
 rattaché à l'endroit du code qu'il concerne.
 
 `gauntlet.sh report <nom> tour`, `SendUserFile` du `report.html` (`display: render`), puis
-`SendUserFile` des captures (`.claude/features/<nom>/qa/*/*.png`, un appel par plateforme). La section
+`SendUserFile` des captures (`.claude/features/<nom>/qa/**/*.png`, un appel par plateforme). La section
 « Visite guidée » montre les étapes de `review.json → tour` (écrites par Romain), dans l'ordre du flux
 de données (vue → BLoC → use case → repository → data source) : chacune avec `fichier:ligne`
 (recalculé depuis le symbole si le code a bougé depuis la revue), un extrait, ce que fait le code, le
@@ -611,16 +669,22 @@ Dans ton message : une ligne par étape, `[fichier:ligne](chemin:ligne)` cliquab
 fait en une phrase et ses rattachements en compte (« 1 mutant équivalent, 2 captures »). Ouvre le
 fichier de la première étape avec `open_in_editor` si l'outil est disponible. Puis `AskUserQuestion` :
 « Valider la visite » / « J'ai une question » / « Je renvoie une étape : … » (texte libre).
+**Pas de « Valider » tant qu'il reste** un ✗ dans `qa.md`, `stages.harden` ou `stages.qa` à
+`FAILED` (ou `qa` rouge), ou un mutant survivant sans explication dans `mutants.md` : dis lequel en
+tête, et les seules options sont « Je renvoie une étape : … » et « Accepter : <raison> » (`accept`,
+qui apparaît dans l'evidence).
 - **Question** → réponds avec l'extrait de code et ce qu'il fait, puis repose la même question. Tant
   qu'il pose des questions, la visite n'est pas validée.
 - **Renvoi** — selon ce qui est en cause à cette étape : le code (défaut, comportement, capture ✗) →
-  Ivan avec l'étape, le `fichier:ligne` et le retour, puis Nina, Romain et Hugo sont **sautés** si
-  `lib/` n'a changé que dans `presentation/**/view/**` (sinon rejoue 5→7), puis Quentin, puis 8b ; une
-  explication de mutant → Hugo avec le retour, puis 8b. `loops.tour`, max 2, puis point imprévu.
+  Ivan avec l'étape, le `fichier:ligne` et le retour, puis **toujours** `gauntlet.sh clean <nom>`
+  (design system, l10n, métriques ne sont vérifiés que là) : rouge → Nina. Si `lib/` n'a changé que
+  dans `presentation/**/view/**`, Romain et Hugo sont sautés ; sinon rejoue 6→7. Puis Quentin, puis
+  8b. Une explication de mutant → Hugo avec le retour, puis 8b. `loops.tour`, max 2, puis point
+  imprévu.
 Validation → `human_gates.tour = {at, by: "user", returned: [<étapes renvoyées>]}`.
 
-**Gabarit S :** identique — la visite a moins d'étapes quand la feature a moins de couches (2
-minimum). **En L :** n'a pas lieu.
+**Gabarit S :** identique — 5 à 8 étapes, moins quand la feature a moins de couches (2 minimum,
+comme le vérifie le gate `review`). **En L :** n'a pas lieu.
 
 ### 9. Evidence, commits, MR
 
@@ -668,7 +732,7 @@ Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue
 ## Mesures
 Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) | sautée (gabarit S) · Complexité max : <n> · Dépendances : ✓
-Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/7
+Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/8
 
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
 Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
@@ -691,7 +755,7 @@ n'est pas corrigée dans la feature, mais elle ne se perd pas.
 Spec : <n> bloquants corrigés avant validation, <n> notes · Tests : <n>/<n> scénarios couverts, <n> bloquants corrigés avant gel
 Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · interne <n>)   ← pipeline.json → refreezes
 
-## Suggestions non appliquées        ← review.json + pipeline.json → suggestions : un bloc par suggestion (problème, si on ne fait rien, correctif, contre)
+## Suggestions non appliquées        ← review.json + pipeline.json → suggestions `skipped` (pas `debt`) : un bloc par suggestion (problème, si on ne fait rien, correctif, contre)
 ## Mutants expliqués                 ← mutants.md
 ## Défauts visuels mineurs           ← qa.md
 ## Captures                          ← chemins relatifs
@@ -752,8 +816,8 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 - **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
   `display: render`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
   Les points imprévus aussi : le dev décide mieux avec les séquences et le code sous les yeux.
-- **L'architecture appartient au dev, et elle est dans son code.** Les contrats commités en 0e
-  (`contracts.sha`) sont la référence : aucun agent ne change une signature, un découpage ou une
+- **L'architecture appartient au dev, et elle est dans son code.** Les fichiers de `contracts.files`
+  (à `contracts.sha`) sont la référence : aucun agent ne change une signature, un découpage ou une
   dépendance qu'ils fixent. Un agent qui rencontre une décision structurante nouvelle la remonte ; tu
   la poses au dev avec l'extrait du fichier concerné, et s'il modifie son contrat, nouveau commit
   `contracts (by Thibault) — <quoi>`.

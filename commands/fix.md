@@ -186,8 +186,11 @@ plan_deviations`, `freeze_sha`, `base_sha`, règles projet.
 
 Puis `fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
 propre classification : critique, bloquant, erreur) comptent comme des critiques.
+- Dans tous les cas, d'abord : chaque entrée de `review.json → debt` va dans `fix.json → debt`
+  (`{source: "review", file, line, issue}`), sans être montrée au dev ; une suggestion qui porte sur
+  du code hors du diff depuis `base_sha` aussi, notée `suggestions.<id> = {"decision": "debt"}`.
 - Aucun critique → `stages.review = PASSED`, puis les **suggestions** (celles de Victor et les
-  non-bloquants des reviewers projet) : montre-les au dev au format de
+  non-bloquants des reviewers projet, dans le diff) : montre-les au dev au format de
   `~/.claude/pipeline/suggestions.md` et fais-le choisir en `AskUserQuestion` multiSelect (même
   fichier). Note chaque choix dans `fix.json → suggestions` (`{"S1": {"decision":
   "applied|skipped", "note": "…"}}`). Des retenues → ajoute-les à `plan_deviations`
