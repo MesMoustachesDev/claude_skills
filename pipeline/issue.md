@@ -19,10 +19,10 @@ Seulement sur un nouveau run : en reprise, `issue` est déjà renseigné et tu n
    → dis-le en une ligne, `issue.status = "none"`, continue. L'issue ne bloque jamais le pipeline.
 2. La description du dev contient une référence d'issue (`#123`, une URL `…/-/issues/123`)
    → prends-la sans poser de question.
-3. Sinon, `AskUserQuestion` (header `Issue`) : « Une issue GitLab existe-t-elle déjà pour ça ? »
-   - « Non, la créer après validation (Recommandé) » → `issue.status = "to_create"` ;
-   - « Pas d'issue pour celle-ci » → `issue.status = "none"` ;
-   - « Other » : le dev tape le numéro ou le lien.
+3. Sinon, **sans question** (règle du dev) : `issue.status = "to_create"`, annoncé en une ligne
+   (« pas de référence d'issue : je la crée après validation de la spec ; donne-moi un numéro si elle
+   existe déjà »). Le contenu de l'issue reste validé par le dev avant création (partie B). Si le dev
+   répond par un numéro ou un lien, passe en 4.
 4. Issue existante : `glab issue view <iid> -F json`. Introuvable → redemande. Fermée → signale-le
    et demande si on continue dessus. Sinon `issue = {status: "existing", iid, url: web_url, title}`.
    Son titre, sa description et ses labels deviennent une **entrée** de l'agent (Sophie ou Bastien),

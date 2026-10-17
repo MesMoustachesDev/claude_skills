@@ -94,6 +94,9 @@ For each commit, indicate:
 - If partial staging (hunk-level) is needed, mention it
 
 **Wait for user approval before proceeding.** The user may reorder, merge, split, or rename commits.
+Exception: when called by the `/feature` or `/fix` pipeline with « sans validation », show the plan
+and execute it right away (commits are local and reversible; the plan goes into the evidence).
+Pushing and creating a MR always stay subject to the user's explicit approval.
 
 ## 5. EXECUTE
 

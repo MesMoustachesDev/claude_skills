@@ -277,10 +277,10 @@ arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi*
 3. **Gabarit.** Vérifie la proposition de Sophie contre les critères de « Gabarits » (c'est la
    règle qui tranche, pas l'estimation de l'agent : 3 décisions majeures, c'est M même si elle
    propose S).
-4. **Fin du cadrage** : un seul `AskUserQuestion` avec deux ou trois questions — « C'est bien ça
-   qu'on fait, séquences comprises ? » (Oui / Non, je précise), « Gabarit » (le gabarit retenu suffixé
-   « (Recommandé) », avec en description les mesures et ce qu'il change ; le gabarit voisin en option
-   2) et, seulement si le cadrage propose une vraie alternative, « Package » (la proposition, puis
+4. **Fin du cadrage** : un seul `AskUserQuestion` avec une à trois questions — « C'est bien ça
+   qu'on fait, séquences comprises ? » (Oui / Non, je précise), **seulement si le gabarit retenu est
+   L** « Découper ? » (le découpage proposé / continuer en M) — un S ou un M s'applique sans question,
+   annoncé en une ligne avec ses mesures (règle du dev) — et, seulement si le cadrage propose une vraie alternative, « Package » (la proposition, puis
    l'alternative, chacune avec ce qu'elle change). Oui → `size`, `size_reason` (les mesures, une
    ligne), `package` et `mode` si le package a changé, `human_gates.cadrage = {at, by: "user", size,
    package}`, `stages.cadrage = PASSED`. Le package et les dépendances validés iront en §9 au statut
@@ -766,8 +766,9 @@ Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · intern
 ## Captures                          ← chemins relatifs
 ```
 
-Puis, **dans cet ordre** : invoque la skill `create_commits` (elle découpe le travail restant en
-commits atomiques ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
+Puis, **dans cet ordre** : invoque la skill `create_commits` avec « sans validation » (elle découpe le
+travail restant en commits atomiques et les crée sans attendre : règle du dev ; le plan va dans
+l'evidence ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
 lui indiquant que la description de MR est `evidence.md` et l'issue liée (`issue.md`, partie C). `create_mr` applique ses propres règles de
 validation du dev avant tout push ou création : tu ne les contournes pas.
 
@@ -784,7 +785,9 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 - **Filtre avant toute question imprévue.** Une question coûte l'attention du dev et souvent une
   boucle d'agents. Avant de la poser, dans l'ordre :
   1. **Une règle tranche** (règles de base, `create_feature_rules.md`, `pr_rules.md`, convention du
-     repo) → applique-la, dis-le en une ligne, ne demande pas.
+     repo, **règles tirées de ses réponses** : `~/.claude/pipeline/answers.md` et
+     `.claude/rules/pipeline_answers.md` du projet) → applique-la, dis-le en une ligne (« règle
+     appliquée : … »), ne demande pas.
   2. **Opérationnel et réversible** (restaurer un fichier généré ou un lockfile, relancer un agent
      bloqué, régénérer un rapport) → fais-le et dis-le en une ligne.
   3. **Dette du code existant** que la feature n'a pas besoin de corriger (check rouge sur une ligne
@@ -794,6 +797,18 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   4. Seuls restent des questions : le périmètre, un comportement visible, un contrat (que le dev
      édite lui-même), ou abaisser un gate (seuil, acceptation). Groupe-les : un seul `AskUserQuestion`
      par arrêt, jamais une question par message.
+- **Chaque réponse peut devenir une règle.** Après une réponse du dev à une question **autre** que
+  le cadrage (0b), les contrats et l'architecture, demande-toi : y a-t-il une règle générale derrière,
+  qui trancherait la même question sur une autre feature ? (« on ne corrige pas le code existant »,
+  « commit + merge, pas de push », « un test faux se corrige et se regèle »…). Si oui, propose-la
+  dans le prochain `AskUserQuestion` de l'arrêt (jamais un appel à part) : header `Règle`, question =
+  la règle à l'impératif en une phrase, options « Oui, tous mes projets » (→ `~/.claude/pipeline/answers.md`,
+  section qui convient) / « Oui, ce projet seulement » (→ `.claude/rules/pipeline_answers.md`, créé
+  s'il manque, commité avec la feature) / « Non, c'est un cas particulier ». Plusieurs règles au même
+  arrêt → une seule question en multiSelect. Oui → ajoute la ligne `- <règle> (<date>, <header de la
+  question d'origine>)`, sans reformuler ce qu'il a validé. Une règle qu'il contredit plus tard :
+  corrige la ligne existante. Pas de règle derrière une réponse de goût ou propre à cette feature :
+  ne propose rien. Compte dans `pipeline.json → rules_proposed` / `rules_added`.
 - **Questions avec leur contexte.** Toute question au dev — cadrage, contrats, spec, point imprévu,
   visite — est précédée, dans ton message, de **ce qui existe aujourd'hui** : l'extrait de code ou de
   cadrage concerné (`fichier:ligne`, 3 à 8 lignes, en lien cliquable) et ce qu'il fait, en une phrase.
@@ -809,7 +824,9 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 - **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
-  Le prompt de lancement tient en 15 lignes.
+  Le prompt de lancement tient en 15 lignes. Celui de Sophie, Camille, Arthur et Romain inclut les
+  chemins des règles tirées des réponses du dev (`~/.claude/pipeline/answers.md`, et
+  `.claude/rules/pipeline_answers.md` s'il existe) : un choix qu'elles tranchent n'est pas proposé.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
@@ -869,7 +886,8 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
 - **Hook d'écriture qui refuse un fichier attendu.** `writes.extra` est un glob : un dossier ou un
   submodule s'écrit `x/**` (pas `x`). Les `test/` et `pubspec.yaml` des packages `<pkg>/lib/**` de
   `writes.extra` sont autorisés aux tests. Ne jamais contourner le hook par le shell : corriger la
-  config, avec l'accord du dev.
+  config (chemins touchés par la spec et les contrats validés : sans demander, règle du dev ; tout
+  autre chemin : avec son accord).
 - **Captures QA perdues après un second run.** Cause : `gauntlet.sh qa` effaçait `qa/<plateforme>/*.png`
   à chaque lancement, et le hook de fin de Quentin le relance. En place : le run précédent (captures,
   `report.xml`, `maestro.log`) est déplacé dans `qa/<plateforme>/_runs/<date>/`, jamais effacé.

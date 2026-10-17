@@ -513,3 +513,15 @@ dependencies:
   {feature_name}:
     path: features/{feature_name}
 ```
+
+
+## Conventions tranchées par Thibault
+
+Tirées de ses réponses aux pipelines (`~/.claude/pipeline/answers.md`). Elles ne se reposent pas en question.
+
+- Couches strictes : BLoC → use case → repository → data sources. Le repository combine les data sources ; pas de parsing JSON ni de persistance dans un use case ; on ne supprime jamais un use case appelé par un BLoC.
+- Jamais `.first` ni `take(1)` sur un Stream de watch : ajouter une méthode `Future` au repository ou à la data source.
+- Une écriture locale qui peut échouer (Isar, stockage, préférences, plugin) rend `Either<ErrorEntity, void>` depuis la data source, comme toute I/O.
+- Un package tiers déjà exposé par `core` s'importe via `core`, pas en dépendance directe.
+- Une nouvelle I/O transverse (détection ou ouverture d'app, plugin natif…) vit dans son propre package.
+- Avant de créer un mécanisme, chercher comment c'est déjà fait ailleurs dans le code et le réutiliser.

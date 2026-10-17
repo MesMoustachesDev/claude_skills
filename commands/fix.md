@@ -239,7 +239,8 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ```
 
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il
-n'est pas commité). Puis invoque la skill `create_commits` (le commit de gel existe déjà ; elle découpe la correction et
+n'est pas commité). Puis invoque la skill `create_commits` avec « sans validation » (règle du dev : commits créés sans
+attendre, plan dans l'evidence ; le commit de gel existe déjà ; elle découpe la correction et
 l'evidence). Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
 `create_mr` au dev, avec l'issue liée (`issue.md`, partie C), qui
 appliquera ses propres validations. `stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
@@ -267,6 +268,15 @@ ligne de l'enregistrer en mémoire.
   évident. Ce qui doit changer passe par l'agent propriétaire.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
 - **Hors plan, sois court** : ce qui bloque, les faits, les options, la question.
+- **Règles tirées des réponses du dev.** Avant toute question, lis `~/.claude/pipeline/answers.md` et
+  `.claude/rules/pipeline_answers.md` du projet s'il existe : une règle qui tranche s'applique, tu le
+  dis en une ligne (« règle appliquée : … ») et tu ne demandes pas. Passe ces deux chemins à Bastien et
+  Victor. Après une réponse du dev à une question autre que le diagnostic et le plan de correction,
+  s'il y a une règle générale derrière (qui trancherait la même question sur un autre fix), propose-la
+  dans le prochain `AskUserQuestion` (header `Règle`, la règle à l'impératif ; « Oui, tous mes projets »
+  → `~/.claude/pipeline/answers.md` / « Oui, ce projet seulement » → `.claude/rules/pipeline_answers.md`
+  / « Non, cas particulier »). Oui → ajoute la ligne telle qu'il l'a validée, avec la date et la
+  question d'origine.
 - **Le rapport d'abord.** Tout point d'étape, prévu ou hors plan, commence par `fix_gauntlet.sh report
   <nom> <étape>` et `SendUserFile` `display: render`. Régénéré à chaque fois, jamais réutilisé.
 - **Le plan appartient au dev.** Couche, approche et fichiers de la correction sont validés avant
