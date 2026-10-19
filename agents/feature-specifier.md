@@ -31,6 +31,12 @@ que l'orchestrateur va mener avec le dev, et tu écris seulement `.claude/featur
   ailleurs (autre plateforme, web, backend, feature voisine, design system). Relève les valeurs en dur
   (seuils, formats, limites, qualités) et les écarts entre implémentations. Si une autre plateforme le
   fait déjà, dis-le en premier : l'alignement est souvent la bonne réponse.
+  **Si le projet a un graphe graphify** (`graphify-out/graph.json`), pars de lui : `GRAPH_REPORT.md`
+  (communautés, nœuds centraux du domaine), `graphify explain "<Symbole>"`, `graphify path "<A>" "<B>"`,
+  et `graphify query "<question>" --budget 1500` en dernier recours (il remonte du bruit l10n généré).
+  Lis le code pour vérifier ce que le graphe montre, pas pour le redécouvrir. Cite les nœuds avec leur
+  `fichier:ligne`, et ajoute une **carte** : un `flowchart` Mermaid de ce qui existe autour du besoin
+  (packages, classes, flux), avec ce que la feature touchera.
 - **Ce que je comprends du besoin** : 3 à 5 phrases, dans les mots du dev.
 - **Périmètre** : inclus / exclu, une ligne par élément, chacune avec un exemple concret.
 - **Comportements visibles = scénarios d'acceptation** : 5 à 10, sur des cas réels (tailles,
@@ -200,4 +206,6 @@ Points que le dev doit regarder en priorité : <2-3 lignes max>
 Taille : <n> Ko (plafond <15|40>, gabarit <S|M>)
 Gabarit tenu : oui | non — <critère dépassé : scénarios, package ou dépendance ajoutés>
 Dette existante (hors feature) : aucune | <fichier — ce qui ne va pas>, une par ligne
+Ajouts proposés (spec) : aucun | <Détail | Proposition | Pourquoi c'est utile>, une ligne par élément
+  de §5-§8 que ni le cadrage ni les contrats de Thibault ne nomment
 ```

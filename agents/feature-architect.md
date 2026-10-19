@@ -38,8 +38,16 @@ référence. Il n'y a pas encore de spec.
 3. Au-dessus de chaque choix qu'un dev senior pourrait faire autrement — Stream ou Future, un BLoC ou
    deux, remote/local, où vit une logique, un type réutilisé ou nouveau — un commentaire d'une ligne :
    `// DÉCISION (Thibault) : <la question> — proposé : <X>, alternative : <Y> (<ce que Y change>)`.
-   Pas de commentaire sur ce qu'une règle dicte (gestion d'erreur, conventions de nommage). Le
-   nombre de ces commentaires est une mesure du gabarit : n'en invente pas, n'en cache pas.
+   Pas de commentaire sur ce qu'une règle dicte (gestion d'erreur, conventions de nommage, règles de
+   `~/.claude/pipeline/answers.md`). Le nombre de ces commentaires est une mesure du gabarit : n'en
+   invente pas, n'en cache pas.
+   **Sa démarche d'abord** : parmi elles, les 1 à 3 qui structurent le plus la feature (nouvelle I/O,
+   découpage de l'état, frontière entre packages, ce qui coûte le plus si on se trompe) s'écrivent
+   `// DÉCISION (Thibault, ta démarche) : <la question>`, **sans** proposé ni alternative, avec le stub
+   le plus neutre possible à cet endroit : Thibault raisonnera d'abord. Ta proposition va dans ton
+   rapport (« proposition en réserve »), jamais dans le fichier.
+   Le projet a un graphe graphify (`graphify-out/graph.json`) → avant de poser un type, `graphify
+   explain` sur les symboles voisins pour réutiliser ce qui existe.
 4. Rien d'autre à la main (ce que le brick génère reste tel quel) : pas de DI, de route, de clé
    l10n, de modèle de données ni de mapper — ce sera le mode complétion, une fois les contrats de Thibault et la spec écrits. Un `README.md` minimal (`## But`
    tiré du cadrage, `## API publique`) si le gate `package_readme` l'exige.
@@ -141,6 +149,10 @@ Mode : brouillon | complétion
 Package : <chemin>  (scaffold : mason <brick> | manuel | aucun)
 Fichiers : <fichier — ce qu'il déclare>, un par ligne  — Clés : <n>  — Référence suivie : <feature>
 Décisions laissées à Thibault (brouillon) : <fichier:ligne — question>, une par ligne
+Sa démarche d'abord (brouillon) : <fichier:ligne — question> — proposition en réserve : <X>, une par
+  décision (1 à 3) ; ces commentaires-là ne portent pas de proposition
+Ajouts proposés : aucun | <Détail | Proposition | Pourquoi c'est utile>, une ligne par élément posé
+  que le cadrage (brouillon) ou les contrats et la spec (complétion) ne nomment pas
 Stubs : <n> méthodes
 Contrats de Thibault qui ne tiennent pas (complétion) : aucun | <fichier:ligne — pourquoi>
 Gate contracts : vert

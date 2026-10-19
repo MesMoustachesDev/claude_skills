@@ -75,4 +75,6 @@ Gate green : vert
 Implémenté : <couches, en une ligne chacune>
 Tests suspects : aucun | <fichier:ligne — attend X, spec dit Y>
 Écarts avec la spec : aucun | <liste>
+Ajouts proposés : aucun | <Détail | Proposition | Pourquoi c'est utile>, une ligne par classe, helper,
+  extension ou découpage que ni les contrats ni la spec ne nomment
 ```

@@ -192,6 +192,16 @@ est décrit en 0e. Chaque reclassement va dans
     sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis
     `EnterWorktree` avec ce `path`. Les sous-agents, les hooks et le gauntlet prennent le worktree
     pour racine.
+  - **Carte graphify** : si le checkout principal a un `graphify-out/graph.json` (racine ou un niveau
+    en dessous), **rafraîchis-le d'abord** s'il est plus ancien que le dernier commit de la branche de
+    base : depuis le dossier qui contient `graphify-out/`, `graphify update <racine de scan>` (contenu de
+    `graphify-out/.graphify_root`) — AST seul, sans LLM ni coût. La commande écrit dans
+    `<racine de scan>/graphify-out/` : recopie `graph.json`, `GRAPH_REPORT.md`, `graph.html` et
+    `manifest.json` dans le `graphify-out/` d'origine. Le code généré est exclu par le
+    `.graphifyignore` du projet (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `generated_l10n/`) :
+    s'il manque, crée-le sur ce modèle et signale-le. Puis copie `graphify-out/` au même chemin relatif
+    dans le worktree et ignore-le (`$(git rev-parse --git-common-dir)/info/exclude`, comme en 9a).
+    Sophie et Arthur s'en servent dès le cadrage ; 9a le mettra à jour. Échec : continue sans carte.
   - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
     worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
@@ -244,6 +254,13 @@ arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi*
    - **Ce qui existe déjà** : le code actuel qui fait tout ou partie du besoin, dans ce repo **et
      ailleurs** (autre plateforme, web, backend, autre feature), avec les valeurs en dur relevées
      (seuils, formats, limites) et les écarts entre eux. C'est souvent là que se cache la bonne réponse.
+     **Le projet a un graphe graphify** (`graphify-out/graph.json`, copié dans le worktree en 0) →
+     Sophie part de la carte, pas d'une exploration à l'aveugle : `GRAPH_REPORT.md` (communautés et
+     nœuds centraux du domaine), puis `graphify explain "<Symbole>"` et `graphify path "<A>" "<B>"` sur
+     les symboles du besoin, `graphify query "<question>" --budget 1500` en dernier recours (bruité
+     par les fichiers l10n générés). Elle ne lit le code que pour vérifier ce que le graphe montre, et
+     cite les nœuds avec leur `fichier:ligne`. Le cadrage en tire une **carte** : un `flowchart` Mermaid
+     de ce qui existe autour du besoin (packages, classes, flux), avec ce que la feature touchera.
    - **Ce que je comprends du besoin** en 3 à 5 phrases, dans les mots du dev.
    - **Périmètre** : inclus / exclu, chaque ligne avec un exemple concret.
    - **Comportements visibles = scénarios d'acceptation** : 5 à 10, chacun sous un titre `### C<n> —
@@ -312,6 +329,14 @@ brouillon de ce que Thibault doit posséder : entités, interfaces de repository
 signatures des use cases, events/states sealed, `keys.dart`. Chaque choix qu'un dev senior pourrait
 faire autrement (Stream ou Future, un BLoC ou deux, où vit une logique, remote/local) porte au-dessus
 de la ligne un commentaire `// DÉCISION (Thibault) : <question> — proposé : <X>, alternative : <Y>`.
+**Sa démarche d'abord** : les 1 à 3 décisions qui structurent le plus la feature (nouvelle I/O,
+découpage de l'état, frontière entre packages, ce qui a le plus de conséquences si on se trompe)
+portent `// DÉCISION (Thibault, ta démarche) : <question>` **sans proposition** ; le stub reste
+minimal à cet endroit. Arthur garde sa proposition pour lui, dans son rapport, à part (« proposition
+retenue en réserve »), et ne la montre pas au dev.
+**Ajouts proposés** : son rapport liste, sous ce titre, tout ce qu'il a posé et que le cadrage ne
+nomme pas (une classe, une interface, une data source, un découpage, une dépendance) : une ligne
+chacun, `Détail | Proposition | Pourquoi c'est utile`.
 Rien d'autre à la main : pas de DI, de route, de modèle de données ni de mapper à ce stade (2).
 
 **Le hook d'Arthur écrit `stages.contracts`, qui appartient à l'étape 2.** Après **chaque** retour
@@ -345,6 +370,18 @@ Thibault (0e) : de nouvelles entrées → Denis les juge, mêmes règles. **En L
 `gauntlet.sh report <nom> contracts` puis `SendUserFile` du `report.html` (`display: render`) : les
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les séquences du cadrage pour rappel.
+
+**Sa démarche d'abord, avant d'ouvrir les fichiers.** Pour chaque `DÉCISION (Thibault, ta démarche)`
+(1 à 3), une question **ouverte**, en texte, pas d'`AskUserQuestion` : le problème concret, ce qui
+existe déjà (carte graphify, `fichier:ligne`), puis « Comment tu le ferais ? ». Attends sa réponse.
+Réponds à **son** raisonnement : ce qui tient, les cas qu'il n'a pas couverts, les risques (erreurs,
+concurrence, test), sans substituer ta solution ni celle d'Arthur. Il bloque ou demande de l'aide →
+explique le concept en jeu, puis rends-lui la décision ; la proposition d'Arthur ne sort que s'il la
+demande. Sa démarche décidée → il l'écrit lui-même dans les fichiers ou demande à Arthur de
+l'appliquer (mode application).
+**Ajouts proposés.** Montre ensuite, à part, le tableau `Détail | Proposition | Pourquoi c'est utile`
+du rapport d'Arthur : ce sont ses ajouts, pas des décisions de Thibault. Chaque ligne est
+contestable ; une ligne qu'il ne comprend pas s'explique avant qu'il édite.
 
 **Ouvre les fichiers pour lui.** Si l'outil `open_in_editor` est disponible (`mcp__ccd_host__open_in_editor`,
 à charger par `ToolSearch` s'il est différé), ouvre chaque fichier de `contracts.files`, en commençant
@@ -703,15 +740,17 @@ en dessous. Absent → saute 9a, et pas de section « Impact » dans l'evidence.
    Copie aussi le `graphify-out/cache/` qui se trouve sous la racine de scan, s'il existe.
 3. Racine de scan : le contenu de `graphify-out/.graphify_root`, avec le préfixe du checkout
    principal remplacé par celui du worktree. Puis, depuis le dossier qui contient `graphify-out/` :
-   `graphify update <racine de scan du worktree>`. C'est de l'AST seul, sans LLM et sans coût. Échec → note-le dans
-   l'evidence et continue : graphify ne bloque jamais la livraison.
+   `graphify update <racine de scan du worktree>`. C'est de l'AST seul, sans LLM et sans coût. La
+   commande écrit dans `<racine de scan>/graphify-out/` : recopie `graph.json`, `GRAPH_REPORT.md`,
+   `graph.html` et `manifest.json` dans le `graphify-out/` du worktree avant de lire l'impact. Échec →
+   note-le dans l'evidence et continue : graphify ne bloque jamais la livraison.
 4. **Impact** : dans `graph.json`, prends les nœuds dont le `source_file` est dans
    `git diff --name-only <base>...HEAD`. Puis leurs voisins directs situés dans **un autre package**. Liste
    ces packages et les symboles par lesquels ils sont touchés : ce sont les consommateurs que la MR
    peut casser. Ignore les nœuds génériques (types du SDK, `_`, imports de `package:core/*`).
 
-Le graphe mis à jour reste dans le worktree. Le checkout principal se rafraîchira avec
-`/graphify <racine> --update` après le merge.
+Le graphe mis à jour reste dans le worktree. Celui du checkout principal sera rafraîchi au
+démarrage de la prochaine feature (étape 0).
 
 Écris `.claude/features/<nom>/evidence.md` — la page que le dev lit à la place du code :
 
@@ -809,6 +848,14 @@ Termine par un résumé de 5 lignes et le chemin de l'evidence.
   question d'origine>)`, sans reformuler ce qu'il a validé. Une règle qu'il contredit plus tard :
   corrige la ligne existante. Pas de règle derrière une réponse de goût ou propre à cette feature :
   ne propose rien. Compte dans `pipeline.json → rules_proposed` / `rules_added`.
+- **« Discuter » sur chaque confirmation.** Toute question de confirmation (valider le cadrage, la
+  spec, les tests, la visite, un plan, une règle) a une option « Discuter — je veux comprendre avant de
+  décider ». Choisie → tu expliques (l'extrait, ce qu'il fait, ce que chaque choix change), tu réponds
+  à ses questions, puis tu reposes la même confirmation. Discuter n'est jamais une validation.
+- **Ajouts proposés, à chaque étape.** Ce qu'un agent ajoute sans que le dev l'ait décidé (Arthur en
+  0c et en complétion : data sources, mappers, providers ; Sophie dans la spec ; Ivan ou Nina : une
+  classe, un helper, un découpage) est montré au prochain arrêt dans un tableau `Détail | Proposition |
+  Pourquoi c'est utile`, séparé de ses décisions. Les agents le listent dans leur rapport sous ce titre.
 - **Questions avec leur contexte.** Toute question au dev — cadrage, contrats, spec, point imprévu,
   visite — est précédée, dans ton message, de **ce qui existe aujourd'hui** : l'extrait de code ou de
   cadrage concerné (`fichier:ligne`, 3 à 8 lignes, en lien cliquable) et ce qu'il fait, en une phrase.
