@@ -74,6 +74,16 @@ git -C "$REPO" diff --quiet -- .gitignore && _pass ".gitignore inchangé" || _fa
 EXF="$(git -C "$WT" rev-parse --git-common-dir)/info/exclude"; case "$EXF" in /*) ;; *) EXF="$WT/$EXF" ;; esac
 expect_eq "$(grep -cxF 'graphify-out/' "$EXF")" 1 "info/exclude : une seule entrée après deux prepare"
 
+echo "prepare_exclude_no_trailing_newline"
+new_prep exclnl
+printf '.claude/worktrees/\n' > "$REPO/.gitignore"; git -C "$REPO" add .gitignore; git -C "$REPO" commit -q -m gi
+git -C "$REPO" worktree remove --force "$WT"; git -C "$REPO" branch -q -D feature/x
+git -C "$REPO" worktree add -q -b feature/x "$WT"
+EXF="$REPO/.git/info/exclude"; mkdir -p "$REPO/.git/info"; printf '*.local' > "$EXF"   # sans saut de ligne final
+prep "$WT"
+expect_eq "$(grep -cxF '*.local' "$EXF")" 1 "info/exclude : ligne existante intacte"
+expect_eq "$(grep -cxF 'graphify-out/' "$EXF")" 1 "info/exclude : entrée graphify-out/ sur sa propre ligne"
+
 echo "prepare_update_worktree"
 new_prep upd
 prep "$WT" --update
@@ -115,6 +125,7 @@ expect_rc 0 "sortie 0"
 expect_out "graphify: ok" "ok"
 expect_eq "$(mark "$WT/features/graphify-out/graph.json")" new "graphe copié au même chemin relatif"
 expect_file_has "$CALLS" "update $REPO/features" "racine de scan résolue (features)"
+expect_eq "$(cat "$WT/features/graphify-out/.scan_root")" "$WT/features" ".scan_root = racine de scan du worktree (chemin physique)"
 
 echo "prepare_path_with_spaces"
 new_prep "sp ace"

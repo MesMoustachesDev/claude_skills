@@ -93,9 +93,9 @@ copy_graph_files() {
 copy_tree() {
   mkdir -p "$2" || return 1
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --exclude 'impact/' --exclude '.prepare_status' --exclude 'graph.base.json' "$1/" "$2/"
+    rsync -a --exclude 'impact/' --exclude '.prepare_status' --exclude '.scan_root' --exclude 'graph.base.json' "$1/" "$2/"
   else
-    cp -R "$1/." "$2/" && rm -rf "$2/impact" "$2/.prepare_status" "$2/graph.base.json"
+    cp -R "$1/." "$2/" && rm -rf "$2/impact" "$2/.prepare_status" "$2/.scan_root" "$2/graph.base.json"
   fi
 }
 
@@ -187,7 +187,10 @@ cmd_prepare() {
     case "$common" in /*) ;; *) common="$wt/$common" ;; esac
     ex="$common/info/exclude"
     mkdir -p "$common/info"
-    grep -qxF 'graphify-out/' "$ex" 2>/dev/null || printf 'graphify-out/\n' >> "$ex"
+    if ! grep -qxF 'graphify-out/' "$ex" 2>/dev/null; then
+      [ -s "$ex" ] && [ -n "$(tail -c1 "$ex")" ] && echo >> "$ex"     # dernière ligne sans saut de ligne
+      printf 'graphify-out/\n' >> "$ex"
+    fi
   fi
 
   if [ "$upd" = 1 ]; then
@@ -202,6 +205,10 @@ cmd_prepare() {
   fi
 
   printf '%s\n' "$st" > "$wtgd/graphify-out/.prepare_status"
+  # racine de scan côté worktree (chemin physique), lue en premier par impact.py
+  wtscan="$wt${scan_rel:+/$scan_rel}"
+  if [ -d "$wtscan" ]; then (cd "$wtscan" && pwd -P) > "$wtgd/graphify-out/.scan_root"
+  else rm -f "$wtgd/graphify-out/.scan_root"; fi
   if [ "$st" = stale ]; then status_line stale "(update worktree en échec)"
   else status_line ok "graph=${gd}graphify-out/graph.json$created"; fi
 }

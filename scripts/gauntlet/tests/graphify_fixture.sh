@@ -61,6 +61,7 @@ PY
 # graph.json dans <repo>/graphify-out/, commit sur develop, puis feature/x avec foo_impl.dart modifié (non commité).
 #   plain    : .graphify_root = <repo>/features, source_file relatifs à features/
 #   rootscan : .graphify_root = <repo>, source_file préfixés features/
+#   reloc    : graph.json dans <repo>/features/graphify-out/, .graphify_root = « features » (relatif à la racine du repo)
 mk_impact_repo() {
   local R="$1" mode="${2:-plain}" F
   mk_repo "$R"; F="$R/features"
@@ -74,6 +75,8 @@ mk_impact_repo() {
   echo "class CError {}" > "$F/core/lib/src/error.dart"
   if [ "$mode" = rootscan ]; then
     mk_graph "$R/graphify-out" "$(impact_graph_json features/)"; printf '%s' "$R" > "$R/graphify-out/.graphify_root"
+  elif [ "$mode" = reloc ]; then
+    mk_graph "$F/graphify-out" "$(impact_graph_json '')"; printf 'features' > "$F/graphify-out/.graphify_root"
   else
     mk_graph "$R/graphify-out" "$(impact_graph_json '')"; printf '%s' "$R/features" > "$R/graphify-out/.graphify_root"
   fi

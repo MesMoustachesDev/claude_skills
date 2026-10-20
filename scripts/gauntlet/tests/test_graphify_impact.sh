@@ -31,11 +31,40 @@ echo "void main() {}" > "$REPO/features/a/test/x_test.dart"
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "d['reading_order'][0]['file']=='features/a/lib/src/data/foo_impl.dart'" "ordre de lecture : fichier d'A_Repo en tête"
 expect_json "$REPO/out/impact.json" "'features/a/test/x_test.dart' in d['not_in_graph']" "test hors graphe"
+# foo_impl.dart : A_Repo (B_Bloc, D_Button, C_Error, SDK_Future ; defines ignoré) + _priv (B_Bloc) = 5
+expect_json "$REPO/out/impact.json" "d['reading_order'][0]['degree']==5" "degré de foo_impl.dart = 5 (arêtes structurelles exclues)"
+
+echo "impact_structural_cross_package"
+new_repo structural
+python3 - "$REPO" <<'PY2'
+import json, sys
+r = sys.argv[1]
+d = json.load(open(r + "/graphify-out/graph.json"))
+d["nodes"] += [{"id": "D_Card", "label": "D_Card", "source_file": "design/lib/src/card.dart", "source_location": "L2"},
+               {"id": "B_State", "label": "B_State", "source_file": "b/lib/src/state.dart", "source_location": "L4"}]
+d["links"] += [{"source": "A_Repo", "target": "D_Card", "relation": "defines", "source_file": "a/lib/src/data/foo_impl.dart", "source_location": "L16"},
+               {"source": "B_State", "target": "A_Repo", "relation": "contains", "source_file": "b/lib/src/state.dart", "source_location": "L5"}]
+json.dump(d, open(r + "/graphify-out/graph.json", "w"))
+PY2
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "not any(x['symbol'] in ('D_Card','B_State') for x in d['consumers']+d['dependencies'])" "defines/contains hors package : ni consommateur ni dépendance"
+expect_json "$REPO/out/impact.json" "$CONSUMER" "le vrai consommateur reste seul"
 
 echo "impact_scan_root_is_repo_root"
 new_repo rootscan rootscan
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "$CONSUMER" "racine de scan = racine du repo : mêmes consommateurs"
+
+echo "impact_relative_graphify_root"
+# features/graphify-out/.graphify_root = « features » : relatif à la racine du repo, pas au dossier du graphe
+new_repo reloc reloc
+run_impact "$REPO"
+expect_out "graphify: ok" "ok"
+expect_json "$REPO/out/impact.json" "$CONSUMER" "sans .scan_root : racine remontée jusqu'au repo, B_Bloc trouvé"
+printf '%s\n' "$(cd "$REPO/features" && pwd -P)" > "$REPO/features/graphify-out/.scan_root"
+printf 'inexistant' > "$REPO/features/graphify-out/.graphify_root"
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "$CONSUMER" ".scan_root écrit par prepare lu en premier"
 
 echo "impact_removed_symbol"
 new_repo removed

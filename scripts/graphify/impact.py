@@ -144,21 +144,38 @@ def main():
         return finish("failed", "graph.json illisible (%s)" % e)
     res["built_at_commit"] = graph.data.get("built_at_commit", "") or ""
 
-    # racine de scan, côté worktree
-    rootf = os.path.join(gdir, ".graphify_root")
-    if not os.path.isfile(rootf):
-        return finish("failed", ".graphify_root manquant")
-    raw = open(rootf, encoding="utf-8").read().strip()
-    if not raw:
-        return finish("failed", ".graphify_root vide")
+    # racine de scan, côté worktree : .scan_root (écrit par prepare, chemin physique) d'abord
     realW = os.path.realpath(W)
-    if os.path.isabs(raw):
-        scan = os.path.realpath(raw)
-        mainco = os.path.realpath(a.main) if a.main else realW
-        if scan == mainco or scan.startswith(mainco + os.sep):
-            scan = os.path.join(realW, os.path.relpath(scan, mainco))
-    else:
-        scan = os.path.realpath(os.path.join(W, a.graph_dir, raw))
+    inside = lambda p: p == realW or p.startswith(realW + os.sep)
+    scan = None
+    srf = os.path.join(gdir, ".scan_root")
+    if os.path.isfile(srf):
+        v = open(srf, encoding="utf-8").read().strip()
+        if v and os.path.isdir(v) and inside(os.path.realpath(v)):
+            scan = os.path.realpath(v)
+    if scan is None:
+        rootf = os.path.join(gdir, ".graphify_root")
+        if not os.path.isfile(rootf):
+            return finish("failed", ".graphify_root manquant")
+        raw = open(rootf, encoding="utf-8").read().strip()
+        if not raw:
+            return finish("failed", ".graphify_root vide")
+        if os.path.isabs(raw):
+            scan = os.path.realpath(raw)
+            mainco = os.path.realpath(a.main) if a.main else realW
+            if scan == mainco or scan.startswith(mainco + os.sep):
+                scan = os.path.join(realW, os.path.relpath(scan, mainco))
+        else:
+            # comme resolve_scan_root de graphify.sh : depuis le dossier du graphe, en remontant jusqu'au worktree
+            cur = os.path.realpath(os.path.join(W, a.graph_dir))
+            while True:
+                if os.path.isdir(os.path.join(cur, raw)):
+                    scan = os.path.realpath(os.path.join(cur, raw))
+                    break
+                if cur == realW or not inside(cur):
+                    scan = os.path.realpath(os.path.join(W, a.graph_dir, raw))
+                    break
+                cur = os.path.dirname(cur)
     scan_rel = os.path.relpath(scan, realW)
     if scan_rel == "." or scan_rel.startswith(".."):
         scan_rel = ""
