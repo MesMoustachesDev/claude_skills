@@ -101,7 +101,7 @@ n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` déta
 | 7 | harden | Hugo | `feature-hardener` | `harden` | non (mutants montrés dans la visite) | seulement si logique modifiée ou `missing_tests` | — |
 | 8 | qa | Quentin | `feature-qa` | `qa` | non (captures montrées dans la visite) | une seule plateforme | — |
 | 8b | visite guidée | toi | — | — | **oui** : 5 à 8 étapes du flux de données (2 minimum), mutants, captures et suggestions rattachés ; il valide ou renvoie une étape | identique | — |
-| 9 | evidence | — | toi (+ `graphify update` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` | gabarit et étapes sautées en tête | arrêt après 0b : pas d'evidence |
+| 9 | evidence | — | toi (+ `graphify.sh impact` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` | gabarit et étapes sautées en tête | arrêt après 0b : pas d'evidence |
 
 « — » en L : la feature n'atteint jamais l'étape 1, chaque sous-feature déroule son propre pipeline
 en S ou en M. Détail en « Gabarits ».
@@ -192,16 +192,10 @@ est décrit en 0e. Chaque reclassement va dans
     sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis
     `EnterWorktree` avec ce `path`. Les sous-agents, les hooks et le gauntlet prennent le worktree
     pour racine.
-  - **Carte graphify** : si le checkout principal a un `graphify-out/graph.json` (racine ou un niveau
-    en dessous), **rafraîchis-le d'abord** s'il est plus ancien que le dernier commit de la branche de
-    base : depuis le dossier qui contient `graphify-out/`, `graphify update <racine de scan>` (contenu de
-    `graphify-out/.graphify_root`) — AST seul, sans LLM ni coût. La commande écrit dans
-    `<racine de scan>/graphify-out/` : recopie `graph.json`, `GRAPH_REPORT.md`, `graph.html` et
-    `manifest.json` dans le `graphify-out/` d'origine. Le code généré est exclu par le
-    `.graphifyignore` du projet (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `generated_l10n/`) :
-    s'il manque, crée-le sur ce modèle et signale-le. Puis copie `graphify-out/` au même chemin relatif
-    dans le worktree et ignore-le (`$(git rev-parse --git-common-dir)/info/exclude`, comme en 9a).
-    Sophie et Arthur s'en servent dès le cadrage ; 9a le mettra à jour. Échec : continue sans carte.
+  - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
+    `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `absent` → ne parle pas de graphify
+    et continue ; `stale` ou `échec` → note la ligne et continue sans carte. Sophie et Arthur s'en
+    servent dès le cadrage ; 9a le mettra à jour.
   - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
     worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
@@ -255,12 +249,10 @@ arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi*
      ailleurs** (autre plateforme, web, backend, autre feature), avec les valeurs en dur relevées
      (seuils, formats, limites) et les écarts entre eux. C'est souvent là que se cache la bonne réponse.
      **Le projet a un graphe graphify** (`graphify-out/graph.json`, copié dans le worktree en 0) →
-     Sophie part de la carte, pas d'une exploration à l'aveugle : `GRAPH_REPORT.md` (communautés et
-     nœuds centraux du domaine), puis `graphify explain "<Symbole>"` et `graphify path "<A>" "<B>"` sur
-     les symboles du besoin, `graphify query "<question>" --budget 1500` en dernier recours (bruité
-     par les fichiers l10n générés). Elle ne lit le code que pour vérifier ce que le graphe montre, et
-     cite les nœuds avec leur `fichier:ligne`. Le cadrage en tire une **carte** : un `flowchart` Mermaid
-     de ce qui existe autour du besoin (packages, classes, flux), avec ce que la feature touchera.
+     Sophie part de la carte, pas d'une exploration à l'aveugle (`~/.claude/pipeline/graphify.md`,
+     section Explorer) et cite les nœuds avec leur `fichier:ligne`. Le cadrage en tire une **carte** :
+     un `flowchart` Mermaid de ce qui existe autour du besoin (packages, classes, flux), avec ce que la
+     feature touchera.
    - **Ce que je comprends du besoin** en 3 à 5 phrases, dans les mots du dev.
    - **Périmètre** : inclus / exclu, chaque ligne avec un exemple concret.
    - **Comportements visibles = scénarios d'acceptation** : 5 à 10, chacun sous un titre `### C<n> —
@@ -730,24 +722,19 @@ comme le vérifie le gate `review`). **En L :** n'a pas lieu.
 
 ### 9. Evidence, commits, MR
 
-**9a. Graphe graphify (seulement si le projet en a un).** Cherche un `graphify-out/graph.json` dans le
-checkout principal (`git worktree list --porcelain` → premier `worktree`), à la racine ou un niveau
-en dessous. Absent → saute 9a, et pas de section « Impact » dans l'evidence. Présent :
-1. Dans le worktree, garantis que `graphify-out/` est ignoré : `git check-ignore -q graphify-out/x`,
-   sinon ajoute `graphify-out/` à `$(git rev-parse --git-common-dir)/info/exclude` (jamais au
-   `.gitignore` versionné depuis le pipeline). `create_commits` ne doit jamais l'embarquer.
-2. Copie le dossier `graphify-out/` du checkout principal au même chemin relatif dans le worktree.
-   Copie aussi le `graphify-out/cache/` qui se trouve sous la racine de scan, s'il existe.
-3. Racine de scan : le contenu de `graphify-out/.graphify_root`, avec le préfixe du checkout
-   principal remplacé par celui du worktree. Puis, depuis le dossier qui contient `graphify-out/` :
-   `graphify update <racine de scan du worktree>`. C'est de l'AST seul, sans LLM et sans coût. La
-   commande écrit dans `<racine de scan>/graphify-out/` : recopie `graph.json`, `GRAPH_REPORT.md`,
-   `graph.html` et `manifest.json` dans le `graphify-out/` du worktree avant de lire l'impact. Échec →
-   note-le dans l'evidence et continue : graphify ne bloque jamais la livraison.
-4. **Impact** : dans `graph.json`, prends les nœuds dont le `source_file` est dans
-   `git diff --name-only <base>...HEAD`. Puis leurs voisins directs situés dans **un autre package**. Liste
-   ces packages et les symboles par lesquels ils sont touchés : ce sont les consommateurs que la MR
-   peut casser. Ignore les nœuds génériques (types du SDK, `_`, imports de `package:core/*`).
+**9a. Graphe graphify (seulement si le projet en a un).** Contrat : `~/.claude/pipeline/graphify.md`.
+Depuis le worktree :
+`bash ~/.claude/scripts/graphify.sh prepare <worktree> --update`, puis
+`bash ~/.claude/scripts/graphify.sh impact <worktree> <base> --out .claude/features/<nom>/.gauntlet/graphify`
+(`<base>` = le merge-base de la branche de base). La dernière ligne de stdout donne l'état :
+- `absent` → saute 9a, pas de section « Impact » dans l'evidence.
+- `ok` → la section « Impact » reprend le tableau « Consommateurs hors package non touchés » de
+  `impact.md` (package consommateur, symboles touchés, via). `impact.md` ne remplace pas le `grep` des
+  usages d'un symbole modifié.
+- `stale` → section « Impact » avec la ligne « Impact : calculé sur le graphe de la base (update en
+  échec) » ; les symboles ajoutés par le diff manquent.
+- `échec` → ligne « Impact : non calculé (<raison>) ».
+graphify ne bloque jamais la livraison.
 
 Le graphe mis à jour reste dans le worktree. Celui du checkout principal sera rafraîchi au
 démarrage de la prochaine feature (étape 0).
@@ -784,8 +771,10 @@ Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acce
 Widgets vs design system : <n> comparés, <n> remplacés, <n> extensions du DS                              ← dedup.json
 Exemptions gauntlet-ignore : <n> (<où>)
 
-## Impact (graphify)                  ← 9a, seulement si le projet a un graphe
-| Package consommateur | Symboles touchés |
+## Impact (graphify)                  ← 9a, seulement si le projet a un graphe ; tableau tiré de impact.md
+| Package consommateur | Symboles touchés | Via |
+Non `ok` : une seule ligne à la place du tableau, « Impact : non calculé (<raison>) » ou, pour `stale`,
+« Impact : calculé sur le graphe de la base (update en échec) ». `absent` : pas de section.
 
 ## Dette existante (hors feature)       ← pipeline.json → debt + .gauntlet/debt_deps.txt
 | Fichier | Problème | Vu par (spec, gate, revue) |
