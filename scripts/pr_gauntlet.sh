@@ -227,7 +227,13 @@ prep_line="$(tail -1 "$out/graphify.log" 2>/dev/null)"
   echo "## Impact (graphify)"; echo
   ist="$(jq -r '.status // empty' "$out/graphify/impact.json" 2>/dev/null)"
   case "$ist" in
-    ok|stale) cat "$out/graphify/impact.md" ;;
+    ok|stale)
+      cat "$out/graphify/impact.md"
+      # le worktree disparaît au cleanup : on garde le graphe de la PR pour explain/path pendant la revue
+      igraph="$(jq -r '.graph // empty' "$out/graphify/impact.json" 2>/dev/null)"
+      if [ -n "$igraph" ] && cp "$wt/$igraph" "$out/graphify/graph.json" 2>/dev/null; then
+        echo; printf 'Graphe de la PR : `%s` (à passer en `--graph` à explain / path / query)\n' "$out/graphify/graph.json"
+      fi ;;
     *)
       ireason="$(jq -r '.reason // empty' "$out/graphify/impact.json" 2>/dev/null)"
       # prepare a échoué alors qu'un graphe existe dans le principal : sa raison vaut mieux que « absent »

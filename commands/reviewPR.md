@@ -54,7 +54,9 @@ existantes du workspace, et les widgets nouveaux face au catalogue du design sys
 Quand le projet a un graphe graphify, le rapport contient aussi une section `## Impact (graphify)` :
 les consommateurs hors package que la PR ne touche pas, et l'ordre de lecture du diff. Le script met
 le graphe à jour sur la branche avant de le calculer ; ça n'influe jamais sur son verdict. Le contrat
-est dans `~/.claude/pipeline/graphify.md`. Sans graphe, il n'y a rien à mentionner.
+est dans `~/.claude/pipeline/graphify.md`. La section donne aussi le chemin du **graphe de la PR**
+(`Graphe de la PR : …`, conservé après la suppression du worktree) : c'est lui que tu passes en
+`--graph <graphe de la PR>` à `graphify explain` / `path` / `query`. Sans graphe, il n'y a rien à mentionner.
 
 Si le script n'est pas disponible (projet sans `feature_pipeline.md`, outils absents), dis-le et
 continue avec le diff seul — mais dis-le, ne fais pas semblant d'avoir mesuré.
@@ -107,7 +109,7 @@ git grep -n "<Symbole>" <remote>/<cible> -- '<glob>'      # existait déjà sur 
 git grep -n "<Symbole>" <remote>/<source> -- '<glob>'     # vs état sur la branche de la MR
 ```
 
-Si le projet a un graphe, `graphify explain "<Symbole>"` donne ses voisins et ce qui l'utilise déjà, et
+Si le projet a un graphe, `graphify explain "<Symbole>" --graph <graphe de la PR>` donne ses voisins et ce qui l'utilise déjà, et
 le `git grep` reste la preuve : le graphe oriente, il ne tranche pas.
 
 Ça change tout au verdict : un `availableLevel` figé à `Unknown()` est une étourderie si le modèle
@@ -118,7 +120,7 @@ sans avoir regardé.
 cas le plus proche déjà en place (le type d'équipement précédent, la feature sœur) et lis-le en
 entier. C'est ton étalon : ce qui s'en écarte est suspect, ce qui le recopie fidèlement est
 « conforme au voisinage » même si le pattern lui-même est discutable, et cette nuance doit apparaître
-dans tes remarques. Avec un graphe, `graphify path "<A>" "<B>"` montre comment le voisin et le nouveau
+dans tes remarques. Avec un graphe, `graphify path "<A>" "<B>" --graph <graphe de la PR>` montre comment le voisin et le nouveau
 code se rejoignent ; même règle, le `git grep` fait foi.
 
 ## Étape 5 — Charger les règles projet

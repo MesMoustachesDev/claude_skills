@@ -37,6 +37,8 @@ expect_file_has "$REPORT" "### Ordre de lecture du diff" "ordre de lecture"
 expect_file_has "$REPORT" "### Consommateurs hors package non touchés" "sous-titre consommateurs"
 [ "$(grep -n '## Impact (graphify)' "$REPORT" | cut -d: -f1)" -lt "$(grep -n '## Verdict scripts' "$REPORT" | cut -d: -f1)" ] \
   && _pass "Impact avant Verdict scripts" || _fail "Impact avant Verdict scripts"
+[ -f "$PROUT/graphify/graph.json" ] && _pass "graphe de la PR conservé hors du worktree" || _fail "graphe de la PR conservé hors du worktree"
+expect_file_has "$REPORT" "Graphe de la PR : \`$PROUT/graphify/graph.json\`" "chemin du graphe dans le rapport"
 grep -q "^prepare\|^update" "$TMP_ROOT/graphify.calls" 2>/dev/null && _pass "graphify update appelé" || { OUT="$(cat "$TMP_ROOT/graphify.calls" 2>&1)"; _fail "graphify update appelé"; }
 
 echo "pr_impact_does_not_change_rc"

@@ -38,8 +38,9 @@ jamais `npm install <paquet>`, jamais de bump. Les `.env` locaux n'y sont pas no
 n'en dépend pas.
 
 **1. La cause racine — log first.** **Le projet a un graphe** (prompt) → localise d'abord le flux du
-symptôme : `graphify explain "<symbole du symptôme>"`, `graphify path "<point d'entrée : page, handler,
-fonction>" "<symbole suspect>"` (`~/.claude/pipeline/graphify.md`). Tu en tires les fichiers du flux où
+symptôme : `graphify explain "<symbole du symptôme>" --graph <g>`, `graphify path "<point d'entrée :
+page, handler, fonction>" "<symbole suspect>" --graph <g>`, où `<g>` est le chemin du graphe donné dans
+ton prompt (`~/.claude/pipeline/graphify.md`, section Explorer). Tu en tires les fichiers du flux où
 poser tes `[DEBUG_ISSUE]`. Le graphe localise, les logs prouvent : aucune hypothèse n'est retenue ni
 écartée sur la foi du graphe seul, la règle log-first est inchangée. Le graphe reflète l'état de la base.
 

@@ -195,8 +195,10 @@ est décrit en 0e. Chaque reclassement va dans
   - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `absent` → ne parle pas de graphify
     et continue ; `stale` ou `échec` → note la ligne et continue sans carte. Sur `ok`, garde la valeur
-    de `graph=` (chemin du graphe relatif à la racine, ex. `flutter_app/graphify-out/graph.json`) :
-    tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage ; 9a le mettra à jour.
+    de `graph=` (chemin du graphe relatif à la racine, ex. `flutter_app/graphify-out/graph.json`) et
+    écris-la dans `pipeline.json → graphify_graph` (à la création, ou en remplacement à la reprise ;
+    `null` hors `ok`) : tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage, et à tout
+    agent relancé plus tard ; 9a le mettra à jour.
   - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
     worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
@@ -218,7 +220,7 @@ est décrit en 0e. Chaque reclassement va dans
   { "feature": "<nom>", "mode": "create|extend", "package": "<chemin du package>", "branch": "feature/<nom>", "base": "<base_branch>",
     "size": null, "size_reason": null, "size_changes": [], "split": [],
     "created": "<iso>", "stages": {}, "human_gates": {}, "attempts": {}, "contracts": {}, "tests_freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
-    "issue": null }
+    "issue": null, "graphify_graph": null }
   ```
   `mode` et `package` sont lus par le gauntlet et les hooks : c'est ce qui définit le périmètre.
   **Rejeu** (amendement de spec, nouvelle passe contracts → red → green sur du code déjà implémenté) :
