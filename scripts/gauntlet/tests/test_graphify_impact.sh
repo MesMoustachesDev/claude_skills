@@ -75,6 +75,12 @@ printf '# t\n```ini\ngraphify.ignore_packages = b\n```\n' > "$REPO/.claude/rules
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "d['consumers']==[]" "ignore_packages = b → aucun consommateur"
 
+echo "impact_graphifyignore_copied"
+new_repo gi
+printf '*.g.dart\n' > "$REPO/.graphifyignore"
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "'.graphifyignore' not in d['not_in_graph'] and not any(x['file'].endswith('.graphifyignore') for x in d['reading_order'])" ".graphifyignore non versionné ignoré du diff"
+
 echo "impact_absent"
 A="$TMP_ROOT/absent/with space/repo"; mk_repo "$A"; echo x > "$A/f.txt"; commit "$A" develop >/dev/null
 OUT="$(bash "$GRAPHIFY_SH" impact "$A" develop 2>/dev/null)"; RC=$?

@@ -125,11 +125,36 @@ expect_eq "$(mark "$WT/graphify-out/graph.base.json")" new "graph.base.json"
 
 echo "prepare_worktree_outside_repo"
 new_prep outside
+printf '.claude/worktrees/\n' > "$REPO/.gitignore"; git -C "$REPO" add .gitignore; git -C "$REPO" commit -q -m gi
 OWT="$TMP_ROOT/out/wt"; mkdir -p "$TMP_ROOT/out"
 git -C "$REPO" worktree add -q --detach "$OWT"
 prep "$OWT"
 expect_out "graphify: ok" "ok"
 expect_eq "$(mark "$OWT/graphify-out/graph.json")" new "graphe copié"
-git -C "$OWT" check-ignore -q graphify-out/x && _pass "exclude correct" || _fail "exclude correct"
+git -C "$OWT" check-ignore -q graphify-out/x && _pass "graphify-out/ ignoré" || _fail "graphify-out/ ignoré"
+EXO="$(git -C "$OWT" rev-parse --git-common-dir)"; case "$EXO" in /*) ;; *) EXO="$OWT/$EXO" ;; esac
+[ "$(cd "$EXO" && pwd -P)" = "$REPO/.git" ] && _pass "common-dir = .git du principal" || { OUT="$EXO"; _fail "common-dir = .git du principal"; }
+expect_eq "$(grep -cxF 'graphify-out/' "$REPO/.git/info/exclude")" 1 "info/exclude du principal : une entrée"
+
+echo "prepare_corrupt_graph"
+new_prep corrupt
+printf '{pas du json' > "$REPO/graphify-out/graph.json"
+FAKE_GRAPHIFY_GRAPH= prep "$WT"
+expect_rc 0 "sortie 0"
+expect_out "graphify: échec graph.json illisible" "échec explicite"
+[ -e "$WT/graphify-out" ] && _fail "rien créé dans le worktree" || _pass "rien créé dans le worktree"
+
+echo "prepare_copies_graphifyignore"
+new_prep gi
+printf '*.g.dart\n' > "$REPO/.graphifyignore"     # non versionné
+prep "$WT" --update
+expect_file_has "$WT/.graphifyignore" '*.g.dart' ".graphifyignore non versionné copié dans le worktree"
+git -C "$WT" check-ignore -q .graphifyignore && _fail ".graphifyignore pas dans exclude" || _pass ".graphifyignore pas dans exclude"
+new_prep gitracked
+printf '*.g.dart\n' > "$REPO/.graphifyignore"; git -C "$REPO" add -f .graphifyignore; git -C "$REPO" commit -q -m ign
+git -C "$REPO" worktree remove --force "$WT"; git -C "$REPO" branch -q -D feature/x; git -C "$REPO" worktree add -q -b feature/x "$WT"
+printf 'modifié\n' > "$WT/.graphifyignore"
+prep "$WT"
+expect_eq "$(cat "$WT/.graphifyignore")" "modifié" ".graphifyignore versionné laissé tel quel"
 
 finish

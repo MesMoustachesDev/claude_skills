@@ -183,7 +183,8 @@ def main():
         if rc != 0:
             return finish("failed", "git %s a échoué" % args[0])
         for f in o.split("\0"):
-            if f and f not in changed and "graphify-out" not in f.split("/"):
+            if f and f not in changed and "graphify-out" not in f.split("/") \
+                    and os.path.basename(f) != ".graphifyignore":
                 changed.append(f)
     cset = set(changed)
 

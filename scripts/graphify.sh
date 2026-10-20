@@ -153,6 +153,10 @@ cmd_prepare() {
     fi
   fi
 
+  # graph.json canonique lisible ? (spec §5) — avant toute copie vers le worktree
+  python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$canon/graph.json" 2>/dev/null \
+    || { status_line failed "graph.json illisible"; return 0; }
+
   # copie vers le worktree (même chemin relatif), cache/ de la racine de scan compris
   if ! [ "$wt" -ef "$mainco" ]; then
     wtgd="$wt/${gd%/}"; wtgd="${wtgd%/}"
@@ -162,6 +166,19 @@ cmd_prepare() {
     fi
   else
     wtgd="$cdir"
+  fi
+
+  # .graphifyignore non versionnés : graphify les lit de la racine de scan jusqu'à la racine du VCS (= celle du worktree)
+  if ! [ "$wt" -ef "$mainco" ]; then
+    local idir="$scan" rel
+    while :; do
+      rel="${idir#"$mainco"}"; rel="${rel#/}"
+      if [ -f "$idir/.graphifyignore" ] && [ ! -e "$wt${rel:+/$rel}/.graphifyignore" ] && [ -d "$wt${rel:+/$rel}" ]; then
+        cp "$idir/.graphifyignore" "$wt${rel:+/$rel}/.graphifyignore"
+      fi
+      [ "$idir" = "$mainco" ] && break
+      idir="$(dirname "$idir")"
+    done
   fi
 
   # exclusion locale (jamais le .gitignore versionné)
