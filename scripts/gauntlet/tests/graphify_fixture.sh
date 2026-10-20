@@ -6,13 +6,15 @@ GRAPHIFY_SH="${GRAPHIFY_SH:-$TESTS_DIR/../../graphify.sh}"
 mk_graph() { mkdir -p "$1" && printf '%s\n' "$2" > "$1/graph.json"; }
 
 # fake_graphify_on_path — met dans le PATH un `graphify` factice : `update <path>` écrit $FAKE_GRAPHIFY_GRAPH
-# dans <path>/graphify-out/graph.json (ou sort en 1 si FAKE_GRAPHIFY_FAIL=1)
+# dans <path>/graphify-out/graph.json (ou sort en 1 si FAKE_GRAPHIFY_FAIL=1) ; journal des appels : $TMP_ROOT/graphify.calls
 fake_graphify_on_path() {
   local bin="$TMP_ROOT/fake-graphify-bin"
   mkdir -p "$bin"
   cat > "$bin/graphify" <<'FAKE'
 #!/usr/bin/env bash
-[ "${FAKE_GRAPHIFY_FAIL:-0}" = 1 ] && { echo "fake graphify: échec forcé" >&2; exit 1; }
+echo "$*" >> "${TMP_ROOT:-/tmp}/graphify.calls"
+# FAKE_GRAPHIFY_FAIL_MATCH : n'échoue que si le chemin passé à update contient cette sous-chaîne
+if [ "${FAKE_GRAPHIFY_FAIL:-0}" = 1 ] && { [ -z "${FAKE_GRAPHIFY_FAIL_MATCH:-}" ] || [[ "${2:-}" == *"$FAKE_GRAPHIFY_FAIL_MATCH"* ]]; }; then echo "fake graphify: échec forcé" >&2; exit 1; fi
 if [ "${1:-}" = update ]; then
   mkdir -p "$2/graphify-out"
   [ -n "${FAKE_GRAPHIFY_GRAPH:-}" ] && cp "$FAKE_GRAPHIFY_GRAPH" "$2/graphify-out/graph.json"
@@ -21,7 +23,7 @@ fi
 exit 0
 FAKE
   chmod +x "$bin/graphify"
-  export PATH="$bin:$PATH"
+  export TMP_ROOT PATH="$bin:$PATH"
 }
 
 # impact_graph_json <préfixe des source_file : "" ou "features/"> — graph.json de la fixture (stdout)
