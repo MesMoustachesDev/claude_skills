@@ -81,6 +81,11 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   - Les dépendances ne sont pas versionnées : Bastien les installe dans le package du bug
     (`npm ci` s'il y a un lockfile, `flutter pub get` / `fvm flutter pub get`) — jamais `npm install`
     d'un paquet, jamais de bump.
+  - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
+    `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : le mot après `graphify: `
+    (`ok`, `stale`, `absent`, `échec`) va dans `fix.json → graphify` (`échec` s'écrit `failed`).
+    `absent` → ne parle pas de graphify et continue ; `stale` ou `échec` → note la ligne et continue
+    sans carte.
 - **Reprise** : une fois dans le worktree, si `.claude/fixes/<nom>/fix.json` existe, affiche l'état et
   reprends à la première étape non `PASSED`. Les agents d'une session précédente ne sont plus
   joignables : relance-les à contexte vierge avec les fichiers du dossier (c'est fait pour).
@@ -92,7 +97,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
   { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
     "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
     "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "human_gates": {},
-    "arbitrations": [], "agents": {}, "accepted": [], "issue": null }
+    "arbitrations": [], "agents": {}, "accepted": [], "issue": null, "graphify": null }
   ```
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
   seulement). Une issue existante fait partie de l'entrée de Bastien.
@@ -103,6 +108,8 @@ Prompt (15 lignes max) : nom, description brute, l'issue GitLab existante entre 
 une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
 (`CLAUDE.md`, `.claude/rules/*`, `.claude/agents/*` s'il y en a — ils portent des invariants), et :
 « Une issue Sentry est citée : utilise le MCP Sentry pour la stack et les tags » si c'est le cas.
+Si `fix.json → graphify` vaut `ok` : « graphe : `graphify-out/graph.json`, voir
+`~/.claude/pipeline/graphify.md` ».
 **Note l'`agentId` retourné dans `fix.json → agents.reproducer`** : tu en auras besoin pour l'arbitrage.
 
 Au retour :
@@ -181,8 +188,14 @@ touchés par `git diff --name-only <freeze_sha>` (ex. `appwrite-function-reviewe
 est lancé **en parallèle** de `fix-reviewer`, dans le même message. Son rapport va dans
 `.claude/fixes/<nom>/review_<agent>.md` (c'est toi qui l'écris, tel quel).
 
+**Graphe (seulement si `fix.json → graphify` n'est pas `absent`).** Avant chaque lancement de Victor,
+boucles comprises, depuis le worktree : `bash ~/.claude/scripts/graphify.sh prepare <worktree> --update`,
+puis `bash ~/.claude/scripts/graphify.sh impact <worktree> <base_sha> --out .claude/fixes/<nom>/.gauntlet/graphify`
+(contrat : `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `ok` ou `stale` → le
+chemin de `impact.json` va dans le prompt de Victor ; `échec` → note la ligne et continue sans.
+
 Prompt de `fix-reviewer` : nom, `diagnosis.md`, `repro.json` (dont `fix_plan`), `fix.json →
-plan_deviations`, `freeze_sha`, `base_sha`, règles projet.
+plan_deviations`, `freeze_sha`, `base_sha`, règles projet, et le chemin de `impact.json` s'il a été calculé.
 
 Puis `fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
 propre classification : critique, bloquant, erreur) comptent comme des critiques.
@@ -230,6 +243,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Plan validé             couche, approche, alternative écartée ; choix du dev (proposé / alternative / autre)
 ## Correction               fichiers, en une ligne chacun, marqués prévu / écart accepté ; même défaut corrigé ailleurs
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
+## Impact (graphify)        consommateurs hors package (impact.json, touched: false) × verdict de Victor (review.json → impact_checked) ; omise sans graphe, une ligne si non calculé
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
 ## Re-gels                  n, par cause (fix.json → refreezes)
 ## Suggestions             appliquées (id, titre) ; non appliquées : un bloc chacune (problème, si on ne fait rien, correctif, contre)

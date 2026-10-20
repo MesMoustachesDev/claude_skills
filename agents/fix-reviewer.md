@@ -28,7 +28,7 @@ correction, au bon endroit, écrite comme le reste du projet ? Tu n'as rien écr
 ## Ce que tu reçois
 
 Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de correction), `base_sha`
-(base du fix entier), et les règles du projet.
+(base du fix entier), les règles du projet, et `impact.json` s'il existe (`~/.claude/pipeline/graphify.md`).
 
 ## Ta méthode
 
@@ -56,7 +56,10 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
   → `critical` si elle produit le même bug (le correctif en dépend pour être complet), sinon `debt[]`
   (code que le correctif n'a pas écrit : règle de « Périmètre » de `~/.claude/pipeline/suggestions.md`).
 - **Régressions** : appelants de ce qui a changé (`grep` des usages) ; contrat public, schéma, payload
-  modifiés sans le dire.
+  modifiés sans le dire. `impact.json` fourni → chaque `consumers[]` avec `touched: false` est un
+  appelant hors package : lis l'usage (`file`, `location`) et tranche. S'il casse ou change de
+  comportement → `critical`, règle `fix: regression`. Le `grep` des usages reste obligatoire : le graphe
+  exclut le code généré et les tests.
 - Puis la grille partagée et les règles projet, item par item.
 
 **4. Classe.** `critical` : cause non traitée, contournement du test, violation d'une règle projet ou
@@ -79,10 +82,11 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
 {
   "root_cause_addressed": "yes | no | partial",
   "plan_respected": "yes | no | partial",
-  "critical":      [ { "file": "src/...", "line": 42, "rule": "fix: cause | fix: plan | fix: scope | fix: elsewhere | grid: <item> | project: <règle>", "summary": "...", "fix": "..." } ],
+  "critical":      [ { "file": "src/...", "line": 42, "rule": "fix: cause | fix: plan | fix: scope | fix: elsewhere | fix: regression | grid: <item> | project: <règle>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "...", "why": "..." } ],
   "debt":          [ { "file": "src/...", "line": 12, "issue": "code préexistant : …", "why_later": "hors des lignes du correctif, ni aggravé ni requis" } ],
+  "impact_checked": [ { "package": "…", "symbol": "…", "verdict": "ok | critical", "why": "…" } ],
   "rules_checked": { "grid": { "<item>": "ok|ko|na" }, "project": { "<règle>": "ok|ko|na" } }
 }
 ```
@@ -96,5 +100,6 @@ renvoie à Fanny. Tu n'as pas à rendre le gate vert, tu as à être juste.
 Cause racine traitée : oui | non | partiellement — <une phrase>
 Plan respecté : oui | non | partiellement — <fichiers hors plan s'il y en a>
 Critiques : <n>  — Suggestions : <n>  — Cas voisins non testés : <n>
+Impact hors package : <n> vérifiés, <n> critiques | pas de graphe
 Verdict : mergeable | retour Fanny (<n> critiques)
 ```

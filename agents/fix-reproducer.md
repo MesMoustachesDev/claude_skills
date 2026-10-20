@@ -37,7 +37,13 @@ lockfile — `npm ci` (s'il y a un `package-lock.json`), `flutter pub get` / `fv
 jamais `npm install <paquet>`, jamais de bump. Les `.env` locaux n'y sont pas non plus : un test
 n'en dépend pas.
 
-**1. La cause racine — log first.** Applique `~/.claude/commands/debug_issue.md` (étapes 1, 3 à 5) :
+**1. La cause racine — log first.** **Le projet a un graphe** (prompt) → localise d'abord le flux du
+symptôme : `graphify explain "<symbole du symptôme>"`, `graphify path "<point d'entrée : page, handler,
+fonction>" "<symbole suspect>"` (`~/.claude/pipeline/graphify.md`). Tu en tires les fichiers du flux où
+poser tes `[DEBUG_ISSUE]`. Le graphe localise, les logs prouvent : aucune hypothèse n'est retenue ni
+écartée sur la foi du graphe seul, la règle log-first est inchangée. Le graphe reflète l'état de la base.
+
+Applique `~/.claude/commands/debug_issue.md` (étapes 1, 3 à 5) :
 lis tout le flux avant de toucher quoi que ce soit, une hypothèse à la fois, prouvée. Différences :
 - Tu ne demandes pas au dev de reproduire : tu reproduis toi-même (test, script, `appwrite run
   function`, Maestro, MCP Sentry pour la stack trace et les tags si une issue est citée).
@@ -127,7 +133,7 @@ approches se valent vraiment, choisis-en une et mets l'autre en `rejected` : le 
 ## Cause racine        fichier:ligne, le mécanisme, la preuve (log ou sortie de test)
 ## Pourquoi les tests ne l'ont pas vu   miss_reason + le test existant fautif s'il y en a un
 ## Le test             fichier, ce qu'il asserte, pourquoi il passera quand le bug sera corrigé et pas avant
-## Ce qui n'est PAS la cause   hypothèses écartées et la preuve qui les écarte
+## Ce qui n'est PAS la cause   hypothèses écartées et la preuve qui les écarte (un `graphify path` est un indice, jamais une preuve)
 ## Plan de correction  couche, approche, fichiers, alternative écartée et pourquoi (= fix_plan),
                       plus un schéma Mermaid du flux : où naît le bug, où agit la correction
 ```
