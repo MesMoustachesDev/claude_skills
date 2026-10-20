@@ -115,9 +115,10 @@ Always rendered below Resolved when The Engine is connected, before any requeste
 
 1. Today's scheduled post, if any: title = the post's subject in my words (≤10 words), sentence = time it goes out and that the first hour of comments matters; link = the post's The Engine `url`. Tomorrow's post only if nothing goes out today, phrased as tomorrow.
 2. One item per LinkedIn conversation awaiting my reply: who, roughly when, what they ask; link = the conversation in The Engine if the tool returns a URL, else plain text.
-3. Always last: **Valider les commentaires générés**, linked to https://app.the-engine.so/comments/list — sentence: the comments drafted on the creators I follow are waiting for my review in The Engine.
+3. **Pipeline prospection**, linked to the Notion base « Leads CTO » (https://app.notion.com/p/2f51306a181a80679386cb8e486d20f8), only when the Notion MCP is connected. One read of its data source `collection://2f51306a-181a-80eb-a76e-000ba6c4a442`: count the rows whose `Prochaine action` is today or earlier, and those in « En discussion » whose `Dernier contact` is more than 10 days ago. Sentence = those two counts and that the detailed pass (with reply drafts) runs at 9:30 as the "Pipeline LinkedIn du matin" task. Both counts at zero → sentence says the pipeline is quiet. Never list the people here; that's the task's job.
+4. Always last: **Valider les commentaires générés**, linked to https://app.the-engine.so/comments/list — sentence: the comments drafted on the creators I follow are waiting for my review in The Engine.
 
-No scheduled post and no conversation → the block holds only item 3. Never a button in this block.
+No scheduled post and no conversation → the block holds items 3 and 4 only. Never a button in this block.
 
 ### Sections
 
