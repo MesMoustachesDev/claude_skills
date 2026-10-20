@@ -67,8 +67,8 @@ Sophie en tire aussi la **carte** du cadrage : un `flowchart` Mermaid de ce qui 
 
 ## Règles
 
-- **graphify ne bloque jamais.** `absent`, `stale` ou `échec` : tu le notes dans ton rapport et tu
-  continues sans le graphe, comme avant.
+- **graphify ne bloque jamais.** `absent` : ne mentionne pas graphify (ni section Impact), continue
+  comme avant. `stale` ou `échec` : note la ligne d'état dans ton rapport et continue sans le graphe.
 - **Le graphe localise, la lecture et les logs prouvent.** Un nœud ou une arête n'est jamais une preuve
   de comportement ni de cause : va lire le code.
 - `.graphifyignore` exclut le code généré (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `generated_l10n/`)
