@@ -50,6 +50,24 @@ PY
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "any(c['symbol']=='B_Bloc' and c['via']=='A_Old' and c['removed'] is True for c in d['consumers']) and any(c['via']=='A_Repo' and c['removed'] is False for c in d['consumers'])" "B_Bloc via A_Old supprimé"
 
+echo "impact_removed_symbol_renamed_file"
+new_repo renamed
+python3 - "$REPO" <<'PY'
+import json, sys
+r = sys.argv[1]
+d = json.load(open(r + "/graphify-out/graph.json"))
+d["nodes"].append({"id": "A_Old", "label": "A_Old", "source_file": "a/lib/src/data/foo_impl.dart", "source_location": "L50"})
+d["links"].append({"source": "B_Bloc", "target": "A_Old", "relation": "calls", "source_file": "b/lib/src/bloc.dart", "source_location": "L60"})
+json.dump(d, open(r + "/graphify-out/graph.base.json", "w"))
+d["nodes"] = [n for n in d["nodes"] if n["id"] != "A_Old"]
+d["links"] = [l for l in d["links"] if "A_Old" not in (l["source"], l["target"])]
+json.dump(d, open(r + "/graphify-out/graph.json", "w"))
+PY
+git -C "$REPO" mv features/a/lib/src/data/foo_impl.dart features/a/lib/src/data/repo_impl.dart
+commit "$REPO" "rename" >/dev/null
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "any(c['symbol']=='B_Bloc' and c['via']=='A_Old' and c['removed'] is True for c in d['consumers'])" "fichier renommé : B_Bloc via A_Old supprimé toujours listé"
+
 echo "impact_ignore_cfg"
 new_repo ignore
 mkdir -p "$REPO/.claude/rules"

@@ -178,7 +178,7 @@ def main():
             return finish("failed", "base introuvable : %s" % a.base)
     res["base"] = mb
     changed = []
-    for args in (("diff", "--name-only", "-z", mb), ("ls-files", "--others", "--exclude-standard", "-z")):
+    for args in (("diff", "--name-only", "--no-renames", "-z", mb), ("ls-files", "--others", "--exclude-standard", "-z")):
         rc, o = git(W, *args)
         if rc != 0:
             return finish("failed", "git %s a échoué" % args[0])
