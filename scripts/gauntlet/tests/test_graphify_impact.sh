@@ -68,6 +68,49 @@ commit "$REPO" "rename" >/dev/null
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "any(c['symbol']=='B_Bloc' and c['via']=='A_Old' and c['removed'] is True for c in d['consumers'])" "fichier renommé : B_Bloc via A_Old supprimé toujours listé"
 
+echo "impact_mutual_deps_orientation"
+new_repo mutual
+F="$REPO/features"
+mk_pkg "$F/a" a design:../design c:../c
+mk_pkg "$F/c" c a:../a
+echo "class CThing {}" > "$F/c/lib/src/thing.dart"
+# c et les dépendances mutuelles existent déjà sur develop ; seul foo_impl.dart change sur feature/x
+git -C "$REPO" stash -q && git -C "$REPO" checkout -q develop && commit "$REPO" "c" >/dev/null \
+  && git -C "$REPO" checkout -q feature/x && git -C "$REPO" merge -q develop && git -C "$REPO" stash pop -q
+python3 - "$REPO" <<'PY'
+import json, sys
+r = sys.argv[1]
+d = json.load(open(r + "/graphify-out/graph.json"))
+d["nodes"].append({"id": "C_Thing", "label": "C_Thing", "source_file": "c/lib/src/thing.dart", "source_location": "L3"})
+d["links"].append({"source": "A_Repo", "target": "C_Thing", "relation": "references", "source_file": "a/lib/src/data/foo_impl.dart", "source_location": "L15"})
+# direction JSON inversée (source = A_Repo) mais référence écrite dans le fichier de B_Bloc
+for l in d["links"]:
+    if {l["source"], l["target"]} == {"B_Bloc", "A_Repo"}:
+        l["source"], l["target"] = "A_Repo", "B_Bloc"
+json.dump(d, open(r + "/graphify-out/graph.json", "w"))
+PY
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "any(x['package']=='features/c' and x['symbol']=='C_Thing' and x['via']=='A_Repo' for x in d['dependencies'])" "c (deps mutuelles) : dépendance"
+expect_json "$REPO/out/impact.json" "not any(c['package']=='features/c' for c in d['consumers'])" "c n'est pas un consommateur"
+expect_json "$REPO/out/impact.json" "$CONSUMER" "lien inversé dans le JSON, source_file côté consommateur : b reste consommateur"
+
+echo "impact_orientation_fallback_source"
+python3 - "$REPO" <<'PY'
+import json, sys
+r = sys.argv[1]
+d = json.load(open(r + "/graphify-out/graph.json"))
+for l in d["links"]:
+    l.pop("source_file", None)
+    if {l["source"], l["target"]} == {"B_Bloc", "A_Repo"}:
+        l["source"], l["target"] = "B_Bloc", "A_Repo"
+    if {l["source"], l["target"]} == {"A_Repo", "C_Thing"}:
+        l["source"], l["target"] = "A_Repo", "C_Thing"
+json.dump(d, open(r + "/graphify-out/graph.json", "w"))
+PY
+run_impact "$REPO"
+expect_json "$REPO/out/impact.json" "$CONSUMER" "sans link.source_file : repli sur link.source (b consommateur)"
+expect_json "$REPO/out/impact.json" "any(x['package']=='features/c' for x in d['dependencies']) and not any(c['package']=='features/c' for c in d['consumers'])" "sans link.source_file : c dépendance"
+
 echo "impact_ignore_cfg"
 new_repo ignore
 mkdir -p "$REPO/.claude/rules"

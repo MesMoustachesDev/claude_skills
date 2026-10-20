@@ -225,12 +225,25 @@ def main():
                 if str(o.get("label", "")).startswith("_"): continue
                 ofile = file_of(o["source_file"]); opkg = pk.of(ofile)
                 if opkg == tpkg or ignored(opkg): continue
-                tk, tname, _ = pk.meta(tpkg); ok_, _, odeps = pk.meta(opkg)
-                label_o, label_t = o.get("label", oid), n.get("label", i)
-                if tk == "dart" and ok_ == "dart":
-                    is_cons, classified = (tname in odeps), True
+                # orientation : le côté où la référence est écrite est le consommateur
+                lsf = lk.get("source_file")
+                lf = file_of(lsf) if lsf else None
+                if lf == ofile and lf != tfile:
+                    is_cons, classified = True, True
+                elif lf == tfile and lf != ofile:
+                    is_cons, classified = False, True
+                elif lk.get("source") == oid and lk.get("source") != i:
+                    is_cons, classified = True, True
+                elif lk.get("source") == i and lk.get("source") != oid:
+                    is_cons, classified = False, True
                 else:
-                    is_cons, classified = True, False
+                    # orientation indéterminée : dernier recours, le pubspec
+                    tk, tname, _ = pk.meta(tpkg); ok_, _, odeps = pk.meta(opkg)
+                    if tk == "dart" and ok_ == "dart":
+                        is_cons, classified = (tname in odeps), True
+                    else:
+                        is_cons, classified = True, False
+                label_o, label_t = o.get("label", oid), n.get("label", i)
                 if is_cons:
                     key = (ofile, label_o, label_t)
                     if key in seen_c: continue
