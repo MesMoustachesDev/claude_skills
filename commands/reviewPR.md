@@ -51,6 +51,11 @@ extend** (périmètre = diff vs base : la dette préexistante ne compte pas, ce 
 `dedup_candidates.json` : les déclarations nouvelles de la PR qui ressemblent à des déclarations
 existantes du workspace, et les widgets nouveaux face au catalogue du design system.
 
+Quand le projet a un graphe graphify, le rapport contient aussi une section `## Impact (graphify)` :
+les consommateurs hors package que la PR ne touche pas, et l'ordre de lecture du diff. Le script met
+le graphe à jour sur la branche avant de le calculer ; ça n'influe jamais sur son verdict. Le contrat
+est dans `~/.claude/pipeline/graphify.md`. Sans graphe, il n'y a rien à mentionner.
+
 Si le script n'est pas disponible (projet sans `feature_pipeline.md`, outils absents), dis-le et
 continue avec le diff seul — mais dis-le, ne fais pas semblant d'avoir mesuré.
 
@@ -66,6 +71,8 @@ git log <remote>/<cible>..<remote>/<source> --oneline           # commits de la 
 ```
 
 Si la branche source n'existe qu'en local : remplace `<remote>/<source>` par `<source>`.
+Lis le diff dans l'**ordre de lecture** de la section Impact du rapport (nœuds centraux d'abord, puis
+les feuilles), les fichiers « hors graphe » en dernier ; sans cette section, l'ordre du `--name-status`.
 Ne compare jamais à la branche courante du repo : c'est la cible de la MR qui compte.
 
 ## Étape 4 — Reconstituer le contexte : le *pourquoi* avant le *comment*
@@ -100,6 +107,9 @@ git grep -n "<Symbole>" <remote>/<cible> -- '<glob>'      # existait déjà sur 
 git grep -n "<Symbole>" <remote>/<source> -- '<glob>'     # vs état sur la branche de la MR
 ```
 
+Si le projet a un graphe, `graphify explain "<Symbole>"` donne ses voisins et ce qui l'utilise déjà, et
+le `git grep` reste la preuve : le graphe oriente, il ne tranche pas.
+
 Ça change tout au verdict : un `availableLevel` figé à `Unknown()` est une étourderie si le modèle
 expose déjà `is_reachable`, et une contrainte backend si le champ n'existe pas. Ne tranche jamais
 sans avoir regardé.
@@ -108,7 +118,8 @@ sans avoir regardé.
 cas le plus proche déjà en place (le type d'équipement précédent, la feature sœur) et lis-le en
 entier. C'est ton étalon : ce qui s'en écarte est suspect, ce qui le recopie fidèlement est
 « conforme au voisinage » même si le pattern lui-même est discutable, et cette nuance doit apparaître
-dans tes remarques.
+dans tes remarques. Avec un graphe, `graphify path "<A>" "<B>"` montre comment le voisin et le nouveau
+code se rejoignent ; même règle, le `git grep` fait foi.
 
 ## Étape 5 — Charger les règles projet
 
@@ -132,6 +143,11 @@ Analyse le diff en tenant compte :
 2. **Des règles projet** (`.claude/rules/pr_rules.md` si présent)
 3. **Des règles de bon sens universelles** listées ci-dessous
 4. **De la grille de maintenabilité** — ce que les scripts ne voient pas
+5. **Des consommateurs hors package** (section Impact du rapport, s'il y en a une) — pour chaque
+   consommateur non touché par la PR, lis l'usage au `fichier:ligne` indiqué. S'il casse ou change de
+   comportement : **point d'attention** au triage (régression hors package, avec le `fichier:ligne` du
+   consommateur). Sinon, rien. Le graphe seul ne crée jamais de remarque : sans usage lu et cassé, pas
+   de remarque.
 
 Les règles universelles et la grille de maintenabilité vivent dans `~/.claude/pipeline/review_grid.md`
 (partagé avec `feature-reviewer` et `fix-reviewer`). Lis-le maintenant et applique-le en entier.
@@ -152,7 +168,8 @@ description (étape 4a). Si la description est vide, écris-le noir sur blanc.
 promet. Et surtout la distinction de l'étape 4c : **ce qui existait déjà sur la cible vs ce que la MR
 ajoute réellement**.
 
-**3. L'arbre du changement** — les fichiers groupés par couche, une ligne de rôle chacun, avec le
+**3. L'arbre du changement** — les fichiers groupés par couche (dans l'ordre de lecture de l'impact
+quand il existe), une ligne de rôle chacun, avec le
 volume. Les fichiers purement mécaniques (reformatage, regénération) sont marqués comme tels pour
 qu'on sache où ne pas chercher :
 
@@ -189,7 +206,13 @@ c'est là que se logent les incohérences visibles par l'utilisateur.
 **5. Verdict gauntlet** — les `[OK]` / `[WARN]` / `[FAIL]` bruts, et surtout **ce qui n'a pas pu
 tourner**. Si le SDK manque ou qu'un check a été sauté, dis lesquels et ce que ça implique : tout ce
 qui suit vient alors de ta lecture, pas d'une mesure. Ne laisse jamais croire qu'une chose a été
-vérifiée quand elle ne l'a pas été.
+vérifiée quand elle ne l'a pas été. Dis aussi si l'impact graphify a tourné (ou la raison de la ligne
+`Impact : non calculé (…)` du rapport) ; si cette ligne dit `(absent)`, le projet n'a pas de graphe :
+n'en parle pas.
+
+**6. Impact** — seulement si le rapport a une section Impact calculée : les consommateurs hors package
+non touchés, une ligne chacun (`package · symbole · via · fichier:ligne`), sans verdict. Aucun
+consommateur : une ligne qui le dit.
 
 Puis, et seulement puis, annonce le nombre de points d'attention et enchaîne sur le triage.
 
@@ -223,7 +246,8 @@ _Ce qui est bien fait — sois honnête, pas condescendant._
 
 ### 🚨 Problèmes critiques
 _Bugs, failles de sécurité, régressions potentielles, violations d'architecture, roue réinventée
-avérée, `[FAIL]` du gauntlet. Doit être corrigé avant merge._
+avérée, `[FAIL]` du gauntlet, régressions hors package vérifiées (consommateur lu et cassé). Doit être
+corrigé avant merge._
 
 Pour chaque problème :
 - **Fichier** : `chemin/vers/fichier.kt` (ligne X)
@@ -236,7 +260,8 @@ _Non bloquants mais recommandés, `[WARN]` du gauntlet inclus. Même format que 
 ### 🧭 Maintenabilité
 _La grille, point par point : architecture · roue réinventée · dépendances (avec le tableau
 package / problème / alternative / fichiers / risque / verdict s'il y a lieu) · design system & l10n ·
-cohérence · lisibilité · tests. `ok` ou `ko` avec une ligne de justification chacun._
+cohérence (impact graphify compris : ce que la PR change chez ses consommateurs) · lisibilité · tests.
+`ok` ou `ko` avec une ligne de justification chacun._
 
 ### 💬 Questions / clarifications
 _Ce qui nécessite une discussion ou contexte supplémentaire._

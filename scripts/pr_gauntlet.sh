@@ -7,6 +7,7 @@
 # 2. checks PR (taille, commits, lock, tests touchés)
 # 3. pour chaque package touché : gauntlet.sh pr en mode extend (périmètre = diff vs base)
 #    + dedup_candidates (pour le jugement IA de /reviewPR)
+# 3b. graphify : update sur la PR + impact (consommateurs hors package, ordre de lecture) — n'influe pas sur le verdict
 # 4. report.md + logs dans --out (défaut ~/.cache/gauntlet/pr/<branche>), exit 1 si un check est rouge
 #
 # Lu par /reviewPR : les scripts d'abord, le jugement ensuite.
@@ -216,6 +217,25 @@ for p in $pkgs; do
     echo; echo "Log complet : \`$out/$name.log\`"; echo
   } >> "$report"
 done
+
+# --- graphify : impact de la PR (AST, sans Flutter : tourne même si sdk_ok=0 ; ne touche jamais à pr_rc) -----------
+GRAPHIFY="$HOME/.claude/scripts/graphify.sh"
+"$GRAPHIFY" prepare "$wt" --update >"$out/graphify.log" 2>&1 || true
+prep_line="$(tail -1 "$out/graphify.log" 2>/dev/null)"
+"$GRAPHIFY" impact "$wt" "$mb" --out "$out/graphify" >>"$out/graphify.log" 2>&1 || true
+{
+  echo "## Impact (graphify)"; echo
+  ist="$(jq -r '.status // empty' "$out/graphify/impact.json" 2>/dev/null)"
+  case "$ist" in
+    ok|stale) cat "$out/graphify/impact.md" ;;
+    *)
+      ireason="$(jq -r '.reason // empty' "$out/graphify/impact.json" 2>/dev/null)"
+      # prepare a échoué alors qu'un graphe existe dans le principal : sa raison vaut mieux que « absent »
+      case "$prep_line" in "graphify: échec "*) [ "$ist" = absent ] && ireason="${prep_line#graphify: échec }" ;; esac
+      printf 'Impact : non calculé (%s)\n' "${ireason:-${ist:-échec}}" ;;
+  esac
+  echo
+} >> "$report"
 
 {
   echo "## Verdict scripts"; echo
