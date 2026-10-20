@@ -169,9 +169,8 @@ promet. Et surtout la distinction de l'étape 4c : **ce qui existait déjà sur 
 ajoute réellement**.
 
 **3. L'arbre du changement** — les fichiers groupés par couche (dans l'ordre de lecture de l'impact
-quand il existe), une ligne de rôle chacun, avec le
-volume. Les fichiers purement mécaniques (reformatage, regénération) sont marqués comme tels pour
-qu'on sache où ne pas chercher :
+quand il existe), une ligne de rôle chacun, avec le volume. Les fichiers purement mécaniques
+(reformatage, regénération) sont marqués comme tels pour qu'on sache où ne pas chercher :
 
 ```
 data/       not_reachable_device_data_source.dart   +33/-2    query GraphQL `esls`

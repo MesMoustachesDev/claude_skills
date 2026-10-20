@@ -194,8 +194,9 @@ est décrit en 0e. Chaque reclassement va dans
     pour racine.
   - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `absent` → ne parle pas de graphify
-    et continue ; `stale` ou `échec` → note la ligne et continue sans carte. Sophie et Arthur s'en
-    servent dès le cadrage ; 9a le mettra à jour.
+    et continue ; `stale` ou `échec` → note la ligne et continue sans carte. Sur `ok`, garde la valeur
+    de `graph=` (chemin du graphe relatif à la racine, ex. `flutter_app/graphify-out/graph.json`) :
+    tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage ; 9a le mettra à jour.
   - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
     worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
@@ -243,13 +244,14 @@ pendant les boucles de spec coûte une boucle Sophie + Camille par changement, e
 arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi* ; les contrats de Thibault, puis la spec, écrivent le *comment*.
 
 1. **Sophie, mode cadrage** (`feature-specifier`, prompt : « mode cadrage », nom, description brute,
-   issue s'il y en a une, racine, sortie `.claude/features/<nom>/cadrage.md`). Elle explore et n'écrit
+   issue s'il y en a une, racine, sortie `.claude/features/<nom>/cadrage.md`, le chemin du graphe
+   (`graph=` de l'étape 0) si `prepare` a dit `ok`). Elle explore et n'écrit
    pas de spec. `cadrage.md` contient, court :
    - **Ce qui existe déjà** : le code actuel qui fait tout ou partie du besoin, dans ce repo **et
      ailleurs** (autre plateforme, web, backend, autre feature), avec les valeurs en dur relevées
      (seuils, formats, limites) et les écarts entre eux. C'est souvent là que se cache la bonne réponse.
-     **Le projet a un graphe graphify** (`graphify-out/graph.json`, copié dans le worktree en 0) →
-     Sophie part de la carte, pas d'une exploration à l'aveugle (`~/.claude/pipeline/graphify.md`,
+     **Le projet a un graphe graphify** (le `graph=` de l'étape 0, copié dans le
+     worktree) → Sophie part de la carte, pas d'une exploration à l'aveugle (`~/.claude/pipeline/graphify.md`,
      section Explorer) et cite les nœuds avec leur `fichier:ligne`. Le cadrage en tire une **carte** :
      un `flowchart` Mermaid de ce qui existe autour du besoin (packages, classes, flux), avec ce que la
      feature touchera.
@@ -313,8 +315,8 @@ de périmètre demandé plus tard repasse par 0b (cadrage mis à jour et revalid
 L'architecture appartient à Thibault, et il la possède mieux en l'écrivant qu'en cochant des
 propositions : Arthur ne fait que lui éviter la page blanche. Prompt : « mode brouillon », nom,
 **mode**, `cadrage.md` validé, `create_feature_rules.md`, package, valeur de `brick`, la feature de
-référence (« Notes pour les agents » de la config). En `extend` : « pas de scaffold ; ajoute dans
-l'existant ; ne renomme rien ».
+référence (« Notes pour les agents » de la config), et le chemin du graphe (`graph=` de l'étape 0)
+si `prepare` a dit `ok`. En `extend` : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ».
 
 Arthur scaffolde (en `create`) et pose **dans les vrais fichiers du package**, en stubs, le court
 brouillon de ce que Thibault doit posséder : entités, interfaces de repository et de data sources,
@@ -731,8 +733,9 @@ Depuis le worktree :
 - `ok` → la section « Impact » reprend le tableau « Consommateurs hors package non touchés » de
   `impact.md` (package consommateur, symboles touchés, via). `impact.md` ne remplace pas le `grep` des
   usages d'un symbole modifié.
-- `stale` → section « Impact » avec la ligne « Impact : calculé sur le graphe de la base (update en
-  échec) » ; les symboles ajoutés par le diff manquent.
+- `stale` → section « Impact » : le même tableau, précédé de la ligne « Impact : calculé sur le graphe
+  de la base (update en échec) » ; les symboles ajoutés par le diff manquent, une absence de
+  consommateur ne prouve rien.
 - `échec` → ligne « Impact : non calculé (<raison>) ».
 graphify ne bloque jamais la livraison.
 
@@ -773,8 +776,8 @@ Exemptions gauntlet-ignore : <n> (<où>)
 
 ## Impact (graphify)                  ← 9a, seulement si le projet a un graphe ; tableau tiré de impact.md
 | Package consommateur | Symboles touchés | Via |
-Non `ok` : une seule ligne à la place du tableau, « Impact : non calculé (<raison>) » ou, pour `stale`,
-« Impact : calculé sur le graphe de la base (update en échec) ». `absent` : pas de section.
+`stale` : tableau gardé, précédé de « Impact : calculé sur le graphe de la base (update en échec) ».
+`échec` : une seule ligne à la place du tableau, « Impact : non calculé (<raison>) ». `absent` : pas de section.
 
 ## Dette existante (hors feature)       ← pipeline.json → debt + .gauntlet/debt_deps.txt
 | Fichier | Problème | Vu par (spec, gate, revue) |

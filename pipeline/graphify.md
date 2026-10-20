@@ -23,6 +23,8 @@ sous-dossier du repo) ; chaque worktree en reçoit une copie.
 - `prepare` rafraîchit le graphe du principal s'il est en retard sur son HEAD, le copie dans le worktree
   (cache compris), copie les `.graphifyignore` non versionnés du principal (graphify les lit de la
   racine de scan jusqu'à la racine du repo) et exclut `graphify-out/` via `.git/info/exclude`.
+  Sa ligne `ok` donne le chemin du graphe relatif au repo (`graph=<dossier>/graphify-out/graph.json`) ;
+  il écrit aussi la racine de scan du worktree dans `graphify-out/.scan_root`, que lit `impact`.
   Avec `--update`, il garde d'abord `graph.base.json` (le graphe avant mise à jour) puis relance
   `graphify update` sur le worktree ; s'il échoue : `stale`, graphe de la base conservé.
 - Un `graph.json` corrompu donne `échec graph.json illisible`. Sans graphe : `absent`, ne crée rien.
@@ -37,14 +39,17 @@ travail et fichiers non suivis compris. Packages listés dans `graphify.ignore_p
   worktree a échoué : **les symboles ajoutés par le diff manquent** du graphe. Les consommateurs trouvés
   restent vrais, l'absence d'un consommateur ne prouve rien.
 - `consumers[]` : un symbole **d'un autre package qui dépend du code touché** (il peut casser).
-  `package`, `file`, `symbol`, `location` (`file:ligne` à lire) ; `via` / `via_file` = le symbole touché
-  qu'il utilise ; `relation` = nature du lien.
+  `package`, `file`, `symbol`, `location` (la ligne seule, ex. `L42` : cite `file:location`) ;
+  `via` / `via_file` = le symbole touché qu'il utilise ; `relation` = nature du lien.
   - `touched` : le fichier du consommateur est déjà dans le diff. Ceux-là sont absents de `impact.md` :
     ils sont dans ce que tu relis de toute façon.
   - `removed` : le symbole `via` n'existe plus dans le graphe courant (supprimé ou renommé), retrouvé
-    via `graph.base.json`. Priorité : le consommateur ne compile plus.
-  - `classified: false` : hors Dart, le sens de la dépendance n'est pas déterminé, tout est
-    consommateur par défaut. Vérifie.
+    via `graph.base.json` : à lire en premier, le consommateur ne compile peut-être plus. Ce graphe peut
+    aussi venir d'un checkout principal en avance sur la base — vérifie que le symbole a bien disparu
+    dans le diff.
+  - `classified: false` : orientation de l'arête indéterminée (ni son `source_file` ni son sens ne
+    désignent le côté qui référence) **et** les deux packages ne sont pas tous deux Dart (pas de pubspec
+    pour trancher) ; consommateur par défaut. Vérifie.
 - `dependencies[]` : `package`, `symbol`, `via` — ce que le code touché **utilise** ailleurs (le package
   touché dépend de lui). Ce n'est **pas** un consommateur : ne le compte pas comme impact.
 - `reading_order[]` : `file`, `degree` — fichiers du diff présents dans le graphe, par degré décroissant
@@ -53,22 +58,29 @@ travail et fichiers non suivis compris. Packages listés dans `graphify.ignore_p
 
 ## Explorer
 
-Quand le projet a un graphe (`graphify-out/graph.json`, copié dans le worktree par `prepare`), pars de
-la carte, pas d'une exploration à l'aveugle :
+Quand le projet a un graphe (copié dans le worktree par `prepare`), pars de la carte, pas d'une
+exploration à l'aveugle. Le graphe n'est pas forcément à la racine : son chemin est le `graph=` de la
+ligne d'état de `prepare` (ex. `flutter_app/graphify-out/graph.json`), transmis dans ton prompt.
+graphify cherche par défaut `./graphify-out/graph.json` : passe `--graph <g>` à chaque commande
+(`<g>` = `<worktree>/<graph=…>`), ou lance-la depuis le dossier qui contient `graphify-out/`.
 
-1. `GRAPH_REPORT.md` : communautés et nœuds centraux du domaine.
-2. `graphify explain "<Symbole>"` et `graphify path "<A>" "<B>"` sur les symboles du besoin.
-3. `graphify query "<question>" --budget 1500` en **dernier recours** : il remonte du bruit, surtout les
-   fichiers l10n générés.
+1. `GRAPH_REPORT.md` (à côté de `graph.json`) : communautés et nœuds centraux du domaine.
+2. `graphify explain "<Symbole>" --graph <g>` et `graphify path "<A>" "<B>" --graph <g>` sur les
+   symboles du besoin.
+3. `graphify query "<question>" --budget 1500 --graph <g>` en **dernier recours** : il remonte du bruit,
+   surtout les fichiers l10n générés.
 
-Ne lis le code que pour vérifier ce que le graphe montre. Cite les nœuds avec leur `fichier:ligne`.
+Ne lis le code que pour vérifier ce que le graphe montre. Cite les nœuds avec leur `fichier:ligne` :
+le `source_file` d'un nœud est relatif à la racine de scan (`graphify-out/.scan_root`), préfixe-le du
+chemin de cette racine dans le repo.
 Sophie en tire aussi la **carte** du cadrage : un `flowchart` Mermaid de ce qui existe autour du besoin
 (packages, classes, flux), avec ce que la feature touchera.
 
 ## Règles
 
 - **graphify ne bloque jamais.** `absent` : ne mentionne pas graphify (ni section Impact), continue
-  comme avant. `stale` ou `échec` : note la ligne d'état dans ton rapport et continue sans le graphe.
+  comme avant. `stale` : impact calculé sur le graphe de la base, utilisable ; une absence de
+  consommateur ne prouve rien — note la ligne. `échec` : note la ligne et continue sans le graphe.
 - **Le graphe localise, la lecture et les logs prouvent.** Un nœud ou une arête n'est jamais une preuve
   de comportement ni de cause : va lire le code.
 - `.graphifyignore` exclut le code généré (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `generated_l10n/`)

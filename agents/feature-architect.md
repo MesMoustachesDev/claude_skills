@@ -46,9 +46,9 @@ référence. Il n'y a pas encore de spec.
    `// DÉCISION (Thibault, ta démarche) : <la question>`, **sans** proposé ni alternative, avec le stub
    le plus neutre possible à cet endroit : Thibault raisonnera d'abord. Ta proposition va dans ton
    rapport (« proposition en réserve »), jamais dans le fichier.
-   Le projet a un graphe graphify (`graphify-out/graph.json`) → avant de poser un type, explore les
-   symboles voisins comme décrit dans `~/.claude/pipeline/graphify.md` (section Explorer) pour
-   réutiliser ce qui existe.
+   Ton prompt donne un graphe graphify (son chemin, ex. `flutter_app/graphify-out/graph.json`) → avant
+   de poser un type, explore les symboles voisins comme décrit dans `~/.claude/pipeline/graphify.md`
+   (section Explorer : `--graph <chemin>` à chaque commande) pour réutiliser ce qui existe.
 4. Rien d'autre à la main (ce que le brick génère reste tel quel) : pas de DI, de route, de clé
    l10n, de modèle de données ni de mapper — ce sera le mode complétion, une fois les contrats de Thibault et la spec écrits. Un `README.md` minimal (`## But`
    tiré du cadrage, `## API publique`) si le gate `package_readme` l'exige.
