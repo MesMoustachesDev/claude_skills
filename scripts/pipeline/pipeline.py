@@ -761,9 +761,15 @@ def cmd_cockpit_push(c, args):
     writes.insert(0, {"op": "set", "collection": "features", "doc_id": key, "file_path": fp})
     # Ligne de l'accueil (artifact commun, sans « Prévenir Claude ») : de quoi voir l'état et ouvrir la page.
     cockpit = c.p.get("cockpit") or {}
-    index = {"kind": "feature", "key": key, "project": c.project(), "title": c.name, "url": cockpit.get("url"),
-             "step": feature["step"], "waiting": feature["waiting"], "size": c.size,
-             "parent": (feature.get("parent") or {}).get("name"), "updated_at": now()}
+    done = n["key"] == "done"
+    ev = ((c.p.get("stages") or {}).get("evidence") or {})
+    issue = c.p.get("issue") or {}
+    index = {"kind": "feature", "key": key, "project": c.project(), "title": c.name,
+             "url": None if cockpit.get("deleted") else cockpit.get("url"), "page_deleted": bool(cockpit.get("deleted")),
+             "step": feature["step"], "waiting": None if done else feature["waiting"], "size": c.size,
+             "parent": (feature.get("parent") or {}).get("name"), "done": done, "done_at": ev.get("at") if done else None,
+             "outcome": (f"evidence prête, MR via create_mr" + (f" · issue #{issue.get('iid')}" if issue.get("iid") else "")) if done else None,
+             "updated_at": now()}
     ip = os.path.join(out_dir, "index.json")
     with open(ip, "w", encoding="utf-8") as fh:
         json.dump(index, fh, ensure_ascii=False)
@@ -852,6 +858,14 @@ def write_page(dest_dir, title):
     print(path)
 
 
+def cmd_page_deleted(c, args):
+    """Thibault a fait supprimer la page de cette feature : l'accueil garde la carte, sans lien."""
+    c.p.setdefault("cockpit", {})["deleted"] = True
+    c.p["cockpit"]["deleted_at"] = now()
+    c.save()
+    print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
+
+
 def cmd_cockpit_page(c, args):
     if not args:
         die("usage : cockpit-page <nom> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
@@ -863,7 +877,7 @@ COMMANDS = {
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "say": cmd_say,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
-    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page,
+    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,
 }
 
 

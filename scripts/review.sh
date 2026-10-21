@@ -25,4 +25,5 @@
 #   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie
 #   review.sh cleanup <slug>                     supprime le worktree de la revue (garde rapports et captures)
 #   review.sh cockpit-page <slug> <dossier>      copie de la page du cockpit pour cette revue (à publier au démarrage)
+#   review.sh page-deleted <slug>                la page de la revue a été supprimée (carte gardée dans l'accueil)
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/review/review.py" "$@"

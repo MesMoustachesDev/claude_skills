@@ -89,3 +89,11 @@ pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'
 `git worktree remove .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
 Termine par un résumé de 5 lignes et le chemin de l'evidence.
 
+**Fin : la page de la feature.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh say <nom> ""`
+puis « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) — la carte de l'accueil passe dans
+« Terminées ». Puis un seul `AskUserQuestion` : « Supprimer la page de cette feature ? » — « Garder (son
+historique : décisions, contrats, rapports) » / « Supprimer ». **Supprimer** → `Artifact` `delete` avec
+`cockpit.url` (l'outil lui demande confirmation ; c'est définitif), puis `pipeline.sh page-deleted
+<nom>`, puis `pipeline.sh cockpit-push` et le seul `batch` de `hub_writes` sur l'accueil : la carte reste,
+marquée « Page supprimée ». Ne supprime jamais la page sans cette question, ni l'accueil, jamais.
+

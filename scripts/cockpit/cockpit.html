@@ -145,6 +145,8 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 .hub-card b { overflow-wrap: anywhere }
 .hub-card .w { color: var(--wait); font-weight: 600; font-size: .88rem }
 .hub-card a.open { justify-self: start; font-weight: 600; color: var(--accent) }
+#hubDone summary { cursor: pointer }
+.hub-grid.done { margin-top: 8px; opacity: .85 }
 .mr { grid-column: 1 / -1; display: grid; gap: 10px }
 .mr h2 { margin: 0 }
 .mr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px }
@@ -214,6 +216,10 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     <h2>En cours</h2>
     <p class="status">Une page par feature et par revue : c'est là que tu tries, édites et préviens la session concernée. Ici, tu vois tout d'un coup d'œil.</p>
     <div class="hub-grid" id="hubList"></div>
+    <details id="hubDone" hidden>
+      <summary class="status" id="hubDoneCount">Terminées</summary>
+      <div class="hub-grid done" id="hubDoneList"></div>
+    </details>
   </section>
 
   <section class="waiting" id="waiting" hidden>
@@ -682,21 +688,35 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   }
 
   // Accueil : une carte par feature ou revue en cours (collection `index`), avec le lien vers sa page.
-  function renderHub(items) {
-    $("hub").hidden = !items.length;
+  function renderHub(all) {
+    $("hub").hidden = !all.length;
+    const live = all.filter((x) => !x.done), done = all.filter((x) => x.done);
     const box = $("hubList"); box.replaceChildren();
-    items.forEach((x) => {
+    if (!live.length) box.append(el("p", "status", "Rien en cours."));
+    live.forEach((x) => box.append(hubCard(x)));
+    const old = $("hubDone");
+    old.hidden = !done.length;
+    $("hubDoneCount").textContent = `Terminées (${done.length})`;
+    const dl = $("hubDoneList"); dl.replaceChildren();
+    done.sort((a, b) => String(b.done_at || b.updated_at).localeCompare(String(a.done_at || a.updated_at))).forEach((x) => dl.append(hubCard(x)));
+  }
+
+  function hubCard(x) {
+    {
       const card = el("div", `hub-card${x.waiting ? " waits" : ""}`);
       const top = el("div", "top");
       top.append(el("b", null, x.kind === "review" ? (x.number ? `!${x.number} ${x.title || ""}` : x.title) : x.title),
                  el("span", `chip ${x.kind === "review" ? "question" : "PASSED"}`, x.kind === "review" ? "revue" : "feature"));
-      card.append(top, el("span", "status", [x.project, x.parent && `sous-feature de ${x.parent}`, x.step && `étape ${x.step.step} — ${x.step.title}`].filter(Boolean).join(" · ")));
+      card.append(top, el("span", "status", [x.project, x.parent && `sous-feature de ${x.parent}`,
+        x.done ? `terminée ${fmt(x.done_at || x.updated_at)}` : x.step && `étape ${x.step.step} — ${x.step.title}`].filter(Boolean).join(" · ")));
+      if (x.done && x.outcome) card.append(el("span", null, x.outcome));
       if (x.waiting) card.append(el("span", "w", `En attente de toi : ${x.waiting}`));
       if (x.url) card.append(Object.assign(el("a", "open", "Ouvrir sa page"), { href: x.url, target: "_blank", rel: "noopener" }));
-      else card.append(el("span", "status", "Page pas encore publiée"));
-      card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
-      box.append(card);
-    });
+      else card.append(el("span", "status", x.page_deleted ? "Page supprimée" : "Page pas encore publiée"));
+      if (x.mr_url) card.append(Object.assign(el("a", "open", "Voir la MR"), { href: x.mr_url, target: "_blank", rel: "noopener" }));
+      if (!x.done) card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
+      return card;
+    }
   }
 
   $("tabF").onclick = () => setMode("features");

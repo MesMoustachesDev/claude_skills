@@ -24,4 +24,5 @@
 #   pipeline.sh cockpit-push <nom> <dossier> [--versions id=v,…] [--hub-version N]  documents de la page de la feature (writes) et de sa ligne dans l'accueil (hub_writes)
 #   pipeline.sh cockpit-pull <nom> <dossier>     applique les éditions de contrats lues du cockpit
 #   pipeline.sh cockpit-page <nom> <dossier>     copie de la page du cockpit pour cette feature (à publier au démarrage)
+#   pipeline.sh page-deleted <nom>               la page de la feature a été supprimée (carte gardée dans l'accueil)
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/pipeline/pipeline.py" "$@"

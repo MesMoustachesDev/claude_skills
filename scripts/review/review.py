@@ -223,6 +223,14 @@ def cmd_pass(r, args):
     print(f"{args[0]} : fait")
 
 
+def cmd_page_deleted(r, args):
+    """Thibault a fait supprimer la page de cette revue : l'accueil garde la carte, sans lien."""
+    r.s.setdefault("cockpit", {})["deleted"] = True
+    r.s["cockpit"]["deleted_at"] = now()
+    r.save()
+    print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
+
+
 def cmd_set_cockpit(r, args):
     """L'URL de la page de cette revue (publiée par la session au démarrage)."""
     if not args or not args[0].startswith("https://"):
@@ -688,9 +696,19 @@ def cmd_cockpit_push(r, args):
     if s["key"] in versions:
         w["if_version"] = versions[s["key"]]
     cockpit = s.get("cockpit") or {}
+    done = stage_done(s, "synthesis")
+    verdict = None
+    m = re.search(r"### Verdict\s*\n+(.+)", read_text(r.file("synthesis.md")) or "")
+    if m:
+        verdict = m.group(1).strip().strip("_")[:160]
+    posted = len(s.get("posted") or [])
     index = {"kind": "review", "key": s["key"], "project": s["project"], "title": doc["title"],
-             "number": s.get("number"), "url": cockpit.get("url"), "mr_url": s.get("url"),
-             "step": doc["step"], "waiting": doc["waiting"], "updated_at": now()}
+             "number": s.get("number"), "url": None if cockpit.get("deleted") else cockpit.get("url"),
+             "page_deleted": bool(cockpit.get("deleted")), "mr_url": s.get("url"),
+             "step": doc["step"], "waiting": None if done else doc["waiting"], "done": done,
+             "done_at": (s.get("stages") or {}).get("synthesis", {}).get("at") if done else None,
+             "outcome": " · ".join(x for x in (verdict, f"{posted} commentaire{'s' if posted > 1 else ''} publié{'s' if posted > 1 else ''}") if x) if done else None,
+             "updated_at": now()}
     ip = os.path.join(out_dir, "index.json")
     with open(ip, "w", encoding="utf-8") as fh:
         json.dump(index, fh, ensure_ascii=False)
@@ -1035,7 +1053,7 @@ COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
     "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge,
-    "check-comments": cmd_check_comments, "set-cockpit": cmd_set_cockpit, "cockpit-page": cmd_cockpit_page, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
+    "check-comments": cmd_check_comments, "set-cockpit": cmd_set_cockpit, "page-deleted": cmd_page_deleted, "cockpit-page": cmd_cockpit_page, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 
