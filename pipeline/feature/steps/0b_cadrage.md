@@ -62,8 +62,10 @@ arrive après les contrats coûte la chaîne entière. Le cadrage fige le *quoi*
    package, size, depends_on}]`) ; Sophie écrit pour chacune `.claude/features/<nom>/split/<sous>.md`
    (l'extrait du cadrage qui la concerne). Puis tu t'arrêtes : pas de spec, pas d'issue, pas de
    worktree de plus. Donne au dev la commande de chaque sous-feature, dans l'ordre de dépendance
-   (`/feature <sous> [--in <package>] "<description>"`) ; au cadrage d'une sous-feature, Sophie reçoit
-   en entrée le chemin absolu de son extrait et ne repart pas de zéro. Une sous-feature qui dépend
+   (`/feature <sous> --parent <nom> [--in <package>] "<description>"`) ; au cadrage d'une sous-feature,
+   Sophie reçoit en entrée le chemin absolu de son extrait (que `pipeline.sh init … --parent` imprime) et
+   ne repart pas de zéro. Le cockpit range chaque sous-feature sous sa parente (« 2/3 ») et montre, sur
+   la parente, l'avancement de toutes. Une sous-feature qui dépend
    d'une autre attend son merge, ou part de sa branche (`base` dans son `pipeline.json`). Sors avec
    `ExitWorktree` `action: "keep"` : le dossier de la feature parente garde le découpage.
 

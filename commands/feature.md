@@ -16,6 +16,7 @@ Argument : **$ARGUMENTS**
 /feature init                                  prépare le projet (config, règles, brick, doctor)
 /feature <nom> [description]                   nouvelle feature = nouveau package features/<nom>
 /feature <nom> --in <package> [description]    ajout à un package existant (mode extend)
+/feature <sous> --parent <nom> [--in <package>] [description]   sous-feature d'une feature découpée (L)
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
 ```

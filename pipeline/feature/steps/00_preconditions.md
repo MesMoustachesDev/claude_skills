@@ -32,8 +32,10 @@
   `human_gates.contracts` reprend à 0e : rouvre les fichiers pour Thibault. `size: L` avec `split`
   rempli : `next` le dit, affiche l'état de chaque sous-feature (son `pipeline.json` dans son worktree)
   et ne lance rien.
-  Sinon : `pipeline.sh init <nom> --mode create|extend --package <chemin> --base <base_branch>`, qui
-  crée le dossier et `pipeline.json` avec tous ses champs. `mode` et `package` sont lus par le
+  Sinon : `pipeline.sh init <nom> --mode create|extend --package <chemin> --base <base_branch>`
+  (`--parent <nom>` pour une sous-feature d'une feature découpée : il vérifie qu'elle est dans son
+  découpage et imprime le chemin de son extrait de cadrage), qui crée le dossier et `pipeline.json`
+  avec tous ses champs. `mode` et `package` sont lus par le
   gauntlet et les hooks : c'est ce qui définit le périmètre. Changement de package ou de mode validé
   au cadrage : `pipeline.sh set <nom> package '"<chemin>"'` et `pipeline.sh set <nom> mode '"extend"'`.
   **Rejeu** (amendement de spec, nouvelle passe contracts → red → green sur du code déjà implémenté) :

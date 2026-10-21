@@ -141,6 +141,39 @@ def state_of(p, key):
     return status
 
 
+def find_pipeline(c, name):
+    """(pipeline.json, dossier de la feature) d'une autre feature de ce repo : ici, ou dans un des worktrees."""
+    roots = [c.root]
+    porcelain = git("worktree", "list", "--porcelain", cwd=c.root, check=False)
+    roots += [l[len("worktree "):] for l in porcelain.splitlines() if l.startswith("worktree ")]
+    for r in dict.fromkeys(roots):
+        d = os.path.join(r, ".claude", "features", name)
+        f = os.path.join(d, "pipeline.json")
+        if os.path.isfile(f):
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    return json.load(fh), d
+            except (OSError, json.JSONDecodeError):
+                continue
+    return None, None
+
+
+def split_status(c):
+    """État de chaque sous-feature d'une feature découpée (L), lu dans son propre pipeline.json."""
+    out = []
+    for i, sub in enumerate(c.p.get("split") or []):
+        name = sub.get("name", "")
+        sp, _ = find_pipeline(c, name)
+        if sp is None:
+            state = {"started": False, "done": False, "step": None, "title": "pas démarrée", "status": None}
+        else:
+            n = next_step(sp)
+            state = {"started": True, "done": n["key"] == "done", "step": n["step"], "title": n["title"], "status": n["status"]}
+        out.append({"index": i + 1, "name": name, "package": sub.get("package"), "size": sub.get("size"),
+                    "depends_on": sub.get("depends_on") or [], "key": None, **state})
+    return out
+
+
 def next_step(p):
     if not p:
         return {"key": None, "step": "0", "title": "Préconditions puis cadrage (nouvelle feature)",
@@ -200,6 +233,16 @@ def cmd_next(c, args):
         print(f"gabarit   : {c.size} · mode : {c.p.get('mode')} · package : {c.p.get('package')}")
     if n["status"] in ("RED", "FAILED"):
         print(f"état      : {n['status']} ({info['attempts'] or 0} tentatives) — FAILED : point imprévu, Thibault décide ; ne rejoue pas en silence")
+    if n["key"] == "split":
+        for s_ in split_status(c):
+            state = "terminée" if s_["done"] else (f"étape {s_['step']} — {s_['title']}" if s_["started"] else "pas démarrée")
+            deps = f" (après {', '.join(s_['depends_on'])})" if s_["depends_on"] else ""
+            print(f"sous-feature {s_['index']}/{len(c.p['split'])} : {s_['name']}{deps} — {state}")
+    if c.p.get("parent"):
+        pp, _ = find_pipeline(c, c.p["parent"])
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        pos = f"{names.index(c.name) + 1}/{len(names)}" if c.name in names else "?"
+        print(f"parent    : sous-feature {pos} de {c.p['parent']}")
     if n["key"] == "hg.suggestions":
         print("note      : revue verte, il reste à montrer les suggestions et à poser human_gates.suggestions")
     for k, v in info["inputs"].items():
@@ -258,8 +301,21 @@ def cmd_init(c, args):
         "tests_freeze_sha": None, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
         "issue": None, "graphify_graph": None,
     }
+    parent = opts.get("--parent")
+    if parent:
+        pp, _ = find_pipeline(c, parent)
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        if pp is None:
+            die(f"feature parente introuvable : {parent} (aucun pipeline.json dans ce repo ni ses worktrees)")
+        if c.name not in names:
+            die(f"{c.name} n'est pas dans le découpage de {parent} : {', '.join(names) or 'aucune sous-feature'}")
+        c.p["parent"] = parent
     c.save()
     print(f"pipeline.json créé : {os.path.relpath(c.path, c.root)}")
+    if parent:
+        _, pdir = find_pipeline(c, parent)
+        extract = os.path.join(pdir, "split", f"{c.name}.md")
+        print(f"sous-feature {names.index(c.name) + 1}/{len(names)} de {parent} · extrait du cadrage : {extract}")
 
 
 def cmd_size(c, args):
@@ -684,8 +740,21 @@ def cmd_cockpit_push(c, args):
         "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
         "tree": tree,
         "report": report,
+        "split": None,
+        "parent": None,
         "updated_at": now(),
     }
+    project = c.project()
+    if c.p.get("split"):
+        subs = split_status(c)
+        for s_ in subs:
+            s_["key"] = doc_id(f"{project}--{s_['name']}")
+        feature["split"] = subs
+    if c.p.get("parent"):
+        pp, _ = find_pipeline(c, c.p["parent"])
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        feature["parent"] = {"name": c.p["parent"], "key": doc_id(f"{project}--{c.p['parent']}"),
+                             "index": names.index(c.name) + 1 if c.name in names else None, "total": len(names)}
     fp = os.path.join(out_dir, "feature.json")
     with open(fp, "w", encoding="utf-8") as fh:
         json.dump(feature, fh, ensure_ascii=False)
