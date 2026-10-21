@@ -641,7 +641,8 @@ def decisions_log(c):
     for r in (p.get("contracts") or {}).get("reedits") or []:
         out.append({"at": r.get("at"), "kind": "contract", "text": f"Contrat modifié : {r.get('what')}"})
     top, _ = repo_of(c, c.package)
-    log = git("log", "--format=%H%x1f%cI%x1f%s", "--grep=by Thibault", "-n", "20", cwd=top, check=False)
+    # Seulement les commits de CETTE feature (« feat(<nom>): contracts (by Thibault) … »), pas ceux du dépôt.
+    log = git("log", "--format=%H%x1f%cI%x1f%s", "--fixed-strings", f"--grep=({c.name}): contracts (by Thibault)", "-n", "20", cwd=top, check=False)
     gate_shas = {str(g.get("sha")) for g in (p.get("human_gates") or {}).values() if isinstance(g, dict) and g.get("sha")}
     gate_shas |= {str(r.get("sha")) for r in (p.get("contracts") or {}).get("reedits") or []}
     for line in log.splitlines():
