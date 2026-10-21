@@ -135,14 +135,47 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 .empty { color: var(--muted); padding: 28px 8px; text-align: center; display: grid; gap: 6px }
 .empty code { font-family: var(--font-code); color: var(--ink) }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 10px }
+.tabs button { padding: 5px 14px }
+.rcols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start }
+@media (max-width: 880px) { .rcols { grid-template-columns: minmax(0, 1fr) } }
+ul.agents, ul.qa { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
+ul.agents li { display: grid; gap: 2px; font-size: .9rem }
+ul.agents .who { display: flex; gap: 8px; align-items: baseline; justify-content: space-between }
+ul.agents .sum, ul.qa .obs { color: var(--muted); font-size: .82rem }
+ul.qa li { display: grid; gap: 2px; font-size: .88rem; padding-left: 10px; border-left: 3px solid var(--line) }
+ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: var(--bad) }
+.md { overflow-wrap: anywhere }
+.md h1, .md h2:not(:first-child), .md h3 { font-size: 1rem; margin: 14px 0 6px; text-transform: none; letter-spacing: 0; color: var(--ink) }
+.md pre { overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-family: var(--font-code); font-size: .78rem }
+.md code { font-family: var(--font-code); font-size: .82em }
+.md table { border-collapse: collapse; display: block; overflow-x: auto; font-size: .85rem }
+.md td, .md th { border: 1px solid var(--line); padding: 3px 8px; text-align: left }
+.md summary { cursor: pointer }
+.findings { display: grid; gap: 12px }
+.finding { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; background: var(--bg) }
+.finding.critical { border-left: 4px solid var(--bad) } .finding.suggestion { border-left: 4px solid var(--wait) } .finding.question { border-left: 4px solid var(--accent) }
+.finding .head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline }
+.finding .head b { font-size: .95rem }
+.finding .where { font-family: var(--font-code); font-size: .78rem; color: var(--muted); overflow-wrap: anywhere }
+.finding dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 10px; font-size: .86rem }
+.finding dt { color: var(--muted) } .finding dd { margin: 0; white-space: pre-wrap }
+.finding textarea { width: 100%; min-height: 90px; resize: vertical; font: inherit; font-size: .88rem; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px }
+.finding .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between }
+.chip.critical { color: var(--bad); border-color: currentColor } .chip.suggestion { color: var(--wait); border-color: currentColor } .chip.question { color: var(--accent); border-color: currentColor }
 @media (prefers-reduced-motion: no-preference) { button { transition: border-color .12s } }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a" crossorigin="anonymous"></script>
 
 <div class="wrap">
   <header>
-    <h1>Cockpit <span>/feature</span></h1>
-    <label class="meta" for="pick">Feature
-      <select id="pick" aria-label="Feature affichée"><option>Chargement…</option></select>
+    <h1>Cockpit</h1>
+    <div class="seg tabs" role="tablist" aria-label="Section">
+      <button id="tabF" role="tab" aria-pressed="true">Features</button>
+      <button id="tabR" role="tab" aria-pressed="false">Revues</button>
+    </div>
+    <label class="meta" for="pick"><span id="pickLabel">Feature</span>
+      <select id="pick" aria-label="Élément affiché"><option>Chargement…</option></select>
     </label>
     <div class="meta" id="meta"></div>
   </header>
@@ -210,6 +243,48 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
     </section>
   </div>
 
+  <div id="reviewView" class="rv" hidden>
+    <div class="empty" id="rEmpty" hidden>
+      <strong>Aucune revue dans le cockpit pour l'instant.</strong>
+      <span>Lance <code>/reviewPR !&lt;numéro&gt;</code> dans une session : la revue apparaît ici dès le gauntlet.</span>
+    </div>
+    <div id="rBody" class="rcols" hidden>
+      <div class="side">
+        <section class="panel">
+          <h2>Relecteurs</h2>
+          <ul class="agents" id="rAgents"></ul>
+        </section>
+        <section class="panel">
+          <h2>Où on en est</h2>
+          <ol class="steps" id="rSteps"></ol>
+        </section>
+        <section class="panel" id="rQaBox" hidden>
+          <h2>Ce que Maëlle a vu sur device</h2>
+          <ul class="qa" id="rQa"></ul>
+        </section>
+      </div>
+      <div class="side">
+        <section class="panel md" id="rBriefBox">
+          <h2>Briefing</h2>
+          <div id="rBrief"></div>
+        </section>
+        <section class="panel">
+          <div class="toolbar">
+            <h2 style="margin:0">Remarques à trier</h2>
+            <span class="status" id="rCount"></span>
+          </div>
+          <div class="findings" id="rFindings"></div>
+        </section>
+        <section class="panel md">
+          <details>
+            <summary><h2 style="display:inline">Rapport du gauntlet</h2></summary>
+            <div id="rGauntlet"></div>
+          </details>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div class="empty" id="empty" hidden>
     <strong>Aucune feature dans le cockpit pour l'instant.</strong>
     <span>Lance <code>/feature &lt;nom&gt; cockpit</code> dans une session : la feature apparaît ici, avec ses contrats.</span>
@@ -267,6 +342,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 
   // ---- rendu
   function renderPicker() {
+    if (mode === "reviews") return renderReviewPicker();
     const pick = $("pick"); pick.replaceChildren();
     // Une sous-feature (gabarit L) se range sous sa parente : « projet · parente › sous-feature (2/3) ».
     const label = (f) => f.parent ? `${f.project} · ${f.parent.name} › ${f.feature} (${f.parent.index ?? "?"}/${f.parent.total})` : `${f.project} · ${f.feature}`;
@@ -278,7 +354,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
   }
 
   function renderFeature() {
-    const f = feature; if (!f) return;
+    const f = feature; if (!f || mode !== "features") return;
     const meta = $("meta"); meta.replaceChildren();
     const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
     if (f.parent) {
@@ -503,7 +579,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
     try {
       const anchor = await comments.anchorFor($("notify"));
       const msg = $("notifyText").value.trim() || "J'ai fini, reprends.";
-      await comments.sendToClaude({ anchor, text: `[cockpit ${key}] ${msg}` });
+      await comments.sendToClaude({ anchor, text: `[cockpit ${mode === "reviews" ? rkey : key}] ${msg}` });
       $("notifyText").value = ""; st.className = "status sent"; st.textContent = `Envoyé à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. La session va reprendre.`;
     } catch (err) {
       st.className = "status err";
@@ -516,7 +592,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
     if (!k || k === key && unsubFeature) return;
     key = k; feature = null; contracts = {}; edits = {}; fileId = null;
     if (unsubReport) unsubReport(); unsubReport = null; reportHash = null;
-    try { history.replaceState(null, "", "#" + k); } catch {}
+    if (mode === "features") { try { history.replaceState(null, "", "#" + k); } catch {} }
     store.set("lastFeature", k);
     [unsubFeature, unsubContracts, unsubEdits].forEach((u) => u && u());
     unsubFeature = db.doc(`features/${k}`).onSnapshot((s) => { feature = s.exists ? s.data() : null; renderFeature(); }, () => {});
@@ -529,7 +605,150 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
     $("pick").value = k;
   }
 
-  $("pick").onchange = (ev) => open(ev.target.value);
+  $("pick").onchange = (ev) => (mode === "reviews" ? openReview(ev.target.value) : open(ev.target.value));
+
+  // ---- revues (/reviewPR) : une fiche par revue, le tri des remarques écrit dans reviews/<clé>/triage
+  let mode = "features", reviews = [], rkey = null, review = null, triage = {}, unsubReview = null, unsubTriage = null;
+  const drafts = {};  // texte en cours d'édition par remarque, gardé d'un rendu à l'autre
+
+  function setMode(m) {
+    mode = m;
+    $("tabF").setAttribute("aria-pressed", String(m === "features"));
+    $("tabR").setAttribute("aria-pressed", String(m === "reviews"));
+    $("pickLabel").textContent = m === "reviews" ? "Revue" : "Feature";
+    $("reviewView").hidden = m !== "reviews";
+    $("body").hidden = m !== "features" || features.length === 0;
+    $("empty").hidden = m !== "features" || features.length > 0;
+    $("report").hidden = m !== "features" || !feature?.report;
+    $("meta").replaceChildren(); $("waiting").hidden = true;
+    store.set("lastMode", m);
+    if (m === "features") { renderPicker(); if (key) { try { history.replaceState(null, "", "#" + key); } catch {} renderFeature(); } }
+    else { renderReviewPicker(); if (rkey) { try { history.replaceState(null, "", "#" + rkey); } catch {} renderReview(); } else if (reviews[0]) openReview(reviews[0].key); }
+  }
+  $("tabF").onclick = () => setMode("features");
+  $("tabR").onclick = () => setMode("reviews");
+
+  function renderReviewPicker() {
+    const pick = $("pick"); pick.replaceChildren();
+    reviews.forEach((r) => { const o = el("option", null, `${r.project} · ${r.number ? "!" + r.number : r.slug} ${r.title ? "— " + r.title : ""}`); o.value = r.key; pick.append(o); });
+    pick.value = rkey || "";
+    $("rEmpty").hidden = reviews.length > 0;
+    $("rBody").hidden = reviews.length === 0;
+  }
+
+  function openReview(k) {
+    if (!k || (k === rkey && unsubReview)) return;
+    rkey = k; review = null; triage = {};
+    try { history.replaceState(null, "", "#" + k); } catch {}
+    store.set("lastReview", k);
+    [unsubReview, unsubTriage].forEach((u) => u && u());
+    unsubReview = db.doc(`reviews/${k}`).onSnapshot((s) => { review = s.exists ? s.data() : null; renderReview(); }, () => {});
+    unsubTriage = db.collection(`reviews/${k}/triage`).onSnapshot((q) => {
+      triage = {}; q.docs.forEach((d) => { triage[d.id] = d.data(); }); renderFindings();
+    }, () => {});
+    $("pick").value = k;
+  }
+
+  function md(text) {
+    const box = el("div");
+    if (!text) return box;
+    if (window.marked && window.DOMPurify) {
+      box.innerHTML = DOMPurify.sanitize(marked.parse(text));
+      box.querySelectorAll("code.language-mermaid").forEach((c) => { const p = el("pre", "mermaid", c.textContent); c.parentElement.replaceWith(p); });
+      try { window.mermaid?.run?.({ nodes: box.querySelectorAll("pre.mermaid") }); } catch {}
+    } else box.append(el("pre", null, text));
+    return box;
+  }
+
+  const AGENTS = { archi: ["Alice", "architecture"], code: ["Corentin", "code"], qa: ["Maëlle", "QA sur device"] };
+  const ASTATUS = { pending: ["TODO", "à venir"], running: ["NOW", "en cours"], done: ["PASSED", "terminé"], skipped: ["SKIPPED", "sautée"], failed: ["FAILED", "échec"] };
+  const RSTEPS = [["2", "Gauntlet"], ["3", "Contexte"], ["4", "Relectures en parallèle"], ["5", "Briefing"], ["6", "Ton tri"], ["7", "Publication validée"], ["8", "Synthèse, worktree supprimé"]];
+
+  function renderReview() {
+    const r = review; if (!r || mode !== "reviews") return;
+    const meta = $("meta"); meta.replaceChildren();
+    const t = el("span"); t.append(r.url ? Object.assign(el("a", null, r.title || r.slug), { href: r.url, target: "_blank", rel: "noopener" }) : el("b", null, r.title || r.slug)); meta.append(t);
+    const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
+    add("par", r.author); add("branche", r.source && `${r.source} → ${r.base || "?"}`); add("mis à jour", fmt(r.updated_at));
+    $("waiting").hidden = !r.waiting; $("waitingText").textContent = r.waiting || "";
+
+    const ag = $("rAgents"); ag.replaceChildren();
+    Object.entries(AGENTS).forEach(([role, [name, axis]]) => {
+      const a = (r.agents || {})[role] || {}; const [chip, label] = ASTATUS[a.status] || ASTATUS.pending;
+      const li = el("li"); const who = el("div", "who"); who.append(el("span", null, `${name} · ${axis}`), el("span", `chip ${chip}`, label));
+      li.append(who); if (a.summary) li.append(el("span", "sum", a.summary)); ag.append(li);
+    });
+    const steps = $("rSteps"); steps.replaceChildren();
+    const cur = r.step?.step;
+    let passed = true;
+    RSTEPS.forEach(([n, title]) => {
+      if (n === cur) passed = false;
+      const isCur = n === cur;
+      const li = el("li", isCur ? "current" : "");
+      li.append(el("span", "num", n), el("span", null, title), el("span", `chip ${r.step?.key === "done" || passed ? "PASSED" : isCur ? "NOW" : "TODO"}`,
+        r.step?.key === "done" || passed ? "fait" : isCur ? "en cours" : "à venir"));
+      steps.append(li);
+    });
+    const qa = r.qa; $("rQaBox").hidden = !qa || !(qa.scenarios || []).length;
+    const ql = $("rQa"); ql.replaceChildren();
+    (qa?.scenarios || []).forEach((s) => {
+      const li = el("li", s.verdict === "ok" ? "ok" : s.verdict === "ko" ? "ko" : "");
+      li.append(el("b", null, `${s.verdict === "ok" ? "✓" : s.verdict === "ko" ? "✗" : "—"} ${s.name}`), el("span", "obs", [s.platform, s.observation].filter(Boolean).join(" · ")));
+      ql.append(li);
+    });
+    $("rBrief").replaceChildren(r.briefing_md ? md(r.briefing_md) : el("p", "status", "Le briefing arrive après les trois relectures."));
+    $("rGauntlet").replaceChildren(r.gauntlet_md ? md(r.gauntlet_md) : el("p", "status", "Pas encore de rapport."));
+    renderFindings();
+  }
+
+  function decisionOf(f) {
+    const t = triage[f.id] || (review?.triage || {})[f.id];
+    return t ? { decision: t.decision, text: t.text || f.comment } : null;
+  }
+
+  function renderFindings() {
+    const box = $("rFindings"); if (!review) return;
+    const fs = review.findings || [];
+    const posted = new Set((review.posted || []).map((p) => p.id));
+    const done = fs.filter((f) => decisionOf(f)).length;
+    $("rCount").textContent = fs.length ? `${done}/${fs.length} triées` : "";
+    const focused = document.activeElement?.dataset?.fid;
+    box.replaceChildren();
+    if (!fs.length) { box.append(el("p", "status", "Les remarques d'Alice, Corentin et Maëlle apparaissent ici une fois fusionnées.")); return; }
+    fs.forEach((f) => {
+      const d = decisionOf(f);
+      const card = el("article", `finding ${f.severity}`);
+      const head = el("div", "head");
+      head.append(el("span", "num", f.id), el("span", `chip ${f.severity}`, { critical: "critique", suggestion: "suggestion", question: "question" }[f.severity] || f.severity),
+                  el("b", null, f.title), el("span", "status", (f.role || "").replace("archi", "Alice").replace("code", "Corentin").replace("qa", "Maëlle")));
+      card.append(head);
+      if (f.file) card.append(el("div", "where", f.line ? `${f.file}:${f.line}` : f.file));
+      const dl = el("dl");
+      [["Problème", f.problem], ["Pourquoi", f.why], ["Preuve", f.evidence], ["Suggestion", f.suggestion]].forEach(([k, v]) => { if (v) dl.append(el("dt", null, k), el("dd", null, v)); });
+      card.append(dl);
+      const ta = el("textarea"); ta.id = `ta-${f.id}`; ta.dataset.fid = f.id; ta.setAttribute("aria-label", `Commentaire ${f.id}`);
+      ta.value = drafts[f.id] ?? d?.text ?? f.comment ?? "";
+      ta.addEventListener("input", () => { drafts[f.id] = ta.value; });
+      card.append(el("label", "status", "Commentaire proposé pour la MR"), ta);
+      const row = el("div", "row");
+      const st = el("span", "status", posted.has(f.id) ? "Publié sur la MR" : d ? (d.decision === "comment" ? "À commenter" : "Écartée") + (triage[f.id] ? ` · enregistré ${fmt(triage[f.id].saved_at)}` : "") : "Pas encore triée");
+      const seg = el("div", "seg");
+      const save = async (decision) => {
+        if (!db) return;
+        st.textContent = "Enregistrement…";
+        try {
+          await db.collection(`reviews/${rkey}/triage`).doc(f.id).set({ id: f.id, decision, text: ta.value.trim(), saved_at: new Date().toISOString() });
+          delete drafts[f.id];
+        } catch (err) { st.textContent = err?.code === "invalid_argument" ? "Tu n'as pas le droit d'écrire ici." : `Échec (${err?.code || "erreur"}), réessaie.`; }
+      };
+      const bC = el("button", null, "Commenter"); bC.setAttribute("aria-pressed", String(d?.decision === "comment")); bC.onclick = () => save("comment");
+      const bS = el("button", null, "Écarter"); bS.setAttribute("aria-pressed", String(d?.decision === "skip")); bS.onclick = () => save("skip");
+      if (posted.has(f.id)) { bC.disabled = true; bS.disabled = true; ta.readOnly = true; }
+      seg.append(bC, bS); row.append(seg, st); card.append(row);
+      box.append(card);
+    });
+    if (focused) { const t = $(`ta-${focused}`); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }
+  }
 
   (async () => {
     db = await window.claude?.use?.("db");
@@ -549,7 +768,15 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
       const k = features.some((f) => f.key === key) ? key : features.some((f) => f.key === wanted) ? wanted : features[0]?.key;
       renderPicker();
       if (k) open(k);
+      if (mode === "features") setMode("features");
     }, () => {});
+    db.collection("reviews").orderBy("updated_at", "desc").limit(50).onSnapshot((q) => {
+      reviews = q.docs.map((d) => { const x = d.data(); return { key: d.id, project: x.project, slug: x.slug, number: x.number, title: x.title }; });
+      const hash = (location.hash || "").slice(1);
+      if (!rkey && reviews.some((r) => r.key === hash)) { setMode("reviews"); openReview(hash); return; }
+      if (mode === "reviews") { renderReviewPicker(); if (!rkey && reviews[0]) openReview(store.get("lastReview") && reviews.some((r) => r.key === store.get("lastReview")) ? store.get("lastReview") : reviews[0].key); }
+    }, () => {});
+    if (store.get("lastMode") === "reviews" && !(location.hash || "").slice(1)) setMode("reviews");
   })();
 })();
 </script>
