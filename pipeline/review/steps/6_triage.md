@@ -2,7 +2,9 @@
 
 Dans le cockpit, chaque remarque montre son agent, sa gravité, `fichier:ligne`, le problème, le
 pourquoi, la preuve, la suggestion, et le commentaire proposé. Thibault choisit **Commenter** ou
-**Écarter**, et peut réécrire le commentaire. Le cockpit enregistre, rien ne part.
+**Écarter**, et peut réécrire le commentaire à la main, ou l'**orienter** : un champ de consigne (« plus
+court », « sous forme de question », « avec la correction en code »…) et Claude le réécrit depuis la
+page, avec la remarque, sa preuve et le code autour ; « Revenir à la version d'avant » annule. Le cockpit enregistre, rien ne part.
 
 **Attendre.** Un seul `AskUserQuestion` : « J'ai trié dans le cockpit » / « Trions ici, dans la
 session » / « Discuter — je veux comprendre une remarque avant de trier ». Un message
