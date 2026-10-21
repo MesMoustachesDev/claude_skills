@@ -852,7 +852,7 @@ def write_page(dest_dir, title):
         die(f"page source introuvable : {COCKPIT_SRC}")
     os.makedirs(dest_dir, exist_ok=True)
     safe = re.sub(r"[<>&]", "", title)
-    html = re.sub(r"<title>.*?</title>", f"<title>{safe}</title>", html, count=1)
+    html = re.sub(r"<title>.*?</title>", f'<title>{safe}</title>\n<meta name="cockpit-role" content="item">', html, count=1)
     path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)

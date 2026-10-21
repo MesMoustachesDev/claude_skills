@@ -136,6 +136,12 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 .empty code { font-family: var(--font-code); color: var(--ink) }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 10px }
 .tabs button { padding: 5px 14px }
+/* Accueil : seulement les cartes ; le détail d'une fiche (ancienne, d'avant le découpage) s'ouvre à la demande. */
+.hub-home .item-only { display: none !important }
+#home { display: none }
+.hub-home #home { display: inline-flex }
+#back { display: none }
+.hub-detail #back { display: inline-flex }
 .hub { display: grid; gap: 10px }
 .hub h2 { margin: 0 }
 .hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px }
@@ -201,20 +207,21 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
 
 <div class="wrap">
   <header>
-    <h1>Cockpit</h1>
-    <div class="seg tabs" role="tablist" aria-label="Section">
+    <h1 id="h1">Cockpit</h1>
+    <button id="back" type="button">← Accueil</button>
+    <div class="seg tabs item-only" role="tablist" aria-label="Section">
       <button id="tabF" role="tab" aria-pressed="true">Features</button>
       <button id="tabR" role="tab" aria-pressed="false">Revues</button>
     </div>
-    <label class="meta" for="pick"><span id="pickLabel">Feature</span>
+    <label class="meta item-only" for="pick"><span id="pickLabel">Feature</span>
       <select id="pick" aria-label="Élément affiché"><option>Chargement…</option></select>
     </label>
-    <div class="meta" id="meta"></div>
+    <div class="meta item-only" id="meta"></div>
   </header>
 
   <section class="panel hub" id="hub" hidden>
     <h2>En cours</h2>
-    <p class="status">Une page par feature et par revue : c'est là que tu tries, édites et préviens la session concernée. Ici, tu vois tout d'un coup d'œil.</p>
+    <p class="status">Chaque feature et chaque revue a sa page : c'est là que tu tries, édites et préviens la session concernée. Ici, tu vois tout d'un coup d'œil et tu ouvres la bonne.</p>
     <div class="hub-grid" id="hubList"></div>
     <details id="hubDone" hidden>
       <summary class="status" id="hubDoneCount">Terminées</summary>
@@ -222,12 +229,12 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     </details>
   </section>
 
-  <section class="waiting" id="waiting" hidden>
+  <section class="waiting item-only" id="waiting" hidden>
     <small>En attente de toi</small>
     <p id="waitingText"></p>
   </section>
 
-  <form class="notify" id="notify" hidden>
+  <form class="notify item-only" id="notify" hidden>
     <label for="notifyText">Un mot pour la session Claude</label>
     <div class="notify-row">
       <input id="notifyText" type="text" maxlength="500" placeholder="J'ai fini d'éditer, reprends." autocomplete="off">
@@ -236,14 +243,14 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     <span class="status" id="notifyStatus"></span>
   </form>
 
-  <section class="panel report" id="report" hidden>
+  <section class="panel report item-only" id="report" hidden>
     <details open>
       <summary><h2>Rapport du point d'étape</h2><span class="status" id="reportMeta"></span></summary>
       <iframe id="reportFrame" sandbox="allow-scripts allow-popups" title="Rapport du point d'étape"></iframe>
     </details>
   </section>
 
-  <div id="body" class="cols">
+  <div id="body" class="cols item-only">
     <div class="side">
       <section class="panel">
         <h2 id="stepsTitle">Où on en est</h2>
@@ -285,7 +292,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     </section>
   </div>
 
-  <div id="reviewView" class="rv" hidden>
+  <div id="reviewView" class="rv item-only" hidden>
     <div class="empty" id="rEmpty" hidden>
       <strong>Aucune revue dans le cockpit pour l'instant.</strong>
       <span>Lance <code>/reviewPR !&lt;numéro&gt;</code> dans une session : la revue apparaît ici dès le gauntlet.</span>
@@ -338,7 +345,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     </div>
   </div>
 
-  <div class="empty" id="empty" hidden>
+  <div class="empty item-only" id="empty" hidden>
     <strong>Aucune feature dans le cockpit pour l'instant.</strong>
     <span>Lance <code>/feature &lt;nom&gt; cockpit</code> dans une session : la feature apparaît ici, avec ses contrats.</span>
   </div>
@@ -688,8 +695,35 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   }
 
   // Accueil : une carte par feature ou revue en cours (collection `index`), avec le lien vers sa page.
+  const ROLE = document.querySelector('meta[name="cockpit-role"]')?.content || "home";
+  let indexItems = [];
+  if (ROLE === "home") { document.documentElement.classList.add("hub-home"); $("h1").textContent = "Accueil"; }
+
+  // Accueil : les cartes de l'index, plus les fiches complètes restées dans sa base d'avant le découpage.
+  function renderHome() {
+    if (ROLE !== "home") return;
+    const legacy = [
+      ...features.map((f) => ({ kind: "feature", key: f.key, project: f.project, title: f.feature, step: f.step, waiting: f.waiting, legacy: true })),
+      ...reviews.map((r) => ({ kind: "review", key: r.key, project: r.project, title: r.title, number: r.number, legacy: true })),
+    ].filter((x) => !indexItems.some((i) => i.key === x.key));
+    renderHub([...indexItems, ...legacy]);
+  }
+
+  function enterDetail(x) {
+    document.documentElement.classList.remove("hub-home");
+    document.documentElement.classList.add("hub-detail");
+    $("hub").hidden = true;
+    if (x.kind === "review") { setMode("reviews"); openReview(x.key); } else { setMode("features"); open(x.key); }
+  }
+  $("back").onclick = () => {
+    document.documentElement.classList.remove("hub-detail");
+    document.documentElement.classList.add("hub-home");
+    $("hub").hidden = false;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  };
+
   function renderHub(all) {
-    $("hub").hidden = !all.length;
+    $("hub").hidden = ROLE !== "home" || document.documentElement.classList.contains("hub-detail");
     const live = all.filter((x) => !x.done), done = all.filter((x) => x.done);
     const box = $("hubList"); box.replaceChildren();
     if (!live.length) box.append(el("p", "status", "Rien en cours."));
@@ -711,7 +745,10 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
         x.done ? `terminée ${fmt(x.done_at || x.updated_at)}` : x.step && `étape ${x.step.step} — ${x.step.title}`].filter(Boolean).join(" · ")));
       if (x.done && x.outcome) card.append(el("span", null, x.outcome));
       if (x.waiting) card.append(el("span", "w", `En attente de toi : ${x.waiting}`));
-      if (x.url) card.append(Object.assign(el("a", "open", "Ouvrir sa page"), { href: x.url, target: "_blank", rel: "noopener" }));
+      if (x.legacy) {
+        card.append(el("span", "status", "Fiche d'avant le découpage, gardée dans l'accueil"));
+        const b = el("button", "link", "Voir la fiche"); b.onclick = () => enterDetail(x); card.append(b);
+      } else if (x.url) card.append(Object.assign(el("a", "open", "Ouvrir sa page"), { href: x.url, target: "_blank", rel: "noopener" }));
       else card.append(el("span", "status", x.page_deleted ? "Page supprimée" : "Page pas encore publiée"));
       if (x.mr_url) card.append(Object.assign(el("a", "open", "Voir la MR"), { href: x.mr_url, target: "_blank", rel: "noopener" }));
       if (!x.done) card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
@@ -1012,13 +1049,16 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       if (k) open(k);
       if (mode === "features") setMode("features");
       syncTabs();
+      renderHome();
     }, () => {});
     db.collection("index").orderBy("updated_at", "desc").limit(100).onSnapshot((q) => {
-      renderHub(q.docs.map((d) => ({ key: d.id, ...d.data() })));
+      indexItems = q.docs.map((d) => ({ key: d.id, ...d.data() }));
+      renderHome();
     }, () => {});
     db.collection("reviews").orderBy("updated_at", "desc").limit(50).onSnapshot((q) => {
       reviews = q.docs.map((d) => { const x = d.data(); return { key: d.id, project: x.project, slug: x.slug, number: x.number, title: x.title }; });
       syncTabs();
+      renderHome();
       const hash = (location.hash || "").slice(1);
       if (!rkey && reviews.some((r) => r.key === hash)) { setMode("reviews"); openReview(hash); return; }
       if (mode === "reviews") { renderReviewPicker(); if (!rkey && reviews[0]) openReview(store.get("lastReview") && reviews.some((r) => r.key === store.get("lastReview")) ? store.get("lastReview") : reviews[0].key); }
