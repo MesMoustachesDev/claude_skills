@@ -12,6 +12,8 @@
 #   review.sh pass <slug> <étape>                étape passée (context, briefing, triage, posted, synthesis)
 #   review.sh say <slug> "<texte>"               « en attente de toi » du cockpit
 #   review.sh qa <slug> [--all-platforms]        rejoue les flows Maestro de la revue sur l'app du worktree
+#   review.sh run-tests <slug> <package> <tests…> rejoue des tests existants du worktree (scénario déjà couvert)
+#   review.sh probe <slug> <package> [fichiers]  joue les tests jetables de <revue>/probes/ dans le worktree, puis les retire
 #   review.sh findings <slug>                    fusionne findings_<rôle>.json en findings.json (ids F1…)
 #   review.sh cockpit-push <slug> <dossier> [--versions id=v,…]
 #   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md

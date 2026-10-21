@@ -280,7 +280,8 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
           <ol class="steps" id="rSteps"></ol>
         </section>
         <section class="panel" id="rQaBox" hidden>
-          <h2>Ce que Maëlle a vu sur device</h2>
+          <h2>Ce que Maëlle a vérifié</h2>
+          <p class="status" id="rQaDevice" hidden></p>
           <ul class="qa" id="rQa"></ul>
         </section>
       </div>
@@ -712,9 +713,11 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
     });
     const qa = r.qa; $("rQaBox").hidden = !qa || !(qa.scenarios || []).length;
     const ql = $("rQa"); ql.replaceChildren();
+    $("rQaDevice").hidden = !qa?.device; $("rQaDevice").textContent = qa?.device ? `Device : ${qa.device}` : "";
     (qa?.scenarios || []).forEach((s) => {
       const li = el("li", s.verdict === "ok" ? "ok" : s.verdict === "ko" ? "ko" : "");
-      li.append(el("b", null, `${s.verdict === "ok" ? "✓" : s.verdict === "ko" ? "✗" : "—"} ${s.name}`), el("span", "obs", [s.platform, s.observation].filter(Boolean).join(" · ")));
+      li.append(el("b", null, `${s.verdict === "ok" ? "✓" : s.verdict === "ko" ? "✗" : "—"} ${s.name}`),
+                el("span", "obs", [s.method && `prouvé par ${s.method}`, s.proof, s.platform, s.observation !== "—" && s.observation].filter(Boolean).join(" · ")));
       ql.append(li);
     });
     const c = r.context || {};

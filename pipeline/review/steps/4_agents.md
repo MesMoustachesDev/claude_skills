@@ -4,9 +4,10 @@ Lance **dans un seul message, trois appels `Agent`** (ils tournent en même temp
 `review-architect` (Alice), `review-code` (Corentin), `review-qa` (Maëlle). Avant l'envoi,
 `review.sh agent <slug> archi running`, puis `code`, puis `qa`.
 
-**Maëlle est sautée** (pas d'appel, `review.sh agent <slug> qa skipped "<raison>"`) si Thibault a
-passé `--no-qa`, s'il n'y a pas de worktree, ou si `context.md` dit « rien de visible ». Sinon c'est
-elle qui décide (config QA absente, build ou device en échec) et elle l'écrit dans son fichier.
+**Maëlle est sautée** (pas d'appel, `review.sh agent <slug> qa skipped "<raison>"`) seulement si
+Thibault a passé `--no-qa` ou s'il n'y a pas de worktree. Un device indisponible ou une MR sans rien de
+visible ne la sautent pas : elle prouve alors par les tests existants, ou par des tests jetables
+(`agents/review-qa.md`). Dis-lui dans son prompt ce que `context.md` promet de visible.
 
 Chaque prompt tient en 10 lignes, avec des chemins et des faits, jamais ton historique :
 - le slug, le dossier de la revue, le worktree, la source, la cible, le merge-base

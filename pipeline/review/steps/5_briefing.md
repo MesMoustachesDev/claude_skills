@@ -25,8 +25,9 @@ remarque** — du contexte. Il comprend :
    l'utilisateur à travers ce que la MR touche : où la valeur naît, où elle est consommée. Deux chemins
    qui alimentent le même écran depuis deux sources : côte à côte.
 5. **Ce qui a été vérifié** — le verdict brut du gauntlet (`[OK]` / `[WARN]` / `[FAIL]`) et surtout ce
-   qui n'a pas tourné ; l'impact graphify s'il a tourné ; la QA de Maëlle (scénarios ok / ko / non
-   vérifiés, plateforme) ou la raison de son saut ; un agent en échec.
+   qui n'a pas tourné ; l'impact graphify s'il a tourné ; la QA de Maëlle, scénario par scénario, avec
+   **comment** il a été prouvé (device, test existant rejoué, test jetable) et pourquoi le device n'a
+   pas servi s'il n'a pas servi ; un agent en échec.
 6. **Impact** — seulement si calculé : les consommateurs hors package non touchés, une ligne chacun
    (`package · symbole · via · fichier:ligne`), sans verdict.
 7. **Les remarques** — le compte par gravité et par agent (« 2 critiques (Corentin 1, Alice 1),

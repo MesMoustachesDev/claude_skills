@@ -295,6 +295,79 @@ def cmd_qa(r, args):
     sys.exit(p.returncode)
 
 
+def project_flutter(wt):
+    """La commande flutter du projet (clé `flutter` de la config, ex. « fvm flutter »)."""
+    try:
+        for line in open(os.path.join(wt, ".claude", "rules", "feature_pipeline.md"), encoding="utf-8"):
+            m = re.match(r"\s*flutter\s*=\s*(.+?)\s*$", line)
+            if m:
+                return m.group(1).split()
+    except OSError:
+        pass
+    return ["flutter"]
+
+
+def package_dir(r, package):
+    wt = r.s.get("worktree")
+    if not wt or not os.path.isdir(wt):
+        die("pas de worktree : review.sh gauntlet d'abord")
+    d = os.path.normpath(os.path.join(wt, package))
+    if not d.startswith(os.path.normpath(wt)) or not os.path.isfile(os.path.join(d, "pubspec.yaml")):
+        die(f"{package} n'est pas un package Dart du worktree (pas de pubspec.yaml)")
+    return wt, d
+
+
+def flutter_test(r, wt, pkg_dir, targets, log_name):
+    # Même PATH que le gauntlet : les exécutables pub (fvm…) d'abord.
+    env = dict(os.environ, PATH=os.pathsep.join([os.path.join(HOME, ".pub-cache", "bin"), os.environ.get("PATH", "")]))
+    cmd = [*project_flutter(wt), "test", *targets, "--reporter", "expanded"]
+    try:
+        p = subprocess.run(cmd, cwd=pkg_dir, capture_output=True, text=True, stdin=subprocess.DEVNULL, env=env)
+    except FileNotFoundError:
+        print(f"« {cmd[0]} » introuvable : clé `flutter` de feature_pipeline.md, ou SDK absent de ce PATH — tests non joués")
+        return 127
+    log = r.file(log_name)
+    with open(log, "w", encoding="utf-8") as f:
+        f.write(p.stdout + p.stderr)
+    tail = [l for l in (p.stdout + p.stderr).splitlines() if re.search(r"\+\d+|All tests passed|Some tests failed|\[E\]|FAILED|Error", l)]
+    print("\n".join(tail[-25:]))
+    print(f"{'vert' if p.returncode == 0 else 'rouge (exit ' + str(p.returncode) + ')'} · log complet : {log}")
+    return p.returncode
+
+
+def cmd_run_tests(r, args):
+    """Rejoue des tests EXISTANTS du worktree (ceux qui prouvent un scénario promis par la MR)."""
+    if len(args) < 2:
+        die("usage : run-tests <slug> <package> <test/…_test.dart>…")
+    wt, d = package_dir(r, args[0])
+    for t in args[1:]:
+        if not os.path.isfile(os.path.join(d, t)):
+            die(f"test introuvable dans {args[0]} : {t}")
+    sys.exit(flutter_test(r, wt, d, args[1:], f"run_tests_{doc_id(args[0])}.log"))
+
+
+def cmd_probe(r, args):
+    """Joue des tests JETABLES écrits par Maëlle dans <revue>/probes/ : copiés le temps du run dans
+    <package>/test/_review_probe/ du worktree, puis retirés. Le repo n'est jamais modifié."""
+    if not args:
+        die("usage : probe <slug> <package> [fichiers de probes/…]")
+    wt, d = package_dir(r, args[0])
+    src = r.file("probes")
+    files = args[1:] or (sorted(f for f in os.listdir(src) if f.endswith("_test.dart")) if os.path.isdir(src) else [])
+    if not files:
+        die(f"aucun test jetable dans {src} (fichiers *_test.dart)")
+    dest = os.path.join(d, "test", "_review_probe")
+    shutil.rmtree(dest, ignore_errors=True)
+    os.makedirs(dest)
+    try:
+        for f in files:
+            shutil.copy(os.path.join(src, os.path.basename(f)), dest)
+        rc = flutter_test(r, wt, d, ["test/_review_probe"], f"probe_{doc_id(args[0])}.log")
+    finally:
+        shutil.rmtree(dest, ignore_errors=True)
+    sys.exit(rc)
+
+
 def safe_tmp(path):
     tmp = os.environ.get("TMPDIR", "/tmp")
     return any(path.startswith(p) for p in (tmp, "/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/"))
@@ -347,7 +420,7 @@ def cmd_findings(r, args):
         if data.get("grid"):
             grids[role] = data["grid"]
         if role == "qa":
-            qa = {"scenarios": data.get("scenarios") or [], "summary": data.get("summary")}
+            qa = {"scenarios": data.get("scenarios") or [], "summary": data.get("summary"), "device": data.get("device")}
         for x in data.get("findings") or []:
             missing = [k for k in REQUIRED if not x.get(k)]
             if missing or x.get("severity") not in SEVERITY_ORDER:
@@ -624,7 +697,7 @@ def cmd_post(r, args):
 
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
-    "gauntlet": cmd_gauntlet, "qa": cmd_qa, "cleanup": cmd_cleanup, "findings": cmd_findings,
+    "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
     "cockpit-push": cmd_cockpit_push, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
