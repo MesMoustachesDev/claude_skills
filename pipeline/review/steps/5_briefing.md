@@ -1,7 +1,12 @@
 ### 5. Fusion, briefing, cockpit
 
 **1. Fusion.** `review.sh findings <slug>` : il fusionne les trois fichiers en `findings.json` (F1, F2…,
-critiques en tête, doublons retirés) et signale les remarques incomplètes. Pour chaque remarque
+critiques en tête) et signale les remarques incomplètes. Les doublons évidents (même fichier, lignes
+proches, titre ou problème proches) sont fusionnés par le script : une seule carte, les autres points de
+vue gardés dedans. Relis la liste : deux remarques qui décrivent le même problème avec d'autres mots
+(F7 et F8, F13 et F14) → `review.sh merge <slug> F7 F8`. **Ne liste jamais des doublons pour Thibault :
+fusionne-les**, il ne doit avoir qu'une carte à trier par problème. Les numéros ne bougent pas (une
+remarque fusionnée laisse un trou). Pour chaque remarque
 critique, vérifie toi-même sa preuve en une commande (`git grep`, le fichier à la ligne) ; une preuve
 qui ne tient pas se signale à Thibault au tri (« F4 : je n'ai pas retrouvé … »), elle ne se supprime pas.
 

@@ -172,6 +172,8 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
 .finding dt { color: var(--muted) } .finding dd { margin: 0; white-space: pre-wrap }
 .finding textarea { width: 100%; min-height: 90px; resize: vertical; font: inherit; font-size: .88rem; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px }
 .finding .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between }
+.finding details summary { cursor: pointer }
+ul.also { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: .85rem }
 .steer { display: grid; gap: 6px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 6px }
 .steer-row { display: flex; flex-wrap: wrap; gap: 8px }
 .steer input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: .88rem; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px }
@@ -868,6 +870,14 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       const dl = el("dl");
       [["Problème", f.problem], ["Pourquoi", f.why], ["Preuve", f.evidence], ["Suggestion", f.suggestion]].forEach(([k, v]) => { if (v) dl.append(el("dt", null, k), el("dd", null, v)); });
       card.append(dl);
+      if (f.also?.length) {
+        // Doublons fusionnés : un seul commentaire possible, les autres points de vue restent lisibles.
+        const who = { archi: "Alice", code: "Corentin", qa: "Maëlle" };
+        const det = el("details"); det.append(el("summary", "status", `Même problème relevé aussi par ${[...new Set(f.also.map((a) => who[a.role] || a.role))].join(", ")} — fusionné ici`));
+        const ul = el("ul", "also");
+        f.also.forEach((a) => { const li = el("li"); li.append(el("b", null, `${who[a.role] || a.role} : ${a.title}`), el("span", "where", a.file ? ` ${a.file}${a.line ? ":" + a.line : ""}` : ""), el("div", null, a.problem || "")); ul.append(li); });
+        det.append(ul); card.append(det);
+      }
       const ta = el("textarea"); ta.id = `ta-${f.id}`; ta.dataset.fid = f.id; ta.setAttribute("aria-label", `Commentaire ${f.id}`);
       ta.value = drafts[f.id] ?? d?.text ?? f.comment ?? "";
       ta.addEventListener("input", () => { drafts[f.id] = ta.value; });

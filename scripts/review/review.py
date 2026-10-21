@@ -5,6 +5,7 @@ La cible, le worktree, l'état des trois agents, la fusion des remarques, le tri
 la publication sur la MR vivent ici, pas dans le prompt de l'orchestrateur.
 """
 import datetime
+import difflib
 import json
 import os
 import re
@@ -434,19 +435,39 @@ def cmd_findings(r, args):
                 problems.append(f"{role} : remarque « {x.get('title', '?')} » incomplète ({', '.join(missing) or 'severity'})")
                 continue
             merged.append({**x, "role": role})
-    # même fichier, même ligne, même titre : une seule remarque, rôles fusionnés
-    seen, out = {}, []
+    # Doublons : même fichier, lignes proches, et titre ou problème qui se ressemblent → une seule remarque
+    # (la plus grave garde son texte, les autres vont dans `also`). Puis les fusions décidées à la main
+    # (review.sh merge), mémorisées par clé et réappliquées à chaque fusion.
+    merged.sort(key=lambda x: SEVERITY_ORDER[x["severity"]])
+    out = []
     for x in merged:
-        k = (x.get("file"), x.get("line"), x["title"].strip().lower())
-        if k in seen:
-            seen[k]["role"] += f"+{x['role']}"
-            continue
-        seen[k] = x
-        out.append(x)
+        twin = next((y for y in out if same_issue(x, y)), None)
+        if twin:
+            absorb(twin, x)
+        else:
+            out.append(x)
+    for group in r.s.get("merges") or []:
+        keys = [list(k) for k in group]
+        items = [y for y in out if finding_key(y) in keys or any(finding_key(a) in keys for a in y.get("also") or [])]
+        if len(items) > 1:
+            items.sort(key=lambda y: SEVERITY_ORDER[y["severity"]])
+            for y in items[1:]:
+                absorb(items[0], y)
+                out.remove(y)
     out.sort(key=lambda x: (SEVERITY_ORDER[x["severity"]], x.get("file") or "~", x.get("line") or 0))
     changed = diff_lines(r)
-    for i, x in enumerate(out, 1):
-        x["id"] = f"F{i}"
+    # Numéros stables : une remarque garde son F<n> d'une fusion à l'autre (le tri y est accroché) ;
+    # une remarque fusionnée laisse un trou, elle ne décale pas les autres.
+    ids = r.s.setdefault("finding_ids", {})
+    nxt = max([int(v[1:]) for v in ids.values()] + [0]) + 1
+    for x in out:
+        k = json.dumps(finding_key(x), ensure_ascii=False)
+        if k not in ids:
+            ids[k] = f"F{nxt}"
+            nxt += 1
+        x["id"] = ids[k]
+    r.save()
+    for x in out:
         if x.get("file") and x.get("line"):
             x["snippet"] = snippet(r, x["file"], int(x["line"]), changed.get(x["file"], set()))
         x.setdefault("comment", f"{x['problem']}" + (f"\n\nSuggestion : {x['suggestion']}" if x.get("suggestion") else ""))
@@ -500,6 +521,57 @@ def parse_context(text):
     pick = lambda *names: next(("\n".join(v).strip() for k, v in out.items() if any(n in k for n in names)), None)
     return {"why": pick("pourquoi", "objectif"), "what": pick("ce que fait", "résumé", "resume"),
             "delta": pick("existait"), "visible": pick("visible", "promet"), "neighbor": pick("voisin")}
+
+
+def finding_key(x):
+    return [x.get("file"), x.get("line"), (x.get("title") or "").strip().lower()]
+
+
+def similar(a, b, threshold=0.55):
+    a, b = (a or "").lower(), (b or "").lower()
+    return bool(a and b) and difflib.SequenceMatcher(None, a, b).ratio() >= threshold
+
+
+def same_issue(x, y):
+    if x.get("file") != y.get("file"):
+        return False
+    lx, ly = x.get("line"), y.get("line")
+    near = (lx is None and ly is None) or (lx is not None and ly is not None and abs(int(lx) - int(ly)) <= 3)
+    if not near:
+        return False
+    return (x["title"].strip().lower() == y["title"].strip().lower() or similar(x["title"], y["title"])
+            or similar(x.get("problem"), y.get("problem"), 0.6))
+
+
+def absorb(primary, other):
+    """`other` est le même problème que `primary` : il disparaît de la liste, son point de vue reste lisible."""
+    roles = set(primary["role"].split("+")) | set(other["role"].split("+"))
+    primary["role"] = "+".join(r for r in ("archi", "code", "qa") if r in roles)
+    also = primary.setdefault("also", [])
+    also.append({k: other.get(k) for k in ("role", "severity", "title", "file", "line", "problem", "evidence", "suggestion")})
+    also.extend(other.get("also") or [])
+    if other.get("evidence") and other["evidence"] not in (primary.get("evidence") or ""):
+        primary["evidence"] = (primary.get("evidence") or "") + ("\n" if primary.get("evidence") else "") + other["evidence"]
+
+
+def cmd_merge(r, args):
+    """Fusionne des remarques que seul le sens rapproche : review.sh merge <slug> F2 F3 [F4…]. La première
+    (la plus grave) reste ; le tri déjà fait sur les autres est retiré."""
+    if len(args) < 2:
+        die("usage : merge <slug> F<n> F<m> [F<k>…]")
+    f = load_findings(r)
+    by_id = {x["id"]: x for x in f["findings"]}
+    missing = [i for i in args if i not in by_id]
+    if missing:
+        die(f"remarques inconnues : {', '.join(missing)}")
+    group = [finding_key(by_id[i]) for i in args]
+    r.s.setdefault("merges", []).append(group)
+    triage = r.s.get("triage") or {}
+    dropped = [i for i in args[1:] if triage.pop(i, None)]
+    r.save()
+    cmd_findings(r, [])
+    if dropped:
+        print(f"tri retiré sur {', '.join(dropped)} (fusionnées) : seul le tri de la remarque restante compte")
 
 
 def load_findings(r):
@@ -818,7 +890,7 @@ def preflight_open(s):
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
-    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
+    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 

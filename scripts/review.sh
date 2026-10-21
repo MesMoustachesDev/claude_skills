@@ -16,7 +16,8 @@
 #   review.sh qa <slug> [--all-platforms]        rejoue les flows Maestro de la revue sur l'app du worktree
 #   review.sh run-tests <slug> <package> <tests…> rejoue des tests existants du worktree (scénario déjà couvert)
 #   review.sh probe <slug> <package> [fichiers]  joue les tests jetables de <revue>/probes/ dans le worktree, puis les retire
-#   review.sh findings <slug>                    fusionne findings_<rôle>.json en findings.json (ids F1…)
+#   review.sh findings <slug>                    fusionne findings_<rôle>.json en findings.json (ids F1…), doublons fusionnés
+#   review.sh merge <slug> F2 F3 [F4…]           fusionne des doublons que seul le sens rapproche (mémorisé)
 #   review.sh cockpit-push <slug> <dossier> [--versions id=v,…]
 #   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md
 #   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie
