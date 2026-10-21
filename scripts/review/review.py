@@ -469,7 +469,8 @@ def cmd_findings(r, args):
     r.save()
     for x in out:
         if x.get("file") and x.get("line"):
-            x["snippet"] = snippet(r, x["file"], int(x["line"]), changed.get(x["file"], set()))
+            x["snippet"] = (diff_snippet(r, x["file"], int(x["line"]))
+                            or snippet(r, x["file"], int(x["line"]), changed.get(x["file"], set())))
         x.setdefault("comment", f"{x['problem']}" + (f"\n\nSuggestion : {x['suggestion']}" if x.get("suggestion") else ""))
     result = {"findings": out, "grids": grids, "qa": qa, "problems": problems, "at": now()}
     with open(r.file("findings.json"), "w", encoding="utf-8") as fh:
@@ -726,8 +727,8 @@ def write_comments(r, f, triage):
 # ---------------------------------------------------------------------------
 # Publication
 # ---------------------------------------------------------------------------
-def diff_lines(r):
-    """Lignes ajoutées ou modifiées par la MR, par fichier (côté nouvelle version) : où un commentaire en ligne est accepté."""
+def diff_range(r):
+    """(dossier où lancer git, merge-base, tête de la MR) : le worktree s'il existe, sinon le repo du projet."""
     s = r.s
     wt = s.get("worktree")
     base = s.get("base")
@@ -740,6 +741,49 @@ def diff_lines(r):
         mb = git("merge-base", head, ref, cwd=cwd, check=False)
         if mb:
             break
+    return cwd, mb, head
+
+
+def diff_snippet(r, path, line, radius=None):
+    """L'extrait du diff autour de la remarque : contexte, lignes SUPPRIMÉES et ajoutées par la MR, avec leurs
+    numéros (ancien / nouveau). None si la ligne visée n'est pas dans un hunk (le code autour n'a pas bougé)."""
+    radius = radius or SNIPPET_RADIUS
+    cwd, mb, head = diff_range(r)
+    if not mb:
+        return None
+    out = git("diff", f"-U{radius}", mb, head, "--", path, cwd=cwd, check=False)
+    hunks, cur, o, n = [], None, 0, 0
+    for l in out.splitlines():
+        m = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", l)
+        if m:
+            o, n = int(m.group(1)), int(m.group(2))
+            cur = []
+            hunks.append(cur)
+            continue
+        if cur is None or l.startswith("\\"):
+            continue
+        if l.startswith("+"):
+            cur.append({"o": None, "n": n, "k": "+", "t": l[1:][:240]}); n += 1
+        elif l.startswith("-"):
+            cur.append({"o": o, "n": None, "k": "-", "t": l[1:][:240]}); o += 1
+        else:
+            cur.append({"o": o, "n": n, "k": " ", "t": l[1:][:240]}); o += 1; n += 1
+    for h in hunks:
+        news = [x["n"] for x in h if x["n"] is not None]
+        if news and min(news) <= line <= max(news):
+            # fenêtre de `radius` lignes de la nouvelle version autour de la cible, suppressions comprises
+            keep = [x for x in h if x["n"] is None or abs(x["n"] - line) <= radius]
+            # une suppression n'est gardée que si elle tombe entre deux lignes gardées
+            idx = [i for i, x in enumerate(h) if x in keep and x["n"] is not None]
+            lo, hi = (min(idx), max(idx)) if idx else (0, len(h) - 1)
+            rows = [x for i, x in enumerate(h) if lo <= i <= hi]
+            return {"rows": rows, "target": line}
+    return None
+
+
+def diff_lines(r):
+    """Lignes ajoutées ou modifiées par la MR, par fichier (côté nouvelle version) : où un commentaire en ligne est accepté."""
+    cwd, mb, head = diff_range(r)
     if not mb:
         return {}
     out, cur, ln = {}, None, 0
