@@ -686,7 +686,15 @@ def cmd_triage_pull(r, args):
     """Le tri fait dans le cockpit (reviews/<clé>/triage/<id>) → review.json et comments.md."""
     if not args:
         die("usage : triage-pull <slug> <dossier lu par ArtifactData out_dir>")
-    tdir = os.path.join(os.path.abspath(args[0]), "reviews", r.s["key"], "triage")
+    base = os.path.abspath(args[0])
+    # ArtifactData out_dir range les documents sous <dossier>/reviews/<clé>/triage/ ; on accepte aussi ce
+    # dossier lui-même. Rien de trouvé n'est JAMAIS « rien n'a été trié » : c'est une lecture ratée.
+    candidates = [os.path.join(base, "reviews", r.s["key"], "triage"), base]
+    candidates += [d for d, _, fs in os.walk(base) if d.endswith(os.path.join(r.s["key"], "triage"))]
+    tdir = next((d for d in candidates if os.path.isdir(d) and any(x.endswith(".json") for x in os.listdir(d))), None)
+    if not tdir:
+        die(f"aucun document de tri lu dans {base}. Relis-le : ArtifactData list, collection "
+            f"reviews/{r.s['key']}/triage, out_dir = {base} ; puis relance. Ne repose PAS le tri à Thibault.")
     f = load_findings(r)
     by_id = {x["id"]: x for x in f["findings"]}
     triage = r.s.setdefault("triage", {})

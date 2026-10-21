@@ -11,8 +11,11 @@ session » / « Discuter — je veux comprendre une remarque avant de trier ». 
 `[cockpit <clé>]` reçu par le cockpit vaut « J'ai trié dans le cockpit ».
 
 - **Trié dans le cockpit** → « Trier » (`~/.claude/pipeline/review/cockpit.md`) : `review.sh
-  triage-pull` applique ses choix et écrit `comments.md`. Il reste des remarques non triées : pose-les
-  ici, par paquets de 4 au plus (« Commenter (Recommandé) » / « Écarter », chacune précédée de son
+  triage-pull` applique ses choix et écrit `comments.md`. **Ce que Thibault a trié dans le cockpit ne
+  se redemande jamais** : si `triage-pull` échoue ou annonce des remarques « NON TRIÉES » alors qu'il dit
+  avoir tout trié, c'est ta lecture qui a raté (mauvais dossier, liste incomplète) — relis
+  `reviews/<clé>/triage` et recommence, sans lui reposer une seule question. Seules les remarques
+  vraiment absentes du cockpit (la liste ArtifactData ne les contient pas) se posent ici, par paquets de 4 au plus (« Commenter (Recommandé) » / « Écarter », chacune précédée de son
   `fichier:ligne` et de l'extrait de code), puis écris ses choix dans le cockpit par la même voie
   (`ArtifactData` `set` sur `reviews/<clé>/triage/<id>` : `{id, decision, text, saved_at}`), et
   « Trier » à nouveau.
