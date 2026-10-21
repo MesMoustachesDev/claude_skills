@@ -751,7 +751,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       } else if (x.url) card.append(Object.assign(el("a", "open", "Ouvrir sa page"), { href: x.url, target: "_blank", rel: "noopener" }));
       else card.append(el("span", "status", x.page_deleted ? "Page supprimée" : "Page pas encore publiée"));
       if (x.mr_url) card.append(Object.assign(el("a", "open", "Voir la MR"), { href: x.mr_url, target: "_blank", rel: "noopener" }));
-      if (!x.done) card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
+      if (!x.done && x.updated_at) card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
       return card;
     }
   }
