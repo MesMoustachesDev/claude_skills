@@ -13,7 +13,10 @@ C<n> ou la décision qu'elle implémente, et rattachés : les mutants de ce fich
 suggestions de Romain avec leur décision, les captures de ses scénarios, les tests suspects. En tête,
 les ✗ de Quentin ; en fin, ce qui n'a pu être rattaché à aucune étape.
 
-Dans ton message : une ligne par étape, `[fichier:ligne](chemin:ligne)` cliquable, puis ce qu'elle
+Dans ton message, d'abord **l'arbre du changement** de la feature :
+`python3 ~/.claude/scripts/change_tree.py <merge-base avec la base>` depuis le worktree (contrats,
+scaffold, code, tests, modifications non commitées comprises), avec le **rôle** de chaque fichier en une ligne (ce que le changement y fait), à la place de `<rôle>` ; ne recalcule ni les volumes ni le reformatage, le script les a mesurés.
+Il dit où regarder et où ne pas chercher (généré, reformatage). Puis une ligne par étape de la visite, `[fichier:ligne](chemin:ligne)` cliquable, puis ce qu'elle
 fait en une phrase et ses rattachements en compte (« 1 mutant équivalent, 2 captures »). Ouvre le
 fichier de la première étape avec `open_in_editor` si l'outil est disponible. Puis `AskUserQuestion` :
 « Valider la visite » / « J'ai une question » / « Je renvoie une étape : … » (texte libre).

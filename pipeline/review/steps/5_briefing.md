@@ -12,8 +12,10 @@ remarque** — du contexte. Il comprend :
    Description vide : écrit noir sur blanc.
 2. **Résumé technique** — 3 à 5 lignes : ce que le code fait, et **ce qui existait déjà sur la cible
    vs ce que la MR ajoute réellement**.
-3. **L'arbre du changement** — fichiers groupés par couche (ordre de lecture de l'impact s'il existe),
-   une ligne de rôle chacun, le volume ; les fichiers purement mécaniques marqués comme tels :
+3. **L'arbre du changement** — `python3 ~/.claude/scripts/change_tree.py <merge-base> -C <worktree>`
+   le mesure : fichiers groupés par package et couche, volume, fichiers générés, et part de reformatage
+   (« ⚠ 4 changements réels, le reste = reformat »). Tu ajoutes le **rôle** de chaque fichier en une ligne (ce que le changement y fait), à la place de `<rôle>` ; ne recalcule ni les volumes ni le reformatage, le script les a mesurés. Dans l'ordre de lecture de
+   l'impact s'il existe :
 
    ```
    data/       not_reachable_device_data_source.dart   +33/-2    query GraphQL `esls`

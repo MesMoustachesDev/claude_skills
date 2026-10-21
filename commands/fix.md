@@ -243,7 +243,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Pourquoi les tests l'ont raté   miss_reason — l'explication, et le test existant corrigé s'il y en a un
 ## Preuve                   test(s) ajouté(s), rouge avant (expected_failure), vert après ; suite verte
 ## Plan validé             couche, approche, alternative écartée ; choix du dev (proposé / alternative / autre)
-## Correction               fichiers, en une ligne chacun, marqués prévu / écart accepté ; même défaut corrigé ailleurs
+## Correction               l'arbre du changement : `python3 ~/.claude/scripts/change_tree.py <base_sha>` depuis le worktree, le rôle de chaque fichier en une ligne à la place de `<rôle>` (volumes et reformatage mesurés : ne les recalcule pas), chaque fichier marqué prévu / écart accepté ; même défaut corrigé ailleurs
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
 ## Impact (graphify)        consommateurs hors package (impact.json, touched: false) × verdict de Victor (review.json → impact_checked) ; omise sans graphe ; `stale` : tableau gardé, précédé de « Impact : calculé sur le graphe de la base (update en échec) » ; `échec` : la seule ligne « Impact : non calculé (<raison>) »
 ## Arbitrages               contestations de Fanny et verdicts (si présents)

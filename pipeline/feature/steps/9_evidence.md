@@ -33,6 +33,11 @@ Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue
 <n> fichiers · <n> décisions d'Arthur tranchées dans le code · commit <sha>
 | ID | Package et dépendances (§9) | Statut |
 
+## Arbre du changement             ← change_tree.py <merge-base> (worktree) + le rôle de chaque fichier, repris de 8b
+```
+<l'arbre, une ligne par fichier, rôle compris>
+```
+
 ## Visite guidée                     ← review.json → tour, human_gates.tour
 | # | Fichier:ligne | Ce que fait le code | Implémente |
 
