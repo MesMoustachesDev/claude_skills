@@ -5,6 +5,8 @@
 # remarques, le tri et la publication passent par ce script. À lancer depuis le repo du projet.
 #
 #   review.sh init <branche | !N | #N | URL>     résout la cible, crée l'état, imprime slug et dossiers
+#   review.sh preflight <slug>                   vérifie outillage, QA, graphe, auth de la forge AVANT le gauntlet
+#   review.sh decide <slug> <domaine> "<décision>"  trace ce que Thibault a tranché au préflight
 #   review.sh next <slug> [--json]               étape suivante et fichier d'étape à lire
 #   review.sh status <slug>                      état de la revue
 #   review.sh gauntlet <slug> [--mutation]       pr_gauntlet.sh avec worktree conservé, chemin enregistré

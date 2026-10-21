@@ -24,6 +24,8 @@ l'étape en cours**. L'état vit dans `~/.cache/gauntlet/review/<slug>/review.js
    description, source, cible, remote) et imprime le `slug`, le dossier de la revue et la clé du
    cockpit. Une revue déjà en cours sur ce slug reprend. Puis surveille le cockpit (« Être prévenu »
    dans `~/.claude/pipeline/feature/cockpit.md`, même artifact, même règle).
+   L'étape 1 est le **préflight** : tout ce qui empêcherait une partie de la revue (outillage, QA,
+   graphe, authentification) est vérifié et tranché avec Thibault avant de lancer quoi que ce soit.
 1. **`review.sh next <slug>`** : l'étape à jouer, le fichier d'étape à lire, le rapport du gauntlet, le
    worktree, l'état des trois agents.
 2. **Lis le fichier d'étape qu'il indique**, puis exécute l'étape.
@@ -71,7 +73,11 @@ captures restent (`~/.cache/gauntlet/review/<slug>/`, `~/.cache/gauntlet/pr/<bra
 - **Tu ne refais pas le travail des agents** et tu ne reformules pas une mesure du gauntlet en
   opinion. Une remarque d'agent qui te paraît fausse : tu la vérifies (`git grep`, le fichier) et tu la
   signales à Thibault au tri, tu ne la supprimes pas en silence.
-- **Ce qui n'a pas tourné se dit.** SDK absent, check sauté, QA sautée ou device indisponible : écrit
-  dans le briefing et la synthèse. Rien ne laisse croire qu'une chose a été vérifiée.
+- **Ce qui manque se demande au début, jamais à la fin.** Le préflight (étape 1) le détecte et Thibault
+  tranche avant le gauntlet. Ce qui casse en route sans avoir été prévu (crash d'un check, build en
+  échec, device qui tombe) : tu t'arrêtes et tu le lui dis tout de suite, avec ce que ça empêche et les
+  options — tu ne continues pas en silence pour le découvrir dans le briefing.
+- **Ce qui n'a pas tourné se dit** quand même, dans le briefing et la synthèse, avec la décision qui
+  l'a voulu. Rien ne laisse croire qu'une chose a été vérifiée.
 - **Ton style** : direct, factuel. Si c'est bon, une ligne. Si c'est problématique, pourquoi et comment
   corriger.

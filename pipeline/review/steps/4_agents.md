@@ -14,6 +14,9 @@ Chaque prompt tient en 10 lignes, avec des chemins et des faits, jamais ton hist
   (`git -C <worktree> merge-base HEAD <remote>/<cible>`) ;
 - `context.md`, le rapport du gauntlet (`review.sh next` le donne), le graphe de la PR s'il existe ;
 - les règles projet qui existent (chemins notés dans `context.md`) ;
+- les décisions du préflight qui le concernent (`review.sh next` les affiche) : « QA sans device,
+  décidé par Thibault », « pas de graphe : lis les consommateurs à la main », « `reinvented` ne
+  tournera pas : juge les doublons à la lecture » ;
 - « écris `findings_<rôle>.json` au format de `~/.claude/pipeline/review/findings_format.md`, puis
   rends ton rapport en trois lignes ».
 
@@ -26,3 +29,7 @@ notifications arrivent seules ; ne les sonde pas.
 `failed` si le fichier manque. Un agent en échec (`failed`, erreur, fichier absent) : relance-le une
 fois avec la même consigne ; au second échec, `review.sh agent <slug> <rôle> failed "<raison>"` et le
 briefing le dira. L'étape est finie quand les trois sont `done`, `skipped` ou `failed`.
+
+Un agent rapporte un manque **que le préflight n'a pas tranché** (build qui échoue, check qui crashe) :
+point imprévu, tout de suite — dis à Thibault ce que ça empêche et propose de corriger puis relancer
+cet agent, ou de continuer sans ; ne le garde pas pour le briefing.

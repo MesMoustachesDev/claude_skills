@@ -26,7 +26,8 @@ remarque** — du contexte. Il comprend :
 4. **Le flux** — un diagramme Mermaid (bloc ` ```mermaid `) du chemin que parcourt la donnée ou
    l'utilisateur à travers ce que la MR touche : où la valeur naît, où elle est consommée. Deux chemins
    qui alimentent le même écran depuis deux sources : côte à côte.
-5. **Ce qui a été vérifié** — le verdict brut du gauntlet (`[OK]` / `[WARN]` / `[FAIL]`) et surtout ce
+5. **Ce qui a été vérifié** — d'abord les **décisions du préflight** (« QA sans device : décidé au
+   départ »), puis le verdict brut du gauntlet (`[OK]` / `[WARN]` / `[FAIL]`) et surtout ce
    qui n'a pas tourné ; l'impact graphify s'il a tourné ; la QA de Maëlle, scénario par scénario, avec
    **comment** il a été prouvé (device, test existant rejoué, test jetable) et pourquoi le device n'a
    pas servi s'il n'a pas servi ; un agent en échec.

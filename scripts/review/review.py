@@ -23,6 +23,7 @@ AGENT_DONE = {"done", "skipped", "failed"}
 SEVERITY_ORDER = {"critical": 0, "suggestion": 1, "question": 2}
 
 ORDER = [
+    ("preflight", "1", "Préflight : ce qui manque, demandé avant de lancer quoi que ce soit", "1_preflight.md"),
     ("gauntlet", "2", "Gauntlet sur la branche, worktree conservé", "2_gauntlet.md"),
     ("context", "3", "Le pourquoi avant le comment", "3_contexte.md"),
     ("agents", "4", "Trois relectures en parallèle (archi, code, QA)", "4_agents.md"),
@@ -194,6 +195,10 @@ def cmd_next(r, args):
     if os.path.isfile(info["gauntlet_report"]):
         print(f"gauntlet  : {info['gauntlet_report']}")
     print("agents    : " + ", ".join(f"{k} {v}" for k, v in info["agents"].items()))
+    for area, d in ((s.get("preflight") or {}).get("decisions") or {}).items():
+        print(f"décidé    : {area} — {d['decision']}")
+    if n["key"] == "preflight" and s.get("preflight") and preflight_open(s):
+        print(f"à trancher: {', '.join(preflight_open(s))}")
     if (s.get("cockpit") or {}).get("waiting"):
         print(f"cockpit   : en attente — {s['cockpit']['waiting']}")
 
@@ -210,6 +215,8 @@ def cmd_status(r, args):
 
 
 def cmd_pass(r, args):
+    if args[0] == "preflight" and preflight_open(r.s):
+        die(f"préflight non tranché : {', '.join(preflight_open(r.s))} — review.sh decide d'abord")
     r.s.setdefault("stages", {})[args[0]] = {"status": "PASSED", "at": now()}
     r.save()
     print(f"{args[0]} : fait")
@@ -542,6 +549,7 @@ def cmd_cockpit_push(r, args):
         "gauntlet_md": read_text(os.path.join(s["gauntlet_out"], "report.md"), 60_000),
         "findings": f.get("findings") or [], "grids": f.get("grids") or {}, "qa": f.get("qa"),
         "triage": s.get("triage") or {}, "posted": s.get("posted") or [],
+        "preflight": s.get("preflight"),
         "updated_at": now(),
     }
     fp = os.path.join(out_dir, "review.json")
@@ -695,10 +703,122 @@ def cmd_post(r, args):
     sys.exit(1 if failed else 0)
 
 
+# ---------------------------------------------------------------------------
+# Préflight : tout ce qui empêcherait une partie de la revue, vérifié et tranché AVANT le gauntlet
+# ---------------------------------------------------------------------------
+PLACEHOLDER = re.compile(r"com\.example|\{[^}]*\}|<[^>]+>|TODO|à renseigner", re.I)
+
+
+def cfg_value(text, key):
+    for block in re.findall(r"```ini\n(.*?)```", text or "", re.S):
+        for line in block.splitlines():
+            m = re.match(rf"\s*{re.escape(key)}\s*=\s*(.*?)\s*$", line)
+            if m:
+                return m.group(1)
+    return ""
+
+
+def find_graph(root):
+    if os.path.isfile(os.path.join(root, "graphify-out", "graph.json")):
+        return os.path.join(root, "graphify-out", "graph.json")
+    for d in sorted(os.listdir(root)):
+        g = os.path.join(root, d, "graphify-out", "graph.json")
+        if os.path.isfile(g):
+            return g
+    return None
+
+
+def cmd_preflight(r, args):
+    s, root = r.s, r.s["project_root"]
+    items = []
+    add = lambda id_, area, status, detail, fix=None: items.append(
+        {"id": id_, "area": area, "status": status, "detail": detail, "fix": fix})
+    cfg_path = os.path.join(root, ".claude", "rules", "feature_pipeline.md")
+    cfg = read_text(cfg_path)
+    if cfg is None:
+        add("config", "projet", "warn", "pas de .claude/rules/feature_pipeline.md : le gauntlet prend le template générique "
+            "(pas de QA device, seuils par défaut)", "/feature init dans le projet")
+    # Outillage : le doctor du gauntlet (SDK épinglé, outils Dart du gauntlet, linter, maestro, plateformes QA)
+    if cfg is not None:
+        p = subprocess.run([GAUNTLET, "doctor"], cwd=root, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=600)
+        section = "outils"
+        for line in re.sub(r"\x1b\[[0-9;]*m", "", p.stdout + p.stderr).splitlines():
+            m = re.match(r"\s*== (.+?) ==", line)
+            if m:
+                section = m.group(1)
+                continue
+            m = re.match(r"\[(FAIL|WARN)\]\s+(.*)", line)
+            if not m or section == "résumé":
+                continue
+            area = "qa" if section.startswith("plateformes") else "outillage"
+            label = m.group(2)
+            if re.search(r"create_feature_rules|brick|mason|package_path", label) or ("mutation_test" in label and "--mutation" not in args):
+                continue  # utiles à /feature, pas à une revue
+            fix = label.split(" — ", 1)[1] if " — " in label else None
+            add(f"doctor:{len(items)}", area, "block" if m.group(1) == "FAIL" else "warn", label, fix)
+    # QA : appIds réels, compte de test référencé (le doctor ne voit pas le compte)
+    if cfg is not None:
+        platforms = [x.strip() for x in cfg_value(cfg, "qa.platforms").split(",") if x.strip()]
+        if not platforms:
+            add("qa:platforms", "qa", "block", "qa.platforms vide : pas de QA sur device")
+        for pf in platforms:
+            v = cfg_value(cfg, f"{pf}.app_id")
+            if (not v or PLACEHOLDER.search(v)) and not any(f"{pf}.app_id" in i["detail"] for i in items):
+                add(f"qa:{pf}.app_id", "qa", "block", f"{pf}.app_id = « {v or 'vide'} » : valeur de template")
+        notes = cfg.split("## Notes pour les agents", 1)[-1] if "## Notes pour les agents" in cfg else ""
+        acct = next((l for l in notes.splitlines() if re.search(r"compte de test", l, re.I)), "")
+        if not acct or PLACEHOLDER.search(acct):
+            add("qa:account", "qa", "warn", "compte de test QA non référencé dans « Notes pour les agents » : "
+                "scénarios connectés impossibles sur device")
+    # Graphe graphify : sans lui, pas d'impact calculé ni d'ordre de lecture
+    if not find_graph(root):
+        add("graphify", "graphe", "warn", "pas de graphe graphify dans le projet : pas d'impact hors package calculé "
+            "ni d'ordre de lecture (Alice lira les consommateurs à la main)", "/graphify sur le projet")
+    # Publication : l'outil de la forge doit être authentifié, sinon on le découvre à l'étape 7
+    tool = {"gitlab": ["glab", "auth", "status"], "github": ["gh", "auth", "status"]}.get(s["kind"])
+    if tool:
+        ok = shutil.which(tool[0]) and subprocess.run(tool, cwd=root, capture_output=True).returncode == 0
+        if not ok:
+            add("forge:auth", "publication", "block", f"{tool[0]} non authentifié : les commentaires ne pourront pas être publiés",
+                f"{tool[0]} auth login")
+    s["preflight"] = {"at": now(), "items": items, "decisions": (s.get("preflight") or {}).get("decisions", {})}
+    r.save()
+    with open(r.file("preflight.json"), "w", encoding="utf-8") as f:
+        json.dump(s["preflight"], f, ensure_ascii=False, indent=2)
+    if not items:
+        print("préflight : tout est prêt (outillage, QA, graphe, publication)")
+        return
+    by = {}
+    for it in items:
+        by.setdefault(it["area"], []).append(it)
+    for area, its in by.items():
+        print(f"\n{area} :")
+        for it in its:
+            print(f"  [{it['status'].upper()}] {it['id']} — {it['detail']}" + (f"  → {it['fix']}" if it.get("fix") else ""))
+    print(f"\n{sum(1 for i in items if i['status'] == 'block')} bloquants, {sum(1 for i in items if i['status'] == 'warn')} avertissements"
+          " — à trancher avec Thibault avant le gauntlet (étape 1)")
+
+
+def cmd_decide(r, args):
+    """Trace la décision de Thibault sur un domaine du préflight (qa, graphe, outillage, publication, projet)."""
+    if len(args) < 2:
+        die("usage : decide <slug> <domaine> \"<décision>\"")
+    pf = r.s.setdefault("preflight", {"items": []})
+    pf.setdefault("decisions", {})[args[0]] = {"decision": args[1], "at": now()}
+    r.save()
+    print(f"décision {args[0]} : {args[1]}")
+
+
+def preflight_open(s):
+    pf = s.get("preflight") or {}
+    areas = {i["area"] for i in pf.get("items") or []}
+    return sorted(areas - set((pf.get("decisions") or {}).keys()))
+
+
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
-    "cockpit-push": cmd_cockpit_push, "triage-pull": cmd_triage_pull, "post": cmd_post,
+    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 
