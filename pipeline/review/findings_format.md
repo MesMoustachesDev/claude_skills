@@ -24,7 +24,7 @@ en tête. Une remarque incomplète est écartée et signalée : remplis tous les
       "why": "Pourquoi c'est un problème ici : conséquence concrète, règle enfreinte (pr_rules, grille), ou écart au voisin de référence.",
       "evidence": "Ce que tu as lu ou lancé pour l'établir : `git grep -n is_reachable origin/develop -- lib/` → 3 résultats ; fichier:ligne du voisin.",
       "suggestion": "Comment corriger, avec un extrait si utile.",
-      "comment": "Le commentaire tel qu'il serait posté sur la MR : poli, direct, autoportant, en français, sans « nous » ni formule creuse. Il cite le fichier et la ligne si le commentaire est général."
+      "comment": "Le commentaire tel qu'il serait posté sur la MR, dans la voix de Thibault : ~/.claude/pipeline/review/voix_revue.md (et les « Règles de style » de ~/.claude/skills/ecrire-linkedin/voix.md). Autoportant, il cite le fichier et la ligne si le commentaire est général."
     }
   ]
 }

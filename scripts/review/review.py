@@ -596,6 +596,52 @@ def read_text(path, limit=None):
     return t
 
 
+VOICE_FILE = os.path.join(HOME, ".claude", "skills", "ecrire-linkedin", "voix.md")
+VOICE_REVIEW = os.path.join(HOME, ".claude", "pipeline", "review", "voix_revue.md")
+
+
+def voice_text():
+    """Ma voix pour un commentaire de MR : voix_revue.md, plus les « Règles de style » de voix.md (source unique)."""
+    review = read_text(VOICE_REVIEW) or ""
+    voix = read_text(VOICE_FILE) or ""
+    m = re.search(r"^## Règles de style\n(.*?)(?=^## |\Z)", voix, re.M | re.S)
+    rules = m.group(1).strip() if m else ""
+    return (review + ("\n\n## Règles de style (voix.md)\n" + rules if rules else "")).strip() or None
+
+
+# Vérification mécanique d'un commentaire (même esprit que skills/ecrire-linkedin/verifier.py, adapté à la revue)
+CHECK_ERRORS = [
+    (r"—|–", "tiret cadratin ou demi-cadratin"), (r"’", "apostrophe typographique"), (r"…", "points de suspension en un caractère"),
+    (r"[→←⇒➜➡•▸►▪◦✓✔]", "symbole non tapé au clavier"),
+    (r"c'est un peu (le|la|les|comme)\b|c'est comme\b|le problème n'est pas|ce qui fait la différence|\blevier\b|\bcrucial|"
+     r"game changer|changer la donne|\bau final\b|\bfinalement\b|\ben réalité\b|\bessentiel|\bfondamental", "tournure IA"),
+    (r"\bnous\b|\bnotre\b", "« nous » (écris en ton nom)"),
+    (r"super travail|petite remarque|n'hésite pas|beau travail|bravo", "formule creuse"),
+    (r"coder avec ses pieds|branquignol|\brelou\b|c'est quoi ce délire|t'as cru|on se calme|faire joujou|pignouf|mdr", "pique hors revue (voix_revue.md)"),
+]
+
+
+def comment_issues(text):
+    low = (text or "").lower()
+    return [label for rx, label in CHECK_ERRORS if re.search(rx, low)]
+
+
+def cmd_check_comments(r, args):
+    f = load_findings(r)
+    triage = r.s.get("triage") or {}
+    bad = 0
+    for x in f["findings"]:
+        t = triage.get(x["id"])
+        if not t or t["decision"] != "comment":
+            continue
+        issues = comment_issues(t.get("text"))
+        if issues:
+            bad += 1
+            print(f"{x['id']} : {', '.join(issues)}")
+    print("commentaires conformes à ta voix" if not bad else f"{bad} commentaire(s) à corriger avant de les montrer")
+    sys.exit(1 if bad else 0)
+
+
 def cmd_cockpit_push(r, args):
     if not args:
         die("usage : cockpit-push <slug> <dossier> [--versions id=v,…]")
@@ -622,6 +668,7 @@ def cmd_cockpit_push(r, args):
         "findings": f.get("findings") or [], "grids": f.get("grids") or {}, "qa": f.get("qa"),
         "triage": s.get("triage") or {}, "posted": s.get("posted") or [],
         "preflight": s.get("preflight"),
+        "voice": voice_text(),
         "updated_at": now(),
     }
     fp = os.path.join(out_dir, "review.json")
@@ -890,7 +937,8 @@ def preflight_open(s):
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
-    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
+    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge,
+    "check-comments": cmd_check_comments, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 

@@ -20,6 +20,7 @@
 #   review.sh merge <slug> F2 F3 [F4…]           fusionne des doublons que seul le sens rapproche (mémorisé)
 #   review.sh cockpit-push <slug> <dossier> [--versions id=v,…]
 #   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md
+#   review.sh check-comments <slug>             vérifie les commentaires retenus contre ma voix (voix_revue.md)
 #   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie
 #   review.sh cleanup <slug>                     supprime le worktree de la revue (garde rapports et captures)
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/review/review.py" "$@"

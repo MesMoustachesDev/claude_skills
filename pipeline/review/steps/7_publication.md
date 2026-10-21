@@ -5,7 +5,11 @@ Une revue de branche sans MR/PR : rien à publier, `review.sh pass <slug> posted
 1. `review.sh post <slug>` (sans `--go`) : l'aperçu, rien n'est envoyé. Pour chaque remarque retenue,
    le commentaire tel qu'il partira, et s'il sera **en ligne** (ligne modifiée par la MR) ou
    **général** (ailleurs : il est préfixé de `fichier:ligne`).
-2. Montre à Thibault, dans la session, **le texte exact** de chaque commentaire (`comments.md`), avec
+2. `review.sh check-comments <slug>` : chaque commentaire retenu contre sa voix (tirets cadratins,
+   caractères non tapés au clavier, tournures d'IA, « nous », formules creuses, piques hors revue). Un
+   commentaire signalé : corrige-le en gardant le sens (dans le cockpit par `ArtifactData` `set` sur
+   `reviews/<clé>/triage/<id>`, puis « Trier »), et dis-lui ce que tu as changé. Puis montre à Thibault,
+   dans la session, **le texte exact** de chaque commentaire (`comments.md`), avec
    sa cible (`!218`, `fichier:ligne`, en ligne ou général). Pas de résumé : le texte.
 3. Un seul `AskUserQuestion` : « Go, publier les <n> commentaires » / « Modifier un commentaire »
    (texte libre : tu le changes dans le cockpit par `ArtifactData` `set` sur

@@ -747,18 +747,19 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   let sample = null, sampleOff = false;
   const rui = {};  // par remarque : consigne, génération en cours, version d'avant, message
   const STEER_CHIPS = ["Plus court", "Sous forme de question", "Avec la correction en code", "Plus doux, non bloquant", "Plus ferme : à corriger avant merge"];
-  const STEER_RULES = `Tu réécris un commentaire de revue de code qui sera posté sur une merge request, au nom de Thibault, développeur mobile senior (Flutter, Android). Règles :
-- En français, poli, direct, autoportant : l'auteur de la MR doit comprendre le problème sans autre contexte.
-- Factuel : le problème, pourquoi c'est un problème ici, et ce qu'il propose. Rien qui ne soit dans les éléments fournis : n'invente ni fichier, ni ligne, ni comportement.
-- Pas de « nous », pas de formule creuse (« Super travail », « Petite remarque », « N'hésite pas »), pas de tiret cadratin, pas d'emoji.
-- Tutoiement si le commentaire d'origine tutoie, vouvoiement sinon.
+  // Les contraintes de fond ; la voix (ton, tics permis, ce qui ne passe pas) vient de voix_revue.md et des
+  // « Règles de style » de skills/ecrire-linkedin/voix.md, envoyés par review.sh dans la fiche (review.voice).
+  const STEER_RULES = `Tu réécris un commentaire de revue de code qui sera posté sur une merge request, au nom de Thibault, développeur mobile senior (Flutter, Android). Contraintes de fond :
+- En français, autoportant : l'auteur de la MR doit comprendre le problème sans autre contexte.
+- Factuel : le problème, pourquoi c'est un problème ici, ce qu'il propose. Rien qui ne soit dans les éléments fournis : n'invente ni fichier, ni ligne, ni comportement.
+- On critique le code, jamais la personne.
 - Un extrait de code seulement si la consigne le demande ou si la correction tient en quelques lignes, dans un bloc \`\`\`dart.
 - Court : 1 à 4 phrases, plus l'extrait éventuel.`;
 
   function steerPrompt(f, current, guide) {
     const r = review || {}, c = r.context || {};
     const snip = f.snippet?.lines?.length ? f.snippet.lines.map((l, i) => `${f.snippet.start + i}${f.snippet.start + i === f.snippet.target ? " >" : "  "} ${l}`).join("\n") : "";
-    return STEER_RULES +
+    return STEER_RULES + (r.voice ? `\n\nÉcris dans sa voix, telle qu'il la décrit lui-même :\n\n${r.voice}` : "") +
       `\n\nLa MR : ${r.title || r.slug}${c.why ? "\nSon objectif : " + c.why : ""}` +
       `\n\nLa remarque (${f.severity}) : ${f.title}` +
       (f.file ? `\nFichier : ${f.file}${f.line ? ":" + f.line : ""}` : "") +
@@ -778,6 +779,14 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     refused: "Claude a refusé cette consigne, reformule-la.",
     empty_completion: "Claude n'a rien proposé, change la consigne.",
   };
+
+  const VOICE_CHECKS = [
+    [/—|–/, "tiret cadratin"], [/’/, "apostrophe typographique"], [/…/, "… en un caractère"], [/[→←⇒➜➡•▸►▪◦✓✔]/, "symbole non tapé au clavier"],
+    [/c'est un peu (le|la|les|comme)\b|c'est comme\b|le problème n'est pas|ce qui fait la différence|\blevier\b|\bcrucial|game changer|changer la donne|\bau final\b|\bfinalement\b|\ben réalité\b|\bessentiel|\bfondamental/, "tournure IA"],
+    [/\bnous\b|\bnotre\b/, "« nous »"], [/super travail|petite remarque|n'hésite pas|beau travail|bravo/, "formule creuse"],
+    [/coder avec ses pieds|branquignol|\brelou\b|c'est quoi ce délire|t'as cru|on se calme|faire joujou|pignouf|mdr/, "pique hors revue"],
+  ];
+  const voiceIssues = (t) => VOICE_CHECKS.filter(([rx]) => rx.test((t || "").toLowerCase())).map(([, l]) => l);
 
   function renderSteer(f, ui) {
     const box = el("div", "steer");
@@ -820,8 +829,9 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       });
       ui.gen = false; ui.ctl = null; ui.prev = before;
       drafts[f.id] = text.trim().replace(/^["«“](.*)["»”]$/s, "$1").replace(/\s*[—–]\s*/g, ", ");
-      ui.msg = truncated ? "Réponse coupée, relis-la." : "Nouvelle version : relis-la, puis Commenter pour l'enregistrer.";
-      ui.err = !!truncated;
+      const issues = voiceIssues(drafts[f.id]);
+      ui.msg = truncated ? "Réponse coupée, relis-la." : issues.length ? "À revoir : " + issues.join(", ") : "Nouvelle version : relis-la, puis Commenter pour l'enregistrer.";
+      ui.err = !!truncated || issues.length > 0;
     } catch (e) {
       ui.gen = false; ui.ctl = null; drafts[f.id] = before;
       if (e?.code === "cancelled") { ui.msg = ""; ui.err = false; }
