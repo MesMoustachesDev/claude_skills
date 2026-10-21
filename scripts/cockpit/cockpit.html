@@ -58,6 +58,17 @@ button:disabled { opacity: .5; cursor: default }
 .waiting small { color: var(--wait); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: .72rem }
 .waiting p { margin: 0; font-size: 1.05rem; font-weight: 600; text-wrap: balance }
 
+.notify { display: grid; gap: 6px; font-size: .88rem }
+.notify label { color: var(--muted) }
+.notify-row { display: flex; flex-wrap: wrap; gap: 8px }
+.notify input { flex: 1 1 260px; min-width: 0; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px }
+.notify .status.sent { color: var(--ok) } .notify .status.err { color: var(--bad) }
+.report details > summary { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; cursor: pointer; list-style: none }
+.report details > summary::-webkit-details-marker { display: none }
+.report details > summary h2 { margin: 0 }
+.report details > summary::before { content: "▾"; color: var(--muted); font-size: .8rem }
+.report details:not([open]) > summary::before { content: "▸" }
+.report iframe { display: block; width: 100%; min-height: 360px; height: 640px; border: 1px solid var(--line); border-radius: 6px; margin-top: 10px; background: #ffffff }
 .cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start }
 @media (max-width: 880px) { .cols { grid-template-columns: minmax(0, 1fr) } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0 }
@@ -137,6 +148,22 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
   <section class="waiting" id="waiting" hidden>
     <small>En attente de toi</small>
     <p id="waitingText"></p>
+  </section>
+
+  <form class="notify" id="notify" hidden>
+    <label for="notifyText">Un mot pour la session Claude</label>
+    <div class="notify-row">
+      <input id="notifyText" type="text" maxlength="500" placeholder="J'ai fini d'éditer, reprends." autocomplete="off">
+      <button id="notifyBtn" class="primary" type="submit" disabled>Prévenir Claude</button>
+    </div>
+    <span class="status" id="notifyStatus"></span>
+  </form>
+
+  <section class="panel report" id="report" hidden>
+    <details open>
+      <summary><h2>Rapport du point d'étape</h2><span class="status" id="reportMeta"></span></summary>
+      <iframe id="reportFrame" sandbox="allow-scripts allow-popups" title="Rapport du point d'étape"></iframe>
+    </details>
   </section>
 
   <div id="body" class="cols">
@@ -251,6 +278,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
     const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
     add("gabarit", f.size); add("mode", f.mode); add("package", f.package); add("mis à jour", fmt(f.updated_at));
     $("waiting").hidden = !f.waiting; $("waitingText").textContent = f.waiting || "";
+    watchReport(f.report);
 
     const steps = $("steps"); steps.replaceChildren();
     const curKey = (f.stages || []).find((s) => s.status !== "PASSED" && s.status !== "SKIPPED")?.key;
@@ -403,10 +431,62 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
   $("vMine").onclick = () => setView("mine");
   $("vEdit").onclick = () => setView("edit");
 
+  // ---- rapport du point d'étape : morceaux du report.html, réassemblés et affichés dans un cadre isolé
+  let reportHash = null, unsubReport = null;
+  const RESIZE = "<script>(function(){function s(){parent.postMessage({ckh:document.documentElement.scrollHeight},'*')}" +
+    "addEventListener('load',s);try{new ResizeObserver(s).observe(document.documentElement)}catch(e){}})()<\/script>";
+  function watchReport(meta) {
+    const box = $("report");
+    if (!meta) { box.hidden = true; if (unsubReport) unsubReport(); unsubReport = null; reportHash = null; return; }
+    box.hidden = false;
+    $("reportMeta").textContent = [meta.step && `étape ${meta.step}`, `généré ${fmt(meta.generated_at)}`].filter(Boolean).join(" · ");
+    if (meta.hash === reportHash) return;
+    reportHash = meta.hash;
+    if (unsubReport) unsubReport();
+    unsubReport = db.collection(`features/${key}/report`).where("hash", "==", meta.hash).onSnapshot((q) => {
+      const parts = []; q.docs.forEach((d) => { const x = d.data(); parts[x.i] = x.html; });
+      if (parts.filter((p) => p != null).length < meta.n) return;
+      $("reportFrame").srcdoc = parts.join("") + RESIZE;
+    }, () => {});
+  }
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== $("reportFrame").contentWindow || typeof ev.data?.ckh !== "number") return;
+    $("reportFrame").style.height = Math.max(360, Math.min(ev.data.ckh + 8, 20000)) + "px";
+  });
+
+  // ---- prévenir la session Claude (commentaire envoyé à Claude, ancré sur ce formulaire)
+  let comments = null;
+  async function refreshNotify() {
+    const btn = $("notifyBtn"), st = $("notifyStatus");
+    if (!comments) { $("notify").hidden = true; return; }
+    $("notify").hidden = false;
+    let can = "off";
+    try { can = await comments.canSendToClaude(); } catch {}
+    btn.disabled = can !== "available";
+    st.className = "status";
+    st.textContent = { available: "", no_session: "Aucune session Claude ne suit le cockpit en ce moment.",
+      writers_only: "Seuls les éditeurs du cockpit peuvent prévenir Claude.", off: "Indisponible dans cette vue." }[can] ?? "Indisponible dans cette vue.";
+  }
+  $("notify").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const btn = $("notifyBtn"), st = $("notifyStatus");
+    btn.disabled = true; st.className = "status"; st.textContent = "Envoi…";
+    try {
+      const anchor = await comments.anchorFor($("notify"));
+      const msg = $("notifyText").value.trim() || "J'ai fini, reprends.";
+      await comments.sendToClaude({ anchor, text: `[cockpit ${key}] ${msg}` });
+      $("notifyText").value = ""; st.className = "status sent"; st.textContent = `Envoyé à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. La session va reprendre.`;
+    } catch (err) {
+      st.className = "status err";
+      st.textContent = err?.code === "claude_unavailable" ? "Aucune session Claude n'a pu recevoir le message." : `Échec de l'envoi (${err?.code || "erreur"}).`;
+    } finally { setTimeout(() => { refreshNotify(); }, 1200); }
+  });
+
   // ---- données
   function open(k) {
     if (!k || k === key && unsubFeature) return;
     key = k; feature = null; contracts = {}; edits = {}; fileId = null;
+    if (unsubReport) unsubReport(); unsubReport = null; reportHash = null;
     try { history.replaceState(null, "", "#" + k); } catch {}
     store.set("lastFeature", k);
     [unsubFeature, unsubContracts, unsubEdits].forEach((u) => u && u());
@@ -430,6 +510,8 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
       $("empty").replaceChildren(el("strong", null, "Le cockpit a besoin d'être ouvert depuis claude.ai, connecté."));
       return;
     }
+    comments = await window.claude?.use?.("comments");
+    refreshNotify();
     db.collection("features").orderBy("updated_at", "desc").limit(50).onSnapshot((q) => {
       features = q.docs.map((d) => ({ key: d.id, project: d.data().project, feature: d.data().feature }));
       const wanted = (location.hash || "").slice(1) || store.get("lastFeature");

@@ -360,6 +360,10 @@ def cmd_set(c, args):
 
 
 def cmd_say(c, args):
+    if "--report" in args:
+        i = args.index("--report")
+        c.p.setdefault("cockpit", {})["report_step"] = args[i + 1]
+        args = args[:i] + args[i + 2:]
     c.p.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
     c.p["cockpit"]["at"] = now()
     c.save()
@@ -591,6 +595,34 @@ def decisions_log(c):
     return sorted(out, key=lambda e: e.get("at") or "")
 
 
+REPORT_CHUNK = 90_000  # caractères par document (un document db fait au plus 256 Ko une fois sérialisé)
+IMG_RE = re.compile(r"<img\b[^>]*\bsrc=\"([^\"]*)\"[^>]*>", re.I)
+
+
+def report_docs(c, key, out_dir):
+    """Le dernier report.html de la feature, découpé en morceaux. Les ids portent l'empreinte du
+    rapport : un nouveau rapport crée de nouveaux documents, jamais d'écrasement (pas de version à lire)."""
+    path = os.path.join(c.dir, "report.html")
+    html = read_text(path)
+    if html is None:
+        return None, []
+    # Les captures sont des fichiers locaux : illisibles depuis l'artifact, remplacées par leur chemin.
+    html = IMG_RE.sub(lambda m: f'<span class="ck-img">capture : {m.group(1)} (dans la session)</span>', html)
+    h = sha1(html)[:12]
+    parts = [html[i:i + REPORT_CHUNK] for i in range(0, len(html), REPORT_CHUNK)] or [""]
+    os.makedirs(os.path.join(out_dir, "report"), exist_ok=True)
+    writes = []
+    for i, part in enumerate(parts):
+        fp = os.path.join(out_dir, "report", f"{h}-{i}.json")
+        with open(fp, "w", encoding="utf-8") as fh:
+            json.dump({"hash": h, "i": i, "html": part}, fh, ensure_ascii=False)
+        writes.append({"op": "set", "collection": f"features/{key}/report", "doc_id": f"r-{h}-{i}", "file_path": fp})
+    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path), datetime.timezone.utc).replace(microsecond=0)
+    meta = {"hash": h, "n": len(parts), "generated_at": mtime.isoformat().replace("+00:00", "Z"),
+            "step": (c.p.get("cockpit") or {}).get("report_step")}
+    return meta, writes
+
+
 TREE_MAX = 3000
 
 
@@ -640,6 +672,8 @@ def cmd_cockpit_push(c, args):
         stages.append({"key": k, "step": step, "title": title, "status": state_of(c.p, k) or "TODO",
                        "reason": st.get("reason") if isinstance(st, dict) else None})
     tree = package_tree(c)
+    report, report_writes = report_docs(c, key, out_dir)
+    writes += report_writes
     n = next_step(c.p)
     feature = {
         "project": c.project(), "feature": c.name, "key": key, "branch": c.p.get("branch"),
@@ -649,6 +683,7 @@ def cmd_cockpit_push(c, args):
         "stages": stages, "decisions": decisions_log(c),
         "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
         "tree": tree,
+        "report": report,
         "updated_at": now(),
     }
     fp = os.path.join(out_dir, "feature.json")

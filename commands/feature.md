@@ -55,9 +55,12 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
    tranche. Les hooks des agents continuent d'écrire `stages.<profil>` eux-mêmes.
-4. **Avant chaque point d'étape**, `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>"`
-   puis rafraîchis le cockpit (`~/.claude/pipeline/feature/cockpit.md`, « Rafraîchir »). Au retour
-   de sa réponse, `pipeline.sh say <nom> ""`.
+4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>` :
+   `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
+   « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
+   sous le bandeau. Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
+   lien du cockpit (`#<clé>`) ; `SendUserFile` ne sert plus qu'aux captures QA, ou si le cockpit
+   échoue. Au retour de sa réponse, `pipeline.sh say <nom> ""`.
 5. Retour en 1.
 
 `/feature <nom> status` : `pipeline.sh status <nom>`, affiché tel quel, plus l'issue et le découpage

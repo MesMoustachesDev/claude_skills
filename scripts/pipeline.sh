@@ -20,7 +20,7 @@
 #   pipeline.sh commit-contracts <nom> draft|thibault|reedit ["<quoi>"] [fichiers…]
 #   pipeline.sh freeze <nom>                     gel des tests (3b)
 #   pipeline.sh refreeze <nom> <cause> <étape>   re-gel (cause : hygiene|technique|contrat|spec|interne)
-#   pipeline.sh say <nom> "<texte>"              ce que le cockpit affiche comme « en attente de toi »
+#   pipeline.sh say <nom> "<texte>" [--report <étape>]  « en attente de toi » du cockpit (+ étape du rapport)
 #   pipeline.sh cockpit-push <nom> <dossier> [--versions id=v,…]  documents du cockpit (pour ArtifactData file_path)
 #   pipeline.sh cockpit-pull <nom> <dossier>     applique les éditions de contrats lues du cockpit
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/pipeline/pipeline.py" "$@"
