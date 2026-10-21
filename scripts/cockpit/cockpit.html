@@ -345,6 +345,35 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     </div>
   </div>
 
+  <div id="fixView" class="rcols item-only" hidden>
+    <div class="side">
+      <section class="panel">
+        <h2>Où on en est</h2>
+        <ol class="steps" id="fSteps"></ol>
+      </section>
+      <section class="panel">
+        <h2>Tes décisions</h2>
+        <ul class="decisions" id="fDecisions"></ul>
+      </section>
+    </div>
+    <div class="side">
+      <section class="panel mr">
+        <h2>Le bug</h2>
+        <div class="mr-grid">
+          <div><h3>Cause racine</h3><div class="md" id="fCause"></div></div>
+          <div><h3>Pourquoi les tests l'ont raté</h3><div class="md" id="fMiss"></div></div>
+          <div><h3>Plan de correction</h3><div class="md" id="fPlan"></div></div>
+        </div>
+      </section>
+      <section class="panel md">
+        <details open>
+          <summary><h2 style="display:inline">Diagnostic de Bastien</h2></summary>
+          <div id="fDiag"></div>
+        </details>
+      </section>
+    </div>
+  </div>
+
   <div class="empty item-only" id="empty" hidden>
     <strong>Aucune feature dans le cockpit pour l'instant.</strong>
     <span>Lance <code>/feature &lt;nom&gt; cockpit</code> dans une session : la feature apparaît ici, avec ses contrats.</span>
@@ -608,7 +637,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     if (meta.hash === reportHash) return;
     reportHash = meta.hash;
     if (unsubReport) unsubReport();
-    unsubReport = db.collection(`features/${key}/report`).where("hash", "==", meta.hash).onSnapshot((q) => {
+    unsubReport = db.collection(mode === "fixes" ? `fixes/${fkey}/report` : `features/${key}/report`).where("hash", "==", meta.hash).onSnapshot((q) => {
       const parts = []; q.docs.forEach((d) => { const x = d.data(); parts[x.i] = x.html; });
       if (parts.filter((p) => p != null).length < meta.n) return;
       $("reportFrame").srcdoc = parts.join("") + RESIZE;
@@ -639,7 +668,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     try {
       const anchor = await comments.anchorFor($("notify"));
       const msg = $("notifyText").value.trim() || "J'ai fini, reprends.";
-      await comments.sendToClaude({ anchor, text: `[cockpit ${mode === "reviews" ? rkey : key}] ${msg}` });
+      await comments.sendToClaude({ anchor, text: `[cockpit ${mode === "reviews" ? rkey : mode === "fixes" ? fkey : key}] ${msg}` });
       $("notifyText").value = ""; st.className = "status sent"; st.textContent = `Envoyé à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. La session va reprendre.`;
     } catch (err) {
       st.className = "status err";
@@ -665,7 +694,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     $("pick").value = k;
   }
 
-  $("pick").onchange = (ev) => (mode === "reviews" ? openReview(ev.target.value) : open(ev.target.value));
+  $("pick").onchange = (ev) => (mode === "reviews" ? openReview(ev.target.value) : mode === "fixes" ? openFix(ev.target.value) : open(ev.target.value));
 
   // ---- revues (/reviewPR) : une fiche par revue, le tri des remarques écrit dans reviews/<clé>/triage
   let mode = "features", reviews = [], rkey = null, review = null, triage = {}, unsubReview = null, unsubTriage = null;
@@ -677,17 +706,73 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     $("tabR").setAttribute("aria-pressed", String(m === "reviews"));
     $("pickLabel").textContent = m === "reviews" ? "Revue" : "Feature";
     $("reviewView").hidden = m !== "reviews";
+    $("fixView").hidden = m !== "fixes";
     $("body").hidden = m !== "features" || features.length === 0;
     $("empty").hidden = m !== "features" || features.length > 0;
-    $("report").hidden = m !== "features" || !feature?.report;
+    $("report").hidden = m === "reviews" || !(m === "fixes" ? fix?.report : feature?.report);
     $("meta").replaceChildren(); $("waiting").hidden = true;
     store.set("lastMode", m);
     if (m === "features") { renderPicker(); if (key) { try { history.replaceState(null, "", "#" + key); } catch {} renderFeature(); } }
+    else if (m === "fixes") { renderFixPicker(); if (fkey) renderFix(); }
     else { renderReviewPicker(); if (rkey) { try { history.replaceState(null, "", "#" + rkey); } catch {} renderReview(); } else if (reviews[0]) openReview(reviews[0].key); }
   }
+  // ---- fixes (/fix) : une page par fix, mêmes principes que les features
+  let fixes = [], fkey = null, fix = null, unsubFix = null;
+  function renderFixPicker() {
+    const pick = $("pick"); pick.replaceChildren();
+    fixes.forEach((x) => { const o = el("option", null, `${x.project} · ${x.feature}`); o.value = x.key; pick.append(o); });
+    pick.value = fkey || "";
+    $("pickLabel").textContent = "Fix";
+  }
+  function openFix(k) {
+    if (!k || (k === fkey && unsubFix)) return;
+    fkey = k; fix = null;
+    if (unsubReport) unsubReport(); unsubReport = null; reportHash = null;
+    try { history.replaceState(null, "", "#" + k); } catch {}
+    if (unsubFix) unsubFix();
+    unsubFix = db.doc(`fixes/${k}`).onSnapshot((s) => { fix = s.exists ? s.data() : null; renderFix(); }, () => {});
+    $("pick").value = k;
+  }
+  function renderFix() {
+    const f = fix; if (!f || mode !== "fixes") return;
+    const meta = $("meta"); meta.replaceChildren();
+    const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
+    add("fix", f.title); add("branche", f.branch); add("mis à jour", fmt(f.updated_at));
+    $("waiting").hidden = !f.waiting; $("waitingText").textContent = f.waiting || "";
+    watchReport(f.report);
+    const steps = $("fSteps"); steps.replaceChildren();
+    (f.stages || []).forEach((s) => {
+      const cur = s.key === f.step?.key;
+      const status = cur ? (s.status === "TODO" ? "NOW" : s.status) : s.status;
+      const li = el("li", cur ? "current" : "");
+      li.append(el("span", "num", s.step), el("span", null, s.title),
+        el("span", `chip ${status}`, { PASSED: "fait", SKIPPED: "sautée", RED: "rouge", FAILED: "échec", TODO: "à venir", NOW: "en cours" }[status] || status));
+      steps.append(li);
+    });
+    const dl = $("fDecisions"); dl.replaceChildren();
+    const ds = (f.decisions || []).slice().reverse();
+    if (!ds.length) dl.append(el("li", null, "Rien de tranché pour l'instant : ton arrêt arrive après la reproduction de Bastien."));
+    ds.forEach((d) => { const li = el("li", d.kind); li.append(el("time", null, fmt(d.at)), el("span", null, d.text)); dl.append(li); });
+    const txt = (id, v, empty) => $(id).replaceChildren(v ? md(v) : el("p", "status", empty));
+    const NL = String.fromCharCode(10), BT = String.fromCharCode(96);
+    const code = (v) => BT + v + BT;
+    txt("fCause", f.root_cause && (f.root_cause + (f.root_cause_location ? NL + NL + code(f.root_cause_location) : "")), "Arrive avec la reproduction de Bastien.");
+    txt("fMiss", f.miss_reason, "—");
+    const pl = f.plan;
+    txt("fPlan", pl && [pl.approach && ("**" + pl.approach + "**"), pl.layer && ("Couche : " + pl.layer),
+      pl.files?.length && ("Fichiers prévus :" + NL + pl.files.map((x) => "- " + code(typeof x === "string" ? x : x.path || JSON.stringify(x))).join(NL)),
+      pl.rejected && ("Alternative écartée : " + (typeof pl.rejected === "string" ? pl.rejected : JSON.stringify(pl.rejected)))].filter(Boolean).join(NL + NL), "Arrive avec la reproduction de Bastien.");
+    $("fDiag").replaceChildren(f.diagnosis_md ? md(f.diagnosis_md) : el("p", "status", "Le diagnostic arrive avec la reproduction de Bastien."));
+  }
+
   // Onglets : seulement si la base porte des features ET des revues (l'accueil). Une page de feature ou de
   // revue n'en porte qu'une : elle s'ouvre directement dessus.
   function syncTabs() {
+    if (fixes.length && !features.length && !reviews.length) {
+      $("tabF").parentElement.hidden = true;
+      if (mode !== "fixes") { setMode("fixes"); openFix(fixes[0].key); }
+      return;
+    }
     const both = features.length > 0 && reviews.length > 0;
     $("tabF").parentElement.hidden = !both;
     if (!both && reviews.length > 0 && mode !== "reviews") setMode("reviews");
@@ -705,6 +790,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     const legacy = [
       ...features.map((f) => ({ kind: "feature", key: f.key, project: f.project, title: f.feature, step: f.step, waiting: f.waiting, legacy: true })),
       ...reviews.map((r) => ({ kind: "review", key: r.key, project: r.project, title: r.title, number: r.number, legacy: true })),
+      ...fixes.map((x) => ({ kind: "fix", key: x.key, project: x.project, title: x.title || x.feature, legacy: true })),
     ].filter((x) => !indexItems.some((i) => i.key === x.key));
     renderHub([...indexItems, ...legacy]);
   }
@@ -713,7 +799,9 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     document.documentElement.classList.remove("hub-home");
     document.documentElement.classList.add("hub-detail");
     $("hub").hidden = true;
-    if (x.kind === "review") { setMode("reviews"); openReview(x.key); } else { setMode("features"); open(x.key); }
+    if (x.kind === "review") { setMode("reviews"); openReview(x.key); }
+    else if (x.kind === "fix") { setMode("fixes"); openFix(x.key); }
+    else { setMode("features"); open(x.key); }
   }
   $("back").onclick = () => {
     document.documentElement.classList.remove("hub-detail");
@@ -740,7 +828,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       const card = el("div", `hub-card${x.waiting ? " waits" : ""}`);
       const top = el("div", "top");
       top.append(el("b", null, x.kind === "review" ? (x.number ? `!${x.number} ${x.title || ""}` : x.title) : x.title),
-                 el("span", `chip ${x.kind === "review" ? "question" : "PASSED"}`, x.kind === "review" ? "revue" : "feature"));
+                 el("span", `chip ${x.kind === "review" ? "question" : x.kind === "fix" ? "critical" : "PASSED"}`, { review: "revue", fix: "fix" }[x.kind] || "feature"));
       card.append(top, el("span", "status", [x.project, x.parent && `sous-feature de ${x.parent}`,
         x.done ? `terminée ${fmt(x.done_at || x.updated_at)}` : x.step && `étape ${x.step.step} — ${x.step.title}`].filter(Boolean).join(" · ")));
       if (x.done && x.outcome) card.append(el("span", null, x.outcome));
@@ -1050,6 +1138,11 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       if (mode === "features") setMode("features");
       syncTabs();
       renderHome();
+    }, () => {});
+    db.collection("fixes").orderBy("updated_at", "desc").limit(50).onSnapshot((q) => {
+      fixes = q.docs.map((d) => ({ key: d.id, project: d.data().project, feature: d.data().feature, title: d.data().title }));
+      syncTabs(); renderHome();
+      if (mode === "fixes" && !fkey && fixes[0]) openFix(fixes[0].key);
     }, () => {});
     db.collection("index").orderBy("updated_at", "desc").limit(100).onSnapshot((q) => {
       indexItems = q.docs.map((d) => ({ key: d.id, ...d.data() }));
