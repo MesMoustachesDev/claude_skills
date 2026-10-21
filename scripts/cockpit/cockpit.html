@@ -80,9 +80,21 @@ ul.decisions li { display: grid; gap: 1px; font-size: .9rem; padding-left: 12px;
 ul.decisions li.gate, ul.decisions li.contract, ul.decisions li.commit { border-left-color: var(--accent) }
 ul.decisions time { color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums }
 
-.files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px }
-.files button { display: inline-flex; gap: 6px; align-items: center; font-family: var(--font-code); font-size: .8rem; padding: 4px 9px }
-.files button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft) }
+.bench { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 16px; align-items: start }
+@media (max-width: 1100px) { .bench { grid-template-columns: minmax(0, 1fr) } }
+.treebox { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); min-width: 0 }
+.treebox > summary { cursor: pointer; padding: 7px 10px; font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+.tree { padding: 0 6px 8px; max-height: 70vh; overflow: auto; font-family: var(--font-code); font-size: .78rem; line-height: 1.6 }
+.tree ul { list-style: none; margin: 0; padding-left: 12px; border-left: 1px solid var(--line) }
+.tree > ul { padding-left: 2px; border-left: 0 }
+.tree summary { cursor: pointer; white-space: nowrap; color: var(--ink) }
+.tree summary .n { font-family: var(--font-ui); font-size: .68rem; font-weight: 700; color: var(--accent); margin-left: 4px }
+.tree .file { display: block; white-space: nowrap; color: var(--muted); padding: 0 4px; overflow: hidden; text-overflow: ellipsis }
+.tree button.file { width: 100%; text-align: left; border: 0; border-radius: 4px; background: none; color: var(--ink); font: inherit; padding: 0 4px; display: flex; gap: 6px; align-items: center }
+.tree button.file:hover { background: var(--accent-soft) }
+.tree button.file[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink) }
+.tree button.file .nm { overflow: hidden; text-overflow: ellipsis }
+.tree .more { color: var(--muted); font-style: italic; padding: 0 4px }
 .badge { font-family: var(--font-ui); font-size: .68rem; font-weight: 700; border-radius: 4px; padding: 0 5px; background: var(--dec-bg); color: var(--ink) }
 .badge.edit { background: var(--accent); color: var(--accent-ink) }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px }
@@ -141,8 +153,13 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 
     <section class="panel" id="contracts">
       <h2>Tes contrats</h2>
-      <div class="files" id="files"></div>
-      <div id="workbench">
+      <p class="status" id="nofiles" hidden>Pas encore de contrats : ils apparaissent après le brouillon d'Arthur (étape 0c).</p>
+      <div class="bench" id="bench">
+      <details class="treebox" id="treebox" open>
+        <summary>Arborescence du package</summary>
+        <nav class="tree" id="tree" aria-label="Arborescence du package"></nav>
+      </details>
+      <div id="workbench" style="min-width:0">
         <div class="toolbar">
           <div class="seg" role="group" aria-label="Vue">
             <button id="vDiff" aria-pressed="true">Diff du brouillon</button>
@@ -159,6 +176,7 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
           <button id="save" class="primary">Enregistrer pour Claude</button>
         </div>
         <ul class="decs" id="decs"></ul>
+      </div>
       </div>
     </section>
   </div>
@@ -255,25 +273,61 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
   function editOf(id) { return edits[id] || null; }
   function localDraft(id) { return store.get(`draft:${key}:${id}`); }
 
-  function renderFiles() {
-    const box = $("files"); box.replaceChildren();
-    const list = (feature?.contracts?.files) || [];
-    if (!list.length) {
-      box.append(el("p", "status", "Pas encore de contrats : ils apparaissent après le brouillon d'Arthur (étape 0c)."));
-      $("workbench").hidden = true; return;
-    }
-    $("workbench").hidden = false;
-    if (!fileId || !list.some((x) => x.id === fileId)) fileId = (list.find((x) => x.decisions) || list[0]).id;
-    list.forEach((x) => {
-      const b = el("button"); b.setAttribute("aria-pressed", String(x.id === fileId));
-      b.append(x.path.split("/").pop());
-      if (x.decisions) b.append(el("span", "badge", `${x.decisions} DÉCISION`));
-      const e = editOf(x.id);
-      if (e?.status === "pending" || localDraft(x.id) != null) b.append(el("span", "badge edit", "édité"));
-      b.title = x.path;
-      b.onclick = () => { fileId = x.id; renderFiles(); };
-      box.append(b);
+  // Dossiers ouverts ou fermés à la main : gardés d'un rendu à l'autre (et d'une visite à l'autre).
+  const folderState = (() => { try { return JSON.parse(store.get("folders") || "{}"); } catch { return {}; } })();
+
+  function buildTree(paths, root) {
+    const top = { dirs: {}, files: [] };
+    paths.forEach((p) => {
+      const rel = p.startsWith(root + "/") ? p.slice(root.length + 1) : p;
+      const parts = rel.split("/"); let node = top;
+      parts.slice(0, -1).forEach((d) => { node = node.dirs[d] ||= { dirs: {}, files: [] }; });
+      node.files.push({ name: parts[parts.length - 1], path: p });
     });
+    return top;
+  }
+
+  function renderFiles() {
+    const list = (feature?.contracts?.files) || [];
+    $("nofiles").hidden = list.length > 0;
+    $("bench").hidden = list.length === 0;
+    if (!list.length) return;
+    if (!fileId || !list.some((x) => x.id === fileId)) fileId = (list.find((x) => x.decisions) || list[0]).id;
+    const byPath = Object.fromEntries(list.map((x) => [x.path, x]));
+    const pkg = feature.package || "";
+    const all = Array.from(new Set([...(feature.tree || []), ...list.map((x) => x.path)])).sort();
+    const tree = buildTree(all, pkg);
+    const count = (n) => n.files.filter((f) => byPath[f.path]).length + Object.values(n.dirs).reduce((s, d) => s + count(d), 0);
+
+    const renderNode = (node, prefix) => {
+      const ul = el("ul");
+      Object.keys(node.dirs).sort().forEach((name) => {
+        const d = node.dirs[name], path = prefix + name, n = count(d);
+        const li = el("li"), det = el("details");
+        det.open = folderState[path] ?? n > 0;
+        det.addEventListener("toggle", () => { folderState[path] = det.open; store.set("folders", JSON.stringify(folderState)); });
+        const sum = el("summary", null, name + "/");
+        if (n) sum.append(el("span", "n", String(n)));
+        det.append(sum, renderNode(d, path + "/"));
+        li.append(det); ul.append(li);
+      });
+      node.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((f) => {
+        const li = el("li"), x = byPath[f.path];
+        if (!x) { const s = el("span", "file", f.name); s.title = f.path; li.append(s); ul.append(li); return; }
+        const b = el("button", "file"); b.setAttribute("aria-pressed", String(x.id === fileId)); b.title = f.path;
+        b.append(el("span", "nm", f.name));
+        if (x.decisions) b.append(el("span", "badge", `${x.decisions} DÉC.`));
+        const e = editOf(x.id);
+        if (e?.status === "pending" || localDraft(x.id) != null) b.append(el("span", "badge edit", "édité"));
+        b.onclick = () => { fileId = x.id; renderFiles(); };
+        li.append(b); ul.append(li);
+      });
+      return ul;
+    };
+    const nav = $("tree"); const keepScroll = nav.scrollTop;
+    nav.replaceChildren(el("div", "file", (pkg.split("/").pop() || pkg) + "/"), renderNode(tree, ""));
+    if ((feature.tree || []).length >= 3000) nav.append(el("div", "more", "Arborescence tronquée à 3 000 fichiers"));
+    nav.scrollTop = keepScroll;
     renderWorkbench();
   }
 

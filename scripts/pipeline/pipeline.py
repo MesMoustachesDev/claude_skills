@@ -591,6 +591,18 @@ def decisions_log(c):
     return sorted(out, key=lambda e: e.get("at") or "")
 
 
+TREE_MAX = 3000
+
+
+def package_tree(c):
+    """Fichiers du package (suivis et nouveaux, hors ignorés), relatifs à c.root : l'arbre du cockpit."""
+    top, pre = repo_of(c, c.package)
+    inner = c.package[len(pre):] if pre else c.package
+    names = git("ls-files", "-co", "--exclude-standard", "--", inner, cwd=top).splitlines()
+    files = sorted({pre + n for n in names if n})
+    return files[:TREE_MAX]
+
+
 def cmd_cockpit_push(c, args):
     if not args:
         die("usage : cockpit-push <nom> <dossier>")
@@ -627,6 +639,7 @@ def cmd_cockpit_push(c, args):
         st = (c.p.get("stages") or {}).get(k) if not k.startswith("hg.") else None
         stages.append({"key": k, "step": step, "title": title, "status": state_of(c.p, k) or "TODO",
                        "reason": st.get("reason") if isinstance(st, dict) else None})
+    tree = package_tree(c)
     n = next_step(c.p)
     feature = {
         "project": c.project(), "feature": c.name, "key": key, "branch": c.p.get("branch"),
@@ -635,6 +648,7 @@ def cmd_cockpit_push(c, args):
         "waiting": (c.p.get("cockpit") or {}).get("waiting"),
         "stages": stages, "decisions": decisions_log(c),
         "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
+        "tree": tree,
         "updated_at": now(),
     }
     fp = os.path.join(out_dir, "feature.json")
