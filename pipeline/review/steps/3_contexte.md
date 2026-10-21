@@ -27,9 +27,18 @@ le plus proche déjà en place et lis-le en entier : c'est l'étalon d'Alice et 
 **e. Les règles** — note les chemins qui existent : `.claude/rules/pr_rules.md`,
 `.claude/rules/create_feature_rules.md`, `CLAUDE.md` du projet.
 
-`context.md` contient, dans cet ordre : **Pourquoi** (besoin, ticket, ou « description vide ») ·
-**Ce que fait le code** (3 à 5 lignes) · **Existait déjà / ajouté par la MR** · **Voisin de référence**
-(`fichier`) · **Ce que la MR promet de visible** (ce que Maëlle doit pouvoir constater sur l'écran, ou
-« rien de visible ») · **Règles** (chemins). Aucun verdict.
+`context.md` contient, dans cet ordre et avec exactement ces titres (le cockpit les affiche en tête
+de la revue, sous « La MR ») :
+
+```
+## Pourquoi                      le besoin, l'objectif de la MR, le ticket — ou « description vide »
+## Ce que fait le code           le résumé : 3 à 5 lignes, ce que le code fait vraiment
+## Existait déjà / ajouté par la MR
+## Voisin de référence           le fichier, et pourquoi c'est lui
+## Ce que la MR promet de visible   ce que Maëlle doit pouvoir constater, ou « rien de visible »
+## Règles                        les chemins qui existent
+```
+
+Aucun verdict.
 
 Puis `review.sh pass <slug> context`.

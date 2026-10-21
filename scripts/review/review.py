@@ -364,8 +364,11 @@ def cmd_findings(r, args):
         seen[k] = x
         out.append(x)
     out.sort(key=lambda x: (SEVERITY_ORDER[x["severity"]], x.get("file") or "~", x.get("line") or 0))
+    changed = diff_lines(r)
     for i, x in enumerate(out, 1):
         x["id"] = f"F{i}"
+        if x.get("file") and x.get("line"):
+            x["snippet"] = snippet(r, x["file"], int(x["line"]), changed.get(x["file"], set()))
         x.setdefault("comment", f"{x['problem']}" + (f"\n\nSuggestion : {x['suggestion']}" if x.get("suggestion") else ""))
     result = {"findings": out, "grids": grids, "qa": qa, "problems": problems, "at": now()}
     with open(r.file("findings.json"), "w", encoding="utf-8") as fh:
@@ -374,6 +377,49 @@ def cmd_findings(r, args):
     print(f"{len(out)} remarques : {counts['critical']} critiques, {counts['suggestion']} suggestions, {counts['question']} questions")
     for p in problems:
         print(f"[WARN] {p}")
+
+
+SNIPPET_RADIUS = 7
+
+
+def file_at_head(r, path):
+    """Le fichier tel que la MR le laisse : dans le worktree s'il existe encore, sinon via git show."""
+    s = r.s
+    wt = s.get("worktree")
+    if wt and os.path.isfile(os.path.join(wt, path)):
+        return read_text(os.path.join(wt, path))
+    for ref in (f"{s['remote']}/{s['source']}", s["source"]):
+        p = subprocess.run(["git", "show", f"{ref}:{path}"], cwd=s["project_root"], capture_output=True, text=True)
+        if p.returncode == 0:
+            return p.stdout
+    return None
+
+
+def snippet(r, path, line, changed):
+    """Les lignes autour de la remarque, avec celles que la MR a ajoutées ou modifiées."""
+    text = file_at_head(r, path)
+    if text is None:
+        return None
+    lines = text.splitlines()
+    start = max(1, line - SNIPPET_RADIUS)
+    end = min(len(lines), line + SNIPPET_RADIUS)
+    return {"start": start, "lines": [l[:240] for l in lines[start - 1:end]],
+            "changed": sorted(n for n in changed if start <= n <= end), "target": line}
+
+
+def parse_context(text):
+    """context.md en sections « ## Titre » : objectif, résumé, ce qui existait, ce qui est promis."""
+    out, cur = {}, None
+    for line in (text or "").splitlines():
+        m = re.match(r"^##\s+(.*)$", line)
+        if m:
+            cur = m.group(1).strip().lower()
+            out[cur] = []
+        elif cur:
+            out[cur].append(line)
+    pick = lambda *names: next(("\n".join(v).strip() for k, v in out.items() if any(n in k for n in names)), None)
+    return {"why": pick("pourquoi", "objectif"), "what": pick("ce que fait", "résumé", "resume"),
+            "delta": pick("existait"), "visible": pick("visible", "promet"), "neighbor": pick("voisin")}
 
 
 def load_findings(r):
@@ -418,6 +464,8 @@ def cmd_cockpit_push(r, args):
         "waiting": (s.get("cockpit") or {}).get("waiting"),
         "agents": {k: {"status": v.get("status"), "summary": v.get("summary")} for k, v in (s.get("agents") or {}).items()},
         "briefing_md": read_text(r.file("briefing.md"), 60_000),
+        "context": parse_context(read_text(r.file("context.md"))),
+        "description_md": (s.get("description") or "")[:20_000],
         "gauntlet_md": read_text(os.path.join(s["gauntlet_out"], "report.md"), 60_000),
         "findings": f.get("findings") or [], "grids": f.get("grids") or {}, "qa": f.get("qa"),
         "triage": s.get("triage") or {}, "posted": s.get("posted") or [],

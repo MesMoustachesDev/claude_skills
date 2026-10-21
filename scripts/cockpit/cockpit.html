@@ -136,6 +136,17 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 .empty code { font-family: var(--font-code); color: var(--ink) }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 10px }
 .tabs button { padding: 5px 14px }
+.mr { grid-column: 1 / -1; display: grid; gap: 10px }
+.mr h2 { margin: 0 }
+.mr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px }
+.mr h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin: 0 0 4px; font-weight: 700 }
+.mr .md p { margin: 0 0 6px } .mr .md :last-child { margin-bottom: 0 }
+.mr summary { cursor: pointer; color: var(--muted); font-size: .88rem }
+.finding .code { margin-top: 2px }
+.finding .code tr.chg td.tx { background: var(--add-bg) }
+.finding .code tr.target td { font-weight: 600 }
+.finding .code tr.target td.ln { color: var(--ink) }
+.finding .code tr.target td.sg { color: var(--bad) }
 .rcols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start }
 @media (max-width: 880px) { .rcols { grid-template-columns: minmax(0, 1fr) } }
 ul.agents, ul.qa { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
@@ -249,6 +260,16 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
       <span>Lance <code>/reviewPR !&lt;numéro&gt;</code> dans une session : la revue apparaît ici dès le gauntlet.</span>
     </div>
     <div id="rBody" class="rcols" hidden>
+      <section class="panel mr" id="rMr">
+        <h2>La MR</h2>
+        <div class="mr-grid">
+          <div><h3>Objectif</h3><div class="md" id="rWhy"></div></div>
+          <div><h3>Résumé</h3><div class="md" id="rWhat"></div></div>
+          <div><h3>Existait déjà / ajouté par la MR</h3><div class="md" id="rDelta"></div></div>
+          <div><h3>Promis de visible</h3><div class="md" id="rVisible"></div></div>
+        </div>
+        <details id="rDescBox"><summary>Description écrite par l'auteur</summary><div class="md" id="rDesc"></div></details>
+      </section>
       <div class="side">
         <section class="panel">
           <h2>Relecteurs</h2>
@@ -696,6 +717,14 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
       li.append(el("b", null, `${s.verdict === "ok" ? "✓" : s.verdict === "ko" ? "✗" : "—"} ${s.name}`), el("span", "obs", [s.platform, s.observation].filter(Boolean).join(" · ")));
       ql.append(li);
     });
+    const c = r.context || {};
+    const fill = (id, text, empty) => $(id).replaceChildren(text ? md(text) : el("p", "status", empty));
+    fill("rWhy", c.why, "Arrive avec le contexte (étape 3).");
+    fill("rWhat", c.what, "Arrive avec le contexte (étape 3).");
+    fill("rDelta", c.delta, "—");
+    fill("rVisible", c.visible, "—");
+    $("rDescBox").hidden = !r.description_md;
+    $("rDesc").replaceChildren(md(r.description_md || ""));
     $("rBrief").replaceChildren(r.briefing_md ? md(r.briefing_md) : el("p", "status", "Le briefing arrive après les trois relectures."));
     $("rGauntlet").replaceChildren(r.gauntlet_md ? md(r.gauntlet_md) : el("p", "status", "Pas encore de rapport."));
     renderFindings();
@@ -723,6 +752,18 @@ ul.qa li.ok { border-left-color: var(--ok) } ul.qa li.ko { border-left-color: va
                   el("b", null, f.title), el("span", "status", (f.role || "").replace("archi", "Alice").replace("code", "Corentin").replace("qa", "Maëlle")));
       card.append(head);
       if (f.file) card.append(el("div", "where", f.line ? `${f.file}:${f.line}` : f.file));
+      if (f.snippet?.lines?.length) {
+        // Le code autour de la remarque : lignes ajoutées ou modifiées par la MR surlignées, ligne visée en gras.
+        const box = el("div", "code"), table = el("table"), tb = el("tbody"); table.append(tb);
+        const chg = new Set(f.snippet.changed || []);
+        f.snippet.lines.forEach((text, i) => {
+          const n = f.snippet.start + i;
+          const tr = el("tr", [chg.has(n) ? "chg" : "", n === f.snippet.target ? "target" : ""].join(" ").trim());
+          tr.append(el("td", "ln", n), el("td", "sg", n === f.snippet.target ? "▸" : chg.has(n) ? "+" : ""), el("td", "tx", text || " "));
+          tb.append(tr);
+        });
+        box.append(table); card.append(box);
+      }
       const dl = el("dl");
       [["Problème", f.problem], ["Pourquoi", f.why], ["Preuve", f.evidence], ["Suggestion", f.suggestion]].forEach(([k, v]) => { if (v) dl.append(el("dt", null, k), el("dd", null, v)); });
       card.append(dl);
