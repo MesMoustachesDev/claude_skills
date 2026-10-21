@@ -18,9 +18,11 @@
 #   review.sh probe <slug> <package> [fichiers]  joue les tests jetables de <revue>/probes/ dans le worktree, puis les retire
 #   review.sh findings <slug>                    fusionne findings_<rôle>.json en findings.json (ids F1…), doublons fusionnés
 #   review.sh merge <slug> F2 F3 [F4…]           fusionne des doublons que seul le sens rapproche (mémorisé)
-#   review.sh cockpit-push <slug> <dossier> [--versions id=v,…]
+#   review.sh set-cockpit <slug> <url>           URL de la page de cette revue (publiée au démarrage)
+#   review.sh cockpit-push <slug> <dossier> [--versions id=v,…] [--hub-version N]  page (writes) + ligne de l'accueil (hub_writes)
 #   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md
 #   review.sh check-comments <slug>             vérifie les commentaires retenus contre ma voix (voix_revue.md)
 #   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie
 #   review.sh cleanup <slug>                     supprime le worktree de la revue (garde rapports et captures)
+#   review.sh cockpit-page <slug> <dossier>      copie de la page du cockpit pour cette revue (à publier au démarrage)
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/review/review.py" "$@"

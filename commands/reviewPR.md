@@ -22,8 +22,9 @@ l'étape en cours**. L'état vit dans `~/.cache/gauntlet/review/<slug>/review.js
 
 0. **Début** (depuis le repo du projet) : `review.sh init <cible>`. Il résout la MR (titre, auteur,
    description, source, cible, remote) et imprime le `slug`, le dossier de la revue et la clé du
-   cockpit. Une revue déjà en cours sur ce slug reprend. Puis surveille le cockpit (« Être prévenu »
-   dans `~/.claude/pipeline/feature/cockpit.md`, même artifact, même règle).
+   cockpit. Une revue déjà en cours sur ce slug reprend. Puis **crée la page de la revue**
+   (`~/.claude/pipeline/review/cockpit.md`, « Créer la page ») : c'est elle, et elle seule, que ta
+   session surveille.
    L'étape 1 est le **préflight** : tout ce qui empêcherait une partie de la revue (outillage, QA,
    graphe, authentification) est vérifié et tranché avec Thibault avant de lancer quoi que ce soit.
 1. **`review.sh next <slug>`** : l'étape à jouer, le fichier d'étape à lire, le rapport du gauntlet, le

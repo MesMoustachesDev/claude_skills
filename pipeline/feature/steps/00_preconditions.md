@@ -44,6 +44,8 @@
   le code et les tests de la passe précédente ne sont plus « non-stub » ni « tout vert » à tort. Les
   gates d'intégrité gardent le périmètre de la feature. `pipeline.sh set <nom> pass_base null` une fois
   le rejeu vert.
+  Puis **crée la page de la feature** (`~/.claude/pipeline/feature/cockpit.md`, « Créer la page ») ;
+  en reprise, réarme-la pour cette session (même section, point 4).
   `size` (`S|M|L`, posé à la fin de 0b par `pipeline.sh size`) est lu par `pipeline.sh` et par le
   gauntlet (QA) ; absent ou `null`, c'est `M`.
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Sophie (nouveau run

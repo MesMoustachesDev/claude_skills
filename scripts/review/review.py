@@ -223,6 +223,15 @@ def cmd_pass(r, args):
     print(f"{args[0]} : fait")
 
 
+def cmd_set_cockpit(r, args):
+    """L'URL de la page de cette revue (publiée par la session au démarrage)."""
+    if not args or not args[0].startswith("https://"):
+        die("usage : set-cockpit <slug> <url de l'artifact>")
+    r.s.setdefault("cockpit", {})["url"] = args[0]
+    r.save()
+    print(f"page de la revue : {args[0]}")
+
+
 def cmd_say(r, args):
     r.s.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
     r.save()
@@ -678,7 +687,17 @@ def cmd_cockpit_push(r, args):
     w = {"op": "set", "collection": "reviews", "doc_id": s["key"], "file_path": fp}
     if s["key"] in versions:
         w["if_version"] = versions[s["key"]]
-    manifest = {"key": s["key"], "writes": [w]}
+    cockpit = s.get("cockpit") or {}
+    index = {"kind": "review", "key": s["key"], "project": s["project"], "title": doc["title"],
+             "number": s.get("number"), "url": cockpit.get("url"), "mr_url": s.get("url"),
+             "step": doc["step"], "waiting": doc["waiting"], "updated_at": now()}
+    ip = os.path.join(out_dir, "index.json")
+    with open(ip, "w", encoding="utf-8") as fh:
+        json.dump(index, fh, ensure_ascii=False)
+    hub = {"op": "set", "collection": "index", "doc_id": s["key"], "file_path": ip}
+    if "--hub-version" in args:
+        hub["if_version"] = int(args[args.index("--hub-version") + 1])
+    manifest = {"key": s["key"], "page": cockpit.get("url"), "writes": [w], "hub_writes": [hub]}
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
@@ -986,11 +1005,37 @@ def preflight_open(s):
     return sorted(areas - set((pf.get("decisions") or {}).keys()))
 
 
+
+
+COCKPIT_SRC = os.path.join(HOME, ".claude", "scripts", "cockpit", "cockpit.html")
+
+
+def write_page(dest_dir, title):
+    """Copie de la page du cockpit pour UN élément, avec son propre titre (la galerie les distingue)."""
+    html = read_text(COCKPIT_SRC)
+    if html is None:
+        die(f"page source introuvable : {COCKPIT_SRC}")
+    os.makedirs(dest_dir, exist_ok=True)
+    safe = re.sub(r"[<>&]", "", title)
+    html = re.sub(r"<title>.*?</title>", f"<title>{safe}</title>", html, count=1)
+    path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(path)
+
+
+def cmd_cockpit_page(r, args):
+    if not args:
+        die("usage : cockpit-page <slug> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
+    num = r.s.get("number")
+    write_page(args[0], f"Revue {'!' + num if num else r.slug} {r.s['project']}")
+
+
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
     "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge,
-    "check-comments": cmd_check_comments, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
+    "check-comments": cmd_check_comments, "set-cockpit": cmd_set_cockpit, "cockpit-page": cmd_cockpit_page, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 

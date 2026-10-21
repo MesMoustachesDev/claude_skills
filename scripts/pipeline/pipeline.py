@@ -759,10 +759,21 @@ def cmd_cockpit_push(c, args):
     with open(fp, "w", encoding="utf-8") as fh:
         json.dump(feature, fh, ensure_ascii=False)
     writes.insert(0, {"op": "set", "collection": "features", "doc_id": key, "file_path": fp})
+    # Ligne de l'accueil (artifact commun, sans « Prévenir Claude ») : de quoi voir l'état et ouvrir la page.
+    cockpit = c.p.get("cockpit") or {}
+    index = {"kind": "feature", "key": key, "project": c.project(), "title": c.name, "url": cockpit.get("url"),
+             "step": feature["step"], "waiting": feature["waiting"], "size": c.size,
+             "parent": (feature.get("parent") or {}).get("name"), "updated_at": now()}
+    ip = os.path.join(out_dir, "index.json")
+    with open(ip, "w", encoding="utf-8") as fh:
+        json.dump(index, fh, ensure_ascii=False)
+    hub_write = {"op": "set", "collection": "index", "doc_id": key, "file_path": ip}
+    if "--hub-version" in args:
+        hub_write["if_version"] = int(args[args.index("--hub-version") + 1])
     for w in writes:
         if w["doc_id"] in versions:
             w["if_version"] = versions[w["doc_id"]]
-    manifest = {"key": key, "writes": writes}
+    manifest = {"key": key, "page": cockpit.get("url"), "writes": writes, "hub_writes": [hub_write]}
     with open(os.path.join(out_dir, "writes.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
@@ -822,12 +833,37 @@ def cmd_cockpit_pull(c, args):
                      ensure_ascii=False, indent=2))
 
 
+
+
+COCKPIT_SRC = os.path.join(os.path.expanduser('~'), ".claude", "scripts", "cockpit", "cockpit.html")
+
+
+def write_page(dest_dir, title):
+    """Copie de la page du cockpit pour UN élément, avec son propre titre (la galerie les distingue)."""
+    html = read_text(COCKPIT_SRC)
+    if html is None:
+        die(f"page source introuvable : {COCKPIT_SRC}")
+    os.makedirs(dest_dir, exist_ok=True)
+    safe = re.sub(r"[<>&]", "", title)
+    html = re.sub(r"<title>.*?</title>", f"<title>{safe}</title>", html, count=1)
+    path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(path)
+
+
+def cmd_cockpit_page(c, args):
+    if not args:
+        die("usage : cockpit-page <nom> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
+    write_page(args[0], f"Cockpit {c.name}")
+
+
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "say": cmd_say,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
-    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull,
+    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page,
 }
 
 

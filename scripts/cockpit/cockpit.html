@@ -136,6 +136,15 @@ textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family:
 .empty code { font-family: var(--font-code); color: var(--ink) }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 10px }
 .tabs button { padding: 5px 14px }
+.hub { display: grid; gap: 10px }
+.hub h2 { margin: 0 }
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px }
+.hub-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; background: var(--bg); min-width: 0 }
+.hub-card.waits { border-left: 4px solid var(--wait) }
+.hub-card .top { display: flex; gap: 8px; align-items: baseline; justify-content: space-between }
+.hub-card b { overflow-wrap: anywhere }
+.hub-card .w { color: var(--wait); font-weight: 600; font-size: .88rem }
+.hub-card a.open { justify-self: start; font-weight: 600; color: var(--accent) }
 .mr { grid-column: 1 / -1; display: grid; gap: 10px }
 .mr h2 { margin: 0 }
 .mr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px }
@@ -200,6 +209,12 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     </label>
     <div class="meta" id="meta"></div>
   </header>
+
+  <section class="panel hub" id="hub" hidden>
+    <h2>En cours</h2>
+    <p class="status">Une page par feature et par revue : c'est là que tu tries, édites et préviens la session concernée. Ici, tu vois tout d'un coup d'œil.</p>
+    <div class="hub-grid" id="hubList"></div>
+  </section>
 
   <section class="waiting" id="waiting" hidden>
     <small>En attente de toi</small>
@@ -657,6 +672,33 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     if (m === "features") { renderPicker(); if (key) { try { history.replaceState(null, "", "#" + key); } catch {} renderFeature(); } }
     else { renderReviewPicker(); if (rkey) { try { history.replaceState(null, "", "#" + rkey); } catch {} renderReview(); } else if (reviews[0]) openReview(reviews[0].key); }
   }
+  // Onglets : seulement si la base porte des features ET des revues (l'accueil). Une page de feature ou de
+  // revue n'en porte qu'une : elle s'ouvre directement dessus.
+  function syncTabs() {
+    const both = features.length > 0 && reviews.length > 0;
+    $("tabF").parentElement.hidden = !both;
+    if (!both && reviews.length > 0 && mode !== "reviews") setMode("reviews");
+    if (!both && features.length > 0 && mode !== "features") setMode("features");
+  }
+
+  // Accueil : une carte par feature ou revue en cours (collection `index`), avec le lien vers sa page.
+  function renderHub(items) {
+    $("hub").hidden = !items.length;
+    const box = $("hubList"); box.replaceChildren();
+    items.forEach((x) => {
+      const card = el("div", `hub-card${x.waiting ? " waits" : ""}`);
+      const top = el("div", "top");
+      top.append(el("b", null, x.kind === "review" ? (x.number ? `!${x.number} ${x.title || ""}` : x.title) : x.title),
+                 el("span", `chip ${x.kind === "review" ? "question" : "PASSED"}`, x.kind === "review" ? "revue" : "feature"));
+      card.append(top, el("span", "status", [x.project, x.parent && `sous-feature de ${x.parent}`, x.step && `étape ${x.step.step} — ${x.step.title}`].filter(Boolean).join(" · ")));
+      if (x.waiting) card.append(el("span", "w", `En attente de toi : ${x.waiting}`));
+      if (x.url) card.append(Object.assign(el("a", "open", "Ouvrir sa page"), { href: x.url, target: "_blank", rel: "noopener" }));
+      else card.append(el("span", "status", "Page pas encore publiée"));
+      card.append(el("span", "status", `mis à jour ${fmt(x.updated_at)}`));
+      box.append(card);
+    });
+  }
+
   $("tabF").onclick = () => setMode("features");
   $("tabR").onclick = () => setMode("reviews");
 
@@ -949,9 +991,14 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       renderPicker();
       if (k) open(k);
       if (mode === "features") setMode("features");
+      syncTabs();
+    }, () => {});
+    db.collection("index").orderBy("updated_at", "desc").limit(100).onSnapshot((q) => {
+      renderHub(q.docs.map((d) => ({ key: d.id, ...d.data() })));
     }, () => {});
     db.collection("reviews").orderBy("updated_at", "desc").limit(50).onSnapshot((q) => {
       reviews = q.docs.map((d) => { const x = d.data(); return { key: d.id, project: x.project, slug: x.slug, number: x.number, title: x.title }; });
+      syncTabs();
       const hash = (location.hash || "").slice(1);
       if (!rkey && reviews.some((r) => r.key === hash)) { setMode("reviews"); openReview(hash); return; }
       if (mode === "reviews") { renderReviewPicker(); if (!rkey && reviews[0]) openReview(store.get("lastReview") && reviews.some((r) => r.key === store.get("lastReview")) ? store.get("lastReview") : reviews[0].key); }

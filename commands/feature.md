@@ -113,7 +113,7 @@ en S ou en M. Détail en « Gabarits ».
 
 | État (écritures) | `~/.claude/scripts/pipeline.sh` — jamais d'édition à la main de `pipeline.json` |
 | Étapes | `~/.claude/pipeline/feature/steps/` — une étape à la fois, celle que donne `pipeline.sh next` |
-| Cockpit | `~/.claude/pipeline/feature/cockpit.md` — l'artifact où Thibault suit la feature et édite ses contrats |
+| Cockpit | `~/.claude/pipeline/feature/cockpit.md` — une page par feature (surveillée par ta seule session) + l'accueil commun |
 
 **Gabarit** (S / M / L, choisi au cadrage, dans `pipeline.json → size`) : il allège le jugement
 (critique, dedup, mutation, QA), jamais la preuve (gates d'intégrité) ni la propriété du code (les six
