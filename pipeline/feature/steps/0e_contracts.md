@@ -4,14 +4,11 @@
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les séquences du cadrage pour rappel.
 
-**Sa démarche d'abord, avant d'ouvrir les fichiers.** Pour chaque `DÉCISION (Thibault, ta démarche)`
-(1 à 3), une question **ouverte**, en texte, pas d'`AskUserQuestion` : le problème concret, ce qui
-existe déjà (carte graphify, `fichier:ligne`), puis « Comment tu le ferais ? ». Attends sa réponse.
-Réponds à **son** raisonnement : ce qui tient, les cas qu'il n'a pas couverts, les risques (erreurs,
-concurrence, test), sans substituer ta solution ni celle d'Arthur. Il bloque ou demande de l'aide →
-explique le concept en jeu, puis rends-lui la décision ; la proposition d'Arthur ne sort que s'il la
-demande. Sa démarche décidée → il l'écrit lui-même dans les fichiers ou demande à Arthur de
-l'appliquer (mode application).
+**Une relecture, pas une découverte.** Les choix structurants ont été tranchés dans la discussion de
+départ (0b) et Arthur les a appliqués : ne repose pas de question ouverte ici. Les `DÉCISION (Thibault)`
+qui restent sont des choix mineurs, avec la proposition d'Arthur. Thibault veut rouvrir un choix du
+cadrage → on en discute dans la session, du tac au tac, et la décision change dans `discussion.md` et le
+cadrage avant qu'il édite.
 **Ajouts proposés.** Montre ensuite, à part, le tableau `Détail | Proposition | Pourquoi c'est utile`
 du rapport d'Arthur : ce sont ses ajouts, pas des décisions de Thibault. Chaque ligne est
 contestable ; une ligne qu'il ne comprend pas s'explique avant qu'il édite.

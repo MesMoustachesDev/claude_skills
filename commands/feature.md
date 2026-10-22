@@ -93,7 +93,7 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après | En S | En L |
 |---|---|---|---|---|---|---|---|
-| 0b | cadrage | Sophie (mode cadrage) + toi | `feature-specifier` | — | **oui, interactif** : ce qui existe, le périmètre, une séquence par scénario d'acceptation, le package, le gabarit, jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
+| 0b | cadrage | toi avec Thibault (discussion), Sophie (exploration en arrière-plan, puis mise en forme) | `feature-specifier` | — | **oui, une discussion du tac au tac** sur le fonctionnel et la base technique, avant tout agent ; puis le cadrage rendu (une séquence par scénario, décisions techniques), jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
 | 0c | brouillon de contrats | Arthur (mode brouillon) | `feature-architect` | `contracts` | non | identique | — |
 | 0d | dedup du brouillon | Denis | `feature-dedup` | `dedup_verdict` | non (ses verdicts vont à 0e) | identique | — |
 | 0e | contrats de Thibault | Thibault, dans son IDE | — | `contracts` | **oui** : il édite les fichiers ouverts pour lui, puis commit « contracts (by Thibault) » | identique | — |
