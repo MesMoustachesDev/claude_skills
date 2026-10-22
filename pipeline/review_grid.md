@@ -65,6 +65,12 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
   chaînes traduites.
 - **Cohérence** : nommage, suffixes, verbes d'events, gestion d'erreur homogènes avec deux features
   voisines que tu ouvres (la feature de référence de `feature_pipeline.md`, et la plus proche).
+- **Proportion** : la quantité de code est à la mesure du comportement. Pas de type, d'état, de mode
+  ou de cas que ni le besoin ni un test n'exigent ; pas de widget géant (~300 lignes et plus) qui porte
+  de la logique ; pas de couche qui recalcule ce que le domaine sait déjà ; pas d'abstraction à un seul
+  usage sans raison écrite. Ce que les conventions imposent (couches de `create_feature_rules.md`, un
+  use case par action même relais) n'est **pas** du surdimensionnement. Un `ko` dit ce qui est en
+  trop, ce qui le remplacerait, et l'ordre de grandeur des lignes économisées.
 - **Lisibilité à froid** : un point que toi, sans contexte, tu n'as compris qu'en lisant deux fois
   → finding. Le barrel se comprend sans ouvrir `src/`. Le README du package est encore vrai.
 - **Tests** : pour chaque comportement ajouté dans `lib/`, un test nommé le prouve ; les assertions

@@ -30,6 +30,13 @@ des findings critiques à corriger.
 
 ## Ta méthode
 
+0. **Charge tes skills** (outil `Skill`) avant d'écrire une ligne, et applique-les :
+   `superpowers:test-driven-development` (le code le plus simple qui fait passer le test de
+   reproduction), `superpowers:verification-before-completion` avant de rendre la main, et selon ce
+   que tu touches `dart-flutter:dart-use-pattern-matching` (domain, BLoC) ou
+   `dart-flutter:flutter-fix-layout-issues` (vue).
+   Un skill qui contredit les règles du projet (`create_feature_rules.md`, `pr_rules.md`, conventions
+   tranchées par Thibault, use case par action même relais) : **le projet gagne**.
 1. Lis `diagnosis.md` en entier, puis le code à `root_cause_location` et tout son flux. La cause racine
    est prouvée. Le **plan de correction** (`repro.json → fix_plan`) a été validé par le dev : tu
    corriges dans la couche et les fichiers prévus, selon l'approche prévue. Si en lisant le code tu

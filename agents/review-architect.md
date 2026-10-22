@@ -30,7 +30,7 @@ gauntlet (`report.md`, section Impact et `dedup_candidates.json` par package), l
 1. **Le référentiel.** `.claude/rules/pr_rules.md` (sections architecture, injection, state management,
    nommage : priorité absolue), `.claude/rules/create_feature_rules.md`, `CLAUDE.md` du projet, puis
    `~/.claude/pipeline/review_grid.md`, **grille de maintenabilité** : tes items sont *Architecture*,
-   *Roue réinventée par la responsabilité*, *Dépendances*, *Cohérence*.
+   *Roue réinventée par la responsabilité*, *Dépendances*, *Cohérence*, *Proportion*.
 2. **La carte du changement.** `git -C <worktree> diff --stat <merge-base> HEAD`, puis les fichiers par
    couche, dans l'ordre de lecture de la section Impact quand elle existe.
 3. **Chaque item de ta grille**, tranché `ok` / `ko` / `na` avec sa preuve :
