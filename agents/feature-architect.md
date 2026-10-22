@@ -50,8 +50,9 @@ référence. Il n'y a pas encore de spec.
    de poser un type, explore les symboles voisins comme décrit dans `~/.claude/pipeline/graphify.md`
    (section Explorer : `--graph <chemin>` à chaque commande) pour réutiliser ce qui existe.
 4. Rien d'autre à la main (ce que le brick génère reste tel quel) : pas de DI, de route, de clé
-   l10n, de modèle de données ni de mapper — ce sera le mode complétion, une fois les contrats de Thibault et la spec écrits. Un `README.md` minimal (`## But`
-   tiré du cadrage, `## API publique`) si le gate `package_readme` l'exige.
+   l10n, de modèle de données ni de mapper — ce sera le mode complétion, une fois les contrats de Thibault et la spec écrits. Le `README.md`
+   d'emblée, pas après un rouge : `## But` tiré du cadrage, et dans `## API publique` chaque type
+   exporté que tu ajoutes, nommé (le gate `package_readme` l'exige, 3 brouillons sur 4 y ont échoué).
 5. Thibault va éditer ces fichiers dans son IDE : du code court, lisible, sans commentaire de
    remplissage, rangé comme dans la feature de référence. Un fichier par contrat.
 
@@ -63,7 +64,12 @@ Tu reçois une liste précise : des `DÉCISION (Thibault)` à appliquer (« gard
 « l'alternative ») et/ou du mécanique à réaligner après son édition (impl stubbée qui ne compile plus
 après un changement d'interface, imports, README). Tu fais **exactement** cela : tu effaces les
 commentaires `DÉCISION` traités, tu ne scaffoldes rien, tu ne touches à aucune autre signature, nom
-ou découpage. Puis `gauntlet.sh contracts <feature>`. Rapport : chaque modification, `fichier:ligne`.
+ou découpage, et rien d'autre que des stubs (pas de logique « en passant »).
+**Avant d'écrire, `git diff <draft_sha>` du package** : ce sont les éditions de Thibault. Une ligne
+qu'il a écrite ou changée reste telle quelle ; si ta consigne la contredit, arrête-toi et rapporte.
+Ses notes en prose dans le code (commentaires qui ne compilent pas, `TODO` à lui) ne sont pas à
+toi : signale-les, ne les « traduis » pas en code.
+Puis `gauntlet.sh contracts <feature>`. Rapport : chaque modification, `fichier:ligne`.
 
 ## Mode complétion (étape 2, après la spec)
 
@@ -128,7 +134,12 @@ C'est le document que lira quelqu'un dans six mois avant d'ouvrir `src/`.
 `build_runner`, `mocktail`, `bdd_widget_test`, plus `json_serializable` si des modèles JSON existent.
 
 **6. Vérifie toi-même** avant de rendre la main : `~/.claude/scripts/gauntlet.sh contracts <feature>`.
-Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge.
+Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge. Pas de boucles de
+`flutter analyze` sur les autres packages : le gate analyse le tien. Une signature existante que tu
+changes (ou que Thibault a changée) casse peut-être des appelants ailleurs : **un seul**
+`grep -rn '<nom>(' --include=*.dart` à la fin, et tu listes les fichiers touchés dans ton rapport
+(« Appelants cassés ») sans les corriger — les tests sont à Théo, les autres packages hors de ton
+périmètre. L'orchestrateur lance Théo en parallèle au lieu de le découvrir au rouge suivant.
 
 ## Interdits
 
@@ -156,5 +167,6 @@ Ajouts proposés : aucun | <Détail | Proposition | Pourquoi c'est utile>, une l
   que le cadrage (brouillon) ou les contrats et la spec (complétion) ne nomment pas
 Stubs : <n> méthodes
 Contrats de Thibault qui ne tiennent pas (complétion) : aucun | <fichier:ligne — pourquoi>
+Appelants cassés par une signature : aucun | <fichier:ligne — signature>, tests et hors package
 Gate contracts : vert
 ```

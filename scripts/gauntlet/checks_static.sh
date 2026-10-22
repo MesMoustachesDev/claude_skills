@@ -188,8 +188,18 @@ check_stub_check() {
   if [ -z "$files" ]; then ko "aucun fichier d'implémentation dans le périmètre — l'architect n'a posé aucun contrat"; return 1; fi
   info "$(printf '%s\n' "$files" | wc -l | tr -d ' ') fichier(s) inspecté(s)"
   scope_for_tool "$PKG_REL/" "$GAUNTLET_OUT/scope_pkg.txt"
+  # Version de base des fichiers modifiés : une méthode existante dont la signature change n'est pas un
+  # contrat neuf et n'a pas à redevenir un stub.
+  local base_dir="$GAUNTLET_OUT/stub_base" f
+  rm -rf "$base_dir"; mkdir -p "$base_dir"
+  if [ "$SCOPE_ALL" != 1 ]; then
+    for f in $files; do
+      mkdir -p "$base_dir/$(dirname "$f")"
+      show_at "${PASS_BASE:-$(merge_base)}" "$PKG_REL/$f" > "$base_dir/$f" || rm -f "$base_dir/$f"
+    done
+  fi
   # shellcheck disable=SC2086
-  run_dart_tool stub_check.dart --root "$PKG_DIR" --scope "$GAUNTLET_OUT/scope_pkg.txt" $(printf '%s ' $files)
+  run_dart_tool stub_check.dart --root "$PKG_DIR" --scope "$GAUNTLET_OUT/scope_pkg.txt" --base-dir "$base_dir" $(printf '%s ' $files)
 }
 
 # metrics — dart_code_linter, seuils depuis la config, rapport JSON filtré au périmètre : une fonction
