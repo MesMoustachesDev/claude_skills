@@ -292,6 +292,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
         <div class="toolbar">
           <label class="status" for="cmpBase">Comparer à
             <select id="cmpBase" aria-label="Version de référence pour les marques de la marge">
+              <option value="base">avant la feature</option>
               <option value="draft">brouillon d'Arthur</option>
               <option value="current">fichier actuel</option>
             </select>
@@ -594,7 +595,10 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   function renderEditor() {
     const c = contracts[fileId]; if (!c) return;
     const text = $("editor").value;
-    const base = $("cmpBase").value === "draft" && c.has_draft ? c.draft : c.current;
+    const ref = $("cmpBase").value;
+    // « avant la feature » : le fichier sur la base (vide s'il est créé par la feature) ; données d'avant ce
+    // changement sans `base` → on retombe sur le brouillon.
+    const base = ref === "base" && ("base" in c) ? (c.base || "") : ref !== "current" && c.has_draft ? c.draft : c.current;
     const rows = diffLines(base, text);
     const lines = text.split("\n");
     const cls = lines.map(() => ""), dels = {};
@@ -616,7 +620,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
         g.title = `${dels[i].length} ligne(s) supprimée(s) avant la ligne ${i + 1}`;
         g.onclick = () => {
           const box = $("edDels");
-          box.replaceChildren(el("b", null, `Supprimé avant la ligne ${i + 1} (par rapport au ${$("cmpBase").value === "draft" ? "brouillon d'Arthur" : "fichier actuel"})`), el("pre", null, dels[i].join("\n")));
+          box.replaceChildren(el("b", null, `Supprimé avant la ligne ${i + 1} (par rapport ${{ base: "au code d'avant la feature", draft: "au brouillon d'Arthur", current: "au fichier actuel" }[$("cmpBase").value]})`), el("pre", null, dels[i].join("\n")));
           box.hidden = false;
         };
       }

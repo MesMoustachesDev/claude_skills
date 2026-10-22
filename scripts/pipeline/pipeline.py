@@ -708,14 +708,19 @@ def cmd_cockpit_push(c, args):
     files = con.get("files") or []
     draft_rev = con.get("draft_sha")
     entries, writes = [], []
+    mb = merge_base(c, repo_of(c, c.package)[0]) if files else None
     for f in files:
         current = read_text(os.path.join(c.root, f))
         if current is None:
             continue
         draft = show(c, draft_rev, f) if draft_rev else None
+        # Le fichier AVANT la feature (merge-base avec la base) : vide pour un fichier créé par la feature.
+        # C'est la comparaison par défaut du cockpit : ce que la feature change au contrat.
+        before = show(c, mb, f) if mb else None
         decisions = [{"line": i + 1, "text": l.strip()} for i, l in enumerate(current.splitlines()) if "DÉCISION (Thibault" in l]
         fid = doc_id(f)
         doc = {"path": f, "draft": draft if draft is not None else "", "has_draft": draft is not None,
+               "base": before or "", "is_new": before is None,
                "current": current, "current_hash": sha1(current), "decisions": decisions, "updated_at": now()}
         fp = os.path.join(out_dir, "contracts", fid + ".json")
         with open(fp, "w", encoding="utf-8") as fh:
