@@ -416,6 +416,8 @@ def cmd_set(c, args):
 
 
 def cmd_say(c, args):
+    args, ask = parse_ask(args)
+    c.p.setdefault("cockpit", {})["ask"] = ask
     if "--report" in args:
         i = args.index("--report")
         c.p.setdefault("cockpit", {})["report_step"] = args[i + 1]
@@ -440,6 +442,23 @@ def cmd_after_architect(c, args):
     print(f"stages.contracts_draft = {st.get('status', '—')} ; attempts.contracts = 0")
     if st.get("status") == "FAILED":
         print("brouillon FAILED : point imprévu (rapport d'Arthur + 40 dernières lignes de last_contracts.log)")
+
+
+def parse_ask(args):
+    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
+    if "--ask" not in args:
+        return args, None
+    i = args.index("--ask")
+    ask_id = args[i + 1]
+    rest = args[:i] + args[i + 2:]
+    opts = []
+    if "--options" in rest:
+        j = rest.index("--options")
+        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
+        rest = rest[:j] + rest[j + 2:]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
+        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
+    return rest, {"id": ask_id, "options": opts, "at": now()}
 
 
 # ---------------------------------------------------------------------------
@@ -742,6 +761,7 @@ def cmd_cockpit_push(c, args):
         "size": c.size, "size_reason": c.p.get("size_reason"), "mode": c.p.get("mode"), "package": c.package,
         "step": {"step": n["step"], "title": n["title"], "status": n["status"]},
         "waiting": (c.p.get("cockpit") or {}).get("waiting"),
+        "ask": (c.p.get("cockpit") or {}).get("ask") if (c.p.get("cockpit") or {}).get("waiting") else None,
         "stages": stages, "decisions": decisions_log(c),
         "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
         "tree": tree,

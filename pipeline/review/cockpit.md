@@ -30,6 +30,14 @@ publiée par la session `/reviewPR` au démarrage et surveillée par elle seule,
    recommence-la, ne repose pas le tri.
 3. « Rafraîchir ».
 
+## Répondre depuis la page
+
+Même mécanique que `/feature` (`~/.claude/pipeline/feature/cockpit.md`, « Répondre depuis la page ») :
+`review.sh say <slug> "<…>" --ask <id> --options "A|B|Discuter"`, « Rafraîchir », puis la question en
+texte dans la session, sans `AskUserQuestion` bloquant. Ids : `preflight`, `tri`, `publication`,
+`page-fin`, `imprevu-<n>`. La publication sur la MR garde sa règle : le texte exact est montré avant,
+et seul un « Go » explicite (bouton ou session) déclenche `review.sh post --go`.
+
 ## Être prévenu
 
 « Prévenir Claude » sur la page de la revue ne réveille que ta session : le message

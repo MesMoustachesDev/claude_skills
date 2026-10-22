@@ -130,6 +130,23 @@ def report_docs(fx, key, out_dir):
             "step": (fx.f.get("cockpit") or {}).get("report_step")}, writes
 
 
+def parse_ask(args):
+    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
+    if "--ask" not in args:
+        return args, None
+    i = args.index("--ask")
+    ask_id = args[i + 1]
+    rest = args[:i] + args[i + 2:]
+    opts = []
+    if "--options" in rest:
+        j = rest.index("--options")
+        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
+        rest = rest[:j] + rest[j + 2:]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
+        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
+    return rest, {"id": ask_id, "options": opts, "at": now()}
+
+
 def cmd_page(fx, args):
     if not args:
         die("usage : page <nom> <dossier>")
@@ -151,7 +168,9 @@ def cmd_set_url(fx, args):
 
 
 def cmd_say(fx, args):
+    args, ask = parse_ask(args)
     c = fx.f.setdefault("cockpit", {})
+    c["ask"] = ask
     if "--report" in args:
         i = args.index("--report")
         c["report_step"] = args[i + 1]
@@ -200,7 +219,8 @@ def cmd_push(fx, args):
     doc = {
         "kind": "fix", "project": fx.project(), "feature": fx.name, "key": key,
         "title": f.get("description") or fx.name, "branch": f.get("branch"),
-        "step": cur, "waiting": None if done else cockpit.get("waiting"), "stages": st,
+        "step": cur, "waiting": None if done else cockpit.get("waiting"),
+        "ask": cockpit.get("ask") if cockpit.get("waiting") and not done else None, "stages": st,
         "decisions": sorted(decisions, key=lambda d: d.get("at") or ""),
         "diagnosis_md": (read_text(os.path.join(fx.dir, "diagnosis.md")) or "")[:60_000] or None,
         "root_cause": rp.get("root_cause"), "root_cause_location": rp.get("root_cause_location"),

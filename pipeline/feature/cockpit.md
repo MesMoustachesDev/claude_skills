@@ -39,6 +39,31 @@ nouveaux documents à chaque rapport : jamais de version à lire pour eux). Les 
 embarquées : le rapport affiche leur chemin, elles s'envoient par `SendUserFile`. L'étape affichée vient
 de `pipeline.sh say … --report <étape>`.
 
+## Répondre depuis la page (points d'étape)
+
+Thibault ne doit pas avoir à sortir du cockpit. À chaque point d'étape dont la réponse est un **choix**
+(valider le cadrage, « j'ai fini mes contrats », valider la spec, les tests, la visite, trancher une
+suggestion, un reclassement, un point imprévu…) :
+
+1. `say <nom> "<ce qu'on attend de lui>" --ask <id> --options "<réponse 1>|<réponse 2>|Discuter"` —
+   exactement les réponses que tu aurais mises dans ton `AskUserQuestion`, la recommandée en premier,
+   « Discuter » toujours en dernier. `<id>` nomme l'arrêt : `cadrage`, `contrats`, `spec`, `tests`,
+   `suggestions`, `visite`, `imprevu-<n>`… Puis « Rafraîchir » : les réponses s'affichent en boutons dans
+   le bandeau « En attente de toi », avec un champ « précision ».
+2. **Termine ton tour** en posant la même question en texte dans la session (les réponses numérotées) :
+   **pas d'`AskUserQuestion` bloquant** à ces arrêts, sinon une réponse donnée dans la page ne peut pas
+   te débloquer.
+3. La réponse arrive de l'une de deux façons :
+   - **depuis la page** : un message `[cockpit <clé>] réponse <id> : <choix> — <précision>` te réveille.
+     La source de vérité est le document `answers/<clé>--<id>` de la page (`ArtifactData` `get` :
+     `choice`, `note`, `ask_at`) — lis-le, ne te fie pas qu'au texte du message ;
+   - **dans la session** : il tape sa réponse (un numéro, un libellé, ou du texte libre).
+   Traite-la exactement comme la réponse à ta question : mêmes règles (une incompréhension n'est jamais
+   une réponse, « Discuter » ouvre la discussion **dans la session**, une précision est un retour à
+   intégrer). Puis `say <nom> ""` et « Rafraîchir ».
+4. Les questions **ouvertes** (« Comment tu le ferais ? » en 0e, une discussion) restent dans la session.
+   Sans page de cockpit (elle n'a pas pu être publiée) : `AskUserQuestion` comme avant.
+
 ## Être prévenu
 
 « Prévenir Claude » sur la page de la feature poste un commentaire envoyé à Claude,

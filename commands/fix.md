@@ -52,7 +52,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après le gel) |
-| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil |
+| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se font **depuis la page** (« Répondre depuis la page ») : là où ce fichier dit `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte dans la session, sans bloquer |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|

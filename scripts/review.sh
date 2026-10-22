@@ -12,7 +12,7 @@
 #   review.sh gauntlet <slug> [--mutation]       pr_gauntlet.sh avec worktree conservé, chemin enregistré
 #   review.sh agent <slug> <archi|code|qa> <running|done|skipped|failed> ["<résumé>"]
 #   review.sh pass <slug> <étape>                étape passée (context, briefing, triage, posted, synthesis)
-#   review.sh say <slug> "<texte>"               « en attente de toi » du cockpit
+#   review.sh say <slug> "<texte>" [--ask <id> --options "A|B"]            « en attente de toi » du cockpit
 #   review.sh qa <slug> [--all-platforms]        rejoue les flows Maestro de la revue sur l'app du worktree
 #   review.sh run-tests <slug> <package> <tests…> rejoue des tests existants du worktree (scénario déjà couvert)
 #   review.sh probe <slug> <package> [fichiers]  joue les tests jetables de <revue>/probes/ dans le worktree, puis les retire

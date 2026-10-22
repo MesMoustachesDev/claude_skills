@@ -59,7 +59,10 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>` :
    `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
    « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
-   sous le bandeau. Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
+   sous le bandeau. **Thibault répond depuis la page** : un point d'étape dont la réponse est un choix
+   se publie avec `--ask` et ne bloque pas sur un `AskUserQuestion` (« Répondre depuis la page »,
+   `~/.claude/pipeline/feature/cockpit.md`). Partout où un fichier d'étape dit `AskUserQuestion` pour un
+   choix, c'est cette mécanique qui s'applique. Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
    lien du cockpit (`#<clé>`) ; `SendUserFile` ne sert plus qu'aux captures QA, ou si le cockpit
    échoue. Au retour de sa réponse, `pipeline.sh say <nom> ""`.
 5. Retour en 1.

@@ -69,6 +69,11 @@ button:disabled { opacity: .5; cursor: default }
 .report details > summary::before { content: "▾"; color: var(--muted); font-size: .8rem }
 .report details:not([open]) > summary::before { content: "▸" }
 .report iframe { display: block; width: 100%; min-height: 360px; height: 640px; border: 1px solid var(--line); border-radius: 6px; margin-top: 10px; background: #ffffff }
+.ask { display: grid; gap: 8px; margin-top: 8px }
+.ask-opts { display: flex; flex-wrap: wrap; gap: 8px }
+.ask-opts button { background: var(--panel); font-weight: 600 }
+.ask-opts button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.ask input { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 0 }
 .cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start }
 @media (max-width: 880px) { .cols { grid-template-columns: minmax(0, 1fr) } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0 }
@@ -250,6 +255,11 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   <section class="waiting item-only" id="waiting" hidden>
     <small>En attente de toi</small>
     <p id="waitingText"></p>
+    <div class="ask" id="ask" hidden>
+      <div class="ask-opts" id="askOpts" role="group" aria-label="Ta réponse"></div>
+      <input id="askNote" type="text" maxlength="800" autocomplete="off" placeholder="Une précision pour la session (facultatif)" aria-label="Précision pour la session">
+      <span class="status" id="askStatus"></span>
+    </div>
   </section>
 
   <form class="notify item-only" id="notify" hidden>
@@ -463,6 +473,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     }
     add("gabarit", f.size); add("mode", f.mode); add("package", f.package); add("mis à jour", fmt(f.updated_at));
     $("waiting").hidden = !f.waiting; $("waitingText").textContent = f.waiting || "";
+    renderAsk(f, key);
     watchReport(f.report);
 
     const steps = $("steps"); steps.replaceChildren();
@@ -678,6 +689,52 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     $("reportFrame").style.height = Math.max(360, Math.min(ev.data.ckh + 8, 20000)) + "px";
   });
 
+  // ---- répondre au point d'étape depuis la page : la réponse est enregistrée (answers/<clé>--<id>) et la
+  // session concernée est réveillée par un commentaire envoyé à Claude, qui ne vise qu'elle (page par élément).
+  let askUnsub = null, askDoc = null;
+  function renderAsk(item, itemKey) {
+    const a = item?.ask, box = $("ask");
+    if (!a || !item.waiting || !db || !a.options?.length) {
+      box.hidden = true; if (askUnsub) askUnsub(); askUnsub = null; askDoc = null; return;
+    }
+    box.hidden = false;
+    const docId = `${itemKey}--${a.id}`.replace(/[^A-Za-z0-9_\-.~:@+]/g, "-").slice(0, 200);
+    const opts = $("askOpts"); opts.replaceChildren();
+    a.options.forEach((o) => { const b = el("button", null, o); b.type = "button"; b.onclick = () => answer(docId, a, o, itemKey); opts.append(b); });
+    if (askDoc !== docId) {
+      if (askUnsub) askUnsub();
+      askDoc = docId; $("askNote").value = "";
+      askUnsub = db.doc(`answers/${docId}`).onSnapshot((snap) => showAnswer(snap.exists ? snap.data() : null, a), () => {});
+    }
+  }
+  function showAnswer(ans, a) {
+    const cur = ans && ans.ask_at === a.at ? ans : null;
+    [...$("askOpts").children].forEach((b) => b.setAttribute("aria-pressed", String(!!cur && cur.choice === b.textContent)));
+    const st = $("askStatus");
+    if (cur && !st.dataset.busy) st.textContent = `Ta réponse : ${cur.choice}${cur.note ? " · " + cur.note : ""} (${fmt(cur.at)})`;
+  }
+  async function answer(docId, a, choice, itemKey) {
+    const st = $("askStatus"), note = $("askNote").value.trim();
+    st.dataset.busy = "1"; st.className = "status"; st.textContent = "Envoi…";
+    try {
+      await db.doc(`answers/${docId}`).set({ ask: a.id, ask_at: a.at, choice, note, at: new Date().toISOString() });
+    } catch (e) {
+      delete st.dataset.busy; st.className = "status err"; st.textContent = `Réponse non enregistrée (${e?.code || "erreur"}) : réponds dans la session.`; return;
+    }
+    let woke = false;
+    if (comments) {
+      try {
+        const anchor = await comments.anchorFor($("waiting"));
+        await comments.sendToClaude({ anchor, text: `[cockpit ${itemKey}] réponse ${a.id} : ${choice}${note ? " — " + note : ""}` });
+        woke = true;
+      } catch {}
+    }
+    delete st.dataset.busy;
+    st.className = woke ? "status sent" : "status pending";
+    st.textContent = woke ? `Envoyé : ${choice}. La session reprend.`
+      : `Réponse enregistrée (${choice}), mais la session n'a pas pu être prévenue d'ici : dis-lui « reprends » dans la session.`;
+  }
+
   // ---- prévenir la session Claude (commentaire envoyé à Claude, ancré sur ce formulaire)
   let comments = null;
   async function refreshNotify() {
@@ -769,6 +826,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
     add("fix", f.title); add("branche", f.branch); add("mis à jour", fmt(f.updated_at));
     $("waiting").hidden = !f.waiting; $("waitingText").textContent = f.waiting || "";
+    renderAsk(f, fkey);
     watchReport(f.report);
     const steps = $("fSteps"); steps.replaceChildren();
     (f.stages || []).forEach((s) => {
@@ -920,6 +978,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     const add = (label, v) => { if (!v) return; const s = el("span"); s.append(`${label} `, el("b", null, v)); meta.append(s); };
     add("par", r.author); add("branche", r.source && `${r.source} → ${r.base || "?"}`); add("mis à jour", fmt(r.updated_at));
     $("waiting").hidden = !r.waiting; $("waitingText").textContent = r.waiting || "";
+    renderAsk(r, rkey);
 
     const ag = $("rAgents"); ag.replaceChildren();
     Object.entries(AGENTS).forEach(([role, [name, axis]]) => {

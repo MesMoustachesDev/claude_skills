@@ -29,6 +29,14 @@ publiée par la session `/fix` au démarrage et surveillée par elle seule, plus
 
 Les captures ne sont pas embarquées dans le rapport : elles s'envoient toujours par `SendUserFile`.
 
+## Répondre depuis la page
+
+Même mécanique que `/feature` (`~/.claude/pipeline/feature/cockpit.md`, « Répondre depuis la page ») :
+`fix_cockpit.py say <nom> "<…>" --ask <id> --options "A|B|Discuter"`, « Rafraîchir », puis la question
+en texte dans la session, sans `AskUserQuestion` bloquant. Ids : `plan`, `test`, `ecart`, `arbitrage`,
+`captures`, `page-fin`. Le point d'étape 1 pose deux questions (plan, test) : deux `say` successifs ne se
+cumulent pas, donc une seule question à la fois — le plan d'abord, puis le test.
+
 ## Être prévenu
 
 « Prévenir Claude » sur la page du fix ne réveille que ta session : `[cockpit <clé>] …` est la réponse de

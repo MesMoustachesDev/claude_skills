@@ -231,6 +231,23 @@ def cmd_page_deleted(r, args):
     print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
 
 
+def parse_ask(args):
+    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
+    if "--ask" not in args:
+        return args, None
+    i = args.index("--ask")
+    ask_id = args[i + 1]
+    rest = args[:i] + args[i + 2:]
+    opts = []
+    if "--options" in rest:
+        j = rest.index("--options")
+        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
+        rest = rest[:j] + rest[j + 2:]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
+        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
+    return rest, {"id": ask_id, "options": opts, "at": now()}
+
+
 def cmd_set_cockpit(r, args):
     """L'URL de la page de cette revue (publiée par la session au démarrage)."""
     if not args or not args[0].startswith("https://"):
@@ -241,6 +258,8 @@ def cmd_set_cockpit(r, args):
 
 
 def cmd_say(r, args):
+    args, ask = parse_ask(args)
+    r.s.setdefault("cockpit", {})["ask"] = ask
     r.s.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
     r.save()
     print("message du cockpit écrit")
@@ -678,6 +697,7 @@ def cmd_cockpit_push(r, args):
         "source": s.get("source"), "base": s.get("base"), "labels": s.get("labels") or [],
         "step": {"step": n["step"], "title": n["title"], "key": n["key"]},
         "waiting": (s.get("cockpit") or {}).get("waiting"),
+        "ask": (s.get("cockpit") or {}).get("ask") if (s.get("cockpit") or {}).get("waiting") else None,
         "agents": {k: {"status": v.get("status"), "summary": v.get("summary")} for k, v in (s.get("agents") or {}).items()},
         "briefing_md": read_text(r.file("briefing.md"), 60_000),
         "context": parse_context(read_text(r.file("context.md"))),
