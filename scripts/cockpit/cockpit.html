@@ -127,8 +127,26 @@ ul.decisions time { color: var(--muted); font-size: .75rem; font-variant-numeric
 .code tr.del { background: var(--del-bg) } .code tr.del td:not(.ln) { color: var(--del-ink) }
 .code tr.dec td.tx { background: var(--dec-bg) }
 .code tr.fold td { color: var(--muted); font-style: italic; text-align: center; padding: 2px }
-textarea#editor { width: 100%; min-height: 420px; resize: vertical; font-family: var(--font-code); font-size: .82rem; line-height: 1.55; tab-size: 2;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; white-space: pre; overflow: auto }
+.ed { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow: auto; max-height: 72vh; font-family: var(--font-code); font-size: .8rem; line-height: 1.6 }
+.ed:focus-within { border-color: var(--accent) }
+.ed-inner { display: grid; grid-template-columns: auto minmax(0, 1fr); min-width: max-content }
+.ed-gutter { padding-block: 10px; text-align: right; color: var(--muted); user-select: none; position: sticky; left: 0; z-index: 2; background: var(--bg); border-right: 1px solid var(--line) }
+.ed-gutter div { position: relative; height: 1.6em; padding: 0 8px 0 10px; border-left: 3px solid transparent; font-variant-numeric: tabular-nums; white-space: pre }
+.ed-gutter div.add { border-left-color: var(--ok) }
+.ed-gutter div.del::before { content: "▸"; position: absolute; left: -2px; top: -.8em; color: var(--bad); cursor: pointer; font-size: .95em }
+.ed-gutter div.del { cursor: pointer }
+.ed-code { position: relative; padding: 10px 12px }
+.ed-hl div { height: 1.6em; white-space: pre; color: var(--ink); tab-size: 2 }
+.ed-hl div.add { background: var(--add-bg) }
+.ed-hl div.dec { background: var(--dec-bg) }
+#editor { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 10px 12px; border: 0; resize: none; overflow: hidden; background: transparent;
+  color: transparent; caret-color: var(--ink); font: inherit; line-height: inherit; white-space: pre; tab-size: 2; outline: none }
+#editor::selection { background: rgba(95, 184, 156, .35) }
+.ed-dels { margin-top: 8px; border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: 6px; padding: 8px 10px; font-family: var(--font-code); font-size: .78rem; overflow-x: auto }
+.ed-dels pre { margin: 4px 0 0; color: var(--del-ink); white-space: pre }
+.ed-legend { margin-right: auto; display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 3px; vertical-align: middle }
+.sw.add { background: var(--ok) } .sw.dec { background: var(--dec-bg); border: 1px solid var(--line) } .sw.del { width: auto; height: auto; color: var(--bad) }
 .decs { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: .85rem }
 .decs li { background: var(--dec-bg); border-radius: 4px; padding: 4px 8px; overflow-wrap: anywhere }
 .decs code { font-family: var(--font-code); font-size: .78rem }
@@ -272,17 +290,28 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       </details>
       <div id="workbench" style="min-width:0">
         <div class="toolbar">
-          <div class="seg" role="group" aria-label="Vue">
-            <button id="vDiff" aria-pressed="true">Diff du brouillon</button>
-            <button id="vMine" aria-pressed="false">Diff de ton édition</button>
-            <button id="vEdit" aria-pressed="false">Éditer</button>
-          </div>
+          <label class="status" for="cmpBase">Comparer à
+            <select id="cmpBase" aria-label="Version de référence pour les marques de la marge">
+              <option value="draft">brouillon d'Arthur</option>
+              <option value="current">fichier actuel</option>
+            </select>
+          </label>
           <span class="status" id="status"></span>
         </div>
         <div class="path" id="path"></div>
-        <div class="code" id="diff"></div>
-        <textarea id="editor" spellcheck="false" hidden aria-label="Contenu du fichier"></textarea>
-        <div class="actions" id="actions" hidden>
+        <!-- Un seul éditeur : on tape dans le code, la marge montre ce qui a changé par rapport à la référence. -->
+        <div class="ed" id="ed">
+          <div class="ed-inner">
+            <div class="ed-gutter" id="edGutter"></div>
+            <div class="ed-code">
+              <div class="ed-hl" id="edHl" aria-hidden="true"></div>
+              <textarea id="editor" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" aria-label="Contenu du fichier"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="ed-dels" id="edDels" hidden></div>
+        <div class="actions" id="actions">
+          <span class="status ed-legend"><span class="sw add"></span>ajouté ou modifié · <span class="sw del">▸</span>lignes supprimées (clic dans la marge) · <span class="sw dec"></span>DÉCISION</span>
           <button id="revert">Revenir au fichier actuel</button>
           <button id="save" class="primary">Enregistrer pour Claude</button>
         </div>
@@ -409,26 +438,6 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     return out;
   }
 
-  function renderCode(rows, foldContext) {
-    const box = $("diff"); box.replaceChildren();
-    const table = el("table"); const tb = el("tbody"); table.append(tb);
-    const changed = rows.map((r) => r.t !== "eq");
-    const keep = rows.map((_, k) => !foldContext || changed.slice(Math.max(0, k - 3), k + 4).some(Boolean) || /DÉCISION \(Thibault/.test(rows[k].s));
-    let folded = 0;
-    const flush = () => { if (!folded) return; const tr = el("tr", "fold"); const td = el("td", null, `${folded} lignes identiques`); td.colSpan = 3; tr.append(td); tb.append(tr); folded = 0; };
-    rows.forEach((r, k) => {
-      if (!keep[k]) { folded++; return; }
-      flush();
-      const tr = el("tr", r.t === "eq" ? "" : r.t);
-      if (/DÉCISION \(Thibault/.test(r.s)) tr.classList.add("dec");
-      tr.append(el("td", "ln", r.t === "del" ? r.a : r.b), el("td", "sg", r.t === "add" ? "+" : r.t === "del" ? "−" : ""), el("td", "tx", r.s || " "));
-      tb.append(tr);
-    });
-    flush();
-    if (!tb.children.length) { const tr = el("tr", "fold"); const td = el("td", null, "Fichier vide"); td.colSpan = 3; tr.append(td); tb.append(tr); }
-    box.append(table);
-  }
-
   // ---- rendu
   function renderPicker() {
     if (mode === "reviews") return renderReviewPicker();
@@ -553,12 +562,6 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     renderWorkbench();
   }
 
-  function setView(v) {
-    view = v;
-    ["Diff", "Mine", "Edit"].forEach((n) => $("v" + n).setAttribute("aria-pressed", String(v === n.toLowerCase())));
-    renderWorkbench();
-  }
-
   function mineText(id) {
     const c = contracts[id]; const e = editOf(id);
     const d = localDraft(id);
@@ -570,7 +573,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
   function renderWorkbench() {
     const c = contracts[fileId];
     $("path").textContent = c?.path || "";
-    if (!c) { $("diff").replaceChildren(el("div", "empty", "Chargement du fichier…")); return; }
+    if (!c) { $("edHl").replaceChildren(el("div", null, "Chargement du fichier…")); $("edGutter").replaceChildren(); return; }
     const e = editOf(fileId), d = localDraft(fileId);
     const st = $("status");
     st.className = "status";
@@ -580,33 +583,60 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
     else if (e?.status === "conflict") { st.textContent = "Conflit : le fichier a changé dans l'IDE entre-temps. Reprends depuis le fichier actuel."; st.classList.add("conflict"); }
     else st.textContent = "";
 
-    const editing = view === "edit";
-    $("diff").hidden = editing; $("editor").hidden = !editing; $("actions").hidden = !editing;
-    if (editing) {
-      const ta = $("editor"); const txt = mineText(fileId);
-      if (ta.dataset.file !== fileId || document.activeElement !== ta) { ta.value = txt; ta.dataset.file = fileId; }
-    } else if (view === "mine") {
-      renderCode(diffLines(c.current, mineText(fileId)), true);
-    } else {
-      renderCode(c.has_draft ? diffLines(c.draft, c.current) : diffLines(c.current, c.current), c.has_draft && c.draft !== c.current);
-    }
+    const ta = $("editor");
+    if (ta.dataset.file !== fileId || document.activeElement !== ta) { ta.value = mineText(fileId); ta.dataset.file = fileId; $("edDels").hidden = true; }
+    renderEditor();
     const decs = $("decs"); decs.replaceChildren();
     (c.decisions || []).forEach((x) => { const li = el("li"); li.append(el("code", null, `l.${x.line} `), x.text.replace(/^\/\/\s*/, "")); decs.append(li); });
   }
 
-  // ---- éditeur
+  // ---- éditeur : un textarea transparent posé sur le code surligné ; la marge compare à la référence choisie
+  function renderEditor() {
+    const c = contracts[fileId]; if (!c) return;
+    const text = $("editor").value;
+    const base = $("cmpBase").value === "draft" && c.has_draft ? c.draft : c.current;
+    const rows = diffLines(base, text);
+    const lines = text.split("\n");
+    const cls = lines.map(() => ""), dels = {};
+    let pending = [];
+    rows.forEach((r) => {
+      if (r.t === "del") { pending.push(r.s); return; }
+      const i = r.b - 1;
+      if (pending.length) { (dels[i] ||= []).push(...pending); pending = []; }
+      if (r.t === "add") cls[i] = "add";
+    });
+    if (pending.length) (dels[Math.max(0, lines.length - 1)] ||= []).push(...pending);
+    const hl = $("edHl"), gut = $("edGutter");
+    hl.replaceChildren(); gut.replaceChildren();
+    lines.forEach((l, i) => {
+      const d = el("div", [cls[i], /DÉCISION \(Thibault/.test(l) ? "dec" : ""].join(" ").trim(), l || " ");
+      hl.append(d);
+      const g = el("div", [cls[i], dels[i] ? "del" : ""].join(" ").trim(), String(i + 1));
+      if (dels[i]) {
+        g.title = `${dels[i].length} ligne(s) supprimée(s) avant la ligne ${i + 1}`;
+        g.onclick = () => {
+          const box = $("edDels");
+          box.replaceChildren(el("b", null, `Supprimé avant la ligne ${i + 1} (par rapport au ${$("cmpBase").value === "draft" ? "brouillon d'Arthur" : "fichier actuel"})`), el("pre", null, dels[i].join("\n")));
+          box.hidden = false;
+        };
+      }
+      gut.append(g);
+    });
+  }
+  $("cmpBase").addEventListener("change", () => { $("edDels").hidden = true; renderEditor(); });
   $("editor").addEventListener("keydown", (ev) => {
     if (ev.key !== "Tab") return;
     ev.preventDefault();
-    const ta = ev.target, s = ta.selectionStart, e = ta.selectionEnd;
-    ta.setRangeText("  ", s, e, "end"); ta.dispatchEvent(new Event("input"));
+    const ta = ev.target, s0 = ta.selectionStart, e0 = ta.selectionEnd;
+    ta.setRangeText("  ", s0, e0, "end"); ta.dispatchEvent(new Event("input"));
   });
-  let draftTimer = null;
+  let draftTimer = null, hlTimer = null;
   $("editor").addEventListener("input", () => {
+    clearTimeout(hlTimer); hlTimer = setTimeout(renderEditor, 80);
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => { store.set(`draft:${key}:${fileId}`, $("editor").value); renderFiles(); }, 400);
   });
-  $("revert").onclick = () => { store.set(`draft:${key}:${fileId}`, null); $("editor").value = contracts[fileId]?.current ?? ""; renderFiles(); };
+  $("revert").onclick = () => { store.set(`draft:${key}:${fileId}`, null); $("editor").value = contracts[fileId]?.current ?? ""; $("edDels").hidden = true; renderEditor(); renderFiles(); };
   $("save").onclick = async () => {
     const c = contracts[fileId]; if (!c || !db) return;
     const btn = $("save"); btn.disabled = true; btn.textContent = "Enregistrement…";
@@ -621,10 +651,6 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       $("status").textContent = err?.code === "invalid_argument" ? "Tu n'as pas le droit d'écrire ici." : `Réessaie dans un instant (${err?.code || "erreur"}).`;
     } finally { setTimeout(() => { btn.disabled = false; btn.textContent = "Enregistrer pour Claude"; }, 1500); }
   };
-  $("vDiff").onclick = () => setView("diff");
-  $("vMine").onclick = () => setView("mine");
-  $("vEdit").onclick = () => setView("edit");
-
   // ---- rapport du point d'étape : morceaux du report.html, réassemblés et affichés dans un cadre isolé
   let reportHash = null, unsubReport = null;
   const RESIZE = "<script>(function(){function s(){parent.postMessage({ckh:document.documentElement.scrollHeight},'*')}" +
