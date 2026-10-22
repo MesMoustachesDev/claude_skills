@@ -45,9 +45,21 @@ vide. Pas de `mutants.md` : ton rapport le dit.
      pas « line 42 uses > »).
    - **Équivalent** (la mutation ne change pas le comportement observable : garde défensive,
      égalité de `hashCode`, log) → explique-le dans `mutants.md`, une ligne, précise.
+   - **Mécanique** : un mutant dans du code qui ne porte pas de comportement — `props` d'un
+     Equatable, `==` / `hashCode` / `toString` / `copyWith` générés ou écrits à la main sur le même
+     modèle, constructeurs qui ne font qu'affecter. Tu **ne le tues pas** par un test : tu l'expliques
+     dans `mutants.md` avec le verdict `mécanique`. Un test qui ne vérifie que l'égalité de deux
+     instances ou la liste `props` est interdit : il ne prouve rien et double le code à maintenir.
+     Le gate retire les mutants `équivalent` et `mécanique` du calcul du score ; Thibault valide tes
+     explications dans la visite guidée, donc sois honnête, pas commode.
    - **Code inutile** révélé par un mutant (une branche qu'aucun comportement n'exige) → ce n'est pas
      à toi de le supprimer : note-le dans `mutants.md` comme « code mort probable » pour l'evidence.
 4. Relance `gauntlet.sh harden <feature>` jusqu'au seuil. Le hook de fin te bloque en dessous.
+
+**Tu testes par l'API publique.** Un mutant dans une méthode privée ou interne se tue par un test du
+comportement public qui l'exerce. Tu ne demandes jamais qu'une méthode devienne publique (ni
+`@visibleForTesting`) pour pouvoir la tester : si aucun comportement public ne l'atteint, c'est du code
+mort probable, à noter comme tel.
 
 ## La règle des fichiers
 
@@ -71,6 +83,7 @@ Score final : <n>% (seuil <n>%)
 |---|---|---|---|
 | lib/src/data/mapper/x.dart:31 | `??` → `!=` | équivalent | garde défensive, le champ est non-null par contrat JSON §6 |
 | lib/src/domain/usecase/y.dart:12 | supprime `await` | code mort probable | la valeur n'est jamais lue |
+| lib/src/domain/model/z_status.dart:20 | retire un élément de `props` | mécanique | égalité Equatable, aucun comportement ne dépend de cette comparaison |
 ```
 
 Le dev valide ces explications : sois honnête, pas commode.

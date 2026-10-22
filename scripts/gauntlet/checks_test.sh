@@ -387,8 +387,20 @@ check_mutation() {
     [ "$fu" != 0 ] && survivors="${survivors}   ✗ ${fu}/${ft} survivant(s) dans $f — ${report#"$PROJECT_ROOT"/}/$slug#*/"$'\n'
   done
   if [ "$total" = 0 ]; then info "aucune mutation possible dans ces fichiers (code trivial) — rien à prouver"; return 0; fi
-  local score=$(( (total-undetected)*100/total ))
-  printf '   mutants : %s, survivants : %s, score : %d%% (seuil %s%%)\n' "$total" "$undetected" "$score" "$thr"
+  # Mutants expliqués dans mutants.md comme « équivalent » ou « mécanique » (égalité générée, props
+  # Equatable, toString, log, garde défensive) : retirés du calcul. Sinon le seul moyen d'atteindre le seuil
+  # est d'écrire des tests qui ne prouvent rien. Le dev valide ces explications dans la visite guidée.
+  local explained=0 mfile="$FEATURE_DIR/mutants.md"
+  if [ -f "$mfile" ] && [ "$undetected" -gt 0 ]; then
+    explained="$(for f in $files; do
+        awk -F'|' -v f="$f" 'index($2, f) && tolower($4) ~ /(équivalent|equivalent|mécanique|mecanique)/ {n++} END {print n+0}' "$mfile"
+      done | awk '{s+=$1} END {print s+0}')"
+    [ "$explained" -gt "$undetected" ] && explained="$undetected"
+  fi
+  local scored=$(( total - explained ))
+  local score=100
+  [ "$scored" -gt 0 ] && score=$(( (total-undetected)*100/scored ))
+  printf '   mutants : %s, survivants : %s (dont %s expliqués équivalents ou mécaniques, hors calcul), score : %d%% (seuil %s%%)\n' "$total" "$undetected" "$explained" "$score" "$thr"
   printf '%s' "$survivors"
   info "rapports : ${report#"$PROJECT_ROOT"/}/<fichier>/ — chaque survivant est à tuer ou à expliquer dans mutants.md"
   [ "$score" -ge "$thr" ]
