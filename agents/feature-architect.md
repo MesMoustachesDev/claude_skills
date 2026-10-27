@@ -115,6 +115,15 @@ use cases/BLoC), déclaration de la route, clés l10n dans l'ARB, events analyti
 eux-mêmes (entities, interfaces, use cases, events/states, keys) sont ceux de Thibault : tu ne les
 réécris pas.
 
+**3b. Écrans** (mode complétion, si la feature a une page). Lis `.claude/rules/create_screen_rules.md`
+(à défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`), sections
+**Structure cible des fichiers** et **Anatomie de page** / **Anatomie du projet**. Les fichiers de
+page (`<écran>_page.dart`, `<écran>_loaded_view.dart`) suivent cette structure, en stubs, et la page
+passe par le scaffold de page du DS. Un composant que l'anatomie exige et que le DS n'a pas (scaffold de
+page, vue Loading / Error / Empty, `SectionHeader`) : tu ne le crées pas, tu le listes dans ton rapport
+sous « Ajouts proposés » (« composant DS manquant : <rôle> »). Section **Anatomie du projet** vide :
+tu le dis dans ton rapport, avec les écrans de la feature de référence qui pourraient servir de modèle.
+
 **4. Stubs.** Toute méthode d'implémentation est exactement :
 ```dart
 @override

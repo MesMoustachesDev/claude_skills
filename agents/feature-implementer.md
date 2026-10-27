@@ -59,6 +59,12 @@ tests), et la dernière sortie rouge du gauntlet.
    sur le widget ET `Semantics(identifier: <Name>Keys.x, ...)` autour — la QA Maestro ne voit que
    les identifiers. Design system pour toutes les valeurs visuelles, `context.l10n.*` pour tout texte,
    les quatre états Loading / Error / Empty / Loaded.
+   **Avant la première vue**, lis `.claude/rules/create_screen_rules.md` (chemin dans ton prompt ; à
+   défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`) : **Anatomie de
+   page**, **Anatomie du projet**, **Conventions visuelles**, **Structure cible des fichiers**. La page
+   a le squelette de ses voisines : scaffold de page du DS, trois niveaux d'espacement par tokens,
+   `SectionHeader` du DS, vues d'état du DS, une action principale à l'endroit habituel. Un écran qui
+   passe les tests mais ne ressemble pas aux autres sera renvoyé par Romain.
 5. **Cherche avant d'écrire.** Avant de créer un helper, une extension, un widget, un mapper, une
    classe utilitaire : `grep -rniE '<mots-clés de sa responsabilité>' features/core/lib features/design/lib`
    puis les features voisines. S'il existe → tu l'utilises. S'il existe presque → tu l'étends (dans

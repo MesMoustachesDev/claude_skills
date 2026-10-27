@@ -29,6 +29,8 @@ profile_checks() {
     review)    echo "review_report" ;;
     harden)    echo "test analyze test_freeze_check:additive mutation" ;;
     qa)        echo "qa" ;;
+    # Polish visuel (8c, sur demande) : la présentation a bougé, mêmes garanties que le clean.
+    polish)    profile_checks clean ;;
     *)         echo "" ;;
   esac
 }
@@ -48,6 +50,7 @@ Profils (étape → checks) :
   review     review_report          (hook du reviewer ; verdict : review_verdict)
   harden     test analyze test_freeze_check:additive mutation
   qa         qa
+  polish     = clean                (hook de feature-polisher, étape 8c sur demande)
 
 Checks individuels :
   analyze            flutter analyze --fatal-warnings sur le package

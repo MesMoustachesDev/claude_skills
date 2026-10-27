@@ -22,6 +22,7 @@ case "$agent" in
   feature-test-reviewer) profile=tests_review ;;  # idem
   feature-hardener)    profile=harden ;;
   feature-qa)          profile=qa ;;
+  feature-polisher)    profile=polish ;;
   *) exit 0 ;;
 esac
 

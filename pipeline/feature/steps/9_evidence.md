@@ -75,6 +75,7 @@ Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · intern
 ## Suggestions non appliquées        ← review.json + pipeline.json → suggestions `skipped` (pas `debt`) : un bloc par suggestion (problème, si on ne fait rien, correctif, contre)
 ## Mutants expliqués                 ← mutants.md
 ## Défauts visuels mineurs           ← qa.md
+## Polish visuel                     ← human_gates.polish (decision) + polish.md : IDs faits, captures avant / après ; « non demandé » si skipped
 ## Captures                          ← chemins relatifs
 ```
 

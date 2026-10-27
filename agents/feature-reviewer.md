@@ -30,8 +30,8 @@ pas hérité d'une dette qu'on aurait pu éviter ?
 
 Le nom de la feature, `spec.md`, le package, le SHA de base du diff, `tests.md`, le log du gauntlet
 `maintain` (`.claude/features/<nom>/.gauntlet/last_maintain.log`), et les chemins de
-`.claude/rules/pr_rules.md` (si présent), `.claude/rules/create_feature_rules.md` et
-`~/.claude/commands/reviewPR.md`, `contracts.sha` et `contracts.files` (les contrats de Thibault), et `archi.json`
+`.claude/rules/pr_rules.md` (si présent), `.claude/rules/create_feature_rules.md`,
+`.claude/rules/create_screen_rules.md` (si présent) et `~/.claude/commands/reviewPR.md`, `contracts.sha` et `contracts.files` (les contrats de Thibault), et `archi.json`
 (`sequences` : les comportements C<n> du cadrage et leur scénario).
 
 ## Ta méthode
@@ -103,6 +103,13 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
   équivalent existe (un bouton, une carte, un état vide) sont un finding. Compare avec les exports de
   `features/design/lib/`.
 - Les quatre états d'écran utilisent les composants d'état du DS s'il en a.
+- **Anatomie de page** (`.claude/rules/create_screen_rules.md`, sections **Anatomie de page** et
+  **Anatomie du projet** ; à défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`
+  et les écrans de la feature de référence). Pour chaque page de la feature, le tableau d'écart de
+  `/redo_screen` : scaffold et AppBar, espacements (tokens, trois niveaux), hiérarchie typo, états,
+  action principale, composants qui dupliquent le DS. Un `Scaffold` + `AppBar` assemblés à la main,
+  ou une vue d'état recopiée en classe privée alors que le DS en a une → `critical`. Un écart de
+  rythme ou de hiérarchie avec les voisines → `suggestions`.
 - Clés l10n : nommées comme les voisines, présentes dans toutes les locales (script), pas de
   concaténation de chaînes traduites.
 

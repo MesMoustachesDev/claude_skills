@@ -109,6 +109,7 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 | 7 | harden | Hugo | `feature-hardener` | `harden` | non (mutants montrés dans la visite) | seulement si logique modifiée ou `missing_tests` | — |
 | 8 | qa | Quentin | `feature-qa` | `qa` | non (captures montrées dans la visite) | une seule plateforme | — |
 | 8b | visite guidée | toi | — | — | **oui** : 5 à 8 étapes du flux de données (2 minimum), mutants, captures et suggestions rattachés ; il valide ou renvoie une étape | identique | — |
+| 8c | polish visuel | toi, puis Pauline **seulement si Thibault dit oui** | `feature-polisher` (audit, puis application) | `polish` (= `clean`) | **oui** : « polish ou pas ? » ; si oui, écarts à retenir, puis captures avant / après à valider. Jamais lancée d'office | identique | — |
 | 9 | evidence | — | toi (+ `graphify.sh impact` si le projet a un graphe) | — | puis `/create_commits` et `/create_mr` | gabarit et étapes sautées en tête | arrêt après 0b : pas d'evidence |
 
 « — » en L : la feature n'atteint jamais l'étape 1, chaque sous-feature déroule son propre pipeline

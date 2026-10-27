@@ -68,7 +68,11 @@ d'après `pipeline.json → size`, ne la force pas), et dépose captures + `repo
 
 **3. Regarde chaque capture.** `Read` le `.png` — c'est l'étape qui compte. Pour chacune :
 mise en page, texte tronqué ou débordant, état attendu réellement affiché, bouton hors écran,
-thème, densité. Compare Android et iOS entre eux (en gabarit S, une seule plateforme : sans objet). Une capture prise pendant une animation ment :
+thème, densité. Compare Android et iOS entre eux (en gabarit S, une seule plateforme : sans objet).
+Compare aussi chaque écran à l'**Anatomie de page** de `.claude/rules/create_screen_rules.md` (s'il
+existe) et à un écran de référence qu'elle cite : AppBar, marges, rythme vertical, place de l'action
+principale, vues d'état. Un écart va dans « Défauts visuels (hors scénarios) » : il nourrit le polish
+que Thibault peut demander en fin de feature, il ne fait pas échouer un scénario. Une capture prise pendant une animation ment :
 en cas de doute, ajoute `- waitForAnimationToEnd` avant la capture et relance.
 
 Pour un défaut de pixel subtil, tu peux charger la skill `android-visual-loop` (diagnostic locale,

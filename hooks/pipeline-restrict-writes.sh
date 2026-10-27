@@ -110,6 +110,11 @@ case "$agent" in
     match "$rel" "$FEAT_REL/tests_review.md" "$FEAT_REL/tests_review.json" \
       || deny "test-reviewer : lecture seule. Tu n'écris que $FEAT_REL/tests_review.md et tests_review.json — jamais un test. Refusé : $rel"
     ;;
+  feature-polisher)
+    is_test_path && deny "polisher : les tests sont GELÉS, clés et Semantics comprises. Un test qui gêne le polish se signale dans polish.md. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/src/presentation/*" "$FEAT_REL/polish.md" "$FEAT_REL/polish/*" $extra \
+      || deny "polisher : zone autorisée = $PKG_REL/lib/src/presentation/**, $FEAT_REL/polish.md, $FEAT_REL/polish/**${extra:+, $extra}. La logique, le domain et la data ne bougent pas au polish. Refusé : $rel"
+    ;;
   feature-qa)
     match "$rel" "$FEAT_REL/qa/*" "$FEAT_REL/qa.md" "$PKG_REL/maestro/*" \
       || deny "qa : zone autorisée = $PKG_REL/maestro/** et $FEAT_REL/qa/. Un bug trouvé se rapporte dans qa.md, il ne se corrige pas ici. Refusé : $rel"

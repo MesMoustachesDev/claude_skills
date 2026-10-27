@@ -34,14 +34,16 @@ ORDER = [
     ("harden", "7", "Durcissement", "7_harden.md", "Hugo (feature-hardener)"),
     ("qa", "8", "QA", "8_qa.md", "Quentin (feature-qa)"),
     ("hg.tour", "8b", "Point d'étape « visite guidée »", "8b_tour.md", "toi avec Thibault"),
+    ("hg.polish", "8c", "Polish visuel (sur demande de Thibault)", "8c_polish.md", "toi avec Thibault, puis Pauline (feature-polisher) s'il dit oui"),
     ("evidence", "9", "Evidence, commits, MR", "9_evidence.md", "toi"),
 ]
 DONE = {"PASSED", "SKIPPED"}
-LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "tests": 2, "review": 2, "dedup_clean": 2, "tour": 2}
+LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "tests": 2, "review": 2, "dedup_clean": 2, "tour": 2, "polish": 2}
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
 GATE_LABELS = {
     "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Spec validée",
     "tests": "Tests validés et gelés", "suggestions": "Suggestions de revue tranchées", "tour": "Visite guidée validée",
+    "polish": "Polish visuel tranché",
 }
 
 
@@ -128,7 +130,11 @@ class Ctx:
 def state_of(p, key):
     """Statut d'une clé d'ORDER : PASSED, SKIPPED, RED, FAILED, ou None (pas encore jouée)."""
     if key.startswith("hg."):
-        return "PASSED" if (p.get("human_gates") or {}).get(key[3:]) else None
+        if (p.get("human_gates") or {}).get(key[3:]):
+            return "PASSED"
+        if key == "hg.polish" and state_of(p, "evidence") == "PASSED":
+            return "SKIPPED"   # feature livrée avant l'étape 8c
+        return None
     st = (p.get("stages") or {}).get(key)
     if not st:
         return None
@@ -203,6 +209,9 @@ def inputs(c):
         out["contracts.draft_sha"] = con["draft_sha"]
     if con.get("files"):
         out["contracts.files"] = con["files"]
+    screen_rules = os.path.join(c.root, ".claude", "rules", "create_screen_rules.md")
+    if os.path.isfile(screen_rules):
+        out["create_screen_rules.md"] = os.path.relpath(screen_rules, c.root)
     for k in ("tests_freeze_sha", "graphify_graph", "pass_base"):
         if c.p.get(k):
             out[k] = c.p[k]

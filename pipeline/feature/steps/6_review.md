@@ -9,6 +9,7 @@ tout ce que la feature a écrit, contrats, scaffold et code ; c'est contre elle 
 suggestion ou dette) et `tests_freeze_sha` (ce qu'Ivan et Nina ont écrit depuis le gel) — `tests.md`,
 `.claude/features/<nom>/.gauntlet/last_maintain.log`, `.claude/features/<nom>/dedup.md`,
 `.claude/rules/pr_rules.md` si présent, `.claude/rules/create_feature_rules.md`,
+`.claude/rules/create_screen_rules.md` si présent,
 `~/.claude/commands/reviewPR.md`, `contracts.sha` et `contracts.files` (les contrats de Thibault : la référence), `archi.json`
 (les C<n> pour la visite guidée). Romain écrit aussi `review.json → tour`, la visite guidée (8b).
 Au retour, `gauntlet.sh review_verdict <nom>` (le hook de l'agent n'a vérifié que le format — un

@@ -1,6 +1,6 @@
 ### 4. Implémentation — Ivan (`feature-implementer`)
 
-Prompt : nom, `spec.md`, package, `tests.md`, et `.claude/features/<nom>/.gauntlet/last_red.log`
+Prompt : nom, `spec.md`, package, `tests.md`, `create_screen_rules.md` si la feature a une page, et `.claude/features/<nom>/.gauntlet/last_red.log`
 (ou `last_green.log` en reprise/boucle) — la sortie rouge. Au retour :
 - `stages.green = PASSED` → continue.
 - `FAILED` (5 tentatives) → **point imprévu** : montre le rapport de l'agent (ce qui bloque,
