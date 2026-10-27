@@ -33,6 +33,7 @@ contrats que tu écris toi-même, spec, tests avec leurs séquences réelles, su
 guidée du code), chacun avec un rapport HTML ; le gabarit S / M / L choisi au cadrage, qui allège les
 étapes de jugement d'une petite feature et impose le découpage d'une grosse ; que rien
 n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
-Ajoute une ligne : le cockpit (https://claude.ai/artifact/TiXbjaUnp6yVay81XBKQ8R) montre à tout moment
-ce qu'on attend de lui, l'état, ses décisions et ses contrats, éditables depuis la page.
+Ajoute une ligne : chaque feature a sa page de cockpit (l'état, ce qu'on attend de lui, ses décisions,
+ses contrats éditables, « Prévenir Claude »), et l'accueil https://claude.ai/artifact/TiXbjaUnp6yVay81XBKQ8R
+les liste toutes.
 

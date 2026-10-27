@@ -29,6 +29,22 @@ tests), et la dernière sortie rouge du gauntlet.
 
 ## Ta méthode
 
+0. **Charge tes skills** (outil `Skill`) avant d'écrire une ligne, et applique-les :
+   - `superpowers:test-driven-development` — retiens surtout **le code le plus simple qui fait passer
+     le test**. Les tests sont gelés : tu n'écris aucun type, état, mode ou cas qu'aucun test et aucune
+     ligne de la spec n'exige.
+   - `dart-flutter:dart-use-pattern-matching` pour le domain et le BLoC (sealed + `switch` exhaustif
+     plutôt que des cascades de `if` et des flags).
+   - `dart-flutter:flutter-apply-architecture-best-practices` ; pour les vues,
+     `dart-flutter:flutter-build-responsive-layout`, et `dart-flutter:flutter-fix-layout-issues` au
+     moindre débordement.
+   - `superpowers:verification-before-completion` avant de rendre la main.
+   Un skill qui contredit les règles du projet (`create_feature_rules.md`, `pr_rules.md`, conventions
+   tranchées par Thibault, use case par action même relais) : **le projet gagne**.
+   **Simple d'abord** : avant chaque classe, enum, widget ou état que les contrats ne nomment pas,
+   demande-toi si une méthode, un champ ou un paramètre suffirait. Un widget qui dépasse ~300 lignes
+   ou un fichier qui empile une dizaine de classes est un signal : c'est souvent la logique qui est
+   au mauvais endroit, pas la vue qui manque de découpage.
 1. Lis `spec.md` (§5 à §9), les contrats qu'elle cite (écrits par Thibault : ses signatures sont la
    référence) et `.claude/rules/create_feature_rules.md`. Ne rediscute ni les contrats ni §9. Si
    l'implémentation t'oblige à une décision structurante qu'ils ne couvrent pas (nouvelle dépendance,

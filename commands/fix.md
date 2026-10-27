@@ -52,6 +52,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après le gel) |
+| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se font **depuis la page** (« Répondre depuis la page ») : là où ce fichier dit `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte dans la session, sans bloquer |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|
@@ -101,6 +102,9 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
     "arbitrations": [], "agents": {}, "accepted": [], "issue": null,
     "graphify": "<ok|stale|absent|failed>", "graphify_graph": "<valeur de graph= ou null>" }
   ```
+- **Cockpit** : crée la page du fix (`~/.claude/pipeline/fix/cockpit.md`, « Créer la page ») ; en
+  reprise, réarme-la pour cette session (même section, point 4). Puis « Rafraîchir » avec `say <nom>
+  "Bastien reproduit le bug"` : la carte apparaît dans l'Accueil.
 - **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
   seulement). Une issue existante fait partie de l'entrée de Bastien.
 
@@ -122,8 +126,10 @@ Au retour :
 - `stages.red` `PASSED` → point d'étape.
 
 **Point d'étape — diagnostic, test rouge et plan de correction.** D'abord
-`fix_gauntlet.sh report <nom> repro` et `SendUserFile` du `report.html` (`display: render`) : cause,
-plan avec son schéma (cause → fichiers prévus, par couche), diff du test. Puis, court :
+`fix_gauntlet.sh report <nom> repro`, puis « Rafraîchir » (`~/.claude/pipeline/fix/cockpit.md`) avec
+`say <nom> "Valide le diagnostic, le test rouge et le plan" --report repro` : la page du fix montre le
+rapport (cause, plan avec son schéma, diff du test), la cause racine, le plan et le diagnostic. Donne le
+lien de la page ; `SendUserFile` du `report.html` seulement si le cockpit échoue. Puis, court :
 - Cause racine (`root_cause` + `root_cause_location`) et la preuve, en 3 lignes tirées de `diagnosis.md`.
 - Pourquoi les tests l'ont raté : `miss_reason` + la phrase du diagnostic.
 - Le test : `git diff <base_sha> -- <test_files>` (le diff entier s'il fait moins de 60 lignes, sinon les
@@ -166,7 +172,7 @@ Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles pr
 
 Au retour :
 - **Écart au plan** dans le rapport → **point imprévu** : `fix_gauntlet.sh report <nom> repro`,
-  `SendUserFile`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
+  « Rafraîchir » avec `say <nom> "Écart au plan de Fanny à trancher" --report repro`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
   ajoute `{at, files, reason}` à `fix.json → plan_deviations` (Victor le lit ; `repro.json` reste
   gelé) et `SendMessage` à Fanny « écart accepté, continue ». Refusé → `SendMessage` avec la
   consigne du dev.
@@ -227,7 +233,8 @@ Le gate green a rejoué le flow : `shots/green/` contient les captures après co
 succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction vs plan), puis
 `SendUserFile` du rapport et des paires avant/après, un appel, `display: render`, légende « avant | après ».
 `AskUserQuestion` : « Valider » / « Défaut visible : … » (→ `SendMessage` à Fanny, puis 2→3→4 ;
-`loops.ui` max 2). Validation → `human_gates.ui`.
+`loops.ui` max 2). Validation → `human_gates.ui`. Avant la question : « Rafraîchir » avec `say <nom>
+"Regarde les captures avant / après" --report ui`.
 
 ### 5. Evidence, commits
 
@@ -243,7 +250,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Pourquoi les tests l'ont raté   miss_reason — l'explication, et le test existant corrigé s'il y en a un
 ## Preuve                   test(s) ajouté(s), rouge avant (expected_failure), vert après ; suite verte
 ## Plan validé             couche, approche, alternative écartée ; choix du dev (proposé / alternative / autre)
-## Correction               fichiers, en une ligne chacun, marqués prévu / écart accepté ; même défaut corrigé ailleurs
+## Correction               l'arbre du changement : `python3 ~/.claude/scripts/change_tree.py <base_sha>` depuis le worktree, le rôle de chaque fichier en une ligne à la place de `<rôle>` (volumes et reformatage mesurés : ne les recalcule pas), chaque fichier marqué prévu / écart accepté ; même défaut corrigé ailleurs
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
 ## Impact (graphify)        consommateurs hors package (impact.json, touched: false) × verdict de Victor (review.json → impact_checked) ; omise sans graphe ; `stale` : tableau gardé, précédé de « Impact : calculé sur le graphe de la base (update en échec) » ; `échec` : la seule ligne « Impact : non calculé (<raison>) »
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
@@ -264,6 +271,13 @@ appliquera ses propres validations. `stages.evidence = PASSED`, supprime `.claud
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
 mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter :
 `git worktree remove .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
+
+**Fin : la page du fix.** Après `stages.evidence = PASSED` : « Rafraîchir » avec `say <nom> ""` — la
+carte de l'Accueil passe dans « Terminées », avec la cause racine. Puis un seul `AskUserQuestion` :
+« Supprimer la page de ce fix ? » — « Garder » / « Supprimer ». **Supprimer** → `Artifact` `delete` de
+`fix.json → cockpit.url` (l'outil lui demande confirmation ; c'est définitif), `fix_cockpit.py
+page-deleted <nom>`, puis `push` et le seul `batch` de `hub_writes` sur l'Accueil : la carte reste, marquée
+« Page supprimée ». Ne supprime jamais la page sans cette question, ni l'Accueil, jamais.
 
 Termine par 5 lignes : cause, pourquoi raté, test, correction, chemin de l'evidence. Si la cause
 racine révèle un piège non évident du projet (un comportement d'API, un invariant), propose en une

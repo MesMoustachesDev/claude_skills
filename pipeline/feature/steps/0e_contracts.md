@@ -4,14 +4,11 @@
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les séquences du cadrage pour rappel.
 
-**Sa démarche d'abord, avant d'ouvrir les fichiers.** Pour chaque `DÉCISION (Thibault, ta démarche)`
-(1 à 3), une question **ouverte**, en texte, pas d'`AskUserQuestion` : le problème concret, ce qui
-existe déjà (carte graphify, `fichier:ligne`), puis « Comment tu le ferais ? ». Attends sa réponse.
-Réponds à **son** raisonnement : ce qui tient, les cas qu'il n'a pas couverts, les risques (erreurs,
-concurrence, test), sans substituer ta solution ni celle d'Arthur. Il bloque ou demande de l'aide →
-explique le concept en jeu, puis rends-lui la décision ; la proposition d'Arthur ne sort que s'il la
-demande. Sa démarche décidée → il l'écrit lui-même dans les fichiers ou demande à Arthur de
-l'appliquer (mode application).
+**Une relecture, pas une découverte.** Les choix structurants ont été tranchés dans la discussion de
+départ (0b) et Arthur les a appliqués : ne repose pas de question ouverte ici. Les `DÉCISION (Thibault)`
+qui restent sont des choix mineurs, avec la proposition d'Arthur. Thibault veut rouvrir un choix du
+cadrage → on en discute dans la session, du tac au tac, et la décision change dans `discussion.md` et le
+cadrage avant qu'il édite.
 **Ajouts proposés.** Montre ensuite, à part, le tableau `Détail | Proposition | Pourquoi c'est utile`
 du rapport d'Arthur : ce sont ses ajouts, pas des décisions de Thibault. Chaque ligne est
 contestable ; une ligne qu'il ne comprend pas s'explique avant qu'il édite.
@@ -44,6 +41,10 @@ stubbées, imports, README) sans toucher à mes signatures » / « J'ai une ques
   réaligne impls stubbées, imports et README ; aucun scaffold, aucune autre signature ») ; à son
   retour, `pipeline.sh after-architect <nom>` comme en 0c. Puis `gauntlet.sh contracts <nom>`. Rouge → montre
   les erreurs (`fichier:ligne`) et propose « je corrige » / « Arthur corrige le mécanique ».
+  « Appelants cassés » dans le rapport d'Arthur (tests ou fichiers hors package qui appellent une
+  signature changée) → Théo les réaligne tout de suite, en background, sans attendre le rouge
+  d'`analyze` : « ces appels ne compilent plus après le changement de signature ; adapte-les, ne
+  change aucune assertion ».
 - Verdicts `architect` de Denis : déclaration remplacée par l'existant → `"accepted": true, "reason":
   "remplacé par Thibault"` sur l'entrée ; gardée → Thibault donne sa raison, `accepted` avec elle.
   Puis `gauntlet.sh dedup_verdict <nom>` vert.

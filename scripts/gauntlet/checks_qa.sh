@@ -95,7 +95,8 @@ qa_fingerprint() {
 # GAUNTLET_QA_REUSE=1 (set by the feature-qa end hook): if a QA run already finished on the same state
 # (qa_fingerprint), its verdict is reused and the flows are not replayed. A manual `gauntlet.sh qa` always runs.
 check_qa() {
-  local flows_dir="$PKG_DIR/maestro" nflows platform out app_id rc=0 prc failures shots fp marker
+  # GAUNTLET_QA_FLOWS : autre dossier de flows (les flows de /reviewPR vivent hors du repo).
+  local flows_dir="${GAUNTLET_QA_FLOWS:-$PKG_DIR/maestro}" nflows platform out app_id rc=0 prc failures shots fp marker
   local last="$GAUNTLET_OUT/qa_last_run.json" failed_platforms=""
   fp="$(qa_fingerprint)"
   if [ -n "${GAUNTLET_QA_REUSE:-}" ] && [ -f "$last" ] && [ "$(jq -r '.fingerprint // empty' "$last")" = "$fp" ]; then

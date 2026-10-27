@@ -16,6 +16,7 @@ Argument : **$ARGUMENTS**
 /feature init                                  prépare le projet (config, règles, brick, doctor)
 /feature <nom> [description]                   nouvelle feature = nouveau package features/<nom>
 /feature <nom> --in <package> [description]    ajout à un package existant (mode extend)
+/feature <sous> --parent <nom> [--in <package>] [description]   sous-feature d'une feature découpée (L)
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
 ```
@@ -55,9 +56,15 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
    tranche. Les hooks des agents continuent d'écrire `stages.<profil>` eux-mêmes.
-4. **Avant chaque point d'étape**, `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>"`
-   puis rafraîchis le cockpit (`~/.claude/pipeline/feature/cockpit.md`, « Rafraîchir »). Au retour
-   de sa réponse, `pipeline.sh say <nom> ""`.
+4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>` :
+   `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
+   « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
+   sous le bandeau. **Thibault répond depuis la page** : un point d'étape dont la réponse est un choix
+   se publie avec `--ask` et ne bloque pas sur un `AskUserQuestion` (« Répondre depuis la page »,
+   `~/.claude/pipeline/feature/cockpit.md`). Partout où un fichier d'étape dit `AskUserQuestion` pour un
+   choix, c'est cette mécanique qui s'applique. Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
+   lien du cockpit (`#<clé>`) ; `SendUserFile` ne sert plus qu'aux captures QA, ou si le cockpit
+   échoue. Au retour de sa réponse, `pipeline.sh say <nom> ""`.
 5. Retour en 1.
 
 `/feature <nom> status` : `pipeline.sh status <nom>`, affiché tel quel, plus l'issue et le découpage
@@ -86,7 +93,7 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après | En S | En L |
 |---|---|---|---|---|---|---|---|
-| 0b | cadrage | Sophie (mode cadrage) + toi | `feature-specifier` | — | **oui, interactif** : ce qui existe, le périmètre, une séquence par scénario d'acceptation, le package, le gabarit, jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
+| 0b | cadrage | toi avec Thibault (discussion), Sophie (exploration en arrière-plan, puis mise en forme) | `feature-specifier` | — | **oui, une discussion du tac au tac** sur le fonctionnel et la base technique, avant tout agent ; puis le cadrage rendu (une séquence par scénario, décisions techniques), jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
 | 0c | brouillon de contrats | Arthur (mode brouillon) | `feature-architect` | `contracts` | non | identique | — |
 | 0d | dedup du brouillon | Denis | `feature-dedup` | `dedup_verdict` | non (ses verdicts vont à 0e) | identique | — |
 | 0e | contrats de Thibault | Thibault, dans son IDE | — | `contracts` | **oui** : il édite les fichiers ouverts pour lui, puis commit « contracts (by Thibault) » | identique | — |
@@ -109,7 +116,7 @@ en S ou en M. Détail en « Gabarits ».
 
 | État (écritures) | `~/.claude/scripts/pipeline.sh` — jamais d'édition à la main de `pipeline.json` |
 | Étapes | `~/.claude/pipeline/feature/steps/` — une étape à la fois, celle que donne `pipeline.sh next` |
-| Cockpit | `~/.claude/pipeline/feature/cockpit.md` — l'artifact où Thibault suit la feature et édite ses contrats |
+| Cockpit | `~/.claude/pipeline/feature/cockpit.md` — une page par feature (surveillée par ta seule session) + l'accueil commun |
 
 **Gabarit** (S / M / L, choisi au cadrage, dans `pipeline.json → size`) : il allège le jugement
 (critique, dedup, mutation, QA), jamais la preuve (gates d'intégrité) ni la propriété du code (les six

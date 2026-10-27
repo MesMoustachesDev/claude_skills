@@ -141,6 +141,39 @@ def state_of(p, key):
     return status
 
 
+def find_pipeline(c, name):
+    """(pipeline.json, dossier de la feature) d'une autre feature de ce repo : ici, ou dans un des worktrees."""
+    roots = [c.root]
+    porcelain = git("worktree", "list", "--porcelain", cwd=c.root, check=False)
+    roots += [l[len("worktree "):] for l in porcelain.splitlines() if l.startswith("worktree ")]
+    for r in dict.fromkeys(roots):
+        d = os.path.join(r, ".claude", "features", name)
+        f = os.path.join(d, "pipeline.json")
+        if os.path.isfile(f):
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    return json.load(fh), d
+            except (OSError, json.JSONDecodeError):
+                continue
+    return None, None
+
+
+def split_status(c):
+    """État de chaque sous-feature d'une feature découpée (L), lu dans son propre pipeline.json."""
+    out = []
+    for i, sub in enumerate(c.p.get("split") or []):
+        name = sub.get("name", "")
+        sp, _ = find_pipeline(c, name)
+        if sp is None:
+            state = {"started": False, "done": False, "step": None, "title": "pas démarrée", "status": None}
+        else:
+            n = next_step(sp)
+            state = {"started": True, "done": n["key"] == "done", "step": n["step"], "title": n["title"], "status": n["status"]}
+        out.append({"index": i + 1, "name": name, "package": sub.get("package"), "size": sub.get("size"),
+                    "depends_on": sub.get("depends_on") or [], "key": None, **state})
+    return out
+
+
 def next_step(p):
     if not p:
         return {"key": None, "step": "0", "title": "Préconditions puis cadrage (nouvelle feature)",
@@ -200,6 +233,16 @@ def cmd_next(c, args):
         print(f"gabarit   : {c.size} · mode : {c.p.get('mode')} · package : {c.p.get('package')}")
     if n["status"] in ("RED", "FAILED"):
         print(f"état      : {n['status']} ({info['attempts'] or 0} tentatives) — FAILED : point imprévu, Thibault décide ; ne rejoue pas en silence")
+    if n["key"] == "split":
+        for s_ in split_status(c):
+            state = "terminée" if s_["done"] else (f"étape {s_['step']} — {s_['title']}" if s_["started"] else "pas démarrée")
+            deps = f" (après {', '.join(s_['depends_on'])})" if s_["depends_on"] else ""
+            print(f"sous-feature {s_['index']}/{len(c.p['split'])} : {s_['name']}{deps} — {state}")
+    if c.p.get("parent"):
+        pp, _ = find_pipeline(c, c.p["parent"])
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        pos = f"{names.index(c.name) + 1}/{len(names)}" if c.name in names else "?"
+        print(f"parent    : sous-feature {pos} de {c.p['parent']}")
     if n["key"] == "hg.suggestions":
         print("note      : revue verte, il reste à montrer les suggestions et à poser human_gates.suggestions")
     for k, v in info["inputs"].items():
@@ -258,8 +301,21 @@ def cmd_init(c, args):
         "tests_freeze_sha": None, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
         "issue": None, "graphify_graph": None,
     }
+    parent = opts.get("--parent")
+    if parent:
+        pp, _ = find_pipeline(c, parent)
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        if pp is None:
+            die(f"feature parente introuvable : {parent} (aucun pipeline.json dans ce repo ni ses worktrees)")
+        if c.name not in names:
+            die(f"{c.name} n'est pas dans le découpage de {parent} : {', '.join(names) or 'aucune sous-feature'}")
+        c.p["parent"] = parent
     c.save()
     print(f"pipeline.json créé : {os.path.relpath(c.path, c.root)}")
+    if parent:
+        _, pdir = find_pipeline(c, parent)
+        extract = os.path.join(pdir, "split", f"{c.name}.md")
+        print(f"sous-feature {names.index(c.name) + 1}/{len(names)} de {parent} · extrait du cadrage : {extract}")
 
 
 def cmd_size(c, args):
@@ -360,6 +416,12 @@ def cmd_set(c, args):
 
 
 def cmd_say(c, args):
+    args, ask = parse_ask(args)
+    c.p.setdefault("cockpit", {})["ask"] = ask
+    if "--report" in args:
+        i = args.index("--report")
+        c.p.setdefault("cockpit", {})["report_step"] = args[i + 1]
+        args = args[:i] + args[i + 2:]
     c.p.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
     c.p["cockpit"]["at"] = now()
     c.save()
@@ -380,6 +442,23 @@ def cmd_after_architect(c, args):
     print(f"stages.contracts_draft = {st.get('status', '—')} ; attempts.contracts = 0")
     if st.get("status") == "FAILED":
         print("brouillon FAILED : point imprévu (rapport d'Arthur + 40 dernières lignes de last_contracts.log)")
+
+
+def parse_ask(args):
+    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
+    if "--ask" not in args:
+        return args, None
+    i = args.index("--ask")
+    ask_id = args[i + 1]
+    rest = args[:i] + args[i + 2:]
+    opts = []
+    if "--options" in rest:
+        j = rest.index("--options")
+        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
+        rest = rest[:j] + rest[j + 2:]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
+        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
+    return rest, {"id": ask_id, "options": opts, "at": now()}
 
 
 # ---------------------------------------------------------------------------
@@ -581,7 +660,8 @@ def decisions_log(c):
     for r in (p.get("contracts") or {}).get("reedits") or []:
         out.append({"at": r.get("at"), "kind": "contract", "text": f"Contrat modifié : {r.get('what')}"})
     top, _ = repo_of(c, c.package)
-    log = git("log", "--format=%H%x1f%cI%x1f%s", "--grep=by Thibault", "-n", "20", cwd=top, check=False)
+    # Seulement les commits de CETTE feature (« feat(<nom>): contracts (by Thibault) … »), pas ceux du dépôt.
+    log = git("log", "--format=%H%x1f%cI%x1f%s", "--fixed-strings", f"--grep=({c.name}): contracts (by Thibault)", "-n", "20", cwd=top, check=False)
     gate_shas = {str(g.get("sha")) for g in (p.get("human_gates") or {}).values() if isinstance(g, dict) and g.get("sha")}
     gate_shas |= {str(r.get("sha")) for r in (p.get("contracts") or {}).get("reedits") or []}
     for line in log.splitlines():
@@ -589,6 +669,34 @@ def decisions_log(c):
         if subject and h not in gate_shas:
             out.append({"at": at, "kind": "commit", "text": subject})
     return sorted(out, key=lambda e: e.get("at") or "")
+
+
+REPORT_CHUNK = 90_000  # caractères par document (un document db fait au plus 256 Ko une fois sérialisé)
+IMG_RE = re.compile(r"<img\b[^>]*\bsrc=\"([^\"]*)\"[^>]*>", re.I)
+
+
+def report_docs(c, key, out_dir):
+    """Le dernier report.html de la feature, découpé en morceaux. Les ids portent l'empreinte du
+    rapport : un nouveau rapport crée de nouveaux documents, jamais d'écrasement (pas de version à lire)."""
+    path = os.path.join(c.dir, "report.html")
+    html = read_text(path)
+    if html is None:
+        return None, []
+    # Les captures sont des fichiers locaux : illisibles depuis l'artifact, remplacées par leur chemin.
+    html = IMG_RE.sub(lambda m: f'<span class="ck-img">capture : {m.group(1)} (dans la session)</span>', html)
+    h = sha1(html)[:12]
+    parts = [html[i:i + REPORT_CHUNK] for i in range(0, len(html), REPORT_CHUNK)] or [""]
+    os.makedirs(os.path.join(out_dir, "report"), exist_ok=True)
+    writes = []
+    for i, part in enumerate(parts):
+        fp = os.path.join(out_dir, "report", f"{h}-{i}.json")
+        with open(fp, "w", encoding="utf-8") as fh:
+            json.dump({"hash": h, "i": i, "html": part}, fh, ensure_ascii=False)
+        writes.append({"op": "set", "collection": f"features/{key}/report", "doc_id": f"r-{h}-{i}", "file_path": fp})
+    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path), datetime.timezone.utc).replace(microsecond=0)
+    meta = {"hash": h, "n": len(parts), "generated_at": mtime.isoformat().replace("+00:00", "Z"),
+            "step": (c.p.get("cockpit") or {}).get("report_step")}
+    return meta, writes
 
 
 TREE_MAX = 3000
@@ -619,14 +727,19 @@ def cmd_cockpit_push(c, args):
     files = con.get("files") or []
     draft_rev = con.get("draft_sha")
     entries, writes = [], []
+    mb = merge_base(c, repo_of(c, c.package)[0]) if files else None
     for f in files:
         current = read_text(os.path.join(c.root, f))
         if current is None:
             continue
         draft = show(c, draft_rev, f) if draft_rev else None
+        # Le fichier AVANT la feature (merge-base avec la base) : vide pour un fichier créé par la feature.
+        # C'est la comparaison par défaut du cockpit : ce que la feature change au contrat.
+        before = show(c, mb, f) if mb else None
         decisions = [{"line": i + 1, "text": l.strip()} for i, l in enumerate(current.splitlines()) if "DÉCISION (Thibault" in l]
         fid = doc_id(f)
         doc = {"path": f, "draft": draft if draft is not None else "", "has_draft": draft is not None,
+               "base": before or "", "is_new": before is None,
                "current": current, "current_hash": sha1(current), "decisions": decisions, "updated_at": now()}
         fp = os.path.join(out_dir, "contracts", fid + ".json")
         with open(fp, "w", encoding="utf-8") as fh:
@@ -640,25 +753,59 @@ def cmd_cockpit_push(c, args):
         stages.append({"key": k, "step": step, "title": title, "status": state_of(c.p, k) or "TODO",
                        "reason": st.get("reason") if isinstance(st, dict) else None})
     tree = package_tree(c)
+    report, report_writes = report_docs(c, key, out_dir)
+    writes += report_writes
     n = next_step(c.p)
     feature = {
         "project": c.project(), "feature": c.name, "key": key, "branch": c.p.get("branch"),
         "size": c.size, "size_reason": c.p.get("size_reason"), "mode": c.p.get("mode"), "package": c.package,
         "step": {"step": n["step"], "title": n["title"], "status": n["status"]},
         "waiting": (c.p.get("cockpit") or {}).get("waiting"),
+        "ask": (c.p.get("cockpit") or {}).get("ask") if (c.p.get("cockpit") or {}).get("waiting") else None,
         "stages": stages, "decisions": decisions_log(c),
         "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
         "tree": tree,
+        "report": report,
+        "split": None,
+        "parent": None,
         "updated_at": now(),
     }
+    project = c.project()
+    if c.p.get("split"):
+        subs = split_status(c)
+        for s_ in subs:
+            s_["key"] = doc_id(f"{project}--{s_['name']}")
+        feature["split"] = subs
+    if c.p.get("parent"):
+        pp, _ = find_pipeline(c, c.p["parent"])
+        names = [x.get("name") for x in (pp or {}).get("split") or []]
+        feature["parent"] = {"name": c.p["parent"], "key": doc_id(f"{project}--{c.p['parent']}"),
+                             "index": names.index(c.name) + 1 if c.name in names else None, "total": len(names)}
     fp = os.path.join(out_dir, "feature.json")
     with open(fp, "w", encoding="utf-8") as fh:
         json.dump(feature, fh, ensure_ascii=False)
     writes.insert(0, {"op": "set", "collection": "features", "doc_id": key, "file_path": fp})
+    # Ligne de l'accueil (artifact commun, sans « Prévenir Claude ») : de quoi voir l'état et ouvrir la page.
+    cockpit = c.p.get("cockpit") or {}
+    done = n["key"] == "done"
+    ev = ((c.p.get("stages") or {}).get("evidence") or {})
+    issue = c.p.get("issue") or {}
+    index = {"kind": "feature", "key": key, "project": c.project(), "title": c.name,
+             "url": None if cockpit.get("deleted") else cockpit.get("url"), "page_deleted": bool(cockpit.get("deleted")),
+             "step": feature["step"], "waiting": None if done else feature["waiting"], "size": c.size,
+             "parent": (feature.get("parent") or {}).get("name"), "done": done, "done_at": ev.get("at") if done else None,
+             "outcome": (f"evidence prête, MR via create_mr" + (f" · issue #{issue.get('iid')}" if issue.get("iid") else "")) if done else None,
+             "updated_at": now()}
+    ip = os.path.join(out_dir, "index.json")
+    with open(ip, "w", encoding="utf-8") as fh:
+        json.dump(index, fh, ensure_ascii=False)
+    hub_write = {"op": "set", "collection": "index", "doc_id": key, "file_path": ip}
+    if "--hub-version" in args:
+        hub_write["if_version"] = int(args[args.index("--hub-version") + 1])
     for w in writes:
         if w["doc_id"] in versions:
             w["if_version"] = versions[w["doc_id"]]
-    manifest = {"key": key, "writes": writes}
+    manifest = {"key": key, "page": cockpit.get("url"), "writes": writes, "hub_writes": [hub_write]}
     with open(os.path.join(out_dir, "writes.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
@@ -718,12 +865,45 @@ def cmd_cockpit_pull(c, args):
                      ensure_ascii=False, indent=2))
 
 
+
+
+COCKPIT_SRC = os.path.join(os.path.expanduser('~'), ".claude", "scripts", "cockpit", "cockpit.html")
+
+
+def write_page(dest_dir, title):
+    """Copie de la page du cockpit pour UN élément, avec son propre titre (la galerie les distingue)."""
+    html = read_text(COCKPIT_SRC)
+    if html is None:
+        die(f"page source introuvable : {COCKPIT_SRC}")
+    os.makedirs(dest_dir, exist_ok=True)
+    safe = re.sub(r"[<>&]", "", title)
+    html = re.sub(r"<title>.*?</title>", f'<title>{safe}</title>\n<meta name="cockpit-role" content="item">', html, count=1)
+    path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(path)
+
+
+def cmd_page_deleted(c, args):
+    """Thibault a fait supprimer la page de cette feature : l'accueil garde la carte, sans lien."""
+    c.p.setdefault("cockpit", {})["deleted"] = True
+    c.p["cockpit"]["deleted_at"] = now()
+    c.save()
+    print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
+
+
+def cmd_cockpit_page(c, args):
+    if not args:
+        die("usage : cockpit-page <nom> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
+    write_page(args[0], f"Cockpit {c.name}")
+
+
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "say": cmd_say,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
-    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull,
+    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,
 }
 
 

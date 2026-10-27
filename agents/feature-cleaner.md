@@ -31,7 +31,14 @@ couverture des lignes modifiées).
 
 1. `~/.claude/scripts/gauntlet.sh clean <feature>` : lis les violations de `metrics` (complexité,
    longueur, imbrication, paramètres) et le manque de `coverage`.
-2. Traite chaque violation par un refactoring **comportement-préservant** : extraire une méthode,
+1b. **Simplifie avant d'extraire.** Charge le skill `simplify` (outil `Skill`) et passe-le sur le diff de
+   la feature (depuis la merge-base). Applique ce qui **réduit** : code mort, duplication, état ou type
+   redondant, abstraction à un seul usage sans raison, logique qui recalcule ce que le domaine sait
+   déjà. Ignore ce qui contredit les règles du projet (couches, use case par action) ou toucherait aux
+   tests, aux contrats de Thibault, aux clés ou aux signatures publiques. Une violation de métrique se
+   règle d'abord en **supprimant** ce qui est en trop ; extraire une méthode ou un widget ne vient
+   qu'ensuite, quand ce qui reste est vraiment nécessaire.
+2. Traite chaque violation restante par un refactoring **comportement-préservant** : extraire une méthode,
    un widget, un objet paramètre ; remplacer une cascade de `if` par un `switch` sur sealed class ;
    nommer ce qui est anonyme ; supprimer la duplication entre couches. Petites étapes, tests entre
    chaque (`flutter test` sur le fichier concerné).

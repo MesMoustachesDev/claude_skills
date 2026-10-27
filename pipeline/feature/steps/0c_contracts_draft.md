@@ -11,11 +11,11 @@ brouillon de ce que Thibault doit posséder : entités, interfaces de repository
 signatures des use cases, events/states sealed, `keys.dart`. Chaque choix qu'un dev senior pourrait
 faire autrement (Stream ou Future, un BLoC ou deux, où vit une logique, remote/local) porte au-dessus
 de la ligne un commentaire `// DÉCISION (Thibault) : <question> — proposé : <X>, alternative : <Y>`.
-**Sa démarche d'abord** : les 1 à 3 décisions qui structurent le plus la feature (nouvelle I/O,
-découpage de l'état, frontière entre packages, ce qui a le plus de conséquences si on se trompe)
-portent `// DÉCISION (Thibault, ta démarche) : <question>` **sans proposition** ; le stub reste
-minimal à cet endroit. Arthur garde sa proposition pour lui, dans son rapport, à part (« proposition
-retenue en réserve »), et ne la montre pas au dev.
+**Les choix structurants viennent du cadrage** (« Décisions techniques », tranchées avec Thibault dans
+la discussion de départ) : Arthur les applique, sans `DÉCISION` à ces endroits. Son rapport signale une
+« Décision manquante au cadrage » → point imprévu : rouvre la discussion avec Thibault sur ce point
+(texte, du tac au tac, comme en 0b), note la décision dans `discussion.md` et le cadrage, puis relance
+Arthur.
 **Ajouts proposés** : son rapport liste, sous ce titre, tout ce qu'il a posé et que le cadrage ne
 nomme pas (une classe, une interface, une data source, un découpage, une dépendance) : une ligne
 chacun, `Détail | Proposition | Pourquoi c'est utile`.

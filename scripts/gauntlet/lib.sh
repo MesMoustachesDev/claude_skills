@@ -334,7 +334,7 @@ run_checks() {
   # Le bloc tourne dans un sous-shell (pipe vers tee) : le verdict passe par le fichier JSON,
   # pas par des variables — elles seraient perdues à la sortie du pipe.
   {
-    local failed="" skipped="" passed="" spec name mode rc fast_failed=0
+    local failed="" skipped="" passed="" timings="" spec name mode rc t0 dt fast_failed=0
     printf 'gauntlet %s — feature %s — package %s — périmètre : %s — %s\n' "$label" "$FEATURE" "$PKG_REL" "$(scope_summary)" "$(date '+%Y-%m-%d %H:%M:%S')"
     for spec in "$@"; do
       name="${spec%%:*}"; mode=""; [[ "$spec" == *:* ]] && mode="${spec#*:}"
@@ -342,9 +342,10 @@ run_checks() {
       if is_expensive "$name" && [ "$fast_failed" = 1 ]; then
         info "sauté : un check rapide a échoué"; skipped="$skipped $name"; continue
       fi
-      "check_$name" "$mode"; rc=$?
-      if [ "$rc" -eq 0 ]; then ok "$name"; passed="$passed $name"
-      else ko "$name"; failed="$failed $name"; is_expensive "$name" || fast_failed=1; fi
+      t0=$SECONDS; "check_$name" "$mode"; rc=$?; dt=$((SECONDS-t0))
+      if [ "$rc" -eq 0 ]; then ok "$name (${dt}s)"; passed="$passed $name"
+      else ko "$name (${dt}s)"; failed="$failed $name"; is_expensive "$name" || fast_failed=1; fi
+      timings="$timings $name=$dt"
     done
     section "résumé $label"
     [ -n "$passed" ]  && printf '  passés  :%s\n' "$passed"
@@ -352,11 +353,12 @@ run_checks() {
     [ -n "$skipped" ] && printf '  sautés  :%s\n' "$skipped"
     jq -n --arg profile "$label" --arg feature "$FEATURE" \
           --argjson ok "$([ -z "$failed" ] && echo true || echo false)" \
-          --arg passed "$passed" --arg failed "$failed" --arg skipped "$skipped" \
+          --arg passed "$passed" --arg failed "$failed" --arg skipped "$skipped" --arg timings "$timings" \
           '{profile:$profile, feature:$feature, ok:$ok, date:(now|todate),
             passed:($passed|split(" ")|map(select(.!=""))),
             failed:($failed|split(" ")|map(select(.!=""))),
-            skipped:($skipped|split(" ")|map(select(.!="")))}' > "$json"
+            skipped:($skipped|split(" ")|map(select(.!=""))),
+            seconds:($timings|split(" ")|map(select(.!="")|split("=")|{(.[0]):(.[1]|tonumber)})|add // {})}' > "$json"
   } 2>&1 | tee -a "$log"
   [ "$(jq -r '.ok' "$json" 2>/dev/null)" = true ]
 }

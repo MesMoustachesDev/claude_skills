@@ -1,8 +1,13 @@
 // stub_check.dart — vérifie qu'après l'étape ARCHITECT, chaque méthode des fichiers
 // d'implémentation est un stub : `throw UnimplementedError(...)`, en bloc ou en expression.
 //
-// Usage : dart run bin/stub_check.dart --root <package_dir> <fichier relatif>...
+// Usage : dart run bin/stub_check.dart --root <package_dir> [--scope <f>] [--base-dir <d>] <fichier relatif>...
 // Exit 0 si tout est stub, 1 sinon. Constructeurs, méthodes abstraites/externes ignorés.
+//
+// Mode extend (--scope) : seules les déclarations nouvelles sont jugées. --base-dir contient la version
+// de base des fichiers modifiés (même chemin relatif) : une méthode qui y existait déjà n'est pas un
+// contrat neuf, même si sa signature a changé. Aucune méthode neuve n'est pas une erreur en extend :
+// un contrat peut ne poser que des champs, des clés, des events ou des states.
 //
 // Pourquoi une analyse AST et pas un grep : compter des méthodes en bash est faux dès qu'il y a
 // un `=>` dans une string ou une closure. L'AST ne se trompe pas.
@@ -39,12 +44,15 @@ class Scope {
 void main(List<String> args) {
   String root = '.';
   String? scopeFile;
+  String? baseDir;
   final files = <String>[];
   for (var i = 0; i < args.length; i++) {
     if (args[i] == '--root' && i + 1 < args.length) {
       root = args[++i];
     } else if (args[i] == '--scope' && i + 1 < args.length) {
       scopeFile = args[++i];
+    } else if (args[i] == '--base-dir' && i + 1 < args.length) {
+      baseDir = args[++i];
     } else {
       files.add(args[i]);
     }
@@ -67,7 +75,7 @@ void main(List<String> args) {
       path: abs,
       featureSet: FeatureSet.latestLanguageVersion(),
     ).unit;
-    final visitor = _StubVisitor(rel, unit, scope);
+    final visitor = _StubVisitor(rel, unit, scope, _baseNames(baseDir, rel));
     unit.accept(visitor);
     methods += visitor.methods;
     violations.addAll(visitor.violations);
@@ -77,18 +85,51 @@ void main(List<String> args) {
   for (final v in violations) {
     stdout.writeln('   ✗ $v');
   }
-  if (methods == 0) {
+  if (methods == 0 && scope.all) {
     stdout.writeln('   ✗ aucune méthode trouvée : les contrats ne sont pas posés');
     exit(1);
+  }
+  if (methods == 0) {
+    stdout.writeln('   aucune méthode neuve : le contrat ne pose que des champs, clés, events ou states');
   }
   exit(violations.isEmpty ? 0 : 1);
 }
 
+/// Noms qualifiés (`Classe.méthode`, ou `fonction` top-level) déclarés dans la version de base du fichier.
+Set<String> _baseNames(String? baseDir, String rel) {
+  if (baseDir == null) return const {};
+  final f = File(p.join(baseDir, rel));
+  if (!f.existsSync()) return const {};
+  final names = <String>{};
+  final unit = parseString(content: f.readAsStringSync(), throwIfDiagnostics: false).unit;
+  unit.accept(_NameCollector(names));
+  return names;
+}
+
+class _NameCollector extends RecursiveAstVisitor<void> {
+  _NameCollector(this.names);
+  final Set<String> names;
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration node) => names.add(_qualified(node, node.name.lexeme));
+
+  @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    if (node.parent is CompilationUnit) names.add(node.name.lexeme);
+  }
+}
+
+String _qualified(AstNode node, String name) {
+  final owner = _StubVisitor._ownerName(node);
+  return owner.isEmpty ? name : '$owner.$name';
+}
+
 class _StubVisitor extends RecursiveAstVisitor<void> {
-  _StubVisitor(this.file, this.unit, this.scope);
+  _StubVisitor(this.file, this.unit, this.scope, this.baseNames);
   final String file;
   final CompilationUnit unit;
   final Scope scope;
+  final Set<String> baseNames;
   int methods = 0;
   final violations = <String>[];
 
@@ -99,6 +140,7 @@ class _StubVisitor extends RecursiveAstVisitor<void> {
     // Abstraite (`;`) ou externe : pas de corps à vérifier.
     if (node.body is EmptyFunctionBody || node.externalKeyword != null) return;
     if (!_inScope(node)) return; // mode extend : les méthodes préexistantes ne sont pas des stubs
+    if (baseNames.contains(_qualified(node, node.name.lexeme))) return; // signature changée, pas un contrat neuf
     methods++;
     if (!_isStubBody(node.body)) {
       final line = unit.lineInfo.getLocation(node.offset).lineNumber;
@@ -114,6 +156,7 @@ class _StubVisitor extends RecursiveAstVisitor<void> {
     // Fonctions top-level uniquement (les locales sont dans des corps déjà rejetés).
     if (node.parent is! CompilationUnit) return;
     if (!_inScope(node)) return;
+    if (baseNames.contains(node.name.lexeme)) return;
     methods++;
     if (!_isStubBody(node.functionExpression.body)) {
       final line = unit.lineInfo.getLocation(node.offset).lineNumber;
