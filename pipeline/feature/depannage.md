@@ -58,6 +58,13 @@
 - **`deps_features` rouge sur une dépendance ou un cycle déjà présents sur la base** (mode extend).
   En place : seuls une dépendance absente du pubspec de la base et un cycle qui emprunte une arête
   ajoutée bloquent ; le reste sort en `[WARN] … préexistant`, à reporter en dette.
+- **Couverture, métriques ou checks de lignes rouges sur du code existant seulement reformaté** (`dart
+  format` sur un fichier entier, mode extend). En place : `drop_format_only` (`lib.sh`, avec
+  `format_only.py`) retire du périmètre et des lignes à couvrir toute ligne `.dart` dont les tokens sont
+  inchangés depuis la base (recoupée, recollée, réindentée, virgule finale). `coverage` l'annonce : « n
+  ligne(s) seulement reformatée(s) ». Ne pas `accept` : si une ligne reformatée est encore comptée, elle
+  porte un vrai changement de token. Les `conventions` de `/fix` gardent ces lignes
+  (`GAUNTLET_KEEP_FORMAT_LINES=1`). Repro : `tests/test_format_only.sh`.
 - **Package dans un submodule (`flutter_app/hades`) invisible au gauntlet.** En place : les diffs
   (périmètre, gel, couverture, `writes.extra`, empreinte QA) tournent dans le submodule, depuis le
   gitlink que la base enregistre. Un `tests_freeze_sha` peut être un commit du parent ou du submodule.

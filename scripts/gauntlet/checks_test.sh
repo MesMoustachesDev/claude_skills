@@ -133,9 +133,10 @@ new_lines() {
   printf '%s\n' "$moved_total" > "$GAUNTLET_OUT/moved_lines.count"
 }
 
-# coverage — couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (new_lines).
+# coverage — couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (new_lines)
+# et seulement reformatées (drop_format_only).
 check_coverage() {
-  local thr lcov base changed rc moved
+  local thr lcov base changed rc moved formatted
   thr="$(cfg threshold.coverage_changed 90)"
   # shellcheck disable=SC2086
   (cd "$PKG_DIR" && $FLUTTER test --coverage --no-pub >/dev/null 2>&1) || { ko "flutter test --coverage a échoué"; return 1; }
@@ -143,9 +144,11 @@ check_coverage() {
   [ -f "$lcov" ] || { ko "pas de $lcov"; return 1; }
   base="$(merge_base)"
   changed="$GAUNTLET_OUT/changed_lines.txt"
-  new_lines "$base" "$PKG_REL/lib" | grep -vE '\.g\.dart:|\.freezed\.dart:' | sort -u > "$changed"
+  new_lines "$base" "$PKG_REL/lib" | grep -vE '\.g\.dart:|\.freezed\.dart:' | drop_format_only "$base" | sort -u > "$changed"
   moved="$(cat "$GAUNTLET_OUT/moved_lines.count" 2>/dev/null)"
   [ "${moved:-0}" -gt 0 ] && info "$moved ligne(s) seulement déplacée(s) (code existant découpé ou extrait) : hors couverture"
+  formatted="$(cat "$GAUNTLET_OUT/format_lines.count" 2>/dev/null)"
+  [ "${formatted:-0}" -gt 0 ] && info "$formatted ligne(s) seulement reformatée(s) (dart format) : hors couverture"
   if [ ! -s "$changed" ]; then info "aucune ligne modifiée dans lib/ depuis $base"; return 0; fi
   awk -v pkg="$PKG_REL" -v thr="$thr" -v changed="$changed" '
     BEGIN { while ((getline l < changed) > 0) ch[l]=1 }

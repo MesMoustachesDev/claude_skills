@@ -206,8 +206,28 @@ scope_compute() {
     diff_names "$base" "$PKG_REL" --diff-filter=A
     untracked "$PKG_REL"
     diff_u0 "$base" "$PKG_REL" --diff-filter=M \
-      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}'
+      | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}' \
+      | drop_format_only "$base"
   } | sort -u
+}
+# drop_format_only <base> — stdin « fichier:ligne » (relatif à PROJECT_ROOT) → sans les lignes d'un fichier
+# .dart qui ne changent que par le format depuis <base> (dart format : ligne recoupée, recollée, réindentée,
+# virgule finale ; format_only.py compare token par token). Sans ça, un `dart format` sur un fichier entier
+# fait entrer du code non touché dans le périmètre : couverture et métriques rouges, re-gels « hygiene ».
+# Les autres entrées passent telles quelles. Écrit le nombre de lignes écartées dans format_lines.count.
+# GAUNTLET_KEEP_FORMAT_LINES=1 : rien n'est écarté (conventions de /fix, qui jugent aussi les lignes réindentées).
+drop_format_only() {
+  local base="$1" in tmp f
+  if [ "${GAUNTLET_KEEP_FORMAT_LINES:-0}" = 1 ]; then cat; echo 0 > "$GAUNTLET_OUT/format_lines.count"; return 0; fi
+  in="$(cat)"; tmp="$(mktemp)"
+  printf '%s\n' "$in" | grep -E '\.dart:[0-9]+$' | sed -E 's/:[0-9]+$//' | sort -u \
+    | while IFS= read -r f; do
+        show_at "$base" "$f" > "$tmp" && [ -f "$PROJECT_ROOT/$f" ] || continue
+        python3 "$GAUNTLET_ROOT/format_only.py" "$tmp" "$PROJECT_ROOT/$f" | sed "s#^#$f:#"
+      done > "$tmp.fmt"
+  printf '%s\n' "$in" | grep -v '^$' | grep -vxFf "$tmp.fmt"
+  grep -c . "$tmp.fmt" > "$GAUNTLET_OUT/format_lines.count"
+  rm -f "$tmp" "$tmp.fmt"
 }
 # use_pass_scope — à appeler en tête d'un check, après `local SCOPE_FILE SCOPE_ALL` : ce check (et les
 # helpers qu'il appelle, portée dynamique de bash) jugent la passe en cours, pas toute la feature.
