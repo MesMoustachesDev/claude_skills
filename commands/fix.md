@@ -51,7 +51,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
-| Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après le gel) |
+| Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` |
 | Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se font **depuis la page** (« Répondre depuis la page ») : là où ce fichier dit `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte dans la session, sans bloquer |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
@@ -105,12 +105,12 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 - **Cockpit** : crée la page du fix (`~/.claude/pipeline/fix/cockpit.md`, « Créer la page ») ; en
   reprise, réarme-la pour cette session (même section, point 4). Puis « Rafraîchir » avec `say <nom>
   "Bastien reproduit le bug"` : la carte apparaît dans l'Accueil.
-- **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
-  seulement). Une issue existante fait partie de l'entrée de Bastien.
+- **Ticket** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
+  seulement). Un ticket existant fait partie de l'entrée de Bastien.
 
 ### 1. Reproduction — Bastien (`fix-reproducer`)
 
-Prompt (15 lignes max) : nom, description brute, l'issue GitLab existante entre `<issue>` s'il y en a
+Prompt (15 lignes max) : nom, description brute, le ticket existant entre `<issue>` s'il y en a
 une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
 (`CLAUDE.md`, `.claude/rules/*`, `.claude/agents/*` s'il y en a — ils portent des invariants), et :
 « Une issue Sentry est citée : utilise le MCP Sentry pour la stack et les tags » si c'est le cas.
@@ -162,7 +162,7 @@ fixture), `technique` (test faux techniquement : async, pump, harness), `diagnos
 incomplète, second défaut trouvé), `couverture` (tests ajoutés sur un cas déjà corrigé). C'est la
 mesure qu'on suit d'un fix à l'autre pour savoir où le pipeline perd du temps.
 
-**Issue GitLab.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit fix
+**Ticket.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit fix
 (`repro.json` et `diagnosis.md` gelés). Puis lance Fanny.
 
 ### 2. Correction — Fanny (`fix-implementer`)

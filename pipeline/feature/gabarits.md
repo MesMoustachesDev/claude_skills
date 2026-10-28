@@ -8,7 +8,7 @@ avec le reste du cadrage, rend le pipeline proportionnel. Il est écrit dans `pi
 |---|---|---|
 | **S** | ≤ ~8 scénarios estimés, aucun nouveau package (ni package de feature créé, ni dépendance pub.dev ajoutée), ≤ 2 décisions majeures estimées | spec ≤ 15 Ko ; une passe de Camille ; pas de 5b ; Hugo seulement si `mutation.include` contient des fichiers de logique modifiés (ou si Romain signale des `missing_tests`) ; QA sur une plateforme |
 | **M** | ni S ni L | le pipeline décrit dans ce fichier, sans allègement (spec ≤ 40 Ko, `loops.spec` max 2) |
-| **L** | > 5 décisions majeures estimées, ou la feature touche plusieurs packages | découpage obligatoire en sous-features avant toute spec ; chacune repasse par `/feature` en S ou en M |
+| **L** | > 5 décisions majeures estimées, ou la feature touche plusieurs packages | découpage obligatoire en sous-features avant toute spec : la feature devient un epic (`/epic`) ; chacune repasse par `/feature --parent` en S ou en M |
 
 Dans le doute entre deux gabarits, prends le plus lourd : un S sous-dimensionné rate des cas, un M
 de trop ne coûte que du temps.

@@ -33,8 +33,17 @@ riverpod_major = 3
 writes.extra = features/router/**, features/l10n/lib/**
 
 # ---------------------------------------------------------------------------
-# Issue GitLab créée par /feature et /fix (~/.claude/pipeline/issue.md). Vides = aucun label, personne.
+# Tracker : où vivent les tickets d'epic, de feature et de fix (~/.claude/pipeline/tracker.md).
+# gitlab | notion | none. Absent : gitlab si `glab repo view` réussit, sinon none.
 # ---------------------------------------------------------------------------
+tracker =
+# Projet GitLab des tickets s'il diffère de celui du code (ex. webapps/audin). Vide = projet du remote.
+tracker.gitlab.project =
+# URL de la base Notion (backend notion). Vide : /feature init ou le premier /epic propose de la créer.
+tracker.notion.database =
+
+# Labels et assignation des tickets créés (issue.md). Vides = aucun label, personne.
+issue.labels.epic = epic
 issue.labels.feature =
 issue.labels.fix = bug
 issue.assignee = @me

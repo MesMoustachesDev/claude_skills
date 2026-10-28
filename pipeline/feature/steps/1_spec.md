@@ -76,6 +76,6 @@ Validation → la colonne Statut des lignes tranchées passe à `validée` ou `m
 `pipeline.sh gate <nom> spec`, `pipeline.sh pass <nom> spec`, et « brouillon » devient « validée le
 <date> » dans l'en-tête de la spec.
 
-**1c. Issue GitLab.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit
+**1c. Ticket.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit
 feature (spec validée, contrats de Thibault). Sinon rien.
 

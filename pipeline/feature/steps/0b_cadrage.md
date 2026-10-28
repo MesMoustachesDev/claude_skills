@@ -63,14 +63,21 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
 7. **En L : découpage, puis arrêt.** Le découpage proposé se valide comme le reste du cadrage
    (texte libre pour le corriger, relance de Sophie). Validé → `pipeline.json → split` (`[{name,
    package, size, depends_on}]`) ; Sophie écrit pour chacune `.claude/features/<nom>/split/<sous>.md`
-   (l'extrait du cadrage qui la concerne). Puis tu t'arrêtes : pas de spec, pas d'issue, pas de
-   worktree de plus. Donne au dev la commande de chaque sous-feature, dans l'ordre de dépendance
+   (l'extrait du cadrage qui la concerne). **La feature devient un epic** : chaque entrée de `split`
+   porte aussi `mode`, `deliverable` (ce que l'utilisateur voit si elle est mergée seule), `status:
+   "prévu"`, `ticket: null`, `branch: null`, `mr: null`, et la suite — tickets dans le tracker, tableau
+   de bord, statuts — est celle de `/epic` (`~/.claude/commands/epic.md`, « nouvel epic », points 4
+   et 5) : enchaîne-la sans repasser par la discussion, elle a eu lieu. Pas de spec, pas de worktree
+   de plus. Le tableau de bord donne la commande de chaque sous-feature, dans l'ordre de dépendance
    (`/feature <sous> --parent <nom> [--in <package>] "<description>"`) ; au cadrage d'une sous-feature,
    Sophie reçoit en entrée le chemin absolu de son extrait (que `pipeline.sh init … --parent` imprime) et
    ne repart pas de zéro. Le cockpit range chaque sous-feature sous sa parente (« 2/3 ») et montre, sur
    la parente, l'avancement de toutes. Une sous-feature qui dépend
    d'une autre attend son merge, ou part de sa branche (`base` dans son `pipeline.json`). Sors avec
-   `ExitWorktree` `action: "keep"` : le dossier de la feature parente garde le découpage.
+   `ExitWorktree` `action: "keep"` : le dossier de la feature parente garde le découpage. Ensuite,
+   c'est `/epic <nom>` qui suit l'avancement.
+   **Une sous-feature (`--parent`) qui se révèle L** ne se découpe pas ici : pas de sous-epic.
+   Arrête-toi et propose `/epic <parent> add <nom> "<ce qui a grossi>"`, qui la redécoupe dans l'epic.
 
 **Le cadrage validé est l'entrée verrouillée des contrats et de la spec.** Arthur en tire son
 brouillon en appliquant les décisions techniques prises (il ne les repose pas), Sophie le reprend en §1-§2 tel quel ; ni un contrat ni §9 ne le contredisent. Un changement

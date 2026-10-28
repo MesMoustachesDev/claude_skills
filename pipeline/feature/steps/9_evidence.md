@@ -24,7 +24,7 @@ démarrage de la prochaine feature (étape 0).
 # Evidence — <nom>
 Spec validée le <date> · Branche feature/<nom> · Base <base>@<sha>
 Gabarit : <S|M> (<size_reason>)      ← pipeline.json → size ; reclassements : size_changes (de → vers, raison)
-Issue : #<iid> <url>                ← si pipeline.json → issue existe (issue.md, partie C)
+Ticket : <ref> <url>                ← si pipeline.json → issue existe (issue.md, partie C) ; sous-feature : + « Epic : <ref> »
 
 ## Étapes sautées (gabarit)          ← pipeline.json → stages, status SKIPPED ; omise en M sans étape sautée
 | Étape | Raison |
@@ -82,7 +82,8 @@ Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · intern
 Puis, **dans cet ordre** : invoque la skill `create_commits` avec « sans validation » (elle découpe le
 travail restant en commits atomiques et les crée sans attendre : règle du dev ; le plan va dans
 l'evidence ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
-lui indiquant que la description de MR est `evidence.md` et l'issue liée (`issue.md`, partie C). `create_mr` applique ses propres règles de
+lui indiquant que la description de MR est `evidence.md` et le ticket lié (`issue.md`, partie C :
+`Closes`/`Relates to`, et pour une sous-feature d'epic le ticket de l'epic aussi). `create_mr` applique ses propres règles de
 validation du dev avant tout push ou création : tu ne les contournes pas.
 
 `pipeline.sh pass <nom> evidence`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste

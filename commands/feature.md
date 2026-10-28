@@ -19,7 +19,11 @@ Argument : **$ARGUMENTS**
 /feature <sous> --parent <nom> [--in <package>] [description]   sous-feature d'une feature découpée (L)
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
+/feature <nom> cockpit                         publie ou rafraîchit le cockpit de la feature
 ```
+
+Une feature trop grosse (gabarit L) devient un **epic** : `/epic` (`~/.claude/commands/epic.md`)
+prend la suite du découpage — tickets dans le tracker du projet, tableau de bord, statuts.
 
 Le nom est en snake_case et nomme **le changement**, pas forcément le package. Une feature = une
 branche `feature/<nom>` = un dossier de travail `.claude/features/<nom>/` = un package cible :
@@ -30,9 +34,6 @@ branche `feature/<nom>` = un dossier de travail `.claude/features/<nom>/` = un p
   ajoutés, lignes ajoutées. La feature est responsable de ce qu'elle touche et doit laisser le reste
   au moins aussi bon : les gates d'intégrité (compilation, suite verte, gel, dépendances, périmètre,
   barrel, README) restent sur le package entier.
-
-/feature <nom> cockpit                         publie ou rafraîchit le cockpit de la feature
-```
 
 ## Comment tu avances : la boucle
 
@@ -87,13 +88,15 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 | Template de spec | `~/.claude/commands/templates/flutter/feature_spec_template.md` |
 | Brick global | `~/.claude/bricks/flutter_feature` |
 | État | `.claude/features/<nom>/pipeline.json` |
-| Issue GitLab | `~/.claude/pipeline/issue.md` (existante ou créée après la spec validée) |
+| Ticket | `~/.claude/pipeline/issue.md` (existant ou créé après la spec validée) · tracker du projet (GitLab, Notion, rien) : `~/.claude/pipeline/tracker.md` |
+| Epic (gabarit L) | `~/.claude/commands/epic.md` |
+| Learn (récurrences → règles) | `~/.claude/pipeline/learn.md` · `~/.claude/scripts/learn.py` — étape 9b ; verdicts de chaque boucle archivés par `pipeline.sh loop` dans `history/` |
 
 Étapes, agents et profils de gate :
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après | En S | En L |
 |---|---|---|---|---|---|---|---|
-| 0b | cadrage | toi avec Thibault (discussion), Sophie (exploration en arrière-plan, puis mise en forme) | `feature-specifier` | — | **oui, une discussion du tac au tac** sur le fonctionnel et la base technique, avant tout agent ; puis le cadrage rendu (une séquence par scénario, décisions techniques), jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis arrêt |
+| 0b | cadrage | toi avec Thibault (discussion), Sophie (exploration en arrière-plan, puis mise en forme) | `feature-specifier` | — | **oui, une discussion du tac au tac** sur le fonctionnel et la base technique, avant tout agent ; puis le cadrage rendu (une séquence par scénario, décisions techniques), jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis la suite de `/epic` (tickets, tableau de bord) |
 | 0c | brouillon de contrats | Arthur (mode brouillon) | `feature-architect` | `contracts` | non | identique | — |
 | 0d | dedup du brouillon | Denis | `feature-dedup` | `dedup_verdict` | non (ses verdicts vont à 0e) | identique | — |
 | 0e | contrats de Thibault | Thibault, dans son IDE | — | `contracts` | **oui** : il édite les fichiers ouverts pour lui, puis commit « contracts (by Thibault) » | identique | — |

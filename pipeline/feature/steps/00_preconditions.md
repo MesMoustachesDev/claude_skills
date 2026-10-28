@@ -48,8 +48,9 @@
   en reprise, réarme-la pour cette session (même section, point 4).
   `size` (`S|M|L`, posé à la fin de 0b par `pipeline.sh size`) est lu par `pipeline.sh` et par le
   gauntlet (QA) ; absent ou `null`, c'est `M`.
-- **Issue GitLab** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Sophie (nouveau run
-  seulement). Une issue existante fait partie de l'entrée de Sophie.
+- **Ticket** (tracker du projet : `~/.claude/pipeline/tracker.md`) : `~/.claude/pipeline/issue.md`,
+  partie A, avant de lancer Sophie (nouveau run seulement). Sous-feature d'un epic (`--parent`) : son
+  ticket est celui de l'epic (`split[i].ticket`). Un ticket existant fait partie de l'entrée de Sophie.
 - **Branche** : déjà en place via le worktree (voir plus haut). Les modifications non commitées du
   checkout principal ne suivent pas : signale-le si elles concernent cette feature.
 - Écris `<nom>` dans `.claude/features/.current` (secours pour les hooks quand la branche ne suit pas

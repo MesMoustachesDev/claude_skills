@@ -185,7 +185,9 @@ def split_status(c):
             n = next_step(sp)
             state = {"started": True, "done": n["key"] == "done", "step": n["step"], "title": n["title"], "status": n["status"]}
         out.append({"index": i + 1, "name": name, "package": sub.get("package"), "size": sub.get("size"),
-                    "depends_on": sub.get("depends_on") or [], "key": None, **state})
+                    "depends_on": sub.get("depends_on") or [], "key": None,
+                    "tracked": sub.get("status"), "ticket": (sub.get("ticket") or {}).get("ref"),
+                    "mr": (sub.get("mr") or {}).get("url"), **state})
     return out
 
 
@@ -255,7 +257,8 @@ def cmd_next(c, args):
         for s_ in split_status(c):
             state = "terminée" if s_["done"] else (f"étape {s_['step']} — {s_['title']}" if s_["started"] else "pas démarrée")
             deps = f" (après {', '.join(s_['depends_on'])})" if s_["depends_on"] else ""
-            print(f"sous-feature {s_['index']}/{len(c.p['split'])} : {s_['name']}{deps} — {state}")
+            epic = " · ".join(x for x in (s_["tracked"], s_["ticket"], s_["mr"]) if x)
+            print(f"sous-feature {s_['index']}/{len(c.p['split'])} : {s_['name']}{deps} — {state}" + (f" [{epic}]" if epic else ""))
     if c.p.get("parent"):
         pp, _ = find_pipeline(c, c.p["parent"])
         names = [x.get("name") for x in (pp or {}).get("split") or []]

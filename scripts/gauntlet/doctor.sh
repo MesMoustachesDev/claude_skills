@@ -71,6 +71,18 @@ run_doctor() {
     project) need "brick projet ./bricks/feature" test -f "$PROJECT_ROOT/bricks/feature/brick.yaml" ;;
     *)       need "brick global ~/.claude/bricks/flutter_feature" test -f "$HOME/.claude/bricks/flutter_feature/brick.yaml" ;;
   esac
+  # Tracker des tickets (~/.claude/pipeline/tracker.md). Vide = défaut (gitlab si le remote l'est, sinon none).
+  case "$(cfg tracker)" in
+    ""|none) ok "tracker : $(cfg tracker none)" ;;
+    gitlab)
+      need "tracker gitlab : glab authentifié — glab auth login" glab auth status
+      if [ -n "$(cfg tracker.gitlab.project)" ]; then
+        need "tracker gitlab : projet $(cfg tracker.gitlab.project) accessible" \
+          sh -c "cd '$PROJECT_ROOT' && glab repo view '$(cfg tracker.gitlab.project)' -F json"
+      fi ;;
+    notion) need "tracker notion : tracker.notion.database renseigné — /feature init" test -n "$(cfg tracker.notion.database)" ;;
+    *) ko "tracker inconnu : $(cfg tracker) (gitlab | notion | none)"; DOCTOR_RC=1 ;;
+  esac
 
   section "plateformes QA"
   for p in $(cfg_list qa.platforms); do

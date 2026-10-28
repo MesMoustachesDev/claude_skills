@@ -8,7 +8,14 @@
    détecte `.fvmrc`), `base_branch` (détecte `develop`/`main`), plateformes QA, `android.app_id`
    (lis `android/app/build.gradle*` → `applicationId`), `ios.app_id` (lis `ios/Runner.xcodeproj/project.pbxproj`
    → `PRODUCT_BUNDLE_IDENTIFIER`), AVD (`emulator -list-avds`), simulateur (`xcrun simctl list devices available`),
-   feature de référence, commandes de build si flavors. Écris les valeurs dans le bloc `ini`.
+   feature de référence, commandes de build si flavors, et le **tracker** (`~/.claude/pipeline/tracker.md`) :
+   backend (détecté : `gitlab` si `glab repo view` réussit, sinon `none` ; `notion` au choix), projet
+   GitLab des tickets s'il diffère du code (une règle projet qui le cite, comme `create_mr_rules.md`,
+   donne la réponse), base Notion (« Créer <Projet> — Roadmap » / « Coller l'URL d'une base »).
+   Écris les valeurs dans le bloc `ini`.
+   Projet déjà configuré mais sans clé `tracker` : pose seulement ces questions-là et ajoute la section
+   du template. Créer la base Notion est une écriture externe : nom, schéma et emplacement montrés et
+   validés avant (`tracker.md`, backend `notion`).
    `riverpod_major` : lis `pubspec.lock` (`riverpod:` → `version:`), pas le pubspec — c'est la version
    résolue qui compte. Si le projet est en 2.x, dis-le : le global vise Riverpod 3, le brick génère la
    forme 2.x tant que le projet n'a pas migré, et `pub_health` le rappellera à chaque feature.
