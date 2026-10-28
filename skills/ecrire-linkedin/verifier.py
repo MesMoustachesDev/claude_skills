@@ -50,6 +50,9 @@ if re.search(r"(^|\s)#\w", texte):
 cherche([r"runrox[^.\n]{0,40}flutter", r"flutter[^.\n]{0,40}runrox"], erreurs, "RunRox n'est pas en Flutter")
 cherche([r"\baudin\b", r"my-?center", r"\bwifirst\b"], erreurs, "client cité par son nom")
 cherche([r"\[à compléter", r"\[x\]", r"\btodo\b", r"\[\.\.\.\]"], erreurs, "trou laissé dans le texte")
+cherche([r"\d[\d  .]*\s?k?\s(vues|votes|upvotes|likes|réactions|points|impressions|abonnés)\b",
+         r"\d[\d  .]*\s?k?\s(commentaires|reposts|partages)\b"],
+        erreurs, "chiffre d'audience d'une source (on s'en fout)")
 
 # Tournures IA, communes à tout
 TOURNURES = [

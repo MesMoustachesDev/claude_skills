@@ -10,6 +10,7 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 - Pas de données perso : emails, identifiants, noms de proches.
 - Hors de mon périmètre technique, je ne fais pas l'expert : je raconte en curieux.
 - Les chiffres et citations d'une source externe : la source est nommée (subreddit, rapport, site).
+- Jamais de chiffres d'audience d'une source : pas de « le post fait 68 000 vues », « 1 000 votes sur Reddit », « 365 points sur Hacker News ». On s'en fout. Ça sert à choisir l'idée, pas à l'écrire. Pareil pour le détail de la source qui n'apporte rien (qui a posté, techno, durée et conditions d'une mission) : on garde seulement ce qui sert le propos.
 
 ## La forme
 
