@@ -179,6 +179,8 @@ warn() { printf '[WARN] %s\n' "$*"; }
 sdk_ok=1
 if [[ "$FLUTTER" == fvm* ]]; then
   for rc in $(find "$wt" -maxdepth 3 -name .fvmrc -not -path '*/.git/*' 2>/dev/null); do
+    # A submodule (its own .git, e.g. a design system) pins its own SDK: it does not build the app.
+    d="$(dirname "$rc")"; [ "$d" != "$wt" ] && [ -e "$d/.git" ] && continue
     v="$(jq -r '.flutter // empty' "$rc" 2>/dev/null)"; [ -n "$v" ] || continue
     if [ ! -d "$HOME/fvm/versions/$v" ]; then
       if [ "$install_sdk" = 1 ]; then echo "fvm install ${v}…" >&2; fvm install "$v" >"$out/fvm_install.log" 2>&1 || { ko "sdk : fvm install $v a échoué (voir $out/fvm_install.log)" | tee -a "$report"; sdk_ok=0; }

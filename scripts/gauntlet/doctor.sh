@@ -64,6 +64,9 @@ run_doctor() {
   need "package_path défini" test -n "$(cfg package_path)"
   need "base_branch existe ($BASE_BRANCH)" git -C "$PROJECT_ROOT" rev-parse --verify "$BASE_BRANCH"
   need "create_feature_rules.md présent" test -f "$PROJECT_ROOT/.claude/rules/create_feature_rules.md"
+  # Le gate coverage écrit <package>/coverage/lcov.info : non ignoré, il finit dans un commit ou une revue.
+  need ".gitignore ignore coverage/ (lcov du gate coverage) — /feature init" \
+    git -C "$PROJECT_ROOT" check-ignore -q --no-index "$(cfg package_path | sed 's/{name}/x/')/coverage/lcov.info"
   case "$(cfg brick global)" in
     project) need "brick projet ./bricks/feature" test -f "$PROJECT_ROOT/bricks/feature/brick.yaml" ;;
     *)       need "brick global ~/.claude/bricks/flutter_feature" test -f "$HOME/.claude/bricks/flutter_feature/brick.yaml" ;;

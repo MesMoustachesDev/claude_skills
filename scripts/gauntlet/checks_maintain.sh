@@ -244,7 +244,8 @@ check_barrel_api() {
   local barrel="$PKG_DIR/lib/$PKG_NAME.dart" bad
   is_app_package && { info "package applicatif (lib/main.dart), pas de barrel"; return 0; }
   [ -f "$barrel" ] || { ko "barrel absent : lib/$PKG_NAME.dart"; return 1; }
-  bad="$(grep -nE "^export '.*(src/data/|_impl\.dart)" "$barrel")"
+  # Existing leaks marked `// gauntlet-ignore: …` are debt, not a feature regression.
+  bad="$(grep -nE "^export '.*(src/data/|_impl\.dart)" "$barrel" | grep -v "$IGNORE_MARK")"
   [ -z "$bad" ] && { info "barrel : $(grep -c '^export' "$barrel") export(s), aucune fuite de la couche data"; return 0; }
   printf '%s\n' "$bad" | sed 's/^/   ✗ /'; ko "le barrel exporte la couche data ou une implémentation"
   return 1

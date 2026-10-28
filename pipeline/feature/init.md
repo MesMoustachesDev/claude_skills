@@ -26,7 +26,8 @@
    `brick = global`. Dans les deux cas : `mason add -g <nom> --path <chemin>` si `mason` est installé.
    S'il ne l'est pas, donne la commande `dart pub global activate mason_cli` et continue : Arthur
    sait scaffolder à la main.
-5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html` et `.claude/features/.current`
+5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html`,
+   `.claude/features/.current` et `coverage/` (le gate coverage écrit `<package>/coverage/lcov.info`)
    s'ils n'y sont pas.
 6. `gauntlet.sh doctor` à nouveau. Tant qu'il est rouge, corrige ou demande. Résume ce qui a été créé.
 

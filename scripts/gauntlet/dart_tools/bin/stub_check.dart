@@ -71,9 +71,12 @@ void main(List<String> args) {
       violations.add('$rel : fichier introuvable');
       continue;
     }
+    // Same as dup_check: syntax the latest language version rejects but the project's version accepts
+    // (e.g. `final` on a parameter) must not crash the check; `analyze` owns compilation errors.
     final unit = parseFile(
       path: abs,
       featureSet: FeatureSet.latestLanguageVersion(),
+      throwIfDiagnostics: false,
     ).unit;
     final visitor = _StubVisitor(rel, unit, scope, _baseNames(baseDir, rel));
     unit.accept(visitor);

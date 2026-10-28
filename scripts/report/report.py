@@ -950,7 +950,13 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     mapping = [m for m in archi.get("sequences") or [] if isinstance(m, dict)] or [
         {"id": f"S{i}", "scenario": p.get("title"), "kind": p.get("kind"), "fr": p.get("fr")}
         for i, p in enumerate(archi.get("scenarios") or [], 1) if isinstance(p, dict)]
-    tests = test_sequences(root, pkg_rel) if has_tests else None
+    # Acceptance scenarios may also live in other packages (pipeline.json → acceptance_packages)
+    accept_pkgs = [pkg_rel] + [p for p in state.get("acceptance_packages") or [] if p != pkg_rel]
+    tests = None
+    if has_tests:
+        tests = {}
+        for ap in accept_pkgs:
+            tests.update(test_sequences(root, ap))
     # au cadrage (pas encore de lien avec §4 ni de test), les séquences sont dans la section Cadrage
     if mapping or tests is not None:
         sq_html, sq_badge = sequences_section(cad, mapping, tests, secs.get("4"))
@@ -966,6 +972,9 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
 
     # Scénarios d'acceptation : ce qui sera testé
     inv_rows, feat_scen = test_inventory(root, pkg_rel) if has_code else ([], [])
+    for ap in accept_pkgs[1:]:
+        if has_code and os.path.isdir(os.path.join(root, ap, "test")):
+            feat_scen = list(feat_scen) + list(test_inventory(root, ap)[1])
     picks = [{"title": m.get("scenario"), "kind": m.get("kind"), "fr": m.get("fr")} for m in mapping]
     sc_html, sc_badge = scenarios_section(secs.get("4"), picks, {norm(x) for x in feat_scen} if feat_scen else None)
     if secs.get("4"):
