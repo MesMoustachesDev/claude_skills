@@ -33,7 +33,22 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
 [ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
 [ -n "$feature" ] || deny "pipeline : feature courante inconnue (branche feature/<nom> ou .claude/features/.current)"
-init_project_context "$feature" 2>/dev/null || deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
+# Create mode before Arthur's scaffold: the package does not exist yet and init_project_context would die
+# (exit 2 inside the function, so `|| deny` never runs and every write is blocked). Only the specifier
+# (cadrage, spec) and the architect (scaffold) may write until the package exists.
+pkg_planned="$(jq -r '.package // empty' "$PROJECT_ROOT/.claude/features/$feature/pipeline.json" 2>/dev/null)"
+pkg_planned="${pkg_planned%/}"
+if [ -n "$pkg_planned" ] && [ ! -d "$PROJECT_ROOT/$pkg_planned" ]; then
+  case "$agent" in
+    feature-specifier|feature-architect) ;;
+    *) deny "pipeline : le package $pkg_planned n'existe pas encore (mode create, avant le scaffold d'Arthur)." ;;
+  esac
+  CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/rules/feature_pipeline.md}"
+  [ -f "$CFG_FILE" ] || deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
+  PKG_REL="$pkg_planned"
+else
+  init_project_context "$feature" 2>/dev/null || deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
+fi
 
 # chemin absolu canonique (le fichier ou ses dossiers parents peuvent ne pas exister encore)
 normalize() {
