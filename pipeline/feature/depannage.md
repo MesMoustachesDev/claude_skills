@@ -28,9 +28,10 @@
   vraiment (`ps`), sinon arrête l'agent et relance.
 - **Hook d'écriture qui refuse un fichier attendu.** `writes.extra` est un glob : un dossier ou un
   submodule s'écrit `x/**` (pas `x`). Les `test/` et `pubspec.yaml` des packages `<pkg>/lib/**` de
-  `writes.extra` sont autorisés aux tests. Ne jamais contourner le hook par le shell : corriger la
-  config (chemins touchés par la spec et les contrats validés : sans demander, règle du dev ; tout
-  autre chemin : avec son accord).
+  `writes.extra` sont autorisés aux tests. Ne jamais contourner le hook par le shell : ouvrir la zone
+  pour cette feature, `pipeline.sh extra <nom> "<glob>"` (guillemets : sinon le shell développe `**`) (chemins touchés par la spec et les contrats
+  validés : sans demander, règle du dev ; tout autre chemin : avec son accord). La config du projet
+  (`writes.extra` de `feature_pipeline.md`) ne garde que les zones que toutes les features touchent.
 - **Captures QA perdues après un second run.** Cause : `gauntlet.sh qa` effaçait `qa/<plateforme>/*.png`
   à chaque lancement, et le hook de fin de Quentin le relance. En place : le run précédent (captures,
   `report.xml`, `maestro.log`) est déplacé dans `qa/<plateforme>/_runs/<date>/`, jamais effacé.

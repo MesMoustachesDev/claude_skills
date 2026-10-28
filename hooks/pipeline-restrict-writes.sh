@@ -49,7 +49,8 @@ PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd -P)"
 rel="${abs#$PROJECT_ROOT/}"
 
 FEAT_REL=".claude/features/$feature"
-extra="$(cfg_list writes.extra | tr '\n' ' ')"   # zones supplémentaires (router, l10n…), config projet
+FEATURE_DIR="${FEATURE_DIR:-$PROJECT_ROOT/$FEAT_REL}"
+extra="$(writes_extra | tr '\n' ' ')"   # zones supplémentaires : config projet (router, l10n…) + pipeline.json de la feature
 
 # match <chemin> <glob>... — case avec * traversant /
 match() { local p="$1"; shift; local g; for g in "$@"; do g="${g//\*\*/\*}"; case "$p" in $g) return 0;; esac; done; return 1; }

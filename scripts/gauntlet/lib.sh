@@ -256,6 +256,12 @@ cfg_list() { cfg "$1" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
 # pipeline_get <clé jq> — lit .claude/features/<feature>/pipeline.json
 pipeline_get() { [ -f "$FEATURE_DIR/pipeline.json" ] && jq -r "$1 // empty" "$FEATURE_DIR/pipeline.json"; }
 
+# writes_extra — zones d'écriture hors du package, une par ligne : celles du projet (feature_pipeline.md →
+# writes.extra : router, l10n…, permanentes) puis celles de la feature (pipeline.json → writes_extra, posées
+# par `pipeline.sh extra`, qui disparaissent avec elle). Une zone ouverte pour une seule feature ne va jamais
+# dans la config du projet.
+writes_extra() { { cfg_list writes.extra; pipeline_get '.writes_extra[]?'; } | grep -v '^$' | awk '!seen[$0]++'; }
+
 # ---------------------------------------------------------------------------
 # Fichiers
 # ---------------------------------------------------------------------------

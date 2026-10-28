@@ -10,7 +10,7 @@ Thibault qui ne tient pas (type absent, conflit de nom) → **point imprévu** :
 du fichier, « je corrige mon contrat » / « Arthur s'adapte sans toucher à mes signatures ».
 
 Pas de point d'étape : la structure est celle que Thibault a écrite. Commit :
-`git add -A <package> pubspec.yaml <writes.extra de la config> && git commit -m "feat(<nom>): scaffold"`.
+`git add -A <package> pubspec.yaml <zones de pipeline.sh extra <nom>> && git commit -m "feat(<nom>): scaffold"`.
 
 **Gabarit S :** identique (gate `contracts` d'intégrité). **En L :** n'a pas lieu.
 

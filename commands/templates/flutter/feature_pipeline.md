@@ -27,8 +27,9 @@ brick = global
 # Majeure de Riverpod réellement résolue (pubspec.lock, détectée par /feature init). Le brick génère
 # Provider(isAutoDispose: true) en 3, Provider.autoDispose en 2.
 riverpod_major = 3
-# Zones d'écriture supplémentaires pour architect/implementer/cleaner, hors du package feature
-# (enregistrer une route, ajouter des clés l10n…). Globs relatifs à la racine du repo.
+# Zones d'écriture supplémentaires pour architect/implementer/cleaner, hors du package feature, ouvertes
+# à TOUTES les features (enregistrer une route, ajouter des clés l10n…). Globs relatifs à la racine du repo.
+# Une zone dont une seule feature a besoin va dans son pipeline.json : `pipeline.sh extra <nom> <glob>`.
 writes.extra = features/router/**, features/l10n/lib/**
 
 # ---------------------------------------------------------------------------

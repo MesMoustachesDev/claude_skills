@@ -107,6 +107,15 @@ class Ctx:
         return [v.strip() for v in self.cfg(key).split(",") if v.strip()]
 
     @property
+    def writes_extra(self):
+        """Zones hors package : config du projet (permanentes) puis pipeline.json → writes_extra (cette feature)."""
+        out = []
+        for g in self.cfg_list("writes.extra") + list(self.p.get("writes_extra") or []):
+            if g not in out:
+                out.append(g)
+        return out
+
+    @property
     def size(self):
         return self.p.get("size") or "M"
 
@@ -424,6 +433,20 @@ def cmd_set(c, args):
     print(f"{key} écrit")
 
 
+def cmd_extra(c, args):
+    """Ouvre des zones d'écriture pour cette feature seulement ; sans argument, liste les zones en vigueur."""
+    feat = c.p.setdefault("writes_extra", [])
+    for g in args:
+        if g not in c.cfg_list("writes.extra") and g not in feat:
+            feat.append(g)
+    if args:
+        c.save()
+    for g in c.cfg_list("writes.extra"):
+        print(f"{g}  (projet)")
+    for g in feat:
+        print(f"{g}  (feature)")
+
+
 def cmd_say(c, args):
     args, ask = parse_ask(args)
     c.p.setdefault("cockpit", {})["ask"] = ask
@@ -526,7 +549,7 @@ def allowed_for_commit(c, f):
         roots |= {f"{app}/pubspec.yaml", f"{app}/pubspec.lock"}
     if f.startswith(c.package + "/") or f in roots:
         return True
-    for g in c.cfg_list("writes.extra"):
+    for g in c.writes_extra:
         if fnmatch.fnmatch(f, g) or (g.endswith("/**") and f.startswith(g[:-2])):
             return True
     return False
@@ -909,7 +932,7 @@ def cmd_cockpit_page(c, args):
 
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass,
-    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "say": cmd_say,
+    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
     "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,

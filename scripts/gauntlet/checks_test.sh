@@ -272,7 +272,7 @@ extra_packages() {
     d="${g%%\**}"; d="${d%/}"
     while [ -n "$d" ] && [ "$d" != . ] && [ ! -f "$PROJECT_ROOT/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done
     [ -n "$d" ] && [ "$d" != . ] && [ "$d" != "$PKG_REL" ] && printf '%s\n' "$d"
-  done < <(cfg_list writes.extra) | sort -u
+  done < <(writes_extra) | sort -u
 }
 # mutation_extra_report — mutation only runs on the feature package. Logic files (mutation.include) the
 # feature changed in a writes.extra package are listed, never silently dropped: their tests are not proven by

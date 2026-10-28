@@ -14,6 +14,8 @@
 #   pipeline.sh loop <nom> <boucle>              loops.<boucle> += 1 ; exit 3 au-delà du plafond
 #   pipeline.sh debt <nom> <source> <fichier> "<problème>" [--line N]
 #   pipeline.sh accept <nom> <étape> "<raison>"  trace une acceptation du dev (evidence)
+#   pipeline.sh extra <nom> [glob…]               zones d'écriture hors package pour cette feature (pipeline.json →
+#                                                writes_extra) ; glob entre guillemets ; sans glob, liste projet + feature
 #   pipeline.sh set <nom> <clé.pointée> <json>   écriture libre (ex. suggestions.S1 '{"decision":"applied"}')
 #   pipeline.sh after-architect <nom>            après chaque retour d'Arthur avant l'étape 2 (0c, 0e)
 #   pipeline.sh contracts-files <nom>            recalcule contracts.files (arbre de travail)

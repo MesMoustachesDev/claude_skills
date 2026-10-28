@@ -18,7 +18,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 - Crée les commits du plan sans demander de validation : ils sont locaux et réversibles, le plan va dans l'evidence. Le push et la MR restent soumis à sa validation. (2026-10-17, « Commits », 11 réponses « Go » sur 11)
 - Applique le gabarit S ou M qui sort des critères sans le demander, annoncé en une ligne avec ses mesures ; ne pose que la question du découpage quand le gabarit est L. (2026-10-17, « Gabarit », 8 sur 8)
 - Sans référence d'issue dans la description, passe l'issue en `to_create` sans demander s'il en existe une ; le contenu de l'issue reste validé avant sa création. (2026-10-17, « Issue », 7 sur 7)
-- Ajoute à `writes.extra` les chemins que la spec et les contrats validés touchent (leurs `test/` compris) sans demander, et dis-le en une ligne ; corrige le hook global quand il contredit son propre commentaire. (2026-10-17, « writes.extra » et « Hook », 11 sur 11)
+- Ouvre pour la feature (`pipeline.sh extra <nom> <glob>`, jamais la config `writes.extra` du projet) les chemins que la spec et les contrats validés touchent (leurs `test/` compris) sans demander, et dis-le en une ligne ; corrige le hook global quand il contredit son propre commentaire. (2026-10-17, « writes.extra » et « Hook », 11 sur 11)
 
 ## Gates et seuils
 
