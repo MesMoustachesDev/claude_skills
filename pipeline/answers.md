@@ -17,6 +17,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 
 - Crée les commits du plan sans demander de validation : ils sont locaux et réversibles, le plan va dans l'evidence. Le push et la MR restent soumis à sa validation. (2026-10-17, « Commits », 11 réponses « Go » sur 11)
 - Applique le gabarit S ou M qui sort des critères sans le demander, annoncé en une ligne avec ses mesures ; ne pose que la question du découpage quand le gabarit est L. (2026-10-17, « Gabarit », 8 sur 8)
+- Une feature qui ne touche les autres packages que par des ajouts mécaniques (param optionnel, une ligne) reste en M au lieu de passer en L. (2026-10-19, « Gabarit »)
 - Sans référence d'issue dans la description, passe l'issue en `to_create` sans demander s'il en existe une ; le contenu de l'issue reste validé avant sa création. (2026-10-17, « Issue », 7 sur 7)
 - Ouvre pour la feature (`pipeline.sh extra <nom> <glob>`, jamais la config `writes.extra` du projet) les chemins que la spec et les contrats validés touchent (leurs `test/` compris) sans demander, et dis-le en une ligne ; corrige le hook global quand il contredit son propre commentaire. (2026-10-17, « writes.extra » et « Hook », 11 sur 11)
 
@@ -24,12 +25,15 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 
 - Couverture sous le seuil avant l'étape de mutation : Hugo couvre, sans question. (2026-10-17, « Couverture », 4 sur 4)
 - Lignes non couvertes qui ne sont que du code existant déplacé, reformaté, ou de la DI ; `metrics` au-dessus du seuil sur une signature qui existait avant la feature ; `stub_check` rouge sur du code inchangé et déjà validé : accepte, note-le en dette, ne demande pas. Reste une question : une ligne de code neuf non couverte après le passage de Hugo. (2026-10-17, « Couverture », « Métriques », « stub_check », 12 cas)
-- Faux positif du gauntlet : corrige le gauntlet ou le script global (avec le diff montré), jamais une acceptation du rouge feature par feature. (2026-10-17, « Gauntlet », 5 sur 5)
+- Faux positif du gauntlet : corrige le gauntlet ou le script global (avec le diff montré), jamais une acceptation du rouge feature par feature. (2026-10-17, « Gauntlet », 5 sur 5) Exception : la règle `stub_check` à périmètre vide ci-dessous.
+- En extend, quand les contrats n'ajoutent que des champs ou paramètres (aucune méthode), accepte `stub_check` sans demander ; l'acceptation reste tracée dans l'evidence. (2026-10-19, « stub_check »)
+- Accepte `red_check` sur les tests d'un code déjà réaligné par le commit de contrats, sans demander ; l'acceptation reste tracée dans l'evidence. (2026-10-19, « red_check »)
 - Ne demande pas de valider les mutants quand tous les survivants sont expliqués dans `mutants.md` : ils sont présentés dans la visite guidée. (2026-10-17, « Mutants », 6 sur 6)
 
 ## Tests
 
 - Un test faux pour une raison technique (assertion de record, step, fixture, constructeur à adapter à une signature) se corrige et se regèle sans demander, re-gel de cause `technique`. Demande seulement si la correction change le comportement attendu. (2026-10-17, « Test faux », 10 sur 10)
+- Une dev_dependency de test déjà résolue en transitif, à la même version, est acceptée sans question. (2026-10-21, fake_async)
 
 ## Périmètre et dette
 
