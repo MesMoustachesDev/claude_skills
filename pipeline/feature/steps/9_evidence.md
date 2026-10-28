@@ -79,6 +79,9 @@ Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · intern
 ## Captures                          ← chemins relatifs
 ```
 
+**9b. Learn.** `~/.claude/pipeline/learn.md`, en entier : extraire, étiqueter, proposer les récurrences à
+Thibault, appliquer ce qu'il retient. Ne bloque jamais la livraison.
+
 Puis, **dans cet ordre** : invoque la skill `create_commits` avec « sans validation » (elle découpe le
 travail restant en commits atomiques et les crée sans attendre : règle du dev ; le plan va dans
 l'evidence ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
@@ -89,7 +92,7 @@ validation du dev avant tout push ou création : tu ne les contournes pas.
 `pipeline.sh pass <nom> evidence`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
 pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter :
 `git worktree remove .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
-Termine par un résumé de 5 lignes et le chemin de l'evidence.
+Termine par un résumé de 5 lignes (la dernière : learn, règles ajoutées ou « aucune récurrence ») et le chemin de l'evidence.
 
 **Fin : la page de la feature.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh say <nom> ""`
 puis « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) — la carte de l'accueil passe dans

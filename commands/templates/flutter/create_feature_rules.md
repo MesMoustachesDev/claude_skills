@@ -525,3 +525,12 @@ Tirées de ses réponses aux pipelines (`~/.claude/pipeline/answers.md`). Elles 
 - Un package tiers déjà exposé par `core` s'importe via `core`, pas en dépendance directe.
 - Une nouvelle I/O transverse (détection ou ouverture d'app, plugin natif…) vit dans son propre package.
 - Avant de créer un mécanisme, chercher comment c'est déjà fait ailleurs dans le code et le réutiliser.
+
+## Leçons des runs
+
+Tirées des revues de `/feature` et `/fix` par learn (`~/.claude/pipeline/learn.md`) : chacune a coûté une boucle dans plusieurs runs.
+
+- Quand tu changes le comportement d'un symbole, mets à jour dans le même diff son commentaire, sa KDoc/dartdoc, le README du package et la doc projet qui le décrit : un commentaire qui décrit l'ancien comportement est un défaut. (learn 2026-10-27, stale_doc_after_change, 9 runs)
+- Une règle métier, une borne, une formule ou un mapping n'existe qu'à un endroit : cherche l'existant (grep du nombre, du nom) avant d'en écrire un ; deux mappings qui doivent rester synchrones deviennent une seule fonction. (learn 2026-10-27, duplicated_rule_constant, 7 runs)
+- Retire dans le même diff ce que ton changement rend inutile (variante, branche, paramètre, dépendance du pubspec, export) ; le barrel n'exporte que ce qu'un autre package consomme, jamais un état mutable ni une API dépréciée. (learn 2026-10-27, dead_code_after_change + barrel_overexport, 8 runs)
+- Un invariant non évident (deux codes à garder synchrones, une borne imposée par une API, un choix qui déroge à l'archi) est écrit en une ligne de commentaire là où on pourrait le casser. (learn 2026-10-27, invariant_not_documented, 2 runs)

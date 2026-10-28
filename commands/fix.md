@@ -50,6 +50,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 | Rapport pour le dev | `~/.claude/scripts/fix_gauntlet.sh report <nom> <étape>` → `.claude/fixes/<nom>/report.html` |
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
+| Learn (récurrences → règles) | `~/.claude/pipeline/learn.md` · `~/.claude/scripts/learn.py` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` |
 | Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se font **depuis la page** (« Répondre depuis la page ») : là où ce fichier dit `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte dans la session, sans bloquer |
@@ -221,7 +222,9 @@ propre classification : critique, bloquant, erreur) comptent comme des critiques
   (`{at, files, reason: "suggestion S1 retenue par le dev"}` : le plan validé ne les couvrait pas),
   `SendMessage` à Fanny avec leur bloc complet et la nuance du dev, puis gate green, puis revue à
   nouveau (`loops.review += 1`). Une suggestion déjà tranchée ne se repose pas.
-- Critiques → `loops.review += 1`. Si ≤ 2 : `SendMessage` à Fanny (ou un neuf si injoignable)
+- Critiques → copie d'abord `review.json` en `.claude/fixes/<nom>/history/review_<n>.json` (`n` = la
+  valeur de `loops.review` après incrément) : la passe suivante l'écrase, et learn en a besoin.
+  `loops.review += 1`. Si ≤ 2 : `SendMessage` à Fanny (ou un neuf si injoignable)
   avec la liste `critical` et leurs `fix`, puis gate green, puis revue à nouveau. Au-delà : point d'étape
   hors plan avec les critiques persistantes.
 - `plan_respected` ≠ `yes` sans critique `fix: plan` (Victor l'a jugé acceptable) : tu le
@@ -271,7 +274,8 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ```
 
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il
-n'est pas commité). Puis invoque la skill `create_commits` avec « sans validation » (règle du dev : commits créés sans
+n'est pas commité). **Learn** : `~/.claude/pipeline/learn.md`, en entier (extraire, étiqueter,
+proposer les récurrences, appliquer ce que le dev retient ; ne bloque jamais la livraison). Puis invoque la skill `create_commits` avec « sans validation » (règle du dev : commits créés sans
 attendre, plan dans l'evidence ; le commit de gel existe déjà ; elle découpe la correction et
 l'evidence). Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
 `create_mr` au dev, avec l'issue liée (`issue.md`, partie C), qui
@@ -288,7 +292,8 @@ carte de l'Accueil passe dans « Terminées », avec la cause racine. Puis un se
 page-deleted <nom>`, puis `push` et le seul `batch` de `hub_writes` sur l'Accueil : la carte reste, marquée
 « Page supprimée ». Ne supprime jamais la page sans cette question, ni l'Accueil, jamais.
 
-Termine par 5 lignes : cause, pourquoi raté, test, correction, chemin de l'evidence. Si la cause
+Termine par 6 lignes : cause, pourquoi raté, test, correction, learn (règles ajoutées ou « aucune
+récurrence »), chemin de l'evidence. Si la cause
 racine révèle un piège non évident du projet (un comportement d'API, un invariant), propose en une
 ligne de l'enregistrer en mémoire.
 

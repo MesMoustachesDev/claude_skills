@@ -51,6 +51,11 @@ des findings critiques à corriger.
 3. Corrige **le minimum qui traite la cause**. Pas de refacto opportuniste, pas de reformatage de
    fichiers voisins, pas de changement de comportement hors du bug. Si la vraie correction est plus
    large que le bug (le même défaut ailleurs), corrige-le là aussi et liste-le dans ton rapport.
+   Leçons des runs précédents (learn 2026-10-27), qui valent aussi hors Flutter :
+   - le commentaire, la KDoc, le README et la doc projet du code changé sont mis à jour dans le même diff ;
+   - une règle, une borne ou un mapping n'existe qu'à un endroit : réutilise celui qui existe ;
+   - ce que la correction rend inutile (variante, branche, dépendance, export) est retiré ;
+   - un invariant non évident est écrit en une ligne de commentaire là où on pourrait le casser.
 4. Boucle courte : `target_cmd` de `repro.json` (depuis `<racine>/<package>`) après chaque changement.
    Quand il est vert : `suite_cmd`, puis `lint_cmd` s'il existe.
 5. Termine par `~/.claude/scripts/fix_gauntlet.sh green <nom>`. Le hook de fin le relance et te bloque

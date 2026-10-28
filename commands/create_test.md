@@ -19,6 +19,10 @@ Tu es un expert en testing Flutter/Dart. Tu écris des tests qui valident le **c
 4. **Noms de tests = documentation** — `'returns empty list when audit has no reports'` > `'test getReports'`
 5. **Pas de tests cosmétiques** — Zéro test juste pour gonfler la couverture. Un test qui `expect(result, isNotNull)` sans vérifier le contenu est un déchet.
 6. **Mock aux frontières** — Mocker les repositories et services (frontière du système), pas les classes internes.
+7. **Le fake tient le contrat du SDK, pas celui du code** — Un fake de SDK ou de plateforme reproduit le contrat documenté de la vraie dépendance, pas ce que le code attend : null ou vide, événements groupés, callbacks répétés ou dans un autre ordre, exceptions du constructeur, limites de volume. Cite la doc dans le test. (learn 2026-10-27, sdk_contract_assumed, 9 runs)
+8. **Le câblage se teste** — Chaque câblage ajouté ou modifié (provider DI, callback passé à une page, route, page montée dans un parent) a un test qui construit le vrai provider ou monte la vraie page, sans le surcharger en entier. (learn 2026-10-27, wiring_untested, 5 runs)
+9. **Caractériser avant de déplacer** — Le code existant que le changement déplace ou découpe (listé en §8 de la spec) reçoit d'abord des tests de caractérisation de son comportement actuel ; le refactor se fait ensuite, sous ces tests. (learn 2026-10-27, refactor_moved_code_without_tests, 4 runs)
+10. **Un champ de `props`, un test d'égalité** — Un champ ajouté aux `props` d'une entité, d'un event ou d'un état Equatable a un test : deux instances qui ne diffèrent que par ce champ ne sont pas égales. (learn 2026-10-27, equatable_props_untested, 2 runs)
 
 ---
 

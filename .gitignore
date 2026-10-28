@@ -21,3 +21,6 @@ __pycache__/
 
 # Weekly extract of Claude sessions, contains client names.
 /skills/idees-posts/semaine.txt
+
+# Learn ledger: review excerpts from client projects.
+/pipeline/lessons/

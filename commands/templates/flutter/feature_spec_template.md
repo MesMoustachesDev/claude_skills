@@ -78,6 +78,8 @@
   exécutés via bdd_widget_test, puis rejoués sur device via Maestro.
 
   - Un scénario = un comportement observable par l'utilisateur.
+  - La phrase d'un scénario ne promet que ce que ses steps vérifient. Chaque step est déclarée, n'a
+    qu'une lecture, Given pour un état, Then pour un résultat observable. (learn 2026-10-27, spec_scenario_overclaims + bdd_step_semantics)
   - Un scénario par comportement C<n> du cadrage, qui reprend chaque étape de sa séquence
     (action, réponse du serveur, résultat visible) ; archi.json → sequences les relie.
   - Couvrir chaque item de la section 2 "Inclus".
@@ -196,6 +198,7 @@ N/A
 - **Dépendances hébergées ajoutées** (pub.dev) : aucune | `{package}` — pourquoi, dernière release le {date}, alternative rejetée
 - **Direction des couches** : `presentation → domain ← data`, `injection → *`. Aucune exception.
 - **DI** (Riverpod, `lib/src/injection/{feature_name}_di.dart`) : providers privés pour data sources et repository, publics pour use cases et BLoC.
+- **Code existant déplacé ou découpé** : aucun | `fichier:symbole` — testé : oui / non (non → tests de caractérisation écrits d'abord, `create_test.md` §9). (learn 2026-10-27, refactor_moved_code_without_tests)
 - **Routes** (`features/router`) : 
 - **Clés l10n** (`features/l10n`, ARB) : 
 - **Events analytics** (`package:core/analytics.dart`) : 

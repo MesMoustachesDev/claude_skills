@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -39,6 +40,8 @@ ORDER = [
 ]
 DONE = {"PASSED", "SKIPPED"}
 LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "tests": 2, "review": 2, "dedup_clean": 2, "tour": 2, "polish": 2}
+# Verdict archivé dans history/ à chaque boucle (lu par learn.py).
+LOOP_VERDICT = {"spec": "spec_review.json", "tests": "tests_review.json", "review": "review.json", "dedup_clean": "dedup.json"}
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
 GATE_LABELS = {
     "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Spec validée",
@@ -394,6 +397,13 @@ def cmd_loop(c, args):
     loops = c.p.setdefault("loops", {})
     loops[name] = loops.get(name, 0) + 1
     c.save()
+    # Le verdict qui déclenche la boucle sera écrasé par la passe suivante : on le garde pour learn.py.
+    verdict = LOOP_VERDICT.get(name)
+    if verdict and os.path.isfile(os.path.join(c.dir, verdict)):
+        hist = os.path.join(c.dir, "history")
+        os.makedirs(hist, exist_ok=True)
+        stem = verdict.rsplit(".", 1)[0]
+        shutil.copyfile(os.path.join(c.dir, verdict), os.path.join(hist, f"{stem}_{loops[name]}.json"))
     if loops[name] > mx:
         print(f"loops.{name} = {loops[name]} > {mx} : plafond dépassé, plus de relance — montre les bloquants à Thibault, il tranche")
         sys.exit(3)

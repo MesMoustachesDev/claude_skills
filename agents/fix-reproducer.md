@@ -157,6 +157,9 @@ approches se valent vraiment, choisis-en une et mets l'autre en `rejected` : le 
 ## Ce qui n'est PAS la cause   hypothèses écartées et la preuve qui les écarte (un `graphify path` est un indice, jamais une preuve)
 ## Plan de correction  couche, approche, fichiers, alternative écartée et pourquoi (= fix_plan),
                       plus un schéma Mermaid du flux : où naît le bug, où agit la correction
+## Autres occurrences   le motif fautif cherché ailleurs (grep de l'appel, de la branche sœur, du type voisin) :
+                      chaque occurrence est dans le plan ou écartée avec sa raison ; « aucune » dit ce que tu as cherché
+                      (learn 2026-10-27, fix_same_bug_elsewhere, 4 runs)
 ```
 
 **Gate** (`~/.claude/scripts/fix_gauntlet.sh red <nom>`, relancé par le hook de fin) : seuls des
