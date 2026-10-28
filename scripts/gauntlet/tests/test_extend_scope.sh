@@ -55,8 +55,11 @@ echo "stub_check — rejeu après une passe implémentée"
 cat > "$R/$F/feat/lib/src/data/foo_impl.dart" <<'EOF'
 class Foo {
   int a() => 1;
+  int c() => 2;
 }
 EOF
+# a() existed on develop (base version, not a new contract: stub_check skips it); c() is pass 1's own
+# contract, implemented, so without pass_base it is judged and fails.
 cat > "$R/$F/feat/test/foo_test.dart" <<'EOF'
 // pass 1 test, green since pass 1 was implemented
 EOF
