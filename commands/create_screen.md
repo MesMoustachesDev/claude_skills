@@ -92,8 +92,9 @@ Applique les templates du fichier de règles en respectant :
 1. La **structure de dossiers** définie
 2. Les **conventions de nommage**
 3. Les **conventions visuelles** (design system, pas de valeurs magiques, pas de strings hardcodées)
-4. Le **découpage en composants** (règle des 30 lignes ou équivalent)
-5. La **gestion des états** sélectionnée (Loading / Error / Empty / Loaded)
+4. L'**anatomie de page** du projet (même squelette, espacements, états et action principale que les autres écrans)
+5. Le **découpage en composants** (règle des 30 lignes ou équivalent)
+6. La **gestion des états** sélectionnée (Loading / Error / Empty / Loaded)
 
 Chaque composant extrait va dans son propre fichier selon les règles.
 

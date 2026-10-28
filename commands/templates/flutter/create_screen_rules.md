@@ -30,6 +30,7 @@ Avant de poser des questions, scanne le projet :
 - Dossiers : `design_system/`, `theme/`, packages dédiés (`hades/`, `ui_kit/`, etc.)
 - Fichiers : `*theme*.dart`, `*colors*.dart`, `*typography*.dart`, `*spacing*.dart`
 - Usages : `Theme.of(context)`, extensions de `ThemeData`, tokens custom
+- Anatomie : section **Anatomie du projet** du `create_screen_rules.md` du repo, sinon widgets de page / états déjà réutilisés par plusieurs écrans (`grep` des classes qui enveloppent `Scaffold`, des vues Loading / Error / Empty)
 
 ### State Management
 
@@ -137,7 +138,92 @@ Chaque widget extrait = `StatelessWidget` (ou `ConsumerWidget` si Riverpod) dans
 
 ---
 
+## Anatomie de page
+
+> **Les tokens rendent un écran cohérent avec le DS. L'anatomie le rend cohérent avec les autres écrans.**
+
+Toutes les pages de l'app partagent le même squelette. Un utilisateur qui passe d'un écran à l'autre ne doit voir changer que le contenu, jamais la charpente : même AppBar, mêmes marges, même rythme vertical, mêmes écrans d'état, même place pour l'action principale.
+
+### Squelette commun
+
+```
+┌──────────────────────────────┐
+│ AppBar (titre l10n, actions) │  ← toujours le même widget DS
+├──────────────────────────────┤
+│ Header de page (optionnel)   │  ← résumé, filtres, onglets
+├──────────────────────────────┤
+│ Body scrollable              │  ← padding horizontal = token page
+│   Section                    │
+│     SectionHeader            │  ← titre de section, widget DS
+│     contenu                  │
+│   ↕ gap section (token)      │
+│   Section                    │
+├──────────────────────────────┤
+│ Footer CTA (optionnel)       │  ← action principale, fixe, SafeArea
+└──────────────────────────────┘
+```
+
+### Règles
+
+1. **Un seul scaffold de page.** Chaque page passe par le widget de page du DS (ex. `AppPageScaffold`), jamais par un `Scaffold` + `AppBar` assemblés à la main. S'il n'existe pas et que le projet a plus de deux pages, le proposer dans le DS avant de coder l'écran.
+2. **Rythme vertical par tokens.** Trois niveaux seulement : marge de page, écart entre sections, écart entre éléments d'une section. Pas d'autre espacement inventé localement.
+3. **Hiérarchie typographique fixe.** Titre de page dans l'AppBar, titres de section via le `SectionHeader` du DS, contenu en style corps. Un écran ne crée pas de nouveau niveau de titre.
+4. **États partagés.** Loading, Error (avec retry) et Empty (icône, message, action optionnelle) sont des widgets du DS réutilisés par toutes les pages, jamais des classes privées recopiées par écran. S'ils n'existent pas, les créer une fois dans le DS.
+5. **Une action principale par écran**, toujours au même endroit (footer CTA ou FAB, selon ce que fait le projet), jamais dans le body.
+6. **Listes et cartes.** Les éléments répétés utilisent la carte / tuile du DS et le même séparateur que les autres listes de l'app.
+7. **Grands écrans.** Le body est contraint à la largeur max du DS si le projet en définit une, pour que tablette et web gardent la même lecture.
+8. **Pas de composant maison qui duplique le DS.** Si un écran a besoin d'un composant visuel qui servira ailleurs, il va dans le DS, pas dans `widgets/` de l'écran.
+
+### Anatomie du projet
+
+Les règles ci-dessus sont génériques. La version projet (noms réels des widgets et tokens) vit dans le `create_screen_rules.md` du repo, sous ce titre, et prime sur les exemples :
+
+```markdown
+### Anatomie du projet
+- Scaffold de page : `<Widget>` (`<chemin>`)
+- AppBar : `<Widget>`
+- SectionHeader : `<Widget>`
+- États : `<LoadingWidget>`, `<ErrorWidget>`, `<EmptyWidget>`
+- Espacements : page `<token>`, section `<token>`, élément `<token>`
+- Action principale : footer CTA `<Widget>` | FAB
+- Largeur max : `<token>` | aucune
+- Écrans de référence : `<page_a.dart>`, `<page_b.dart>`
+```
+
+Si cette section est absente ou incomplète, la déduire de 2 ou 3 écrans de référence validés par l'utilisateur, puis proposer de l'écrire dans le `create_screen_rules.md` du repo pour que les écrans suivants s'y alignent.
+
+---
+
+## Refaire un écran existant (`/redo_screen`)
+
+### Contrat à préserver
+
+Une refonte ne change que la présentation. Avant d'écrire, lister et garder intacts :
+
+- L'API publique de la page : nom de classe, constructeur, paramètres, route GoRouter / AutoRoute
+- Le binding au state management : `BlocBuilder` / `BlocListener` / `BlocSelector`, `ref.watch` / `ref.listen`, events émis, providers lus
+- Les `Key(...)` et `ValueKey(...)` et les `Semantics` / `semanticsLabel` : les tests widget, `bdd_widget_test` et flows Maestro s'en servent
+- Les clés l10n existantes (on les réutilise, on n'en renomme aucune)
+- Les comportements : navigation, dialogs, snackbars, pull-to-refresh, pagination
+
+### Détection des tests liés
+
+- `grep` des noms de widgets de l'écran et de ses clés dans `test/`, `integration_test/`, `maestro/`
+- Goldens : fichiers utilisant `matchesGoldenFile` / `screenMatchesGolden` qui couvrent l'écran
+- Widgetbook : use cases qui référencent ses widgets
+
+### Vérification
+
+1. `dart analyze` sur les fichiers touchés, zéro nouveau warning
+2. `flutter test` sur les tests liés détectés, tous verts
+3. Goldens liés : les régénérer (`--update-goldens`) seulement après validation visuelle de l'utilisateur, jamais pour faire passer un test rouge
+4. Visuel : captures avant / après sur simulateur ou émulateur (flow Maestro si le repo en a, sinon lancement manuel), en clair et en sombre, et une fois en grande taille de police. Regarder chaque capture avant de conclure.
+
+---
+
 ## Templates de fichiers
+
+Les noms `AppPageScaffold`, `AppLoadingView`, `AppErrorView`, `AppEmptyView` et `AppSpacing` sont des exemples : utiliser ceux de **Anatomie du projet**.
 
 ### Page principale avec BLoC (`{screen_name}_page.dart`)
 
@@ -147,21 +233,25 @@ class {ScreenName}Page extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<{ScreenName}Bloc, {ScreenName}State>(
-      builder: (context, state) {
-        return Scaffold(
-          // AppBar si applicable
-          body: switch (state) {
-            {ScreenName}Initial() => const _LoadingView(),
-            {ScreenName}Loading() => const _LoadingView(),
-            {ScreenName}Loaded(:final data) =>
-              {ScreenName}LoadedView(data: data),
-            {ScreenName}Error(:final message) =>
-              _ErrorView(message: message),
-            {ScreenName}Empty() => const _EmptyView(),
-          },
-        );
-      },
+    return AppPageScaffold(
+      title: context.l10n.{screenName}Title,
+      body: BlocBuilder<{ScreenName}Bloc, {ScreenName}State>(
+        builder: (context, state) => switch (state) {
+          {ScreenName}Initial() || {ScreenName}Loading() =>
+            const AppLoadingView(),
+          {ScreenName}Loaded(:final data) =>
+            {ScreenName}LoadedView(data: data),
+          {ScreenName}Error(:final message) => AppErrorView(
+              message: message,
+              onRetry: () => context
+                  .read<{ScreenName}Bloc>()
+                  .add(const {ScreenName}Requested()),
+            ),
+          {ScreenName}Empty() => AppEmptyView(
+              message: context.l10n.{screenName}Empty,
+            ),
+        },
+      ),
     );
   }
 }
@@ -175,37 +265,49 @@ class {ScreenName}Page extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
+    return AppPageScaffold(
+      title: context.l10n.{screenName}Title,
       body: ref.watch({screenName}Provider).when(
             data: (data) => {ScreenName}LoadedView(data: data),
-            loading: () => const _LoadingView(),
-            error: (error, _) => _ErrorView(message: error.toString()),
+            loading: () => const AppLoadingView(),
+            error: (error, _) => AppErrorView(
+              message: error.toString(),
+              onRetry: () => ref.invalidate({screenName}Provider),
+            ),
           ),
     );
   }
 }
 ```
 
-### Loading view (privée dans le fichier page)
+### Vue Loaded (`{screen_name}_loaded_view.dart`)
 
 ```dart
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
+class {ScreenName}LoadedView extends StatelessWidget {
+  const {ScreenName}LoadedView({super.key, required this.data});
+
+  final {Data} data;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: CircularProgressIndicator.adaptive(),
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        // Sections séparées par AppSpacing.section
+      ],
     );
   }
 }
 ```
 
-### Error view avec retry (privée)
+### Vues d'état (dans le DS, créées une seule fois)
+
+Uniquement si le DS ne les a pas encore. Elles servent à toutes les pages, jamais recopiées en classes privées.
 
 ```dart
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({
+class AppErrorView extends StatelessWidget {
+  const AppErrorView({
+    super.key,
     required this.message,
     required this.onRetry,
   });
@@ -216,43 +318,30 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: onRetry,
-            child: Text(context.l10n.retry),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.page),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: AppSpacing.item,
+          children: [
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.retry),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 ```
 
-### Empty view (privée)
-
-```dart
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        context.l10n.noDataAvailable,
-        style: Theme.of(context).textTheme.bodyLarge,
-      ),
-    );
-  }
-}
-```
+`AppLoadingView` (indicateur adaptatif centré) et `AppEmptyView` (icône, message, action optionnelle) suivent le même modèle.
 
 ### Widget extrait (dans son propre fichier)
 
