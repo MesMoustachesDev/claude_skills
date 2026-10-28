@@ -79,6 +79,24 @@ Si un test existant est **faux**, tu le corriges — c'est dans ton périmètre 
   montrer le bug. Sélecteurs `id:` uniquement ; jamais `clearState` sauf si le bug est dans l'onboarding.
   La skill `android-visual-loop` aide au diagnostic visuel.
 
+**3 bis. Le parcours du signalement, sur device — obligatoire.** Le test du niveau le plus bas prouve la
+cause ; il ne prouve pas que le symptôme signalé disparaît. Dès que le bug a été vu dans l'app (un
+écran, un chiffre, un rapport, une URL, des étapes), tu rejoues **ce parcours-là** sur le simulateur,
+avec les données du signalement (le rapport cité, le compte de QA) : flow Maestro
+`<package>/maestro/fix_<nom>.yaml`, qui asserte le comportement **correct** et prend ses captures dans
+`${FIX_SHOTS_DIR}`. Il doit échouer aujourd'hui, sur le symptôme signalé (le chiffre faux, l'écran
+cassé). `repro.json → device_repro = {cmd, expected_failure}` : `cmd` builde la base, installe sans
+désinstaller et joue le flow. L'orchestrateur le lance lui-même (`device_red`, puis `device_green`
+après la correction), aucun hook ne le fait. **Le simulateur est partagé avec d'autres sessions** :
+tu ne l'utilises (build iOS, `simctl`, Maestro) que dans le créneau que l'orchestrateur te donne, et
+tu le libères dès que tes captures sont prises. Regarde chaque capture (`Read`). Le signalement ne se reproduit pas
+à l'identique (état local de l'appareil perdu) → rejoue ses étapes sur un état propre et dis ce qui
+diffère ; l'assertion porte quand même sur le symptôme. Seule exception : un bug sans parcours dans
+l'app (crash backend, tâche planifiée, Sentry sans écran) → `device_repro = {not_applicable:
+"<raison>"}`, que l'orchestrateur montre au dev. « Le test unitaire suffit » n'est pas une raison.
+Un envoi vers staging fait partie du parcours si le symptôme n'apparaît qu'à l'envoi : dis-le dans ton
+rapport (`Besoin du dev : …` si le rapport à utiliser n'est pas dans le signalement).
+
 Le test doit échouer **sur une assertion qui nomme le bug**, pas sur une compilation, un import ou un
 setup. Le message d'échec que tu attends va dans `expected_failure`. Si le runner manque (pas de
 script `test`), branche-le dans `package.json` / `pubspec.yaml` — c'est autorisé.
@@ -96,6 +114,8 @@ en lecture :
   "target_cmd": "node --test tests/weekly.test.js",
   "expected_failure": "weekly cap resets after a transactional push",
   "suite_cmd": "npm test --silent",
+"device_repro": { "cmd": "<build de la base + install + maestro test maestro/fix_<nom>.yaml>", "expected_failure": "<texte de l'assertion du symptôme>" },
+                  // ou { "not_applicable": "<pourquoi le bug n'a aucun parcours dans l'app>" }
   "lint_cmd": "",
   "test_files": ["functions/push/tests/weekly.test.js"],
   "test_paths": [],

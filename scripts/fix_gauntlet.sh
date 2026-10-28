@@ -21,7 +21,7 @@ profile_checks() {
   case "$1" in
     red)            echo "repro_schema only_tests_changed no_debug_markers target_red" ;;
     repro_report)   echo "repro_schema no_debug_markers" ;;
-    green)          echo "repro_schema freeze_check source_changed no_debug_markers target_green suite_green lint" ;;
+    green)          echo "repro_schema freeze_check source_changed no_debug_markers target_green suite_green lint conventions" ;;
     review_report)  echo "review_report" ;;
     review_verdict) echo "review_verdict" ;;
     *) echo "" ;;
@@ -34,6 +34,8 @@ Profils :
   red             après le REPRODUCER : seuls des tests ont changé, le test cible échoue avec expected_failure
   repro_report    reproducer en arbitrage : repro.json valide, pas de log de debug oublié
   green           après l'IMPLEMENTER : gel intact, du code a changé, cible verte, suite verte, lint
+  (device_red / device_green ne sont dans aucun profil : le simulateur est partagé avec d'autres sessions,
+   l'orchestrateur les lance lui-même, un par un, après le go du dev — jamais un hook)
   review_report   review.json présent et valide (hook du reviewer)
   review_verdict  aucun critique non accepté (lu par l'orchestrateur)
 
@@ -47,6 +49,11 @@ Checks :
   target_green       target_cmd passe
   suite_green        suite_cmd passe
   lint               lint_cmd passe (sauté si vide)
+  conventions        design_system + l10n_strings du gauntlet feature sur les lignes modifiées de chaque package touché
+                     (sauté sans .claude/rules/feature_pipeline.md)
+  device_red         device_repro.cmd (le parcours du signalement, sur device) échoue avec device_repro.expected_failure
+  device_green       device_repro.cmd passe
+                     (les deux sautés seulement si device_repro.not_applicable donne une raison)
 EOF
 }
 
@@ -74,6 +81,14 @@ check_repro_schema() {
     if [ -n "$(state_get .freeze_sha)" ]; then info "pas de fix_plan (gelé avant le plan de correction)"
     else ko "repro.json : fix_plan {layer, approach, files[], rejected} manquant ou incomplet"; return 1; fi
   fi
+  # The bug is reproduced where it was reported: a device run of the reported scenario, or a stated
+  # reason why there is none (backend crash with no screen, Sentry-only…).
+  if ! jq -e '(.device_repro|type=="object") and (
+                ((.device_repro.cmd|type=="string" and length>0) and (.device_repro.expected_failure|type=="string" and length>0))
+                or (.device_repro.not_applicable|type=="string" and length>0))' "$REPRO" >/dev/null 2>&1; then
+    if [ -n "$(state_get .freeze_sha)" ]; then info "pas de device_repro (gelé avant son introduction)"
+    else ko "repro.json : device_repro {cmd, expected_failure} (parcours du signalement rejoué sur device) ou {not_applicable: \"<raison>\"} manquant"; return 1; fi
+  fi
   [ -d "$PROJECT_ROOT/$(repro_get .package)" ] || { ko "package introuvable : $(repro_get .package)"; return 1; }
   local f rc=0
   while IFS= read -r f; do
@@ -86,11 +101,15 @@ check_repro_schema() {
 
 check_only_tests_changed() {
   local base f bad=""
-  base="$(state_get .base_sha)"
+  # A second reproducer pass runs after the fix was committed: compare to the
+  # last freeze, not to the base, or the fix itself reads as source changes.
+  base="$(state_get .freeze_sha)"
+  [ -n "$base" ] && [ "$base" != "null" ] || base="$(state_get .base_sha)"
   [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    case "$f" in .claude/fixes/*) continue ;; esac
+    # graphify.sh prepare copies untracked .graphifyignore files into the worktree.
+    case "$f" in .claude/fixes/*|.graphifyignore|*/.graphifyignore|graphify-out/*) continue ;; esac
     is_test_path "$f" || is_manifest_path "$f" || bad="$bad  $f"$'\n'
   done < <(changed_since "$base")
   [ -z "$bad" ] && { info "depuis $base : tests et dossier du fix seulement"; return 0; }
@@ -123,6 +142,41 @@ check_target_red() {
   fi
   grep -nF -- "$expected" "$FIX_OUT/target.out" | head -3 | sed 's/^/  › /'
   info "rouge pour la bonne raison (exit $rc)"
+}
+
+# device_skip — true (with the reason logged) when the fix declares no device reproduction.
+device_skip() {
+  local na; na="$(repro_get .device_repro.not_applicable)"
+  if [ -n "$na" ]; then info "pas de repro device : $na"; return 0; fi
+  if [ -z "$(repro_get .device_repro.cmd)" ] && [ -n "$(state_get .freeze_sha)" ]; then
+    info "pas de device_repro (gelé avant son introduction)"; return 0
+  fi
+  return 1
+}
+
+check_device_red() {
+  device_skip && return 0
+  local rc expected
+  run_in_pkg device "$(repro_get .device_repro.cmd)"; rc=$?
+  expected="$(repro_get .device_repro.expected_failure)"
+  if [ "$rc" = 0 ]; then
+    tail -15 "$FIX_OUT/device.out" | sed 's/^/  /'
+    ko "device_repro.cmd passe : le parcours du signalement ne montre pas le bug sur device"; return 1
+  fi
+  if ! grep -qF -- "$expected" "$FIX_OUT/device.out"; then
+    tail -30 "$FIX_OUT/device.out" | sed 's/^/  /'
+    ko "device_repro.cmd échoue, mais pas pour la raison annoncée : « $expected » absent de la sortie (build ? device ? sélecteur ?)"
+    return 1
+  fi
+  info "bug reproduit sur device (captures : ${FIX_SHOTS_DIR#$PROJECT_ROOT/})"
+}
+
+check_device_green() {
+  device_skip && return 0
+  run_in_pkg device "$(repro_get .device_repro.cmd)" && { info "parcours du signalement vert sur device (captures : ${FIX_SHOTS_DIR#$PROJECT_ROOT/})"; return 0; }
+  tail -30 "$FIX_OUT/device.out" | sed 's/^/  /'
+  ko "device_repro.cmd échoue encore sur device"
+  return 1
 }
 
 check_freeze_check() {
@@ -176,6 +230,34 @@ check_lint() {
   return 1
 }
 
+# conventions — the feature gauntlet's presentation checks, scoped to the lines this fix changed. A fix is
+# held to the same design system and l10n rules as a feature, even on a line it only re-indents.
+check_conventions() {
+  [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] || { info "pas de feature_pipeline.md : sauté"; return 0; }
+  local base f d pkgs="" pkg c rc=0
+  base="$(state_get .base_sha)"
+  [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }
+  while IFS= read -r f; do
+    case "$f" in *.dart) ;; *) continue ;; esac
+    is_test_path "$f" && continue
+    d="$(dirname "$f")"
+    while [ "$d" != . ] && [ ! -f "$PROJECT_ROOT/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done
+    [ "$d" != . ] && pkgs="$pkgs"$'\n'"$d"
+  done < <(changed_since "$base")
+  pkgs="$(printf '%s\n' "$pkgs" | grep -v '^$' | sort -u)"
+  [ -n "$pkgs" ] || { info "aucun package Dart touché hors tests"; return 0; }
+  while IFS= read -r pkg; do
+    for c in design_system l10n_strings; do
+      GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$pkg" GAUNTLET_FEATURES_ROOT="$FIX_OUT/conventions" GAUNTLET_KEEP_FORMAT_LINES=1 \
+        "$HOME/.claude/scripts/gauntlet.sh" "$c" "$(printf '%s' "$pkg" | tr '/' '_')" > "$FIX_OUT/conventions_$c.out" 2>&1 \
+        && { info "$pkg : $c conforme"; continue; }
+      grep -E '✗|\[FAIL\]' "$FIX_OUT/conventions_$c.out" | sed 's/^/  /'
+      ko "$pkg : $c"; rc=1
+    done
+  done <<< "$pkgs"
+  return $rc
+}
+
 check_review_report() {
   local f="$FIX_DIR/review.json"
   [ -f "$f" ] || { ko "review.json absent — le reviewer doit produire ${f#$PROJECT_ROOT/}"; return 1; }
@@ -213,7 +295,7 @@ if [ -z "$checks" ]; then
   declare -F "check_$target" >/dev/null || die "profil ou check inconnu : $target"
   checks="$target"
 fi
-case "$target" in green|target_green) FIX_PHASE=green ;; *) FIX_PHASE=red ;; esac
+case "$target" in green|target_green|device_green) FIX_PHASE=green ;; *) FIX_PHASE=red ;; esac
 FIX_SHOTS_DIR="$FIX_DIR/shots/$FIX_PHASE"
 
 log="$FIX_OUT/last_${target}.log"; json="$FIX_OUT/last_${target}.json"

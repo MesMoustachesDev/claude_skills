@@ -38,7 +38,7 @@ Affiche le bloc d'usage ci-dessus, puis :
 ```
 
 Puis en trois lignes : le point d'étape unique (diagnostic + test rouge + plan de correction, avec un
-rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests sont gelés après validation, et `~/.claude/scripts/fix_gauntlet.sh list`.
+rapport HTML, plus les captures avant/après du parcours signalé rejoué sur device), que les tests sont gelés après validation, et `~/.claude/scripts/fix_gauntlet.sh list`.
 
 ---
 
@@ -59,7 +59,7 @@ rapport HTML, plus les captures avant/après pour un bug d'UI), que les tests so
 | 1 | reproduction | Bastien | `fix-reproducer` | `red` | **oui** : diagnostic + test rouge + plan de correction, puis gel |
 | 2 | correction | Fanny | `fix-implementer` | `green` | non (arbitrage par Bastien si un test est contesté) |
 | 3 | revue | Victor | `fix-reviewer` (+ reviewers du projet) | `review_verdict` | non (boucle vers 2) |
-| 4 | captures | — | toi | — | **oui si `kind: ui`** : avant / après |
+| 4 | captures | — | toi | — | **oui dès que `device_repro.cmd` existe** : avant / après sur device |
 | 5 | evidence, commits | — | toi | — | puis `create_commits` |
 
 ---
@@ -136,7 +136,10 @@ lien de la page ; `SendUserFile` du `report.html` seulement si le cockpit échou
   noms des tests et l'assertion clé), et la ligne `expected_failure` relevée dans `.gauntlet/target.out`.
 - `baseline_suite` si elle n'est pas verte : le dev doit le savoir avant de lancer la correction.
 - Le plan : `fix_plan.layer`, `approach`, `files`, et `rejected` (l'alternative écartée).
-- `kind: ui` → `SendUserFile` des captures `.claude/fixes/<nom>/shots/red/*.png` (display `render`).
+- Le parcours du signalement sur device (`device_repro`) : la capture qui montre le bug (`shots/red/`,
+  `SendUserFile`, display `render`) et le symptôme relevé par `device_red`. `device_repro.not_applicable`
+  → sa raison en une ligne, que le dev valide avec le test : jamais acceptée en silence. Pas de
+  `device_repro` du tout → le gate red est rouge, tu ne fais pas de point d'étape.
 
 `AskUserQuestion`, deux questions dans le même appel :
 1. **Plan** (header `Plan`) : « <approche en une phrase> dans <couche> (Recommandé) » / « <alternative
@@ -152,7 +155,7 @@ Validation → **gel** :
 git add <test_files> <manifestes touchés> .claude/fixes/<nom>/repro.json .claude/fixes/<nom>/diagnosis.md
 git commit -m "test(<nom>): reproduce <bug en une phrase> (frozen)"
 ```
-(+ `shots/red/` pour un bug d'UI, + tout test existant corrigé par Bastien). `freeze_sha` = ce
+(+ le flow `maestro/fix_<nom>.yaml` et `shots/red/`, + tout test existant corrigé par Bastien). `freeze_sha` = ce
 commit, `human_gates.repro = {at, by: "user"}`, `phase = "impl"`. Le plan est gelé avec `repro.json`.
 
 **Tout re-gel** (arbitrage, second passage de Bastien sur un diagnostic incomplet ou des
@@ -226,9 +229,15 @@ propre classification : critique, bloquant, erreur) comptent comme des critiques
 - `missing_tests` de Victor : **ne relance personne**. Ils vont dans l'evidence ; le dev décidera
   s'ils méritent un second passage de Bastien.
 
-### 4. Captures — seulement `kind: ui`
+### 4. Captures — dès que `device_repro.cmd` existe
 
-Le gate green a rejoué le flow : `shots/green/` contient les captures après correction. Regarde-les
+Pas de fix livré sans le parcours du signalement rejoué sur device après la correction : c'est la
+seule preuve que le symptôme vu par l'utilisateur a disparu, les tests ne prouvent que la cause.
+**Le simulateur est partagé avec d'autres sessions.** `device_red` et `device_green` ne sont dans aucun
+profil ni hook : tu les lances toi-même (`fix_gauntlet.sh device_green <nom>`), seulement quand le
+build est prêt et après le go explicite du dev pour ce créneau (`AskUserQuestion`), jamais avant que la
+correction soit verte. Un agent ne lance ni build iOS, ni `simctl`, ni Maestro sans ce go.
+`shots/green/` contient alors les captures après correction. Regarde-les
 (`Read`) avant de les montrer — une capture qui ne montre pas l'état attendu est un défaut, pas un
 succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction vs plan), puis
 `SendUserFile` du rapport et des paires avant/après, un appel, `display: render`, légende « avant | après ».
@@ -258,7 +267,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Suggestions             appliquées (id, titre) ; non appliquées : un bloc chacune (problème, si on ne fait rien, correctif, contre)
 ## Non traité               missing_tests, hors périmètre signalé, acceptations (raisons)
 ## Dette existante          fix.json → debt (review.json → debt de Victor) : fichier, ligne, problème
-## Captures                 avant / après (ui)
+## Parcours sur device      le signalement rejoué : symptôme avant (shots/red), état après (shots/green), avec les données utilisées ; ou la raison de device_repro.not_applicable validée par le dev
 ```
 
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il

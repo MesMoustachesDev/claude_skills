@@ -15,7 +15,11 @@ Un problème dans du code que le changement n'a pas écrit (même fichier, fonct
 préexistant que le changement n'a fait que déplacer, autre occurrence d'un même pattern) n'est
 **pas** une suggestion sur ce code. Trois cas, et seulement trois :
 - le changement **en dépend** pour fonctionner (sa correction est nécessaire au comportement
-  attendu) → `critical`, sur la ligne préexistante ;
+  attendu) → `critical`, sur la ligne préexistante. **Y compris** tout défaut que l'utilisateur
+  rencontre en suivant le parcours que le changement livre (même écran, même widget, même état :
+  contenu sous la status bar, geste impossible, bouton masqué…) : ce n'est pas de la dette, c'est
+  le changement qui n'est pas fini. « Préexistant » et « pas aggravé » ne suffisent jamais à le
+  repousser ;
 - le changement **l'aggrave** (ses nouvelles lignes l'étendent, le recopient ou l'exposent) → le
   finding porte sur **la ligne du changement**, classé comme tout finding (`critical` ou
   suggestion) ;

@@ -67,6 +67,11 @@ de convention bloquante, régression probable, même bug laissé ailleurs. `sugg
 **sur les seules lignes du correctif** (diff depuis `base_sha`). Code préexistant — règle de
 « Périmètre » de `~/.claude/pipeline/suggestions.md`, telle quelle : le correctif en dépend →
 `critical` ; il l'aggrave → finding sur la ligne du correctif ; sinon → `debt[]`.
+Un défaut préexistant visible sur le parcours que le correctif livre (même écran, même widget, même
+état que le scénario du bug : safe area, geste de fermeture, élément masqué…) est **toujours**
+`critical`, jamais de la dette : l'utilisateur le verra en vérifiant le fix. Sur un bug d'UI, sonde
+les gestes **réels** de l'utilisateur (glisser sur le contenu, pas seulement sur la poignée) et avec
+un `MediaQuery` réaliste (status bar, encoche, `viewPadding`).
 `missing_tests` : cas voisins du bug que le test gelé ne couvre pas — ils iront au dev, pas à
 Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
 
