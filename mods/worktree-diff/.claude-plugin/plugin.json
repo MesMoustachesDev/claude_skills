@@ -1,0 +1,6 @@
+{
+  "name": "worktree-diff",
+  "version": "0.1.0",
+  "description": "Pane listing the files each /feature or /fix worktree changed, as a folder tree, with the diff of the selected file",
+  "types": "./types/index.d.ts"
+}
