@@ -7,8 +7,14 @@ TEST_REPORT="" # défini par run_tests_json
 run_tests_json() {
   TEST_REPORT="$GAUNTLET_OUT/test_report.jsonl"
   [ -d "$PKG_DIR/test" ] || { ko "pas de dossier test/ dans $PKG_REL"; return 1; }
+  # Couche : seuls les tests de la moitié tournent, ceux que l'autre écrit en même temps ne la cassent pas.
+  local targets=""
+  if [ -n "${LAYER:-}" ]; then
+    targets="$(layer_files test | grep '_test\.dart$' | tr '\n' ' ')"
+    [ -n "$targets" ] || { ko "aucun fichier de test dans la couche $LAYER"; : > "$TEST_REPORT"; return 1; }
+  fi
   # shellcheck disable=SC2086
-  (cd "$PKG_DIR" && $FLUTTER test --reporter json --no-pub > "$TEST_REPORT" 2>"$GAUNTLET_OUT/test_stderr.log")
+  (cd "$PKG_DIR" && $FLUTTER test --reporter json --no-pub $targets > "$TEST_REPORT" 2>"$GAUNTLET_OUT/test_stderr.log")
 }
 
 # test_results — une ligne JSON par test non caché : {file, name, result, skipped}

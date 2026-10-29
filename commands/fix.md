@@ -27,7 +27,7 @@ Affiche le bloc d'usage ci-dessus, puis :
 
 ```
 # Bug backend signalé par Sentry
-/fix weekly_cap_reset "Sentry COOKBOOKER-4F2 : le cap hebdo marketing repart à zéro après un push transactionnel"
+/fix weekly_cap_reset "Sentry APP-4F2 : le cap hebdo marketing repart à zéro après un push transactionnel"
 
 # Bug d'UI visible sur device
 /fix recipe_title_overflow "Sur iPhone SE, un titre de recette long pousse le bouton favori hors de l'écran"

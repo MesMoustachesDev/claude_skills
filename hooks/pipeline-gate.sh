@@ -15,6 +15,10 @@ case "$agent" in
   feature-architect)   profile=contracts ;;
   feature-test-writer) profile=red ;;
   feature-implementer) profile=green ;;
+  # Moitiés parallèles des étapes 3 et 4 : gate de leur couche ; le gate complet se joue après les deux
+  # (pipeline.sh join).
+  feature-test-writer-data|feature-test-writer-presentation) profile="red_${agent##*-}" ;;
+  feature-implementer-data|feature-implementer-presentation) profile="green_${agent##*-}" ;;
   feature-cleaner)     profile=clean ;;
   feature-reviewer)      profile=review ;;        # format du rapport seulement ; le verdict est lu par l'orchestrateur
   feature-dedup)         profile=dedup ;;         # idem
@@ -35,10 +39,20 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
 [ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
 [ -n "$feature" ] || { echo "pipeline-gate : feature courante inconnue, gate ignoré" >&2; exit 0; }
+case "$profile" in *_data|*_presentation) export GAUNTLET_LAYER="${profile##*_}" ;; esac   # sorties de la couche (log)
 init_project_context "$feature" 2>/dev/null || { echo "pipeline-gate : contexte projet illisible, gate ignoré" >&2; exit 0; }
 
 PIPE="$FEATURE_DIR/pipeline.json"
 [ -f "$PIPE" ] || echo '{}' > "$PIPE"
+# pipe_set <statut> <tentatives> — sous verrou : les deux moitiés des étapes 3 et 4 finissent parfois
+# ensemble, et deux jq > tmp && mv simultanés perdent l'écriture de l'une.
+pipe_set() {
+  local lock="$PIPE.lock" i=0 tmp
+  until mkdir "$lock" 2>/dev/null; do i=$((i+1)); [ "$i" -ge 100 ] && break; sleep 0.1; done
+  tmp="$(mktemp)"
+  jq --arg p "$profile" --arg s "$1" --argjson a "$2" '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
+  rmdir "$lock" 2>/dev/null
+}
 max="$(cfg pipeline.max_attempts 5)"
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 
@@ -46,14 +60,14 @@ attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 # verdict is reused. Flows can be single-use (they change server state) and the agent usually ran them itself.
 [ "$profile" = qa ] && export GAUNTLET_QA_REUSE=1
 if "$GAUNTLET" "$profile" "$feature" >/dev/null 2>&1; then
-  tmp="$(mktemp)"; jq --arg p "$profile" '.attempts[$p]=0 | .stages[$p]={status:"PASSED", at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
+  pipe_set PASSED 0
   exit 0
 fi
 
 attempts=$((attempts+1))
 log="$GAUNTLET_OUT/last_${profile}.log"
 if [ "$attempts" -ge "$max" ]; then
-  tmp="$(mktemp)"; jq --arg p "$profile" --argjson a "$attempts" '.attempts[$p]=$a | .stages[$p]={status:"FAILED", at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
+  pipe_set FAILED "$attempts"
   {
     echo "pipeline-gate : gate '$profile' toujours rouge après $attempts tentatives. Étape marquée FAILED."
     echo "Arrête-toi et rends un rapport : ce qui bloque, ce que tu as essayé, ce que tu recommandes (spec ? test faux ? contrat ?)."
@@ -61,7 +75,7 @@ if [ "$attempts" -ge "$max" ]; then
   exit 0
 fi
 
-tmp="$(mktemp)"; jq --arg p "$profile" --argjson a "$attempts" '.attempts[$p]=$a | .stages[$p]={status:"RED", at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
+pipe_set RED "$attempts"
 {
   echo "GATE '$profile' ROUGE (tentative $attempts/$max) — tu ne peux pas t'arrêter tant que ce n'est pas vert."
   echo "Sortie du gauntlet (${log#$PROJECT_ROOT/}) :"

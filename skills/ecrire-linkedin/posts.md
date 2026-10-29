@@ -6,7 +6,7 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 
 - N'invente rien sur ce que je fais. Un fait du post vient de ce que j'ai dit, d'une discussion Claude Code, ou de « CE QUE JE SUIS ». Pas d'anecdote, de chiffre ou de résultat fabriqué.
 - **Pas de trou.** Jamais de `[À COMPLÉTER]`, `[X]`, `TODO` laissé dans le texte. Le fait manquant (une conclusion, un chiffre, un résultat), va le chercher toi-même dans les transcripts `~/.claude/projects/*/*.jsonl` du projet concerné (préfixe les chemins par `./`, les dossiers commencent par « - »), avec des sous-agents en parallèle s'il y en a plusieurs. S'il n'existe nulle part, réécris le passage pour ne plus en dépendre, et dis-le.
-- Les missions clients ne sont jamais citées par leur nom (audin, my-center, Wifirst…) : « une app terrain », « un client ».
+- Les missions clients ne sont jamais citées par leur nom (projet-client, autre-client, client…) : « une app terrain », « un client ».
 - Pas de données perso : emails, identifiants, noms de proches.
 - Hors de mon périmètre technique, je ne fais pas l'expert : je raconte en curieux.
 - Les chiffres et citations d'une source externe : la source est nommée (subreddit, rapport, site).

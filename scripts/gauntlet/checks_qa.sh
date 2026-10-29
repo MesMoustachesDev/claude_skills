@@ -85,7 +85,7 @@ qa_fingerprint() {
   local app f; app="$(cfg app_dir .)"
   {
     git -C "$PROJECT_ROOT" rev-parse HEAD
-    # --submodule=diff : a submodule (hades) changes the state through its content, not only its gitlink.
+    # --submodule=diff : a submodule (dskit) changes the state through its content, not only its gitlink.
     git -C "$PROJECT_ROOT" diff --submodule=diff HEAD -- "$app" ':(exclude,glob)**/.claude/**'
     untracked "$app" | grep -v '/\.claude/' | grep -v '^\.claude/' \
       | while IFS= read -r f; do shasum "$PROJECT_ROOT/$f"; done

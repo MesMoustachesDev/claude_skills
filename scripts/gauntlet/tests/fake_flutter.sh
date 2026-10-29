@@ -3,11 +3,26 @@
 #   --version            → une ligne
 #   test --reporter json → un rapport JSON par fichier test/**/*_test.dart du dossier courant, un test par
 #                          fichier ; le test échoue si le fichier contient FAKE_FAIL. Exit 1 si un échec.
+#                          Des chemins en argument (gauntlet par couche) → ces fichiers seulement.
+#   analyze              → FAKE_ANALYZE_ERROR dans un fichier analysé = erreur de compilation (les chemins en
+#                          argument, sinon lib/ et test/)
 case "${1:-}" in
   --version) echo "Flutter fake (gauntlet tests)"; exit 0 ;;
-  test) ;;
+  test|analyze) ;;
   *) exit 0 ;;
 esac
+cmd="$1"; shift
+paths=()
+while [ $# -gt 0 ]; do
+  case "$1" in --reporter) shift ;; -*) ;; *) paths+=("$1") ;; esac
+  shift
+done
+if [ "$cmd" = analyze ]; then
+  [ ${#paths[@]} -gt 0 ] || paths=(lib test)
+  hits="$(grep -rl FAKE_ANALYZE_ERROR "${paths[@]}" 2>/dev/null)"
+  [ -z "$hits" ] && { echo "No issues found!"; exit 0; }
+  printf '  error • fake compile error • %s:1:1 • fake\n' $hits; exit 1
+fi
 id=0 rc=0
 while IFS= read -r f; do
   id=$((id+1))
@@ -16,5 +31,5 @@ while IFS= read -r f; do
   printf '{"type":"suite","suite":{"id":%d,"path":"%s"}}\n' "$id" "$abs"
   printf '{"type":"testStart","test":{"id":%d,"name":"%s","suiteID":%d,"url":"file://%s"}}\n' "$id" "$(basename "$f" .dart)" "$id" "$abs"
   printf '{"type":"testDone","testID":%d,"result":"%s","hidden":false,"skipped":false}\n' "$id" "$result"
-done < <(find test -name '*_test.dart' 2>/dev/null | sort)
+done < <(if [ ${#paths[@]} -gt 0 ]; then printf '%s\n' "${paths[@]}"; else find test -name '*_test.dart' 2>/dev/null | sort; fi)
 exit $rc

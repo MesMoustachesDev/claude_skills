@@ -9,6 +9,7 @@
 #                                          étapes : cadrage | contracts | spec | tests | tour | evidence
 #
 # Profils : contracts | red | green | clean | harden | qa   (voir gauntlet/profiles.sh)
+#           red_data | red_presentation | green_data | green_presentation : une couche (étapes 3 et 4 en parallèle)
 # Checks  : n'importe quel check individuel (gauntlet.sh list)
 #
 # À lancer depuis n'importe où dans le repo du projet. Lit .claude/rules/feature_pipeline.md et, s'il
@@ -39,6 +40,8 @@ case "$target" in
 esac
 
 [ -n "$feature" ] || die "usage: gauntlet.sh <profil|check> <feature>"
+# Profil d'une moitié (red_data, green_presentation…) : la couche vient du suffixe.
+case "$target" in *_data|*_presentation) export GAUNTLET_LAYER="${target##*_}" ;; esac
 init_project_context "$feature"
 
 checks="$(profile_checks "$target")"

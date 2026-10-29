@@ -40,6 +40,18 @@ Lis `spec.md` §3, §4, §6, §7, puis **chaque fichier** de `test/` (pas seulem
 → le test qui le prouve, ou `missing`. Chaque état de §3 par écran → un test de widget. Chaque champ
 de la table de mapping §6 → un test de mapper, cas limites inclus.
 
+*Jonction des deux moitiés* — les tests ont été écrits par deux Théo en parallèle : data/domain
+(`test/src/{data,domain,injection}/`) et présentation (le reste). Un maillon que chacun a cru couvert par
+l'autre est invisible dans chaque moitié prise seule. Pour **chaque erreur de §7**, une ligne de
+`coverage` par maillon : `§7 <X> : data source` (exception → `Left(X)`), `repository`, `use case`
+(propage `Left(X)`), `BLoC` (`Left(X)` → état), `vue` (l'état est visible). Un maillon `missing` est un
+**bloquant**. L'orchestrateur te passe la ligne « Jonction §7 » de chaque Théo : vérifie-la sur le code,
+ne la recopie pas.
+
+*Niveau du mock* — l'acceptation tourne sur le vrai BLoC et des use cases mockés. Un test d'acceptation ou
+de widget qui mocke ou instancie un repository, une data source ou un client, ou un test d'acceptation qui
+mocke le BLoC, est un **bloquant** : il teste la mauvaise frontière et lie la présentation à la data.
+
 *Comportement, pas implémentation* — un test qui `verify()` un appel interne non listé comme
 side-effect dans la spec, qui dépend de l'ordre d'appels de mocks, ou qui teste une méthode privée,
 est couplé : il rougira au premier refactoring légitime et vert sur un vrai bug. Bloquant.
@@ -61,7 +73,7 @@ avec les clés de §5, jamais `find.text`.
 *Séquences du cadrage* — pour chaque C<n>, compare la séquence de `cadrage.md` au test d'acceptation
 réel (le `testWidgets` généré et le corps de ses steps) : chaque action de l'utilisateur a un step qui
 la fait, chaque réponse d'un serveur ou d'un stockage (erreur comprise) a un step qui configure le
-faux, chaque résultat visible a une assertion. Une étape du cadrage absente du test est un
+use case mocké, chaque résultat visible a une assertion. Une étape du cadrage absente du test est un
 **bloquant** (« C3, étape 4 : la réponse 409 n'est jamais simulée ») ; une action du test absente du
 cadrage, une note. Le rapport du dev signale ces écarts par heuristique : écris dans `notes` ceux que
 tu juges justifiés (« C2 : 3 résultats visibles, 2 assertions — la 2e assertion couvre les deux »),

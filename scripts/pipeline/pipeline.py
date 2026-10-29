@@ -25,9 +25,9 @@ ORDER = [
     ("hg.contracts", "0e", "Point d'étape « contrats » : Thibault les écrit", "0e_contracts.md", "Thibault (+ Arthur en mode application)"),
     ("spec", "1", "Spec, critique, point d'étape « spec »", "1_spec.md", "Sophie (feature-specifier) puis Camille (feature-spec-critic)"),
     ("contracts", "2", "Complétion du scaffold", "2_scaffold.md", "Arthur (feature-architect, mode complétion)"),
-    ("red", "3", "Tests", "3_tests.md", "Théo (feature-test-writer)"),
+    ("red", "3", "Tests", "3_tests.md", "Théo en deux moitiés parallèles (feature-test-writer-data + feature-test-writer-presentation), puis join"),
     ("hg.tests", "3b", "Revue des tests, point d'étape « tests », gel", "3_tests.md", "Gaëlle (feature-test-reviewer)"),
-    ("green", "4", "Implémentation", "4_impl.md", "Ivan (feature-implementer)"),
+    ("green", "4", "Implémentation", "4_impl.md", "Ivan en deux moitiés parallèles (feature-implementer-data + feature-implementer-presentation), puis join"),
     ("clean", "5", "Nettoyage", "5_clean.md", "Nina (feature-cleaner)"),
     ("dedup_clean", "5b", "Roue réinventée, second passage", "5_clean.md", "Denis (feature-dedup)"),
     ("review", "6", "Revue", "6_review.md", "Romain (feature-reviewer)"),
@@ -256,6 +256,13 @@ def cmd_next(c, args):
         print(f"gabarit   : {c.size} · mode : {c.p.get('mode')} · package : {c.p.get('package')}")
     if n["status"] in ("RED", "FAILED"):
         print(f"état      : {n['status']} ({info['attempts'] or 0} tentatives) — FAILED : point imprévu, Thibault décide ; ne rejoue pas en silence")
+    if n["key"] in ("red", "green"):
+        for half in ("data", "presentation"):
+            st = (c.p.get("stages") or {}).get(f"{n['key']}_{half}")
+            st = st.get("status") if isinstance(st, dict) else st
+            tries = attempts.get(f"{n['key']}_{half}")
+            print(f"moitié    : {n['key']}_{half} = {st or 'pas lancée'}" + (f" ({tries} tentatives)" if tries else "")
+                  + (" — ne la relance pas" if st == "PASSED" else ""))
     if n["key"] == "split":
         for s_ in split_status(c):
             state = "terminée" if s_["done"] else (f"étape {s_['step']} — {s_['title']}" if s_["started"] else "pas démarrée")
@@ -361,6 +368,31 @@ def cmd_pass(c, args):
     c.p.setdefault("stages", {})[args[0]] = {"status": "PASSED", "at": now()}
     c.save()
     print(f"stages.{args[0]} = PASSED")
+
+
+def cmd_join(c, args):
+    """Étapes 3 et 4 en deux moitiés : une fois les deux gates de couche verts (posés par le hook de chaque
+    moitié), le gate complet tranche l'étape — la suite entière, l'analyse de tout le package, tests.md."""
+    if not args or args[0] not in ("red", "green"):
+        die("usage : join <nom> red|green")
+    profile = args[0]
+    halves = [f"{profile}_data", f"{profile}_presentation"]
+    stages = c.p.get("stages") or {}
+    status = lambda v: v.get("status") if isinstance(v, dict) else v
+    # SKIPPED : moitié sans rien à faire (extend qui ne touche qu'une couche), posée par `skip` avec sa raison.
+    pending = [f"{h} ({status(stages.get(h)) or 'pas lancée'})" for h in halves if status(stages.get(h)) not in DONE]
+    if pending:
+        die(f"moitié(s) pas encore verte(s) : {', '.join(pending)} — relance-la ; rien n'est joint", code=1)
+    gauntlet = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gauntlet.sh")
+    r = subprocess.run(["bash", gauntlet, profile, c.name], cwd=c.root, capture_output=True, text=True)
+    c.p = c._load()
+    ok = r.returncode == 0
+    c.p.setdefault("stages", {})[profile] = {"status": "PASSED" if ok else "RED", "at": now(), "joined": halves}
+    c.save()
+    print("\n".join(r.stdout.strip().splitlines()[-12:]))
+    log = os.path.relpath(os.path.join(c.dir, ".gauntlet", f"last_{profile}.log"), c.root)
+    print(f"stages.{profile} = {'PASSED' if ok else 'RED'} (gate complet après {' + '.join(halves)}) — log : {log}")
+    sys.exit(0 if ok else 1)
 
 
 def cmd_skip(c, args):
@@ -944,7 +976,7 @@ def cmd_cockpit_page(c, args):
 
 
 COMMANDS = {
-    "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass,
+    "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,

@@ -27,7 +27,7 @@ Avant de poser des questions, scanne le projet :
 
 ### Design System
 
-- Dossiers : `design_system/`, `theme/`, packages dédiés (`hades/`, `ui_kit/`, etc.)
+- Dossiers : `design_system/`, `theme/`, packages dédiés (`dskit/`, `ui_kit/`, etc.)
 - Fichiers : `*theme*.dart`, `*colors*.dart`, `*typography*.dart`, `*spacing*.dart`
 - Usages : `Theme.of(context)`, extensions de `ThemeData`, tokens custom
 - Anatomie : section **Anatomie du projet** du `create_screen_rules.md` du repo, sinon widgets de page / états déjà réutilisés par plusieurs écrans (`grep` des classes qui enveloppent `Scaffold`, des vues Loading / Error / Empty)

@@ -52,7 +52,7 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    citée dans son fichier, `steps/<étape>_*.md`. Gabarits et reclassement :
    `~/.claude/pipeline/feature/gabarits.md`, à lire en 0b, en 0e et à chaque reclassement.
 3. **Toute écriture de `pipeline.json` passe par `pipeline.sh`.** Tu n'édites jamais le fichier à la
-   main : `pass`, `skip`, `gate`, `size`, `loop`, `debt`, `accept`, `set` (écriture libre, pour ce qu'aucune
+   main : `pass`, `skip`, `join` (étapes 3 et 4 : gate complet après les deux moitiés), `gate`, `size`, `loop`, `debt`, `accept`, `set` (écriture libre, pour ce qu'aucune
    commande ne couvre : `suggestions.S1`, `issue`, `suspect_tests`…), `after-architect`,
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
@@ -103,9 +103,9 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 | 1 | spec | Sophie | `feature-specifier` | — | non | plafond 15 Ko | — |
 | 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : la spec, et dans le même appel les lignes de §9 encore `proposée` (boucle vers 1 avant) | une seule passe (`loops.spec` max 0) | — |
 | 2 | complétion du scaffold | Arthur (mode complétion) | `feature-architect` | `contracts` | non | identique | — |
-| 3 | tests | Théo | `feature-test-writer` | `red` | non | identique | — |
+| 3 | tests | Théo, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Théo complet | `feature-test-writer-data` + `feature-test-writer-presentation` ; relances `feature-test-writer` | `red_data` + `red_presentation`, puis `red` au join | non | identique | — |
 | 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : séquences cadrage ↔ tests réels, `tests.md`, puis gel (boucle vers 3 avant) | identique | — |
-| 4 | impl | Ivan | `feature-implementer` | `green` | non | identique | — |
+| 4 | impl | Ivan, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Ivan complet | `feature-implementer-data` + `feature-implementer-presentation` ; relances `feature-implementer` | `green_data` + `green_presentation`, puis `green` au join | non | identique | — |
 | 5 | clean | Nina | `feature-cleaner` | `clean` | non | identique | — |
 | 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) | `SKIPPED`, sauf entrées `cleaner` reportées de 0d | — |
 | 6 | review | Romain | `feature-reviewer` | `review_verdict` | **oui** : suggestions à retenir (boucle vers 4 si critiques) ; Romain écrit aussi la visite guidée | identique ; `missing_tests` → Hugo | — |

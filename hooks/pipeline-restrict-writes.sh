@@ -96,6 +96,31 @@ case "$agent" in
     match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" "$FEAT_REL/tests.md" $extra_tests $extra_pubspecs \
       || deny "test-writer : tu n'écris que dans $PKG_REL/test/**${extra_tests:+, $extra_tests} (et pubspec.yaml pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel"
     ;;
+  # Moitiés parallèles des étapes 3 et 4 : chacune n'écrit que sa couche, l'autre écrit le reste en même
+  # temps. data = src/data, src/domain, src/injection ; presentation = le reste du package (et writes.extra :
+  # router, l10n). Le pubspec n'est ouvert qu'aux tests de présentation (dev_dependency bdd_widget_test).
+  feature-test-writer-data)
+    match "$rel" "$PKG_REL/test/src/data/*" "$PKG_REL/test/src/domain/*" "$PKG_REL/test/src/injection/*" \
+      || deny "test-writer data : tu n'écris que dans $PKG_REL/test/src/{data,domain,injection}/**. Le BLoC, l'acceptation et le pubspec sont à la moitié présentation, qui écrit en même temps que toi. Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel"
+    ;;
+  feature-test-writer-presentation)
+    match "$rel" "$PKG_REL/test/src/data/*" "$PKG_REL/test/src/domain/*" "$PKG_REL/test/src/injection/*" \
+      && deny "test-writer présentation : $PKG_REL/test/src/{data,domain,injection}/** est à la moitié data, qui écrit en même temps que toi. Refusé : $rel"
+    match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" $extra_tests $extra_pubspecs \
+      || deny "test-writer présentation : tu n'écris que dans $PKG_REL/test/** hors src/{data,domain,injection}${extra_tests:+, $extra_tests} (et pubspec.yaml pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel"
+    ;;
+  feature-implementer-data)
+    is_test_path && deny "implementer data : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/src/data/*" "$PKG_REL/lib/src/domain/*" "$PKG_REL/lib/src/injection/*" \
+      || deny "implementer data : zone autorisée = $PKG_REL/lib/src/{data,domain,injection}/**. La présentation est à l'autre moitié ; une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel"
+    ;;
+  feature-implementer-presentation)
+    is_test_path && deny "implementer présentation : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/src/data/*" "$PKG_REL/lib/src/domain/*" "$PKG_REL/lib/src/injection/*" \
+      && deny "implementer présentation : $PKG_REL/lib/src/{data,domain,injection}/** est à la moitié data, qui écrit en même temps que toi. Tu ne dépends que des signatures des use cases. Refusé : $rel"
+    match "$rel" "$PKG_REL/lib/*" $extra \
+      || deny "implementer présentation : zone autorisée = $PKG_REL/lib/** hors src/{data,domain,injection}${extra:+, $extra}. Une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel"
+    ;;
   feature-implementer|feature-cleaner)
     is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel"
     match "$rel" "$PKG_REL/lib/*" "$PKG_REL/pubspec.yaml" "pubspec.yaml" $extra \

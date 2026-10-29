@@ -125,7 +125,7 @@ commits="$(git -C "$wt" log --no-merges --format='%h %s' "$mb"..HEAD)"
 ncommits="$(printf '%s\n' "$commits" | grep -c . || true)"
 
 # packages touchés : le pubspec.yaml le plus proche de chaque fichier modifié — package d'un workspace
-# (features/x), app dans un sous-dossier (my_center/), ou la racine elle-même (".").
+# (features/x), app dans un sous-dossier (autre-client/), ou la racine elle-même (".").
 pkg_of() { local d; d="$(dirname "$1")"; while [ "$d" != "." ] && [ "$d" != "/" ] && [ ! -f "$wt/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done; [ -f "$wt/$d/pubspec.yaml" ] && printf '%s\n' "$d"; }
 pkgs="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do pkg_of "$f"; done | sort -u)"
 outside="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do [ -z "$(pkg_of "$f")" ] && printf '%s\n' "$f"; done || true)"

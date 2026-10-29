@@ -20,6 +20,12 @@ profile_checks() {
     # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
     red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
+    # Moitiés parallèles des étapes 3 et 4 (gauntlet.sh pose GAUNTLET_LAYER d'après le suffixe) : chaque
+    # check ne juge que la couche. build_runner seulement côté présentation (bdd_widget_test) : deux
+    # build_runner en même temps sur le même package se marchent dessus. tests.md s'écrit au gate complet.
+    red_data)          echo "analyze format:test no_secrets:test test_hygiene red_check" ;;
+    red_presentation)  echo "build_runner analyze format:test no_secrets:test test_hygiene red_check" ;;
+    green_data|green_presentation) profile_checks green ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
     # Revue de PR (pr_gauntlet.sh, mode extend sur chaque package touché) : pas de gel, pas de stubs,
@@ -44,6 +50,10 @@ Profils (étape → checks) :
   red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
   green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
+  red_data, red_presentation, green_data, green_presentation
+             moitiés parallèles des étapes 3 et 4 : mêmes checks que red / green (sans test_names ; build_runner
+             côté présentation seulement), jugés sur la couche (data = lib|test/src/{data,domain,injection},
+             presentation = le reste) ; sorties dans .gauntlet/<couche>/
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
   pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation

@@ -65,7 +65,7 @@
   ligne(s) seulement reformatée(s) ». Ne pas `accept` : si une ligne reformatée est encore comptée, elle
   porte un vrai changement de token. Les `conventions` de `/fix` gardent ces lignes
   (`GAUNTLET_KEEP_FORMAT_LINES=1`). Repro : `tests/test_format_only.sh`.
-- **Package dans un submodule (`flutter_app/hades`) invisible au gauntlet.** En place : les diffs
+- **Package dans un submodule (`flutter_app/dskit`) invisible au gauntlet.** En place : les diffs
   (périmètre, gel, couverture, `writes.extra`, empreinte QA) tournent dans le submodule, depuis le
   gitlink que la base enregistre. Un `tests_freeze_sha` peut être un commit du parent ou du submodule.
 - **`stub_check` / `dup_check` cassés, « Dart 2.18 ».** Cause : `fvm dart` lancé depuis la racine du

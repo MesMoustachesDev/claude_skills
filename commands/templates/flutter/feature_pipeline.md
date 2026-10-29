@@ -37,7 +37,7 @@ writes.extra = features/router/**, features/l10n/lib/**
 # gitlab | notion | none. Absent : gitlab si `glab repo view` réussit, sinon none.
 # ---------------------------------------------------------------------------
 tracker =
-# Projet GitLab des tickets s'il diffère de celui du code (ex. webapps/audin). Vide = projet du remote.
+# Projet GitLab des tickets s'il diffère de celui du code (ex. groupe/projet-client). Vide = projet du remote.
 tracker.gitlab.project =
 # URL de la base Notion (backend notion). Vide : /feature init ou le premier /epic propose de la créer.
 tracker.notion.database =
