@@ -207,19 +207,10 @@ export const register: Register = on => {
           <Button key="refresh" label="Rafraîchir" plain onPress={() => refresh($)} />
         </Box>
 
-        {/* The diff comes first: below a long tree it falls out of the pane's rows. */}
-        {isDiffShown && shownDiff && (
-          <Box flexDirection="column">
-            <Box flexDirection="row" gap={1}>
-              <Text bold>{shownDiff.path}</Text>
-              <Button key="close-diff" label="Fermer" plain onPress={() => update($, diff, () => null)} />
-            </Box>
-            <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
-          </Box>
-        )}
-
+        {/* Tree and diff side by side: below a long tree the diff falls out of the pane's rows. */}
+        <Box flexDirection="row" gap={2}>
         {worktree && (
-          <Box flexDirection="column">
+          <Box flexDirection="column" width={isDiffShown ? '35%' : '100%'} flexShrink={0}>
             <Text dimColor>
               base {worktree.base} · {worktree.mergeBase.slice(0, 9)}
             </Text>
@@ -248,6 +239,17 @@ export const register: Register = on => {
             )}
           </Box>
         )}
+
+        {isDiffShown && shownDiff && (
+          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+            <Box flexDirection="row" gap={1}>
+              <Text bold wrap="truncate-start">{shownDiff.path}</Text>
+              <Button key="close-diff" label="Fermer" plain onPress={() => update($, diff, () => null)} />
+            </Box>
+            <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
+          </Box>
+        )}
+        </Box>
       </Box>
     )
   })
