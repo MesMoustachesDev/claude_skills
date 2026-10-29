@@ -1,0 +1,6 @@
+{
+  "name": "worktree-list",
+  "version": "0.1.0",
+  "description": "Pane listing the git worktrees of the current repository and the branch each one points to",
+  "types": "./types/index.d.ts"
+}

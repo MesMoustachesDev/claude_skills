@@ -1,8 +1,24 @@
 {
   "name": "thibault-mods",
-  "owner": { "name": "Thibault François" },
+  "owner": {
+    "name": "Thibault François"
+  },
   "plugins": [
-    { "name": "pipeline-band", "source": "./pipeline-band" },
-    { "name": "worktree-diff", "source": "./worktree-diff" }
+    {
+      "name": "pipeline-view",
+      "source": "./pipeline-view"
+    },
+    {
+      "name": "pipeline-band",
+      "source": "./pipeline-band"
+    },
+    {
+      "name": "worktree-diff",
+      "source": "./worktree-diff"
+    },
+    {
+      "name": "worktree-list",
+      "source": "./worktree-list"
+    }
   ]
 }
