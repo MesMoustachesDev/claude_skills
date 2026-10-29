@@ -11,6 +11,19 @@ const worktrees = atom({ plugin: 'worktree-diff', key: 'worktrees' } as const, [
 const selectedWorktree = atom({ plugin: 'worktree-diff', key: 'selectedWorktree' } as const, '')
 const collapsed = atom({ plugin: 'worktree-diff', key: 'collapsed' } as const, [])
 const diff = atom({ plugin: 'worktree-diff', key: 'diff' } as const, null)
+const areTestsShown = atom({ plugin: 'worktree-diff', key: 'areTestsShown' } as const, false)
+
+const TEST_FOLDERS = ['test', 'tests', 'integration_test', 'test_driver', '__tests__', 'maestro']
+
+function isTest(path: string) {
+  const parts = path.split('/')
+  const name = parts.at(-1) ?? ''
+  return (
+    parts.slice(0, -1).some(part => TEST_FOLDERS.includes(part)) ||
+    name.endsWith('_test.dart') ||
+    /\.(test|spec)\.[a-z]+$/.test(name)
+  )
+}
 
 async function git($: Engine, dir: string, args: string[]) {
   return $.process.run(['git', ...args], { cwd: dir })
@@ -230,6 +243,9 @@ export const register: Register = on => {
     const shownDiff = await read($, diff)
     const worktree = all.find(one => one.name === selectedName)
     const isDiffShown = shownDiff !== null && shownDiff.worktree === worktree?.name
+    const testsShown = await read($, areTestsShown)
+    const testCount = worktree?.files.filter(file => isTest(file.path)).length ?? 0
+    const visibleFiles = (worktree?.files ?? []).filter(file => testsShown || !isTest(file.path))
 
     if (all.length === 0) {
       return <Text dimColor>Aucun worktree /feature ou /fix actif.</Text>
@@ -247,6 +263,12 @@ export const register: Register = on => {
             />
           ))}
           <Button key="refresh" label="Rafraîchir" plain onPress={() => refresh($)} />
+          <Button
+            key="tests"
+            plain
+            label={testsShown ? 'Tests affichés' : `Tests masqués (${testCount})`}
+            onPress={() => update($, areTestsShown, shown => !shown)}
+          />
         </Box>
 
         {/* Tree and diff side by side: below a long tree the diff falls out of the pane's rows. */}
@@ -257,7 +279,7 @@ export const register: Register = on => {
               base {worktree.base} · {worktree.mergeBase.slice(0, 9)}
             </Text>
             {worktree.error && <Text color="red">{worktree.error}</Text>}
-            {treeRows(buildTree(worktree.files), folded).map(row =>
+            {treeRows(buildTree(visibleFiles), folded).map(row =>
               row.kind === 'dir' ? (
                 <Box key={`dir-${worktree.name}-${row.node.path}`} flexDirection="row">
                   <Text mono dimColor>{row.guide}</Text>

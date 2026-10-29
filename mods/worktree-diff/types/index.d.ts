@@ -27,6 +27,7 @@ declare module 'claude-code' {
       selectedWorktree: string
       collapsed: string[]
       diff: SelectedDiff | null
+      areTestsShown: boolean
     }
   }
 }
