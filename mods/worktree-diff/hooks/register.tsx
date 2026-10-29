@@ -150,15 +150,33 @@ function indent(depth: number) {
   return '  '.repeat(depth)
 }
 
+const REFRESH_MS = 30_000
+let isStarted = false
+
+// Opens the pane and starts the timer once per load: on a new session from
+// session.start, after a hot reload from the first turn end (session.start
+// does not run again then).
+async function start($: Engine) {
+  if (isStarted) return
+  isStarted = true
+  await refresh($)
+  await $.ui.open({ id: PANE, title: 'Worktrees' })
+  $.clock.every(REFRESH_MS, () => {
+    void refresh($)
+  })
+}
+
 export const register: Register = on => {
-  let isPaneAsked = false
+  isStarted = false
+
+  on('session.start', async ($, e, next) => {
+    await start($)
+    return next(e)
+  })
 
   on('turn.complete', async ($, e, next) => {
+    await start($)
     await refresh($)
-    if (!isPaneAsked) {
-      isPaneAsked = true
-      await $.ui.open({ id: PANE, title: 'Worktrees' })
-    }
     return next(e)
   })
 
@@ -169,6 +187,7 @@ export const register: Register = on => {
     const folded = await read($, collapsed)
     const shownDiff = await read($, diff)
     const worktree = all.find(one => one.name === selectedName)
+    const isDiffShown = shownDiff !== null && shownDiff.worktree === worktree?.name
 
     if (all.length === 0) {
       return <Text dimColor>Aucun worktree /feature ou /fix actif.</Text>
@@ -187,6 +206,17 @@ export const register: Register = on => {
           ))}
           <Button key="refresh" label="Rafraîchir" plain onPress={() => refresh($)} />
         </Box>
+
+        {/* The diff comes first: below a long tree it falls out of the pane's rows. */}
+        {isDiffShown && shownDiff && (
+          <Box flexDirection="column">
+            <Box flexDirection="row" gap={1}>
+              <Text bold>{shownDiff.path}</Text>
+              <Button key="close-diff" label="Fermer" plain onPress={() => update($, diff, () => null)} />
+            </Box>
+            <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
+          </Box>
+        )}
 
         {worktree && (
           <Box flexDirection="column">
@@ -210,19 +240,12 @@ export const register: Register = on => {
                 <Button
                   key={`file-${worktree.name}-${row.file.path}`}
                   plain
-                  dimColor={shownDiff?.path !== row.file.path}
-                  label={`${indent(row.depth)}${row.file.status} ${row.name}  +${row.file.added} −${row.file.deleted}`}
+                  dimColor={!(isDiffShown && shownDiff?.path === row.file.path)}
+                  label={`${indent(row.depth)}${isDiffShown && shownDiff?.path === row.file.path ? '● ' : ''}${row.file.status} ${row.name}  +${row.file.added} −${row.file.deleted}`}
                   onPress={() => showDiff($, worktree, row.file)}
                 />
               ),
             )}
-          </Box>
-        )}
-
-        {shownDiff && shownDiff.worktree === worktree?.name && (
-          <Box flexDirection="column">
-            <Text bold>{shownDiff.path}</Text>
-            <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
           </Box>
         )}
       </Box>
