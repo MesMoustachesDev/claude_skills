@@ -53,3 +53,4 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 - Jamais `.first` ni `take(1)` sur un Stream de watch : ajoute une méthode `Future` au repository ou à la data source. (2026-10-17, 2 réponses)
 - Un package tiers déjà exposé par `core` s'importe via `core`, pas en dépendance directe. (2026-10-17, « Core est là pour ça »)
 - Une nouvelle I/O transverse (détection ou ouverture d'app, plugin natif…) vit dans son propre package. (2026-10-17, « Dans sa propre feature ça », 4 réponses)
+- Nomme chaque entité de domaine avec le suffixe `Entity` (classe `XxxEntity`, fichier `xxx_entity.dart`). (2026-10-29, « Contrats »)
