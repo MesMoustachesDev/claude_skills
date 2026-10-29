@@ -82,6 +82,17 @@ _verdict_ok() { # _verdict_ok <file> <label> <message>
   return 1
 }
 
+# spec_lint — avant Camille, gate du hook de Sophie : ce qu'un script vérifie sans relecture (clés, une
+# scène par erreur de §7, symboles cités, archi.json ↔ §4, plafond du gabarit). Voir spec_lint.py.
+# Sans spec.md (cadrage, exploration), rien à vérifier.
+check_spec_lint() {
+  local spec="$FEATURE_DIR/spec.md" archi="$FEATURE_DIR/archi.json" cap
+  [ -f "$spec" ] || { info "pas encore de spec.md, rien à vérifier"; return 0; }
+  [ -f "$archi" ] || archi=-
+  case "$SIZE" in S) cap=15360 ;; L) cap=0 ;; *) cap=40960 ;; esac
+  python3 "$GAUNTLET_ROOT/spec_lint.py" "$spec" "$PKG_DIR" "$PROJECT_ROOT/$(cfg features_root features)" "$archi" "$cap"
+}
+
 check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_review.json" '(.blocking|type=="array") and (.notes|type=="array")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/spec_review.json"), notes : $(jq '.notes|length' "$FEATURE_DIR/spec_review.json")"; }
 check_spec_review_verdict() {
   check_spec_review_report || return 1

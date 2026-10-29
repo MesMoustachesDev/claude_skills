@@ -12,7 +12,10 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    des **faits**, sans rien proposer : le code qui fait déjà tout ou partie du besoin (ici et ailleurs :
    autre plateforme, web, backend, feature voisine), les valeurs en dur, la carte de ce qui entoure le
    besoin, les règles non négociables qui s'appliquent, et les **points techniques qui structureront la
-   feature** (nouvelle I/O, état, frontières de packages) avec ce qui existe pour chacun.
+   feature** (nouvelle I/O, état, frontières de packages) avec ce qui existe pour chacun. Elle lève
+   aussi les **inconnues techniques** des dépendances touchées (ce qu'elles lèvent, leurs cas limites,
+   leur asynchronisme), dans les sources du paquet : c'est du temps gratuit pendant la discussion, que
+   la spec n'aura plus à prendre sur le chemin critique.
 2. **Toi et Thibault, tout de suite, sans attendre Sophie.** Une conversation, pas un formulaire :
    - **Une question à la fois**, courte (une ou deux phrases). Pas d'`AskUserQuestion`, pas de rapport,
      pas de cockpit : du texte, dans la session. Six lignes au plus par message.

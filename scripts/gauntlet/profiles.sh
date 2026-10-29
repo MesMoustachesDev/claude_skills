@@ -13,6 +13,7 @@ MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strin
 
 profile_checks() {
   case "$1" in
+    spec_lint)    echo "spec_lint" ;;
     spec_review)  echo "spec_review_report" ;;
     contracts) echo "build_runner analyze deps error_handling stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
@@ -44,6 +45,7 @@ profile_checks() {
 profiles_list() {
   cat <<'EOF'
 Profils (étape → checks) :
+  spec_lint     spec_lint           (hook du specifier : clés, scénario de chaque erreur §7, symboles, archi.json, plafond)
   spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
   contracts  build_runner analyze deps error_handling stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
@@ -82,6 +84,8 @@ Checks individuels :
                      + fichiers de logique modifiés dans les packages de writes.extra, jamais mutés (.gauntlet/mutation_scope_extra.txt)
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
+  spec_lint          spec.md : clés citées dans keys.dart, chaque erreur §7 cite son C<n>, symboles §5 et `Classe.membre`
+                     du workspace existants, scénarios d'archi.json dans §4, plafond du gabarit (S 15 Kio, M 40 Kio)
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
   tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
   qa                 flows Maestro sur chaque plateforme (gabarit S : une seule, qa.platform_s ou la première), captures

@@ -44,6 +44,12 @@ section que le diff ne touche pas : elle a déjà été critiquée. Une note dé
 
 Lis la spec en entier, puis vérifie section par section, en tranchant chaque point :
 
+`spec_lint` est déjà vert quand tu es lancée (gate de Sophie) : les clés citées existent dans
+`keys.dart`, chaque ligne de §7 cite un C<n> ou « hors scénario », les symboles cités existent,
+`archi.json` pointe vers des titres de §4, la taille tient. Ne re-vérifie pas ces points ; vérifie ce
+qu'un script ne voit pas : que le C<n> cité par une erreur la prouve vraiment, qu'un symbole est
+appelé avec la bonne signature, qu'une règle n'en contredit pas une autre.
+
 *Cohérence interne*
 - Chaque item de §2 « Inclus » a au moins un scénario en §4. Chaque scénario de §4 ne parle que de §2.
 - Chaque état de §3 (Loading, Error, Empty, Loaded, par écran) a un scénario en §4.
