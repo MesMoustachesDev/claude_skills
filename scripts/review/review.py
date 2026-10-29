@@ -879,11 +879,16 @@ def post_calls(r):
         if s["kind"] == "gitlab":
             if inline:
                 refs = s.get("diff_refs") or {}
+                # Corps JSON sur stdin : glab >= 1.126 refuse les champs position[...] en -f.
+                payload = {"body": body, "position": {
+                    "position_type": "text", "base_sha": refs.get("base_sha"), "start_sha": refs.get("start_sha"),
+                    "head_sha": refs.get("head_sha"), "new_path": x["file"], "old_path": x["file"],
+                    "new_line": int(x["line"])}}
                 cmd = ["glab", "api", "--method", "POST", f"projects/:id/merge_requests/{s['number']}/discussions",
-                       "-f", f"body={body}", "-f", "position[position_type]=text",
-                       "-f", f"position[base_sha]={refs.get('base_sha')}", "-f", f"position[start_sha]={refs.get('start_sha')}",
-                       "-f", f"position[head_sha]={refs.get('head_sha')}", "-f", f"position[new_path]={x['file']}",
-                       "-f", f"position[old_path]={x['file']}", "-F", f"position[new_line]={int(x['line'])}"]
+                       "-H", "Content-Type: application/json", "--input", "-"]
+                calls.append({"id": x["id"], "inline": True, "cmd": cmd,
+                              "stdin": json.dumps(payload, ensure_ascii=False)})
+                continue
             else:
                 where = f"`{x['file']}:{x['line']}` — " if x.get("file") and x.get("line") else (f"`{x['file']}` — " if x.get("file") else "")
                 cmd = ["glab", "mr", "note", str(s["number"]), "-m", where + body]
@@ -914,10 +919,12 @@ def cmd_post(r, args):
         for c in calls:
             print(f"\n{c['id']} ({'en ligne' if c['inline'] else 'commentaire général'}) :")
             print("  " + " ".join(json.dumps(a, ensure_ascii=False) if " " in a or "\n" in a else a for a in c["cmd"]))
+            if c.get("stdin"):
+                print("  stdin : " + c["stdin"])
         return
     failed = []
     for c in calls:
-        p = subprocess.run(c["cmd"], cwd=s["project_root"], capture_output=True, text=True)
+        p = subprocess.run(c["cmd"], cwd=s["project_root"], capture_output=True, text=True, input=c.get("stdin"))
         if p.returncode == 0:
             s.setdefault("posted", []).append({"id": c["id"], "inline": c["inline"], "at": now()})
             r.save()
