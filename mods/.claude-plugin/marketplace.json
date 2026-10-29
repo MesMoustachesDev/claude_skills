@@ -1,5 +1,5 @@
 {
-  "name": "mods",
+  "name": "thibault-mods",
   "owner": { "name": "Thibault François" },
   "plugins": [
     { "name": "pipeline-band", "source": "./pipeline-band" },
