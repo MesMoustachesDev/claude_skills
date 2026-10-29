@@ -12,6 +12,45 @@ ko()      { printf '%s[FAIL]%s %s\n' "$C_KO" "$C_0" "$*"; }
 die()     { printf '%s[ABORT]%s %s\n' "$C_KO" "$C_0" "$*" >&2; exit 2; }
 
 # ---------------------------------------------------------------------------
+# Worktree de la feature, pour les hooks
+# ---------------------------------------------------------------------------
+# Un sous-agent hérite du cwd de la session de l'orchestrateur, qui n'est pas toujours le worktree de la
+# feature (session ouverte sur le checkout principal, reprise, cwd remis à zéro). Les hooks ne s'y fient
+# donc pas seuls : ils cherchent le worktree dans le fichier écrit, le cwd, puis le prompt de l'agent
+# (l'orchestrateur y met toujours « Racine : <worktree> »).
+
+# feature_root_from <chemin> — racine git de <chemin> (ou de son premier parent existant) si elle est sur
+# une branche feature/*, rien sinon
+feature_root_from() {
+  local d="$1" top
+  [ -n "$d" ] || return 1
+  while [ ! -d "$d" ] && [ "$d" != / ] && [ "$d" != . ]; do d="$(dirname "$d")"; done
+  top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  case "$(git -C "$top" branch --show-current 2>/dev/null)" in feature/*) printf '%s\n' "$top" ;; *) return 1 ;; esac
+}
+# hook_agent_transcript <entrée JSON du hook> — transcript du sous-agent : agent_transcript_path, sinon
+# déduit du transcript de la session (<session>/subagents/agent-<id>.jsonl)
+hook_agent_transcript() {
+  local t id
+  t="$(jq -r '.agent_transcript_path // empty' <<<"$1")"
+  [ -n "$t" ] && { printf '%s\n' "$t"; return; }
+  t="$(jq -r '.transcript_path // empty' <<<"$1")"; id="$(jq -r '.agent_id // empty' <<<"$1")"
+  [ -n "$t" ] && [ -n "$id" ] && printf '%s\n' "${t%.jsonl}/subagents/agent-$id.jsonl"
+}
+# hook_feature_root <cwd> <fichier ou ""> <transcript de l'agent ou ""> — le worktree de la feature
+hook_feature_root() {
+  local r wt pat='/[^ "`'"'"'\\]*/\.claude/worktrees/feature-[A-Za-z0-9_.-]*'
+  r="$(feature_root_from "$2")" && { printf '%s\n' "$r"; return 0; }
+  r="$(feature_root_from "$1")" && { printf '%s\n' "$r"; return 0; }
+  [ -n "$3" ] && [ -f "$3" ] || return 1
+  # La ligne « Racine : » du prompt d'abord ; à défaut, le premier worktree de feature cité.
+  wt="$(grep -m1 'Racine' "$3" | grep -oE "$pat" | head -1)"
+  [ -n "$wt" ] || wt="$(head -c 400000 "$3" | grep -oE "$pat" | head -1)"
+  r="$(feature_root_from "$wt")" && { printf '%s\n' "$r"; return 0; }
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # Contexte projet
 # ---------------------------------------------------------------------------
 # Variables exportées : PROJECT_ROOT CFG_FILE FEATURE PKG_REL PKG_DIR PKG_NAME FEATURE_DIR

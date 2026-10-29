@@ -185,6 +185,11 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   Le prompt de lancement tient en 15 lignes. Celui de Sophie, Camille, Arthur et Romain inclut les
   chemins des règles tirées des réponses du dev (`~/.claude/pipeline/answers.md`, et
   `.claude/rules/pipeline_answers.md` s'il existe) : un choix qu'elles tranchent n'est pas proposé.
+  **Chaque prompt commence par `Racine : <chemin absolu du worktree>`.** Les hooks y retrouvent le
+  worktree quand le cwd hérité de ta session n'est pas le bon (checkout principal, reprise) ; sans
+  elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par
+  « GATE NON JOUÉ » : rejoue toi-même `gauntlet.sh <profil> <nom>` depuis le worktree avant de
+  continuer, et corrige ton prompt.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction

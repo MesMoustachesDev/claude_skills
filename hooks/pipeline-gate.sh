@@ -30,15 +30,23 @@ case "$agent" in
   *) exit 0 ;;
 esac
 
-GAUNTLET="$HOME/.claude/scripts/gauntlet.sh"
-GAUNTLET_ROOT="$HOME/.claude/scripts/gauntlet"
+GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$HOME/.claude/scripts/gauntlet}"   # surcharge : tests du hook
+GAUNTLET="$GAUNTLET_ROOT/../gauntlet.sh"
 # shellcheck source=../scripts/gauntlet/lib.sh
 source "$GAUNTLET_ROOT/lib.sh"
+# Le worktree de la feature, pas le cwd hérité de la session (voir hook_feature_root).
+root="$(hook_feature_root "$cwd" "" "$(hook_agent_transcript "$input")")" && cwd="$root"
 cd "$cwd" 2>/dev/null || exit 0
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
 [ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
-[ -n "$feature" ] || { echo "pipeline-gate : feature courante inconnue, gate ignoré" >&2; exit 0; }
+if [ -z "$feature" ]; then
+  # Jamais « gate ignoré » en silence : l'agent le dit en tête de son rapport, l'orchestrateur rejoue le
+  # gate lui-même. Une seule fois (stop_hook_active), sinon l'agent tournerait sans fin.
+  [ "$(jq -r '.stop_hook_active // false' <<<"$input")" = true ] && exit 0
+  echo "pipeline-gate : worktree de la feature introuvable (cwd $cwd, pas de « Racine : <worktree> » dans ton prompt) — gate '$profile' NON JOUÉ. Commence ton rapport final par « GATE NON JOUÉ ($profile) : worktree introuvable », puis termine." >&2
+  exit 2
+fi
 case "$profile" in *_data|*_presentation) export GAUNTLET_LAYER="${profile##*_}" ;; esac   # sorties de la couche (log)
 init_project_context "$feature" 2>/dev/null || { echo "pipeline-gate : contexte projet illisible, gate ignoré" >&2; exit 0; }
 

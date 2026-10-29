@@ -25,9 +25,13 @@ deny() {
 }
 
 # --- contexte projet (réutilise le gauntlet) --------------------------------------------------
-GAUNTLET_ROOT="$HOME/.claude/scripts/gauntlet"
+GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$HOME/.claude/scripts/gauntlet}"   # surcharge : tests du hook
 # shellcheck source=../scripts/gauntlet/lib.sh
 source "$GAUNTLET_ROOT/lib.sh"
+# Le worktree de la feature, pas le cwd : un sous-agent hérite du cwd de la session, qui peut être le
+# checkout principal (session ouverte sur le projet, reprise) — la branche y est develop et tout serait
+# refusé, ou contourné par Bash. Le fichier écrit, puis le cwd, puis la racine du prompt de l'agent.
+root="$(hook_feature_root "$cwd" "$file" "$(hook_agent_transcript "$input")")" && cwd="$root"
 cd "$cwd" 2>/dev/null || exit 0
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
@@ -60,7 +64,7 @@ normalize() {
 abs="$(normalize "$file")"
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd -P)"
 [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && exit 0     # brouillons : toujours permis
-[[ "$abs" == "$PROJECT_ROOT"/* ]] || deny "pipeline : écriture hors du projet refusée ($file)"
+[[ "$abs" == "$PROJECT_ROOT"/* ]] || deny "pipeline : écriture hors du worktree de la feature refusée ($file). Le worktree est $PROJECT_ROOT : écris sous ce chemin."
 rel="${abs#$PROJECT_ROOT/}"
 
 FEAT_REL=".claude/features/$feature"
