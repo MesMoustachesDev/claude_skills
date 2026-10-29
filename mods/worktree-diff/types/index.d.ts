@@ -10,6 +10,7 @@ export type PipelineWorktree = {
   dir: string
   base: string
   mergeBase: string
+  branch: string
   files: ChangedFile[]
   error: string
 }
@@ -24,6 +25,7 @@ declare module 'claude-code' {
   interface PluginState {
     'worktree-diff': {
       worktrees: PipelineWorktree[]
+      currentBranch: string
       selectedWorktree: string
       collapsed: string[]
       diff: SelectedDiff | null

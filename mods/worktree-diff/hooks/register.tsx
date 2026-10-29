@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Engine, Register } from 'claude-code'
+import type { EngineInterface as Engine, Register } from 'claude-code'
 
 import type { ChangedFile, PipelineWorktree, SelectedDiff } from '../types'
 
@@ -8,6 +8,7 @@ const PANE = 'worktree-diff'
 const HIDDEN_PREFIXES = ['.claude/']
 
 const worktrees = atom({ plugin: 'worktree-diff', key: 'worktrees' } as const, [])
+const currentBranch = atom({ plugin: 'worktree-diff', key: 'currentBranch' } as const, '')
 const selectedWorktree = atom({ plugin: 'worktree-diff', key: 'selectedWorktree' } as const, '')
 const collapsed = atom({ plugin: 'worktree-diff', key: 'collapsed' } as const, [])
 const diff = atom({ plugin: 'worktree-diff', key: 'diff' } as const, null)
@@ -27,6 +28,16 @@ function isTest(path: string) {
 
 async function git($: Engine, dir: string, args: string[]) {
   return $.process.run(['git', ...args], { cwd: dir })
+}
+
+// The branch checked out in dir, or the short sha when HEAD is detached.
+async function branchOf($: Engine, dir?: string): Promise<string> {
+  const { exitCode, stdout } = await $.process.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], dir ? { cwd: dir } : {})
+  if (exitCode !== 0) return ''
+  const branch = stdout.trim()
+  if (branch !== 'HEAD') return branch
+  const sha = await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], dir ? { cwd: dir } : {})
+  return `détachée @ ${sha.stdout.trim()}`
 }
 
 async function readJson($: Engine, path: string): Promise<Record<string, unknown> | null> {
@@ -69,7 +80,7 @@ async function changedFiles($: Engine, dir: string, mergeBase: string): Promise<
   for (const line of statuses.stdout.split('\n').filter(Boolean)) {
     const [status, ...paths] = line.split('\t')
     const path = paths.at(-1) ?? ''
-    byPath.set(path, { path, status: status.charAt(0), added: 0, deleted: 0 })
+    byPath.set(path, { path, status: (status ?? '').charAt(0), added: 0, deleted: 0 })
   }
   for (const line of counts.stdout.split('\n').filter(Boolean)) {
     const [added, deleted, ...rest] = line.split('\t')
@@ -107,18 +118,21 @@ async function scan($: Engine): Promise<PipelineWorktree[]> {
     const dir = `${WORKTREES}/${entry.name}`
     const base = await baseOf($, dir, entry.name)
     if (base === null) continue
+    const branch = await branchOf($, dir)
     const mergeBase = await mergeBaseOf($, dir, base)
     if (mergeBase === null) {
-      found.push({ name: entry.name, dir, base, mergeBase: '', files: [], error: `base ${base} introuvable` })
+      found.push({ name: entry.name, dir, base, mergeBase: '', branch, files: [], error: `base ${base} introuvable` })
       continue
     }
-    found.push({ name: entry.name, dir, base, mergeBase, files: await changedFiles($, dir, mergeBase), error: '' })
+    found.push({ name: entry.name, dir, base, mergeBase, branch, files: await changedFiles($, dir, mergeBase), error: '' })
   }
   return found
 }
 
 async function refresh($: Engine) {
   const found = await scan($)
+  const branch = await branchOf($)
+  await update($, currentBranch, () => branch)
   await update($, worktrees, () => found)
   const current = await read($, selectedWorktree)
   if (!found.some(worktree => worktree.name === current)) {
@@ -165,9 +179,10 @@ function buildTree(files: ChangedFile[]): DirNode {
 function compress(node: DirNode): DirNode {
   node.dirs = node.dirs.map(dir => {
     let merged = dir
-    while (merged.files.length === 0 && merged.dirs.length === 1) {
-      const only = merged.dirs[0]
+    let only = merged.dirs[0]
+    while (merged.files.length === 0 && merged.dirs.length === 1 && only) {
       merged = { ...only, name: `${merged.name}/${only.name}` }
+      only = merged.dirs[0]
     }
     return compress(merged)
   })
@@ -215,10 +230,21 @@ async function start($: Engine) {
   if (isStarted) return
   isStarted = true
   await refresh($)
-  await $.ui.open({ id: PANE, title: 'Worktrees' })
+  // A session driven from another surface (Remote Control) may place no pane:
+  // say so in the status line instead of failing silently.
+  const opened = await $.ui.open({ id: PANE, title: 'Worktrees' })
+  $.ui.status(opened.isPlaced ? undefined : `worktree-diff : pane non placé (${opened.reason})`)
   $.clock.every(REFRESH_MS, () => {
     void refresh($)
+    void clearStatusOncePlaced($)
   })
+}
+
+// The pane waits undrawn below 144 columns or with no surface attached; once a
+// surface places it, the status line has nothing left to say.
+async function clearStatusOncePlaced($: Engine) {
+  const panes = await $.ui.panes()
+  if (panes.some(pane => pane.id === PANE && pane.isPlaced)) $.ui.status(undefined)
 }
 
 export const register: Register = on => {
@@ -238,6 +264,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Code, Text } = $.ui.resolve(e)
     const all = await read($, worktrees)
+    const sessionBranch = await read($, currentBranch)
     const selectedName = await read($, selectedWorktree)
     const folded = await read($, collapsed)
     const shownDiff = await read($, diff)
@@ -247,12 +274,25 @@ export const register: Register = on => {
     const testCount = worktree?.files.filter(file => isTest(file.path)).length ?? 0
     const visibleFiles = (worktree?.files ?? []).filter(file => testsShown || !isTest(file.path))
 
+    const sessionLine = (
+      <Text>
+        <Text dimColor>Session sur </Text>
+        <Text bold>{sessionBranch || '(pas de dépôt git)'}</Text>
+      </Text>
+    )
+
     if (all.length === 0) {
-      return <Text dimColor>Aucun worktree /feature ou /fix actif.</Text>
+      return (
+        <Box flexDirection="column" gap={1}>
+          {sessionLine}
+          <Text dimColor>Aucun worktree /feature ou /fix actif.</Text>
+        </Box>
+      )
     }
 
     return (
       <Box flexDirection="column" gap={1}>
+        {sessionLine}
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
           {all.map(one => (
             <Button
@@ -275,6 +315,12 @@ export const register: Register = on => {
         <Box flexDirection="row" gap={2}>
         {worktree && (
           <Box flexDirection="column" width={isDiffShown ? '35%' : '100%'} flexShrink={0}>
+            {worktree.branch && (
+              <Text>
+                <Text dimColor>branche </Text>
+                <Text bold>{worktree.branch}</Text>
+              </Text>
+            )}
             <Text dimColor>
               base {worktree.base} · {worktree.mergeBase.slice(0, 9)}
             </Text>
