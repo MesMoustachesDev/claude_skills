@@ -4,7 +4,7 @@ description: Hugo — Étape 7 du feature pipeline. Mutation testing — tue les
 model: sonnet
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"
@@ -68,6 +68,9 @@ de **nouveaux** fichiers, à côté du test existant, suffixés `_mutation_test.
 `test/src/domain/usecase/fetch_x_usecase_mutation_test.dart`. Même conventions que `create_test.md`
 (mocktail, mocks privés, un comportement par test). Le gate `test_freeze_check:additive` vérifie par
 `git diff` que seuls des fichiers ont été ajoutés.
+Les fichiers que tu as créés depuis le gel sont à toi : tu les corriges avec Edit. Une écriture que
+le hook refuse ne se refait pas autrement (`sed -i`, redirection, `python -c`) : Bash suit la même zone,
+et un refus qui te semble faux va dans ton rapport final, avec le message du hook.
 
 Si un test existant est **faux** (il rend un mutant intuable parce qu'il fige un comportement
 incorrect), tu ne le corriges pas : tu le signales dans ton rapport final.

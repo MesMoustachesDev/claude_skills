@@ -4,7 +4,7 @@ description: Arthur — Étapes 0c et 2 du feature pipeline. En mode brouillon, 
 model: sonnet
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"
