@@ -45,7 +45,7 @@ Prépare 6 à 12 idées. Pour chacune : un titre court (≤ 10 mots), un format,
 Règles :
 - Varie les sujets : 2 idées maximum sur un même thème (un outil, une techno, une actu), y compris en comptant les posts déjà programmés dans la table.
 - N'invente rien sur ce qu'il fait. Une idée tirée des discussions repose sur ce qui y est écrit.
-- Les missions clients (audin, my-center, Wifirst…) ne sont jamais citées par leur nom : « une app terrain », « un client ».
+- Les missions clients (projet-client, autre-client, client…) ne sont jamais citées par leur nom : « une app terrain », « un client ».
 - Pas de données perso (emails, ids, noms de proches).
 - Pour l'accroche, lis `~/.claude/skills/ecrire-linkedin/voix.md` (une touche, pas plus). Jamais de tiret cadratin ni de tournure IA.
 

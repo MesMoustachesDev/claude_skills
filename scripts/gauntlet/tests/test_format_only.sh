@@ -4,7 +4,7 @@
 #   error_handling : un try/catch préexistant hors data/, reformaté par la feature → pas de FAIL ;
 #                    un try/catch ajouté par la feature, dans le même fichier reformaté → FAIL (contrôle).
 #   GAUNTLET_KEEP_FORMAT_LINES=1 (conventions de /fix) : la ligne reformatée reste jugée (contrôle).
-# Cas réels : ingredients_to_use_chips (couverture 79,4 % sur du code reformaté), sidos_menu_entries (S10,
+# Cas réels : ingredients_to_use_chips (couverture 79,4 % sur du code reformaté), import_menu_entries (S10,
 # 4 providers et ~70 lignes reformatés), two_factor_login (re-gel « dart format only »).
 source "$(dirname "$0")/fixture.sh"
 need_fvm

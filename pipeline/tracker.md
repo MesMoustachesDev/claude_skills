@@ -1,6 +1,6 @@
 # Tracker — partagé par `/epic`, `/feature` et `/fix`
 
-Où vivent les tickets d'un projet : GitLab (audin), Notion (cookbooker), ou nulle part. Les
+Où vivent les tickets d'un projet : GitLab (projet-client), Notion (mon-app), ou nulle part. Les
 orchestrateurs ne parlent au tracker **qu'à travers les opérations de ce fichier**. Le contenu des
 tickets (gabarits) est dans `issue.md` ; ici, seulement le comment.
 
@@ -11,7 +11,7 @@ Bloc `ini` de `.claude/rules/feature_pipeline.md` :
 ```ini
 # gitlab | notion | none
 tracker = gitlab
-# ex. webapps/audin ; vide = projet du remote
+# ex. groupe/projet-client ; vide = projet du remote
 tracker.gitlab.project =
 # URL de la base Notion
 tracker.notion.database =
@@ -30,7 +30,7 @@ Partout (`pipeline.json → issue`, `split[i].ticket`, `fix.json → issue`) :
 
 ```json
 { "status": "existing | to_create | created | none", "backend": "gitlab | notion",
-  "id": "123 | <page id>", "ref": "#123 | webapps/audin#123 | <url notion>", "url": "…", "title": "…" }
+  "id": "123 | <page id>", "ref": "#123 | groupe/projet-client#123 | <url notion>", "url": "…", "title": "…" }
 ```
 
 `ref` est ce qu'on écrit dans une MR (`Closes <ref>`). Une ancienne entrée sans `backend` est `gitlab`.
@@ -68,8 +68,8 @@ La vérité est locale (`pipeline.json`, git, MR) ; le tracker en est le miroir.
 ## Backend `gitlab`
 
 `glab`, toujours avec `-R <tracker.gitlab.project>` quand la clé est renseignée. Quand ce projet
-diffère de celui du code, `ref` est cross-projet (`webapps/audin#12`) : c'est la forme à mettre dans
-les MR (`create_mr_rules.md` d'audin le demande déjà).
+diffère de celui du code, `ref` est cross-projet (`groupe/projet-client#12`) : c'est la forme à mettre dans
+les MR (`create_mr_rules.md` du projet client le demande déjà).
 
 - `reachable` : `glab auth status` puis `glab repo view [-R <project>] -F json`.
 - `find` : `#123`, `projet#123` ou URL `…/-/issues/123` → `glab issue view <iid> [-R …] -F json`.

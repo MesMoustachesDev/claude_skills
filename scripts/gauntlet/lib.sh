@@ -82,7 +82,7 @@ fvm_pinned_version() {
 # ---------------------------------------------------------------------------
 # Git, submodules compris
 # ---------------------------------------------------------------------------
-# Un package peut vivre dans un submodule (flutter_app/hades) : le repo parent n'en voit que le gitlink.
+# Un package peut vivre dans un submodule (flutter_app/dskit) : le repo parent n'en voit que le gitlink.
 # Les helpers ci-dessous lancent git dans le bon repo et rendent des chemins relatifs à PROJECT_ROOT.
 # submodules — chemins des submodules (relatifs à PROJECT_ROOT), un par ligne.
 submodules() {
@@ -127,13 +127,15 @@ git_sites() {
     printf '%s\036%s\036%s\036%s\n' "$PROJECT_ROOT/$s" "$s/" "$(sub_rev "$s" "$rev")" .
   done < <(submodules)
   local IFS=$'\036'
-  printf '%s\n' "$PROJECT_ROOT"$'\036'$'\036'"$rev"$'\036'"$path${excl[*]:+$'\036'}${excl[*]}"
+  printf '%s\n' "$PROJECT_ROOT"$'\036'$'\036'"$rev"$'\036'"$path${excl[*]+${excl[*]:+$'\036'}${excl[*]}}"  # ${…+} : tableau vide sous set -u en bash 3.2
 }
 # Chaque helper lit un site : SITE_DIR, SITE_PRE, SITE_REV et le tableau SITE_PATHS (chemin + exclusions).
 _read_site() {
-  local IFS=$'\036' f
+  local IFS=$'\036' f i
   read -r -a f || return 1
-  SITE_DIR="${f[0]}"; SITE_PRE="${f[1]}"; SITE_REV="${f[2]}"; SITE_PATHS=("${f[@]:3}")
+  SITE_DIR="${f[0]}"; SITE_PRE="${f[1]}"; SITE_REV="${f[2]}"
+  # Pas de "${f[@]:3}" : sous bash 3.2 (macOS), avec un IFS non standard, la tranche colle les éléments en un seul.
+  SITE_PATHS=(); for ((i = 3; i < ${#f[@]}; i++)); do SITE_PATHS+=("${f[i]}"); done
 }
 # diff_names <rev> <chemin> [args…] — fichiers modifiés depuis <rev> (arbre de travail compris).
 diff_names() {

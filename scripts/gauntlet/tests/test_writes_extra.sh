@@ -4,7 +4,7 @@
 #   pipeline.sh extra : écrit pipeline.json, jamais la config ; sans glob, liste projet + feature.
 #   hook pipeline-restrict-writes : l'implementer peut écrire dans la zone de la feature ; sans elle, refus.
 #   footprint : un fichier modifié dans la zone de la feature passe ; sans elle, FAIL.
-# Cas réels : cookbooker meal_plan_basics_leftovers (functions/** ouvert à vie pour un paramètre), social_apps
+# Cas réels : mon-app meal_plan_basics_leftovers (functions/** ouvert à vie pour un paramètre), social_apps
 # (remote_config/**, Info.plist, AndroidManifest.xml ajoutés à la config du projet).
 source "$(dirname "$0")/fixture.sh"
 need_fvm

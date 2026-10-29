@@ -92,7 +92,7 @@ check_error_handling() {
   # writes.extra : seules les zones `<pkg>/lib/**` d'un package à couches (lib/src/) sont scannées.
   base="$(merge_base)"
   extra="$(writes_extra | while IFS= read -r g; do
-      case "$g" in */lib/\*\*) dir="${g%/\*\*}/src" ;; *) continue ;; esac
+      case "$g" in (*/lib/\*\*) dir="${g%/\*\*}/src" ;; (*) continue ;; esac
       [ -d "$PROJECT_ROOT/$dir" ] || continue
       { diff_u0 "$base" "$dir" \
           | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); n=substr(a[1],2)} /^\+[^+]/{print f":"n": "substr($0,2); n++}'
