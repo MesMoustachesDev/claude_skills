@@ -123,31 +123,73 @@ async function showDiff($: Engine, worktree: PipelineWorktree, file: ChangedFile
   await update($, diff, () => selected)
 }
 
-type Row = { kind: 'dir'; path: string; name: string; depth: number } | { kind: 'file'; file: ChangedFile; name: string; depth: number }
+type DirNode = { name: string; path: string; dirs: DirNode[]; files: ChangedFile[]; count: number }
 
-// Folder rows then their files, each folder once, skipping what a collapsed folder holds.
-function treeRows(files: ChangedFile[], folded: string[]): Row[] {
-  const rows: Row[] = []
-  const seen = new Set<string>()
+type Row =
+  | { kind: 'dir'; guide: string; node: DirNode }
+  | { kind: 'file'; guide: string; file: ChangedFile; name: string }
+
+function buildTree(files: ChangedFile[]): DirNode {
+  const root: DirNode = { name: '', path: '', dirs: [], files: [], count: 0 }
   for (const file of files) {
     const parts = file.path.split('/')
-    let hiddenBy = ''
-    for (let depth = 0; depth < parts.length - 1; depth += 1) {
-      const path = parts.slice(0, depth + 1).join('/')
-      if (hiddenBy) break
-      if (!seen.has(path)) {
-        seen.add(path)
-        rows.push({ kind: 'dir', path, name: parts[depth], depth })
+    let node = root
+    for (const part of parts.slice(0, -1)) {
+      const path = node.path ? `${node.path}/${part}` : part
+      let child = node.dirs.find(dir => dir.path === path)
+      if (!child) {
+        child = { name: part, path, dirs: [], files: [], count: 0 }
+        node.dirs.push(child)
       }
-      if (folded.includes(path)) hiddenBy = path
+      node = child
     }
-    if (!hiddenBy) rows.push({ kind: 'file', file, name: parts.at(-1) ?? file.path, depth: parts.length - 1 })
+    node.files.push(file)
   }
+  return compress(root)
+}
+
+// A folder holding one folder and no file merges with it, as in VS Code: a/b/c on one row.
+function compress(node: DirNode): DirNode {
+  node.dirs = node.dirs.map(dir => {
+    let merged = dir
+    while (merged.files.length === 0 && merged.dirs.length === 1) {
+      const only = merged.dirs[0]
+      merged = { ...only, name: `${merged.name}/${only.name}` }
+    }
+    return compress(merged)
+  })
+  node.count = node.files.length + node.dirs.reduce((sum, dir) => sum + dir.count, 0)
+  return node
+}
+
+// Folders before files, each with its guide (├─ └─ │), skipping what a folded folder holds.
+function treeRows(node: DirNode, folded: string[], prefix = ''): Row[] {
+  const children = [
+    ...node.dirs.map(dir => ({ kind: 'dir' as const, dir })),
+    ...node.files.map(file => ({ kind: 'file' as const, file })),
+  ]
+  const rows: Row[] = []
+  children.forEach((child, index) => {
+    const isLast = index === children.length - 1
+    // Non-breaking spaces: the desktop collapses ordinary leading whitespace.
+    const guide = `${prefix}${isLast ? '└─ ' : '├─ '}`
+    if (child.kind === 'dir') {
+      rows.push({ kind: 'dir', guide, node: child.dir })
+      if (!folded.includes(child.dir.path)) {
+        rows.push(...treeRows(child.dir, folded, `${prefix}${isLast ? '   ' : '│  '}`))
+      }
+    } else {
+      rows.push({ kind: 'file', guide, file: child.file, name: child.file.path.split('/').at(-1) ?? child.file.path })
+    }
+  })
   return rows
 }
 
-function indent(depth: number) {
-  return '  '.repeat(depth)
+function statusColor(status: string) {
+  if (status === 'A') return 'success'
+  if (status === 'D') return 'error'
+  if (status === '?') return 'inactive'
+  return 'warning'
 }
 
 const REFRESH_MS = 30_000
@@ -215,26 +257,38 @@ export const register: Register = on => {
               base {worktree.base} · {worktree.mergeBase.slice(0, 9)}
             </Text>
             {worktree.error && <Text color="red">{worktree.error}</Text>}
-            {treeRows(worktree.files, folded).map(row =>
+            {treeRows(buildTree(worktree.files), folded).map(row =>
               row.kind === 'dir' ? (
-                <Button
-                  key={`dir-${worktree.name}-${row.path}`}
-                  plain
-                  label={`${indent(row.depth)}${folded.includes(row.path) ? '▸' : '▾'} ${row.name}/`}
-                  onPress={() =>
-                    update($, collapsed, list =>
-                      list.includes(row.path) ? list.filter(one => one !== row.path) : [...list, row.path],
-                    )
-                  }
-                />
+                <Box key={`dir-${worktree.name}-${row.node.path}`} flexDirection="row">
+                  <Text mono dimColor>{row.guide}</Text>
+                  <Button
+                    key={`dirbtn-${worktree.name}-${row.node.path}`}
+                    plain
+                    label={`${folded.includes(row.node.path) ? '▸' : '▾'} ${row.node.name}/`}
+                    onPress={() =>
+                      update($, collapsed, list =>
+                        list.includes(row.node.path)
+                          ? list.filter(one => one !== row.node.path)
+                          : [...list, row.node.path],
+                      )
+                    }
+                  />
+                  <Text dimColor> {row.node.count}</Text>
+                </Box>
               ) : (
-                <Button
-                  key={`file-${worktree.name}-${row.file.path}`}
-                  plain
-                  dimColor={!(isDiffShown && shownDiff?.path === row.file.path)}
-                  label={`${indent(row.depth)}${isDiffShown && shownDiff?.path === row.file.path ? '● ' : ''}${row.file.status} ${row.name}  +${row.file.added} −${row.file.deleted}`}
-                  onPress={() => showDiff($, worktree, row.file)}
-                />
+                <Box key={`file-${worktree.name}-${row.file.path}`} flexDirection="row">
+                  <Text mono dimColor>{row.guide}</Text>
+                  <Text mono color={statusColor(row.file.status)}>{row.file.status} </Text>
+                  <Button
+                    key={`filebtn-${worktree.name}-${row.file.path}`}
+                    plain
+                    dimColor={!(isDiffShown && shownDiff?.path === row.file.path)}
+                    label={`${isDiffShown && shownDiff?.path === row.file.path ? '● ' : ''}${row.name}`}
+                    onPress={() => showDiff($, worktree, row.file)}
+                  />
+                  <Text color="diffAdded"> +{row.file.added}</Text>
+                  <Text color="diffRemoved"> −{row.file.deleted}</Text>
+                </Box>
               ),
             )}
           </Box>
