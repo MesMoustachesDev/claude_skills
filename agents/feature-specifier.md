@@ -64,6 +64,9 @@ lieu** : `discussion.md` en garde les décisions et le périmètre, `exploration
   `fichier:ligne`, et ajoute une **carte** : un `flowchart` Mermaid de ce qui existe autour du besoin
   (packages, classes, flux), avec ce que la feature touchera.
 - **Ce que je comprends du besoin** : 3 à 5 phrases, dans les mots du dev (tirées de `discussion.md`).
+- **Critère de succès** : à quoi on verra que c'est réussi, tel que le dev l'a dit, en une ou deux
+  phrases observables. Chaque C<n> le sert ou le protège ; un C<n> qui ne fait ni l'un ni l'autre va
+  dans « À confirmer ». Absent de `discussion.md` : « À confirmer », jamais inventé.
 - **Périmètre** : inclus / exclu, une ligne par élément, chacune avec un exemple concret.
 - **Comportements visibles = scénarios d'acceptation** : 5 à 10, sur des cas réels (tailles,
   formats, sources, erreurs), pas de Gherkin. Chacun sous un titre `### C<n> — <quand … alors …>`
