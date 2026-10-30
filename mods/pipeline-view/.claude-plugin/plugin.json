@@ -1,6 +1,6 @@
 {
   "name": "pipeline-view",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Affiche l'état du pipeline /feature ou /fix en cours : étapes, gates, tentatives, agent actif, ce qui t'attend. Lecture seule.",
   "types": "./types/index.d.ts"
 }

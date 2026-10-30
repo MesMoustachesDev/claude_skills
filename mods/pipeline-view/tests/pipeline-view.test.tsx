@@ -83,8 +83,8 @@ test('le panneau liste les étapes dans l’ordre du pipeline', async ($, on) =>
   await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /contrats/ }))?.text).toBe('✓ contrats')
-  expect((await ui.find({ type: 'Text', text: /impl/ }))?.text).toBe('✗ impl (vert)  2/5')
+  expect((await ui.find({ type: 'Text', text: /contrats/ }))?.text).toBe('✓ contrats · Arthur, puis Thibault')
+  expect((await ui.find({ type: 'Text', text: /impl/ }))?.text).toBe('✗ impl (vert) · Ivan  2/5')
   await ui.unmount()
 })
 
@@ -146,7 +146,7 @@ test('le panneau suit Ivan : durée, appels, refus et fichiers modifiés', async
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect((await ui.find({ type: 'Text', text: /Ivan/ }))?.text).toBe('▸ Ivan · 3m07 · 3 appel(s)')
+    expect((await ui.find({ type: 'Text', text: /▸ Ivan/ }))?.text).toBe('▸ Ivan (implémentation) · 3m07 · 3 appel(s)')
     expect((await ui.find({ type: 'Text', text: /refusé/ }))?.text).toBe(
       '  1 écriture(s) ou appel(s) refusé(s)',
     )
@@ -158,7 +158,7 @@ test('le panneau suit Ivan : durée, appels, refus et fichiers modifiés', async
 
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await band.find({ type: 'Text', text: /Ivan/ }))?.text).toContain(
-    'Ivan au travail 3m07, 1 refus',
+    'Ivan (implémentation) au travail 3m07, 1 refus',
   )
   await band.unmount()
 })

@@ -3,6 +3,7 @@ import type { ActiveAgent, PipelineSnapshot, PipelineStage } from '../types'
 // Ordre d'affichage, tiré des tableaux d'étapes de ~/.claude/commands/feature.md et fix.md.
 // Une clé inconnue de pipeline.json s'affiche après, dans l'ordre du fichier.
 const FEATURE_ORDER: [string, string][] = [
+  ['cadrage', 'cadrage'],
   ['contracts', 'contrats'],
   ['dedup', 'dedup contrats'],
   ['spec', 'spec'],
@@ -28,13 +29,49 @@ const FIX_ORDER: [string, string][] = [
   ['evidence', 'evidence'],
 ]
 
+// Qui tient chaque étape (colonne « Prénom » des mêmes tableaux). « toi » : l'orchestrateur.
+const FEATURE_OWNERS: Record<string, string> = {
+  cadrage: 'toi + Sophie',
+  contracts: 'Arthur, puis Thibault',
+  dedup: 'Denis',
+  spec: 'Sophie',
+  spec_review: 'Camille',
+  red: 'Théo',
+  tests_review: 'Gaëlle',
+  green: 'Ivan',
+  clean: 'Nina',
+  dedup_clean: 'Denis',
+  review: 'Romain',
+  harden: 'Hugo',
+  qa: 'Quentin',
+  polish: 'Pauline',
+  evidence: 'toi',
+}
+
+const FIX_OWNERS: Record<string, string> = {
+  red: 'Bastien',
+  repro_report: 'Bastien',
+  green: 'Fanny',
+  review: 'Victor',
+  review_report: 'Victor',
+  evidence: 'toi',
+}
+
+/** Le prénom de qui tient l'étape, vide pour une clé inconnue. */
+export const stageOwner = (kind: 'feature' | 'fix', key: string): string =>
+  (kind === 'feature' ? FEATURE_OWNERS : FIX_OWNERS)[key] ?? ''
+
 export const PERSONAS: Record<string, string> = {
   'feature-architect': 'Arthur',
   'feature-specifier': 'Sophie',
   'feature-spec-critic': 'Camille',
   'feature-test-writer': 'Théo',
+  'feature-test-writer-data': 'Théo',
+  'feature-test-writer-presentation': 'Théo',
   'feature-test-reviewer': 'Gaëlle',
   'feature-implementer': 'Ivan',
+  'feature-implementer-data': 'Ivan',
+  'feature-implementer-presentation': 'Ivan',
   'feature-cleaner': 'Nina',
   'feature-dedup': 'Denis',
   'feature-reviewer': 'Romain',
@@ -48,6 +85,34 @@ export const PERSONAS: Record<string, string> = {
   'review-code': 'Corentin',
   'review-qa': 'Maëlle',
 }
+
+// Le rôle de chaque agent, en quelques mots (la description de ~/.claude/agents/<type>.md).
+export const ROLES: Record<string, string> = {
+  'feature-architect': 'architecte : contrats, scaffold',
+  'feature-specifier': 'cadrage et spec',
+  'feature-spec-critic': 'critique de la spec',
+  'feature-test-writer': 'tests',
+  'feature-test-writer-data': 'tests data/domain',
+  'feature-test-writer-presentation': 'tests présentation',
+  'feature-test-reviewer': 'revue des tests',
+  'feature-implementer': 'implémentation',
+  'feature-implementer-data': 'implémentation data/domain',
+  'feature-implementer-presentation': 'implémentation présentation',
+  'feature-cleaner': 'nettoyage',
+  'feature-dedup': 'doublons',
+  'feature-reviewer': 'revue de code',
+  'feature-hardener': 'mutation testing',
+  'feature-qa': 'QA Maestro',
+  'feature-polisher': 'polish visuel',
+  'fix-reproducer': 'reproduction du bug',
+  'fix-implementer': 'correction',
+  'fix-reviewer': 'revue du fix',
+  'review-architect': 'revue architecture',
+  'review-code': 'revue code',
+  'review-qa': 'revue QA',
+}
+
+export const roleOf = (type: string): string => ROLES[type] ?? ''
 
 export const isPipelineAgent = (type: string): boolean => type in PERSONAS
 

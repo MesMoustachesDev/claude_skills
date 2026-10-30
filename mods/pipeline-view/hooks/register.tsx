@@ -15,8 +15,10 @@ import {
   mark,
   maxAttemptsFromConfig,
   parseState,
+  roleOf,
   sameSnapshot,
   shortPath,
+  stageOwner,
   toolLabel,
 } from './model'
 
@@ -114,7 +116,7 @@ const describe = (
   const stage = focusStage(snap)
   for (const a of list.filter(a => a.end === 0)) {
     const refusals = a.denied > 0 ? `, ${a.denied} refus` : ''
-    parts.push(`${a.persona} au travail ${duration(at - a.start)}${refusals}`)
+    parts.push(`${a.persona}${roleOf(a.type) ? ` (${roleOf(a.type)})` : ''} au travail ${duration(at - a.start)}${refusals}`)
   }
   if (stage) {
     const tries = stage.attempts > 0 ? ` ${stage.attempts}/${snap.maxAttempts}` : ''
@@ -266,6 +268,7 @@ export const register: Register = on => {
             bold={stage.key === current?.key}
           >
             {mark(stage.status)} {stage.label}
+            {stageOwner(snap.kind, stage.key) !== '' ? ` · ${stageOwner(snap.kind, stage.key)}` : ''}
             {stage.attempts > 0 ? `  ${stage.attempts}/${snap.maxAttempts}` : ''}
           </Text>
         ))}
@@ -278,7 +281,8 @@ export const register: Register = on => {
           return (
             <Box flexDirection="column">
               <Text bold={isRunning} dimColor={!isRunning}>
-                {isRunning ? '▸' : '✓'} {a.persona} · {stats}
+                {isRunning ? '▸' : '✓'} {a.persona}
+                {roleOf(a.type) !== '' ? ` (${roleOf(a.type)})` : ''} · {stats}
               </Text>
               {a.denied > 0 && (
                 <Text color="warning">  {a.denied} écriture(s) ou appel(s) refusé(s)</Text>
