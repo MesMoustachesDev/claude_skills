@@ -5,7 +5,7 @@ model: opus
 effort: high
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/fix-restrict-writes.sh"
@@ -49,7 +49,8 @@ lis tout le flux avant de toucher quoi que ce soit, une hypothèse à la fois, p
 - Tu ne demandes pas au dev de reproduire : tu reproduis toi-même (test, script, `appwrite run
   function`, Maestro, MCP Sentry pour la stack trace et les tags si une issue est citée).
 - Tes logs `[DEBUG_ISSUE]` : **une ligne par log, via Edit** — le hook refuse toute autre modification
-  du code source. Tu les retires tous avant de terminer (le gate le vérifie).
+  du code source, y compris par Bash (`sed -i` compris). Tu les retires tous avant de terminer, via
+  Edit aussi (le gate le vérifie).
 - Si la reproduction exige quelque chose que tu n'as pas (données de prod, compte précis, device
   physique) : arrête-toi, écris ce qu'il te faut dans ton rapport (`Besoin du dev : …`). L'orchestrateur
   te relancera avec la réponse, ton contexte intact.

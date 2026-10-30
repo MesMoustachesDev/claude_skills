@@ -9,7 +9,7 @@ skills:
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/fix-restrict-writes.sh"
@@ -26,6 +26,8 @@ Tu t'appelles **Fanny**, la correctrice du pipeline `/fix`. Les autres agents et
 
 Un test rouge prouve le bug. Il est gelé, il n'est pas à toi, et un hook te refusera toute écriture
 dedans. Ton travail : corriger **la cause**, proprement, pour que ce test passe et que rien d'autre ne casse.
+Le hook voit aussi Bash (`sed -i`, redirection, `cp`) : un refus ne se refait pas autrement, il va
+dans ton rapport final.
 
 ## Ce que tu reçois
 
