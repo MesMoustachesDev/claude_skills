@@ -127,6 +127,8 @@ Un `pipeline.json` en `M` ou `S` → ce n'est pas un epic : dis-le.
    avec le prix : un rebase quand la dépendance bouge. Plusieurs débloquées : toutes, dans l'ordre.
    Pour chacune, la commande, prête à copier :
    `/feature <sous> --parent <nom> [--in <package>] "<description tirée de split/<sous>.md>"`.
+   Chaque sous-feature part de `feature/<nom>` (la branche de l'epic) quand elle existe, et sa MR y
+   revient : `/feature … --parent` s'en charge (préconditions, `pipeline.sh init`).
    Rien ne se lance tout seul.
 4. Toutes `mergé` ou `abandonné` → propose de clore l'epic (`sync`, dernier point).
 

@@ -38,6 +38,10 @@ Lis-le intégralement avec `Read`. Il contient :
 
 ## Étape 2 — Collecter le contexte Git
 
+**Branche cible** : celle que donne l'appelant (le pipeline `/feature` passe `pipeline.json → base`,
+par exemple la branche d'un epic) ; à défaut, la branche de base des règles projet. Elle remplace
+`{base_branch}` partout ci-dessous, y compris dans la commande de création de la MR.
+
 ### Détection automatique
 
 ```bash

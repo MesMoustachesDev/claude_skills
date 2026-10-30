@@ -341,8 +341,22 @@ def cmd_init(c, args):
         if c.name not in names:
             die(f"{c.name} n'est pas dans le découpage de {parent} : {', '.join(names) or 'aucune sous-feature'}")
         c.p["parent"] = parent
+        # Une sous-feature part de la branche de l'epic et y revient (MR) quand elle existe : la base du
+        # diff est cette branche, pas base_branch (cas réel : refactor_feature partie de develop,
+        # MR sur develop, 5 conflits au reciblage). --base explicite vers une autre branche (une
+        # dépendance encore en MR, feature/<dep>) reste permis.
+        epic = f"feature/{parent}"
+        has_epic = any(git("rev-parse", "--verify", "--quiet", ref, cwd=c.root, check=False)
+                       for ref in (f"refs/heads/{epic}", f"refs/remotes/origin/{epic}"))
+        if has_epic:
+            if "--base" not in opts:
+                c.p["base"] = epic
+            elif opts["--base"] == c.cfg("base_branch", "develop"):
+                die(f"sous-feature de {parent} : la branche {epic} existe, la base est {epic}, pas "
+                    f"{opts['--base']} (worktree à créer depuis {epic}, MR vers {epic})")
     c.save()
     print(f"pipeline.json créé : {os.path.relpath(c.path, c.root)}")
+    print(f"base : {c.p['base']}")
     if parent:
         _, pdir = find_pipeline(c, parent)
         extract = os.path.join(pdir, "split", f"{c.name}.md")

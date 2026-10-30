@@ -6,6 +6,11 @@
   dans `.claude/worktrees/feature-<nom>/`, sur la branche `feature/<nom>` — à faire **avant** de lire
   ou créer `pipeline.json`, qui vit dans le worktree :
   - `git worktree list` montre déjà `feature/<nom>` → `EnterWorktree` avec `path` = ce chemin (reprise).
+  - **`<base>`** : `base_branch` de la config. **Sous-feature d'un epic (`--parent <epic>`)** :
+    `feature/<epic>` dès que cette branche existe (`git rev-parse --verify feature/<epic>` ou
+    `origin/feature/<epic>`) — la sous-feature en part, sa MR y revient, et c'est la base du diff des
+    gates. Seule exception : `/epic` a proposé de partir de la branche d'une dépendance encore en MR
+    (`feature/<dep>`). Annonce la base en une ligne avant de créer le worktree.
   - Sinon : `git fetch origin <base>` (ignore l'échec hors ligne), puis
     `git worktree add .claude/worktrees/feature-<nom> -b feature/<nom> <base>` (si la branche existe
     sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis
@@ -32,9 +37,10 @@
   `human_gates.contracts` reprend à 0e : rouvre les fichiers pour Thibault. `size: L` avec `split`
   rempli : `next` le dit, affiche l'état de chaque sous-feature (son `pipeline.json` dans son worktree)
   et ne lance rien.
-  Sinon : `pipeline.sh init <nom> --mode create|extend --package <chemin> --base <base_branch>`
-  (`--parent <nom>` pour une sous-feature d'une feature découpée : il vérifie qu'elle est dans son
-  découpage et imprime le chemin de son extrait de cadrage), qui crée le dossier et `pipeline.json`
+  Sinon : `pipeline.sh init <nom> --mode create|extend --package <chemin> --base <base>` (la base
+  du worktree, ci-dessus ; `--parent <nom>` pour une sous-feature d'une feature découpée : il vérifie
+  qu'elle est dans son découpage, imprime le chemin de son extrait de cadrage, et refuse `base_branch`
+  quand `feature/<parent>` existe), qui crée le dossier et `pipeline.json`
   avec tous ses champs. `mode` et `package` sont lus par le
   gauntlet et les hooks : c'est ce qui définit le périmètre. Changement de package ou de mode validé
   au cadrage : `pipeline.sh set <nom> package '"<chemin>"'` et `pipeline.sh set <nom> mode '"extend"'`.
