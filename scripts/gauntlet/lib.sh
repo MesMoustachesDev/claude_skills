@@ -12,6 +12,45 @@ ko()      { printf '%s[FAIL]%s %s\n' "$C_KO" "$C_0" "$*"; }
 die()     { printf '%s[ABORT]%s %s\n' "$C_KO" "$C_0" "$*" >&2; exit 2; }
 
 # ---------------------------------------------------------------------------
+# Worktree de la feature, pour les hooks
+# ---------------------------------------------------------------------------
+# Un sous-agent hérite du cwd de la session de l'orchestrateur, qui n'est pas toujours le worktree de la
+# feature (session ouverte sur le checkout principal, reprise, cwd remis à zéro). Les hooks ne s'y fient
+# donc pas seuls : ils cherchent le worktree dans le fichier écrit, le cwd, puis le prompt de l'agent
+# (l'orchestrateur y met toujours « Racine : <worktree> »).
+
+# feature_root_from <chemin> — racine git de <chemin> (ou de son premier parent existant) si elle est sur
+# une branche feature/*, rien sinon
+feature_root_from() {
+  local d="$1" top
+  [ -n "$d" ] || return 1
+  while [ ! -d "$d" ] && [ "$d" != / ] && [ "$d" != . ]; do d="$(dirname "$d")"; done
+  top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  case "$(git -C "$top" branch --show-current 2>/dev/null)" in feature/*) printf '%s\n' "$top" ;; *) return 1 ;; esac
+}
+# hook_agent_transcript <entrée JSON du hook> — transcript du sous-agent : agent_transcript_path, sinon
+# déduit du transcript de la session (<session>/subagents/agent-<id>.jsonl)
+hook_agent_transcript() {
+  local t id
+  t="$(jq -r '.agent_transcript_path // empty' <<<"$1")"
+  [ -n "$t" ] && { printf '%s\n' "$t"; return; }
+  t="$(jq -r '.transcript_path // empty' <<<"$1")"; id="$(jq -r '.agent_id // empty' <<<"$1")"
+  [ -n "$t" ] && [ -n "$id" ] && printf '%s\n' "${t%.jsonl}/subagents/agent-$id.jsonl"
+}
+# hook_feature_root <cwd> <fichier ou ""> <transcript de l'agent ou ""> — le worktree de la feature
+hook_feature_root() {
+  local r wt pat='/[^ "`'"'"'\\]*/\.claude/worktrees/feature-[A-Za-z0-9_.-]*'
+  r="$(feature_root_from "$2")" && { printf '%s\n' "$r"; return 0; }
+  r="$(feature_root_from "$1")" && { printf '%s\n' "$r"; return 0; }
+  [ -n "$3" ] && [ -f "$3" ] || return 1
+  # La ligne « Racine : » du prompt d'abord ; à défaut, le premier worktree de feature cité.
+  wt="$(grep -m1 'Racine' "$3" | grep -oE "$pat" | head -1)"
+  [ -n "$wt" ] || wt="$(head -c 400000 "$3" | grep -oE "$pat" | head -1)"
+  r="$(feature_root_from "$wt")" && { printf '%s\n' "$r"; return 0; }
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # Contexte projet
 # ---------------------------------------------------------------------------
 # Variables exportées : PROJECT_ROOT CFG_FILE FEATURE PKG_REL PKG_DIR PKG_NAME FEATURE_DIR
@@ -41,7 +80,11 @@ init_project_context() {
   if [ -n "$FEATURE" ]; then
     # GAUNTLET_FEATURES_ROOT : relocalise .claude/features (tests du gauntlet sans écrire dans le projet).
     FEATURE_DIR="${GAUNTLET_FEATURES_ROOT:-$PROJECT_ROOT/.claude/features}/$FEATURE"
-    GAUNTLET_OUT="$FEATURE_DIR/.gauntlet"
+    # Couche (profils *_data / *_presentation, étapes 3 et 4 en deux moitiés parallèles) : sorties à part,
+    # deux gauntlets tournent en même temps sur le même package sans écraser le rapport de l'autre.
+    LAYER="${GAUNTLET_LAYER:-}"
+    case "$LAYER" in ""|data|presentation) ;; *) die "couche inconnue : $LAYER (data|presentation)" ;; esac
+    GAUNTLET_OUT="$FEATURE_DIR/.gauntlet${LAYER:+/$LAYER}"
     mkdir -p "$GAUNTLET_OUT"
     # Mode et package : pipeline.json (écrit par l'orchestrateur) > variables d'environnement > config.
     #   create : la feature EST le package, tout le package est dans le périmètre.
@@ -200,6 +243,46 @@ scope_init() {
     PASS_SCOPE_FILE="$GAUNTLET_OUT/scope_pass.txt"; PASS_SCOPE_ALL=0
     scope_compute "$PASS_BASE" > "$PASS_SCOPE_FILE"
   fi
+  if [ -n "${LAYER:-}" ]; then
+    layer_scope "$SCOPE_FILE" "$SCOPE_ALL"; SCOPE_ALL=0
+    [ "$PASS_SCOPE_FILE" != "$SCOPE_FILE" ] && layer_scope "$PASS_SCOPE_FILE" "$PASS_SCOPE_ALL"
+    PASS_SCOPE_ALL=0
+  fi
+}
+
+# Couches d'une moitié (étapes 3 et 4 en parallèle). data = data, domain et injection, lib et test ;
+# presentation = tout le reste du package (presentation, barrel, test/step, .feature, tests générés).
+# Chemins relatifs au package.
+LAYER_DATA_DIRS="lib/src/data lib/src/domain lib/src/injection test/src/data test/src/domain test/src/injection"
+# in_layer <couche> <chemin relatif au package>
+in_layer() {
+  local d
+  for d in $LAYER_DATA_DIRS; do
+    case "$2" in "$d"/*) [ "$1" = data ]; return ;; esac
+  done
+  [ "$1" = presentation ]
+}
+# layer_files <dossier>… — fichiers .dart de la couche courante sous ces dossiers, relatifs au package
+layer_files() {
+  local f
+  (cd "$PKG_DIR" && find "$@" -name '*.dart' 2>/dev/null) | sort | while IFS= read -r f; do
+    in_layer "$LAYER" "$f" && printf '%s\n' "$f"
+  done
+}
+# layer_scope <fichier de périmètre> <tout ?> — restreint le périmètre à la couche courante. Un périmètre
+# « package entier » (create) devient la liste des fichiers de la couche ; un périmètre extend garde ses
+# entrées dans la couche. Les checks filtrés au périmètre (format, marqueurs, error_handling, deps,
+# red_check…) ne jugent alors que la moitié de l'agent, pas les fichiers que l'autre écrit en même temps.
+layer_scope() {
+  local file="$1" all="$2" tmp l; tmp="$(mktemp)"
+  if [ "$all" = 1 ]; then layer_files lib test | sed "s#^#$PKG_REL/#" > "$tmp"
+  else
+    while IFS= read -r l; do
+      [[ "$l" == "$PKG_REL/"* ]] || continue
+      in_layer "$LAYER" "${l#$PKG_REL/}" && printf '%s\n' "$l"
+    done < "$file" > "$tmp"
+  fi
+  mv "$tmp" "$file"
 }
 # scope_compute <base> — le périmètre du package depuis <base>, au format de SCOPE_FILE.
 scope_compute() {
@@ -235,7 +318,10 @@ drop_format_only() {
 # helpers qu'il appelle, portée dynamique de bash) jugent la passe en cours, pas toute la feature.
 use_pass_scope() { SCOPE_FILE="$PASS_SCOPE_FILE"; SCOPE_ALL="$PASS_SCOPE_ALL"; }
 pass_label() { [ -n "${PASS_BASE:-}" ] && printf 'depuis pass_base %s' "${PASS_BASE:0:10}" || printf 'depuis %s' "$BASE_BRANCH"; }
-scope_summary() { [ "$SCOPE_ALL" = 1 ] && echo "package entier (create)" || echo "$(grep -vc ':' "$SCOPE_FILE") fichier(s) nouveau(x), $(grep -c ':' "$SCOPE_FILE") ligne(s) ajoutée(s) dans $(grep ':' "$SCOPE_FILE" | cut -d: -f1 | sort -u | wc -l | tr -d ' ') fichier(s) modifié(s) (extend)"; }
+scope_summary() {
+  if [ -n "${LAYER:-}" ] && [ "$MODE" != extend ]; then echo "couche $LAYER, $(grep -c . "$SCOPE_FILE") fichier(s) (create)"; return; fi
+  [ "$SCOPE_ALL" = 1 ] && echo "package entier (create)" || echo "${LAYER:+couche $LAYER, }$(grep -vc ':' "$SCOPE_FILE") fichier(s) nouveau(x), $(grep -c ':' "$SCOPE_FILE") ligne(s) ajoutée(s) dans $(grep ':' "$SCOPE_FILE" | cut -d: -f1 | sort -u | wc -l | tr -d ' ') fichier(s) modifié(s) (extend)"
+}
 # in_scope_file <chemin relatif à PROJECT_ROOT> — fichier nouveau ou touché
 in_scope_file() { [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }
 # scope_files <prefix> — fichiers du périmètre, relatifs à <prefix> (ex: "$PKG_REL/"), .dart seulement

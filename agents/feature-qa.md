@@ -4,7 +4,7 @@ description: Quentin — Étape 8 du feature pipeline. Transforme chaque scénar
 model: sonnet
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"

@@ -179,13 +179,14 @@ N/A
 
 ## 7. Erreurs
 
-<!-- Chaque ErrorEntity possible, d'où elle vient, et ce que l'UI en fait. C'est la spec des scénarios Error. -->
+<!-- Chaque ErrorEntity possible, d'où elle vient, et ce que l'UI en fait. C'est la spec des scénarios Error.
+     Colonne Scénario : le C<n> qui la prouve, ou « hors scénario : <raison> » (spec_lint le vérifie). -->
 
-| Erreur | Origine | Comportement UI | Retry possible |
-|---|---|---|---|
-| `NetworkError` | remote data source | `{Name}Error` + message générique + bouton retry | oui |
-| `NotFoundError` | remote data source | `{Name}Empty` | non |
-| `UnauthorizedError` | remote data source | redirection login (géré par `error` package) | non |
+| Erreur | Origine | Comportement UI | Retry possible | Scénario |
+|---|---|---|---|---|
+| `NetworkError` | remote data source | `{Name}Error` + message générique + bouton retry | oui | C3 |
+| `NotFoundError` | remote data source | `{Name}Empty` | non | C4 |
+| `UnauthorizedError` | remote data source | redirection login (géré par `error` package) | non | hors scénario : géré par le package `error`, testé là-bas |
 
 ## 8. Architecture
 

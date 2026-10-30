@@ -4,7 +4,7 @@ description: Pauline — Étape 8c du feature pipeline, seulement si Thibault di
 model: opus
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"

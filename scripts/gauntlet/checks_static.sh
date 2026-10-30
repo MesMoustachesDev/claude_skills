@@ -12,8 +12,12 @@ capture() {
 
 # analyze — le package compile ; les issues (warnings, infos) ne bloquent que dans les fichiers du périmètre.
 check_analyze() {
-  local out rc issues
-  out="$(cd "$PKG_DIR" && $FLUTTER analyze --fatal-warnings --fatal-infos --no-pub 2>&1)"; rc=$?
+  local out rc issues targets=""
+  # Couche : les fichiers de la moitié seulement ; une erreur de compilation dans un fichier que l'autre
+  # moitié écrit en même temps n'est pas la sienne (le gate complet, après les deux, analyse tout).
+  [ -n "${LAYER:-}" ] && targets="$(layer_files lib test | tr '\n' ' ')"
+  # shellcheck disable=SC2086
+  out="$(cd "$PKG_DIR" && $FLUTTER analyze --fatal-warnings --fatal-infos --no-pub $targets 2>&1)"; rc=$?
   [ "$rc" = 0 ] && { info "aucune issue"; return 0; }
   # une erreur de compilation bloque toujours ; le reste est filtré au périmètre
   if printf '%s\n' "$out" | grep -qE '^\s*error •'; then printf '%s\n' "$out" | grep -E '^\s*error •' | head -30; ko "erreurs de compilation"; return 1; fi
@@ -38,7 +42,10 @@ check_format() {
 check_build_runner() {
   if ! has_dev_dep build_runner; then info "pas de build_runner dans le package, sauté"; return 0; fi
   # shellcheck disable=SC2086
-  capture $DART run build_runner build --delete-conflicting-outputs
+  capture $DART run build_runner build --delete-conflicting-outputs || return 1
+  # Couche, mode create : les tests générés (bdd_widget_test) n'existaient pas au calcul du périmètre.
+  [ -n "${LAYER:-}" ] && scope_init
+  return 0
 }
 
 check_no_stubs() {
@@ -47,7 +54,9 @@ check_no_stubs() {
   # "... must be overridden" message (same line or the next one once formatted). A line marked
   # `// gauntlet-ignore` (same line or the next one) is exempted too.
   local mark="${IGNORE_MARK:-gauntlet-ignore}" f
+  # Couche : les stubs de l'autre moitié sont encore là, ils ne sont pas à elle.
   hits="$(grep -rl --include='*.dart' 'UnimplementedError' "$PKG_DIR/lib" 2>/dev/null | while IFS= read -r f; do
+      [ -n "${LAYER:-}" ] && ! in_layer "$LAYER" "${f#$PKG_DIR/}" && continue
       awk -v mark="$mark" -v file="${f#$PKG_DIR/}" '
         { line[NR]=$0 }
         END {

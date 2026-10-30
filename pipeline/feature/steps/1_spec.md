@@ -16,6 +16,9 @@ dépendance découverte en écrivant la spec. Un contrat qui ne permet pas un sc
 sans state, donnée absente d'une entité) n'est pas corrigé par Sophie : elle le liste dans son rapport
 sous « Contrats à revoir par Thibault », avec le fichier et le symbole.
 `archi.json` ne contient que `sequences` : chaque C<n> relié à son scénario de §4.
+Sophie revient quand `spec_lint` est vert (son hook : clés, scénario de chaque erreur §7, symboles,
+`archi.json` ↔ §4, plafond). Les jetons qu'elle marque `spec_lint: ignore` sont des contrats manquants :
+ils sont dans ses « Contrats à revoir par Thibault ».
 
 **Gabarit S :** plafond 15 Ko au lieu de 40. **En L :** l'étape n'a pas lieu (découpée en 0b).
 
@@ -24,8 +27,9 @@ sous « Contrats à revoir par Thibault », avec le fichier et le symbole.
 Lance Camille (`feature-spec-critic`, prompt : nom, gabarit et plafond de taille, `spec.md`,
 `archi.json`, `cadrage.md`, `contracts.sha` et `contracts.files`, `create_feature_rules.md`, template
 de spec). Puis `gauntlet.sh spec_review_verdict <nom>` :
-- rouge avec des bloquants `owner: "spec"` → relance le **specifier** avec ceux-là (« corrige ces
-  points, sans réécrire ce qui n'est pas cité »), puis 1b à nouveau ;
+- rouge avec des bloquants `owner: "spec"` → relance le **specifier** avec ceux-là (« mode correction :
+  corrige ces points, aligne les autres lignes qui disent la même chose, sans réécrire ce qui n'est pas
+  cité »), puis 1b à nouveau ;
 - rouge avec **seulement** des bloquants `owner: "thibault"` (un contrat à changer) → personne n'est
   relancé : passe au point d'étape « spec », où Thibault tranche chacun. Le verdict reste rouge tant
   qu'un seul n'est pas tranché.

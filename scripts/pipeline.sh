@@ -9,6 +9,7 @@
 #   pipeline.sh init <nom> --mode M --package P --base B
 #   pipeline.sh size <nom> S|M|L "<raison>"      gabarit (reclassement tracé dans size_changes)
 #   pipeline.sh pass <nom> <étape>               stages.<étape> = PASSED
+#   pipeline.sh join <nom> red|green             étapes 3 et 4 : les deux moitiés vertes → gate complet → stages.<étape>
 #   pipeline.sh skip <nom> <étape> "<raison>"    stages.<étape> = SKIPPED (gabarit)
 #   pipeline.sh gate <nom> <point> [k=v ...]     human_gates.<point> = {at, by: user, k: v…}
 #   pipeline.sh loop <nom> <boucle>              loops.<boucle> += 1 ; exit 3 au-delà du plafond

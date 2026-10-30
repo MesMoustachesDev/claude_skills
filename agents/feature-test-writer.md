@@ -5,7 +5,7 @@ model: opus
 effort: high
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"
@@ -61,8 +61,9 @@ le `testWidgets` généré et le corps de chaque step, et redessine la séquence
 du cadrage ; Thibault valide les deux côte à côte. Pour que ce soit lisible et juste :
 - chaque action de l'utilisateur de la séquence (`U->>E`) a un step qui fait l'action (`tester.tap`,
   `enterText`, `drag`…) ; chaque réponse d'un système extérieur (`S-->>A`, erreur comprise) a un step
-  qui configure le faux repository / data source (`when(...).thenAnswer`, `controller.add`, un
-  `Fake…`) ; chaque résultat visible (`E-->>U`) a au moins un step qui l'asserte (`expect`) ;
+  qui configure le **use case mocké** (`when(() => getX(...)).thenAnswer((_) async => Right(…))`,
+  `Left(<ErrorEntity>)` pour une erreur de §7, un `StreamController` pour un use case `watch`) ; chaque
+  résultat visible (`E-->>U`) a au moins un step qui l'asserte (`expect`) ;
 - un step fait **une** chose : un pump/mise en place, une action, une réponse simulée, ou une
   assertion. Un step qui tape et vérifie à la fois brouille la séquence ;
 - un helper partagé est défini dans un fichier de `test/**/step/` (le rapport suit un niveau d'appel).
@@ -72,7 +73,11 @@ et l'étape.
 Pour l'acceptation : ajoute `bdd_widget_test` aux `dev_dependencies` si absent, écris le `.feature`,
 lance `dart run build_runner build --delete-conflicting-outputs`, puis complète les step definitions
 générées dans `test/step/` en utilisant `find.byKey(ValueKey(<Name>Keys.x))` — jamais `find.text`.
-Les widgets sous test reçoivent des BLoCs/use cases mockés ; tu ne lances pas l'app.
+Les widgets sous test tournent sur le **vrai BLoC**, branché sur des **use cases mockés** : l'acceptation
+prouve vue ↔ BLoC ↔ use case, jamais la couche data (ses tests unitaires la prouvent, Quentin prouve la
+DI sur device). Jamais de repository ni de data source mockés ou instanciés dans un test d'acceptation ou
+de widget, et jamais de BLoC mocké dans un test d'acceptation (un test de widget d'un état isolé peut,
+lui, piloter un BLoC mocké avec `whenListen`). Tu ne lances pas l'app.
 
 ## Règles
 

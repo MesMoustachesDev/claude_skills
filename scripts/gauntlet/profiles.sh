@@ -13,6 +13,7 @@ MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strin
 
 profile_checks() {
   case "$1" in
+    spec_lint)    echo "spec_lint" ;;
     spec_review)  echo "spec_review_report" ;;
     contracts) echo "build_runner analyze deps error_handling stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
@@ -20,6 +21,12 @@ profile_checks() {
     # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
     red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
+    # Moitiés parallèles des étapes 3 et 4 (gauntlet.sh pose GAUNTLET_LAYER d'après le suffixe) : chaque
+    # check ne juge que la couche. build_runner seulement côté présentation (bdd_widget_test) : deux
+    # build_runner en même temps sur le même package se marchent dessus. tests.md s'écrit au gate complet.
+    red_data)          echo "analyze format:test no_secrets:test test_hygiene red_check" ;;
+    red_presentation)  echo "build_runner analyze format:test no_secrets:test test_hygiene red_check" ;;
+    green_data|green_presentation) profile_checks green ;;
     clean)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict metrics $MAINTAIN_FIXABLE coverage" ;;
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
     # Revue de PR (pr_gauntlet.sh, mode extend sur chaque package touché) : pas de gel, pas de stubs,
@@ -38,12 +45,17 @@ profile_checks() {
 profiles_list() {
   cat <<'EOF'
 Profils (étape → checks) :
+  spec_lint     spec_lint           (hook du specifier : clés, scénario de chaque erreur §7, symboles, archi.json, plafond)
   spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
   contracts  build_runner analyze deps error_handling stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
   red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
   green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
+  red_data, red_presentation, green_data, green_presentation
+             moitiés parallèles des étapes 3 et 4 : mêmes checks que red / green (sans test_names ; build_runner
+             côté présentation seulement), jugés sur la couche (data = lib|test/src/{data,domain,injection},
+             presentation = le reste) ; sorties dans .gauntlet/<couche>/
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
   pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation
@@ -72,6 +84,8 @@ Checks individuels :
                      + fichiers de logique modifiés dans les packages de writes.extra, jamais mutés (.gauntlet/mutation_scope_extra.txt)
   review_report      review.json présent et valide        review_verdict   aucun critique non accepté
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
+  spec_lint          spec.md : clés citées dans keys.dart, chaque erreur §7 cite son C<n>, symboles §5 et `Classe.membre`
+                     du workspace existants, scénarios d'archi.json dans §4, plafond du gabarit (S 15 Kio, M 40 Kio)
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
   tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
   qa                 flows Maestro sur chaque plateforme (gabarit S : une seule, qa.platform_s ou la première), captures
