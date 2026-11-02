@@ -16,9 +16,11 @@ const areTestsShown = atom({ plugin: 'worktree-diff', key: 'areTestsShown' } as 
 
 const TEST_FOLDERS = ['test', 'tests', 'integration_test', 'test_driver', '__tests__', 'maestro']
 
+// Gherkin scenarios stay visible with the tests hidden: they read as the feature's spec.
 function isTest(path: string) {
   const parts = path.split('/')
   const name = parts.at(-1) ?? ''
+  if (name.endsWith('.feature')) return false
   return (
     parts.slice(0, -1).some(part => TEST_FOLDERS.includes(part)) ||
     name.endsWith('_test.dart') ||
