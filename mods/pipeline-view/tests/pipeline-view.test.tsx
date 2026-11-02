@@ -103,7 +103,7 @@ test('le panneau s’ouvre seul, une fois, quand un pipeline est en cours', asyn
   await $.session.start({ cwd: ROOT, surface: 'desktop', isInteractive: true })
   await $.command.run({ command: 'pipeline' })
 
-  expect(opens).toEqual(['pipeline-view', 'pipeline-view'])
+  expect(opens).toEqual(['pipeline-view', 'pipeline-scenarios', 'pipeline-view', 'pipeline-scenarios'])
 })
 
 test('hors pipeline, le panneau ne s’ouvre pas seul', async ($, on) => {
@@ -161,4 +161,36 @@ test('le panneau suit Ivan : durée, appels, refus et fichiers modifiés', async
     'Ivan (implémentation) au travail 3m07, 1 refus',
   )
   await band.unmount()
+})
+
+const SCENARIOS_PANE = { ...PANE, requestId: 'pipeline-scenarios', props: { ...PANE.props, title: 'Scénarios' } } as const
+const GHERKIN = 'Feature: Login\n\n  Scenario: Code juste\n    Given un code\n\n  Scénario: Code faux\n    Given un code\n'
+
+const seed = (on: Parameters<Parameters<typeof test>[1]>[1], values: Record<string, unknown>) =>
+  on('state.get', (_, e) => (e.key in values ? { value: { value: values[e.key], version: 1 } } : { value: { value: undefined, version: 0 } }))
+
+test('le panneau Scénarios montre le Gherkin que le pipeline a changé', async ($, on) => {
+  seed(on, {
+    snapshot: { shape: 'snapshot-1', value: { kind: 'feature', name: 'two_factor_login', pkg: 'app/login', phase: '', maxAttempts: 5, stages: [], decisions: 0 } },
+    scenarios: [{ path: 'app/login/test/login.feature', status: 'ajouté', source: GHERKIN, count: 2 }],
+  })
+
+  const ui = await $.ui.mount({ ...SCENARIOS_PANE, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Button', key: 'scenario-app/login/test/login.feature' }))?.props.label).toBe(
+    'login.feature · ajouté · 2 scénarios',
+  )
+  expect((await ui.find({ type: 'Code' }))?.props.source).toBe(GHERKIN)
+  await ui.unmount()
+})
+
+test('le panneau Scénarios attend le premier .feature', async ($, on) => {
+  seed(on, {
+    snapshot: { shape: 'snapshot-1', value: { kind: 'feature', name: 'svg_layer', pkg: 'app/editor', phase: '', maxAttempts: 5, stages: [], decisions: 0 } },
+  })
+
+  const ui = await $.ui.mount({ ...SCENARIOS_PANE, surface: 'desktop' })
+
+  expect((await ui.find({ type: 'Text' }))?.text).toBe('Pas encore de .feature ajouté ou modifié dans app/editor.')
+  await ui.unmount()
 })

@@ -5,13 +5,6 @@ export type ChangedFile = {
   deleted: number
 }
 
-export type FeatureFile = {
-  path: string
-  status: string
-  source: string
-  scenarios: number
-}
-
 export type PipelineWorktree = {
   name: string
   dir: string
@@ -19,7 +12,6 @@ export type PipelineWorktree = {
   mergeBase: string
   branch: string
   files: ChangedFile[]
-  features: FeatureFile[]
   error: string
 }
 
@@ -38,7 +30,6 @@ declare module 'claude-code' {
       collapsed: string[]
       diff: SelectedDiff | null
       areTestsShown: boolean
-      selectedFeature: string
     }
   }
 }

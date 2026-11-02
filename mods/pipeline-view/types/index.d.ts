@@ -38,6 +38,17 @@ export type ActiveAgent = {
   files: string[]
 }
 
+export type ScenarioFile = {
+  /** Chemin depuis la racine du repo. */
+  path: string
+  /** `ajouté` ou `modifié` depuis la base du pipeline. */
+  status: string
+  /** Le fichier Gherkin entier. */
+  source: string
+  /** Nombre de Scenario / Scénario / Plan du scénario. */
+  count: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'pipeline-view': {
@@ -46,6 +57,9 @@ declare module 'claude-code' {
       isAsking: boolean
       /** Horloge de l'affichage, avancée par le rafraîchissement pendant qu'un agent tourne. */
       now: number
+      /** Les .feature du package ajoutés ou modifiés depuis la base, pour le panneau Scénarios. */
+      scenarios: ScenarioFile[]
+      selectedScenario: string
     }
   }
 }

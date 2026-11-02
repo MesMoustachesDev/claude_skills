@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PipelineSnapshot } from '../types'
+import type { ActiveAgent, PipelineSnapshot, ScenarioFile } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -23,6 +23,7 @@ import {
 } from './model'
 
 const PANE = 'pipeline-view'
+const SCENARIOS_PANE = 'pipeline-scenarios'
 const REFRESH_MS = 5000
 const DECISION = 'DÉCISION (Thibault)'
 const FOLDER = { feature: 'features', fix: 'fixes' } as const
@@ -35,6 +36,8 @@ const agents = atom({ plugin: 'pipeline-view', key: 'agents' } as const, [], {
 })
 const isAsking = atom({ plugin: 'pipeline-view', key: 'isAsking' } as const, false)
 const now = atom({ plugin: 'pipeline-view', key: 'now' } as const, 0)
+const scenarios = atom({ plugin: 'pipeline-view', key: 'scenarios' } as const, [])
+const selectedScenario = atom({ plugin: 'pipeline-view', key: 'selectedScenario' } as const, '')
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -63,6 +66,44 @@ const locate = async ($: EngineInterface, root: string) => {
   return null
 }
 
+const SCENARIO = /^\s*(Scenario|Scenario Outline|Scenario Template|Scénario|Plan du scénario)\s*:/gm
+
+/** Base du diff : pipeline.json → base pour une feature, fix.json → base_sha pour un fix. */
+const baseOf = (text: string, kind: 'feature' | 'fix'): string => {
+  try {
+    const raw = JSON.parse(text) as Record<string, unknown>
+    const base = raw[kind === 'feature' ? 'base' : 'base_sha']
+
+    return typeof base === 'string' ? base : ''
+  } catch {
+    return ''
+  }
+}
+
+/** Les .feature que le pipeline a ajoutés ou modifiés dans son package depuis sa base, lus en entier. */
+const loadScenarios = async ($: EngineInterface, pkg: string, base: string): Promise<ScenarioFile[]> => {
+  if (!pkg || !base) return []
+  const mergeBase =
+    (await git($, ['merge-base', 'HEAD', base], root)) || (await git($, ['merge-base', 'HEAD', `origin/${base}`], root))
+  if (!mergeBase) return []
+  const changed = await git($, ['diff', '--name-status', '--diff-filter=AMR', mergeBase, '--', pkg], root)
+  const untracked = await git($, ['ls-files', '--others', '--exclude-standard', '--', pkg], root)
+  const byPath = new Map<string, string>()
+  for (const line of changed.split('\n').filter(Boolean)) {
+    const [status, ...paths] = line.split('\t')
+    byPath.set(paths.at(-1) ?? '', (status ?? '').charAt(0) === 'A' ? 'ajouté' : 'modifié')
+  }
+  for (const path of untracked.split('\n').filter(Boolean)) byPath.set(path, 'ajouté')
+  const found: ScenarioFile[] = []
+  for (const [path, status] of [...byPath].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    if (!path.endsWith('.feature')) continue
+    const source = await readText($, `${root}/${path}`)
+    found.push({ path, status, source, count: source.match(SCENARIO)?.length ?? 0 })
+  }
+
+  return found
+}
+
 const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   root = await git($, ['rev-parse', '--show-toplevel'])
   if (!root) return null
@@ -71,7 +112,10 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const dir = `${root}/.claude/${FOLDER[where.kind]}/${where.name}`
   const file = `${dir}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
   const config = await readText($, `${root}/.claude/rules/feature_pipeline.md`)
-  const snap = parseState(where.kind, where.name, await readText($, file), maxAttemptsFromConfig(config))
+  const text = await readText($, file)
+  const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
+  const found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
+  if (JSON.stringify(found) !== JSON.stringify(await read($, scenarios))) await update($, scenarios, () => found)
   if (!snap || !snap.pkg) return snap
   const grep = await git($, ['grep', '--untracked', '-I', '-F', '-c', DECISION, '--', snap.pkg], root)
   const decisions = grep
@@ -104,6 +148,7 @@ const autoOpen = async ($: EngineInterface, next: PipelineSnapshot | null): Prom
   if (!next) return
   const opened = await $.ui.open({ id: PANE, title: 'Pipeline' })
   if (!opened.isPlaced) $.ui.log(`pipeline-view : panneau non placé (${opened.reason})`)
+  await $.ui.open({ id: SCENARIOS_PANE, title: 'Scénarios' })
 }
 
 const describe = (
@@ -146,8 +191,9 @@ export const register: Register = on => {
   on('command.run', { command: 'pipeline' }, async $ => {
     await refresh($)
     await $.ui.open({ id: PANE, title: 'Pipeline' })
+    await $.ui.open({ id: SCENARIOS_PANE, title: 'Scénarios' })
 
-    return { text: 'Panneau Pipeline ouvert.' }
+    return { text: 'Panneaux Pipeline et Scénarios ouverts.' }
   })
 
   on('agent.spawn', async ($, e, next) => {
@@ -299,6 +345,41 @@ export const register: Register = on => {
           </Text>
         )}
         {asking && <Text color="warning">Une question attend ta réponse.</Text>}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'Pane', requestId: SCENARIOS_PANE }, async ($, e) => {
+    const { Box, Button, Code, Text } = $.ui.resolve(e)
+    const snap = await read($, snapshot)
+    const files = await read($, scenarios)
+    if (snap === null) {
+      return <Text dimColor>Aucun /feature ni /fix en cours dans ce dépôt.</Text>
+    }
+    if (files.length === 0) {
+      return <Text dimColor>Pas encore de .feature ajouté ou modifié dans {snap.pkg || 'le package'}.</Text>
+    }
+    const wanted = await read($, selectedScenario)
+    const shown = files.find(file => file.path === wanted) ?? files[0]
+
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Box flexDirection="row" flexWrap="wrap" gap={1}>
+          {files.map(file => (
+            <Button
+              key={`scenario-${file.path}`}
+              label={`${file.path.split('/').at(-1)} · ${file.status} · ${file.count} scénario${file.count > 1 ? 's' : ''}`}
+              variant={file.path === shown?.path ? 'primary' : 'secondary'}
+              onPress={() => update($, selectedScenario, () => file.path)}
+            />
+          ))}
+        </Box>
+        {shown && (
+          <Box flexDirection="column">
+            <Text dimColor wrap="truncate-start">{shown.path}</Text>
+            <Code source={shown.source} language="gherkin" path={shown.path} startLine={1} />
+          </Box>
+        )}
       </Box>
     )
   })

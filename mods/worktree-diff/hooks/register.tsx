@@ -1,10 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, Register } from 'claude-code'
 
-import type { ChangedFile, FeatureFile, PipelineWorktree, SelectedDiff } from '../types'
+import type { ChangedFile, PipelineWorktree, SelectedDiff } from '../types'
 
 const PANE = 'worktree-diff'
-const GHERKIN_PANE = 'worktree-gherkin'
 // Pipeline records and generated files: the tree shows the code a run wrote.
 const HIDDEN_PREFIXES = ['.claude/']
 
@@ -14,7 +13,6 @@ const selectedWorktree = atom({ plugin: 'worktree-diff', key: 'selectedWorktree'
 const collapsed = atom({ plugin: 'worktree-diff', key: 'collapsed' } as const, [])
 const diff = atom({ plugin: 'worktree-diff', key: 'diff' } as const, null)
 const areTestsShown = atom({ plugin: 'worktree-diff', key: 'areTestsShown' } as const, false)
-const selectedFeature = atom({ plugin: 'worktree-diff', key: 'selectedFeature' } as const, '')
 
 const TEST_FOLDERS = ['test', 'tests', 'integration_test', 'test_driver', '__tests__', 'maestro']
 
@@ -66,19 +64,6 @@ async function mergeBaseOf($: Engine, dir: string, base: string): Promise<string
     if (exitCode === 0) return stdout.trim()
   }
   return null
-}
-
-const SCENARIO = /^\s*(Scenario|Scenario Outline|Scenario Template|Scénario|Plan du scénario)\s*:/gm
-
-// The Gherkin a run changed, read whole: the second pane shows scenarios, not hunks.
-async function gherkinFiles($: Engine, dir: string, files: ChangedFile[]): Promise<FeatureFile[]> {
-  const found: FeatureFile[] = []
-  for (const file of files) {
-    if (!file.path.endsWith('.feature') || file.status === 'D') continue
-    const source = await $.fs.read(`${dir}/${file.path}`)
-    found.push({ path: file.path, status: file.status, source, scenarios: source.match(SCENARIO)?.length ?? 0 })
-  }
-  return found
 }
 
 function isShown(path: string) {
@@ -136,11 +121,10 @@ async function scan($: Engine): Promise<PipelineWorktree[]> {
     const branch = await branchOf($, dir)
     const mergeBase = await mergeBaseOf($, dir, base)
     if (mergeBase === null) {
-      found.push({ name: entry.name, dir, base, mergeBase: '', branch, files: [], features: [], error: `base ${base} introuvable` })
+      found.push({ name: entry.name, dir, base, mergeBase: '', branch, files: [], error: `base ${base} introuvable` })
       continue
     }
-    const files = await changedFiles($, dir, mergeBase)
-    found.push({ name: entry.name, dir, base, mergeBase, branch, files, features: await gherkinFiles($, dir, files), error: '' })
+    found.push({ name: entry.name, dir, base, mergeBase, branch, files: await changedFiles($, dir, mergeBase), error: '' })
   }
   return found
 }
@@ -250,7 +234,6 @@ async function start($: Engine) {
   // say so in the status line instead of failing silently.
   const opened = await $.ui.open({ id: PANE, title: 'Worktrees' })
   $.ui.status(opened.isPlaced ? undefined : `worktree-diff : pane non placé (${opened.reason})`)
-  await $.ui.open({ id: GHERKIN_PANE, title: 'Scénarios' })
   $.clock.every(REFRESH_MS, () => {
     void refresh($)
     void clearStatusOncePlaced($)
@@ -389,41 +372,6 @@ export const register: Register = on => {
           </Box>
         )}
         </Box>
-      </Box>
-    )
-  })
-
-  on('ui.render', { component: 'Pane', requestId: GHERKIN_PANE }, async ($, e) => {
-    const { Box, Button, Code, Text } = $.ui.resolve(e)
-    const all = await read($, worktrees)
-    const selectedName = await read($, selectedWorktree)
-    const worktree = all.find(one => one.name === selectedName)
-    const features = worktree?.features ?? []
-    const wanted = await read($, selectedFeature)
-    const shown = features.find(file => file.path === wanted) ?? features[0]
-
-    if (!worktree || features.length === 0) {
-      return <Text dimColor>{worktree ? `Aucun .feature modifié dans ${worktree.name}.` : 'Aucun worktree sélectionné.'}</Text>
-    }
-
-    return (
-      <Box flexDirection="column" gap={1}>
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          {features.map(file => (
-            <Button
-              key={`feature-${worktree.name}-${file.path}`}
-              label={`${file.path.split('/').at(-1)} · ${file.status} · ${file.scenarios} scénario${file.scenarios > 1 ? 's' : ''}`}
-              variant={file.path === shown?.path ? 'primary' : 'secondary'}
-              onPress={() => update($, selectedFeature, () => file.path)}
-            />
-          ))}
-        </Box>
-        {shown && (
-          <Box flexDirection="column">
-            <Text dimColor wrap="truncate-start">{shown.path}</Text>
-            <Code source={shown.source} language="gherkin" path={shown.path} startLine={1} />
-          </Box>
-        )}
       </Box>
     )
   })
