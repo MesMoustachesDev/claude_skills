@@ -108,13 +108,23 @@ async function worktreesRoot($: Engine): Promise<string | null> {
   return `${stdout.trim().replace(/\/\.git$/, '')}/.claude/worktrees`
 }
 
+// The run worktree the session sits in, by folder name; '' from the main checkout or elsewhere.
+async function ownWorktree($: Engine): Promise<string> {
+  const { exitCode, stdout } = await $.process.run(['git', 'rev-parse', '--show-toplevel'])
+  if (exitCode !== 0) return ''
+  return stdout.trim().match(/\/\.claude\/worktrees\/((?:feature|fix)-[^/]+)$/)?.[1] ?? ''
+}
+
+// From inside a run worktree, that worktree alone; from the main checkout, every run.
 async function scan($: Engine): Promise<PipelineWorktree[]> {
   const WORKTREES = await worktreesRoot($)
   if (WORKTREES === null || !(await $.fs.exists(WORKTREES))) return []
+  const own = await ownWorktree($)
   const found: PipelineWorktree[] = []
   for (const entry of await $.fs.list(WORKTREES)) {
     if (entry.kind !== 'dir') continue
     if (!entry.name.startsWith('feature-') && !entry.name.startsWith('fix-')) continue
+    if (own && entry.name !== own) continue
     const dir = `${WORKTREES}/${entry.name}`
     const base = await baseOf($, dir, entry.name)
     if (base === null) continue
@@ -294,7 +304,7 @@ export const register: Register = on => {
       <Box flexDirection="column" gap={1}>
         {sessionLine}
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          {all.map(one => (
+          {all.length > 1 && all.map(one => (
             <Button
               key={`wt-${one.name}`}
               label={`${one.name} (${one.files.length})`}
