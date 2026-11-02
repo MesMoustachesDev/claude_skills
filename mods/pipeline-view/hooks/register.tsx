@@ -23,7 +23,6 @@ import {
 } from './model'
 
 const PANE = 'pipeline-view'
-const SCENARIOS_PANE = 'pipeline-scenarios'
 const REFRESH_MS = 5000
 const DECISION = 'DÉCISION (Thibault)'
 const FOLDER = { feature: 'features', fix: 'fixes' } as const
@@ -148,7 +147,6 @@ const autoOpen = async ($: EngineInterface, next: PipelineSnapshot | null): Prom
   if (!next) return
   const opened = await $.ui.open({ id: PANE, title: 'Pipeline' })
   if (!opened.isPlaced) $.ui.log(`pipeline-view : panneau non placé (${opened.reason})`)
-  await $.ui.open({ id: SCENARIOS_PANE, title: 'Scénarios' })
 }
 
 const describe = (
@@ -191,9 +189,8 @@ export const register: Register = on => {
   on('command.run', { command: 'pipeline' }, async $ => {
     await refresh($)
     await $.ui.open({ id: PANE, title: 'Pipeline' })
-    await $.ui.open({ id: SCENARIOS_PANE, title: 'Scénarios' })
 
-    return { text: 'Panneaux Pipeline et Scénarios ouverts.' }
+    return { text: 'Panneau Pipeline ouvert.' }
   })
 
   on('agent.spawn', async ($, e, next) => {
@@ -283,7 +280,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Button, Code, Text } = $.ui.resolve(e)
     const snap = await read($, snapshot)
     if (snap === null) {
       return <Text dimColor>Aucun /feature ni /fix en cours dans ce dépôt.</Text>
@@ -292,6 +289,9 @@ export const register: Register = on => {
     const at = await read($, now)
     const asking = await read($, isAsking)
     const current = focusStage(snap)
+    const files = await read($, scenarios)
+    const wanted = await read($, selectedScenario)
+    const shownScenario = files.find(file => file.path === wanted) ?? files[0]
 
     return (
       <Box flexDirection="column">
@@ -345,39 +345,27 @@ export const register: Register = on => {
           </Text>
         )}
         {asking && <Text color="warning">Une question attend ta réponse.</Text>}
-      </Box>
-    )
-  })
-
-  on('ui.render', { component: 'Pane', requestId: SCENARIOS_PANE }, async ($, e) => {
-    const { Box, Button, Code, Text } = $.ui.resolve(e)
-    const snap = await read($, snapshot)
-    const files = await read($, scenarios)
-    if (snap === null) {
-      return <Text dimColor>Aucun /feature ni /fix en cours dans ce dépôt.</Text>
-    }
-    if (files.length === 0) {
-      return <Text dimColor>Pas encore de .feature ajouté ou modifié dans {snap.pkg || 'le package'}.</Text>
-    }
-    const wanted = await read($, selectedScenario)
-    const shown = files.find(file => file.path === wanted) ?? files[0]
-
-    return (
-      <Box flexDirection="column" gap={1}>
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          {files.map(file => (
-            <Button
-              key={`scenario-${file.path}`}
-              label={`${file.path.split('/').at(-1)} · ${file.status} · ${file.count} scénario${file.count > 1 ? 's' : ''}`}
-              variant={file.path === shown?.path ? 'primary' : 'secondary'}
-              onPress={() => update($, selectedScenario, () => file.path)}
-            />
-          ))}
-        </Box>
-        {shown && (
+        <Text> </Text>
+        <Text bold>Scénarios</Text>
+        {files.length === 0 && (
+          <Text dimColor>Pas encore de .feature ajouté ou modifié dans {snap.pkg || 'le package'}.</Text>
+        )}
+        {files.length > 0 && (
+          <Box flexDirection="row" flexWrap="wrap" gap={1}>
+            {files.map(file => (
+              <Button
+                key={`scenario-${file.path}`}
+                label={`${file.path.split('/').at(-1)} · ${file.status} · ${file.count} scénario${file.count > 1 ? 's' : ''}`}
+                variant={file.path === shownScenario?.path ? 'primary' : 'secondary'}
+                onPress={() => update($, selectedScenario, () => file.path)}
+              />
+            ))}
+          </Box>
+        )}
+        {shownScenario && (
           <Box flexDirection="column">
-            <Text dimColor wrap="truncate-start">{shown.path}</Text>
-            <Code source={shown.source} language="gherkin" path={shown.path} startLine={1} />
+            <Text dimColor wrap="truncate-start">{shownScenario.path}</Text>
+            <Code source={shownScenario.source} language="gherkin" path={shownScenario.path} startLine={1} />
           </Box>
         )}
       </Box>
