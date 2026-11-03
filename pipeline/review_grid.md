@@ -78,6 +78,9 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
   vérifient le contenu, pas le type ; pas de `verify()` d'un appel interne hors side-effect.
   Une interface du domaine doublée par un mock reconfiguré dans chaque fichier de test, alors qu'un fake
   (implémentation en mémoire, écrite une fois dans `test/`) suffirait → suggestion.
+  Un test qui attend un délai fixe pour voir un résultat (`pump(Duration(seconds: …))`, `Future.delayed`,
+  `sleep`, `waitForAnimationToEnd` sans condition dans Maestro) → `ko` : il attend un état
+  (`pumpAndSettle`, `expectLater` sur le stream, `extendedWaitUntil`), sinon il est lent ou instable.
 - **Règles portées par les objets** : une règle qui ne dépend que de l'état d'une entité (validité, total,
   statut qui interdit une action) est une méthode de l'entité, pure et testée sans mock. Un BLoC ou un use
   case qui lit les champs d'une entité pour décider à sa place → `ko`, avec la méthode qui la remplacerait.
