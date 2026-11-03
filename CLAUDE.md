@@ -30,3 +30,12 @@ Quand tu lances ou pilotes d'autres sessions (`start_session`, `SendMessage`, so
   d'une session dans une autre) : vérifie d'abord tout ce qui peut échouer (modèle disponible, dossier,
   branche, résumé à transmettre), puis seulement arrête l'ancienne, et montre à Thibault le résumé
   passé à la nouvelle avant de l'envoyer.
+
+## Écrire d'après une réponse de modèle
+
+Quand une routine, un script ou un skill écrit quelque chose (Notion, n8n, config, règle, fichier) à
+partir de ce qu'un modèle a répondu : **le modèle traduit, le script décide.** Sa réponse est une
+donnée, décodée strictement (JSON attendu, champs connus, valeurs bornées), refusée si elle ne passe
+pas, jamais exécutée telle quelle. Avant d'écrire : la dire en mots à Thibault, et l'essayer à blanc
+quand c'est possible (ce qu'elle changerait, sur quoi). C'est ce que font déjà `verifier.py`
+d'`ecrire-linkedin` et la liste fermée des écritures de `mission-linkedin`.
