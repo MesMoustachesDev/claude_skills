@@ -136,10 +136,10 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   boucle d'agents. Avant de la poser, dans l'ordre :
   1. **Une règle tranche** (règles de base, `create_feature_rules.md`, `pr_rules.md`, convention du
      repo, **règles tirées de ses réponses** : `~/.claude/pipeline/answers.md` et
-     `.claude/rules/pipeline_answers.md` du projet) → applique-la, dis-le en une ligne (« règle
-     appliquée : … »), ne demande pas.
+     `.claude/rules/pipeline_answers.md` du projet) → applique-la, dis-le avec le bloc « ce que tu
+     tranches sans lui » (règle citée, ce qu'elle change ici), ne demande pas.
   2. **Opérationnel et réversible** (restaurer un fichier généré ou un lockfile, relancer un agent
-     bloqué, régénérer un rapport) → fais-le et dis-le en une ligne.
+     bloqué, régénérer un rapport) → fais-le et dis-le avec ce même bloc.
   3. **Dette du code existant** que la feature n'a pas besoin de corriger (check rouge sur une ligne
      non touchée, DI ou README d'un package voisin, copie à migrer) → `pipeline.json → debt`, rien
      d'autre ; elle sort à l'evidence. Si un gate bloque *uniquement* sur cette dette, c'est un bug
@@ -196,8 +196,21 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
   exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
-- **Aux points d'étape, sois court.** Ce que le dev doit décider, les faits qui comptent, la question.
-  Pas de récit de ce que les agents ont fait.
+- **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le pipeline par
+  intermittence, sans ton historique : une ligne nue ne lui suffit pas.
+  - **Première ligne d'un point d'étape : ce qu'on attend de lui** (la décision à prendre, ou
+    « rien à décider, pour info »). Puis ce qui existe aujourd'hui, les faits qui comptent, la question.
+    Pas de récit de ce que les agents ont fait.
+  - **Ce que tu tranches sans lui se dit en un bloc, jamais en une ligne nue** (règle appliquée, action
+    réversible, gabarit, chemins ouverts, base de branche…) :
+    1. ce qui a été fait, avec le `fichier:ligne` cliquable s'il y en a un ; 2. pourquoi : la règle
+    citée telle qu'écrite, avec sa date, ou la mesure qui a tranché ; 3. ce que ça change pour lui, et
+    où revenir dessus s'il n'est pas d'accord. Deux à quatre lignes. Un fichier d'étape qui dit
+    d'annoncer un choix fait sans lui renvoie à ce bloc.
+  - **Une erreur se dit à plat** : où (`fichier:ligne`, check ou étape), la cause, puis la correction
+    prévue ou la question. Pas de « il semble y avoir un souci ».
+  - **Avant d'envoyer** : en ne lisant que ta première et ta dernière ligne, sait-il ce qui vient de se
+    passer et ce qu'il doit faire ? Sinon, réécris-les.
 - **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
   `display: render`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
   Les points imprévus aussi : le dev décide mieux avec les séquences et le code sous les yeux.

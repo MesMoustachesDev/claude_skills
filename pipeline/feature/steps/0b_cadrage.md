@@ -17,8 +17,8 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    leur asynchronisme), dans les sources du paquet : c'est du temps gratuit pendant la discussion, que
    la spec n'aura plus à prendre sur le chemin critique.
 2. **Toi et Thibault, tout de suite, sans attendre Sophie.** Une conversation, pas un formulaire :
-   - **Gabarit pressenti, annoncé d'entrée** : dans ton premier message, en une ligne, le gabarit
-     que la description laisse voir et pourquoi (« ça ressemble à un S : un écran, aucune I/O
+   - **Gabarit pressenti, annoncé d'entrée** : dans ton premier message, le gabarit
+     que la description laisse voir, pourquoi, et ce qu'il change pour la suite (« ça ressemble à un S : un écran, aucune I/O
      nouvelle »). Il règle la profondeur de la discussion : en S, quelques questions suffisent. Il ne
      fait que monter : une complexité découverte en route (nouvelle I/O, deuxième écran, package),
      tu le dis et tu montes d'un cran ; tu ne redescends jamais en cours de discussion. Le gabarit
@@ -45,7 +45,8 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
      suivant, glisse le fait utile avec son `fichier:ligne` (« `X` existe déjà dans `core/…:42`, on
      s'appuie dessus ? »).
    - **Les règles non négociables** (`create_feature_rules.md`, gestion d'erreur, règles tirées de ses
-     réponses) ne se discutent pas : rappelle-les quand elles tranchent, en une ligne.
+     réponses) ne se discutent pas : quand l'une tranche, cite-la et dis ce qu'elle
+     impose ici.
    - **Tu notes au fil de l'eau** dans `.claude/features/<nom>/discussion.md` : les décisions prises
      (une ligne chacune, avec la raison dans ses mots), le périmètre retenu, les questions encore
      ouvertes. C'est l'entrée de Sophie, pas un compte rendu pour lui.
@@ -71,7 +72,7 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
 6. **Fin du cadrage** : une seule question (en boutons dans le cockpit, « Répondre depuis la page ») avec une à trois réponses à donner — « C'est bien ça
    qu'on fait, séquences comprises ? » (Oui / Non, je précise), **seulement si le gabarit retenu est
    L** « Découper ? » (le découpage proposé / continuer en M) — un S ou un M s'applique sans question,
-   annoncé en une ligne avec ses mesures (règle du dev) — et, seulement si le cadrage propose une vraie alternative, « Package » (la proposition, puis
+   annoncé avec ses mesures et ce qu'il change (règle du dev, bloc « ce que tu tranches sans lui ») — et, seulement si le cadrage propose une vraie alternative, « Package » (la proposition, puis
    l'alternative, chacune avec ce qu'elle change). Oui → `size`, `size_reason` (les mesures, une
    ligne), `package` et `mode` si le package a changé : `pipeline.sh size <nom> <S|M|L> "<mesures>"`,
    `pipeline.sh gate <nom> cadrage size=<S|M|L> package=<chemin>`, `pipeline.sh pass <nom> cadrage`. Le package et les dépendances validés iront en §9 au statut

@@ -6,7 +6,8 @@ au même format ; en cas de conflit, la règle du projet gagne.
 
 Lu par les orchestrateurs avant toute question (étape 1 du filtre), et transmis aux agents qui
 proposent des choix (Sophie, Camille, Arthur, Romain, Victor, Bastien). Une règle s'applique sans
-redemander ; l'orchestrateur dit en une ligne laquelle il a appliquée. Elle prime sur une question
+redemander ; l'orchestrateur dit laquelle il a appliquée, citée, et ce qu'elle change ici (bloc
+« ce que tu tranches sans lui » de `feature.md` et `fix.md`). Elle prime sur une question
 que `feature.md` ou `fix.md` prévoirait au même endroit.
 
 Format : une ligne par règle, à l'impératif, puis entre parenthèses la date et la question d'origine.
@@ -16,10 +17,10 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 ## Pipeline et livraison
 
 - Crée les commits du plan sans demander de validation : ils sont locaux et réversibles, le plan va dans l'evidence. Le push et la MR restent soumis à sa validation. (2026-10-17, « Commits », 11 réponses « Go » sur 11)
-- Applique le gabarit S ou M qui sort des critères sans le demander, annoncé en une ligne avec ses mesures ; ne pose que la question du découpage quand le gabarit est L. (2026-10-17, « Gabarit », 8 sur 8)
+- Applique le gabarit S ou M qui sort des critères sans le demander, annoncé avec ses mesures et ce qu'il change pour la suite ; ne pose que la question du découpage quand le gabarit est L. (2026-10-17, « Gabarit », 8 sur 8)
 - Une feature qui ne touche les autres packages que par des ajouts mécaniques (param optionnel, une ligne) reste en M au lieu de passer en L. (2026-10-19, « Gabarit »)
 - Sans référence d'issue dans la description, passe l'issue en `to_create` sans demander s'il en existe une ; le contenu de l'issue reste validé avant sa création. (2026-10-17, « Issue », 7 sur 7)
-- Ouvre pour la feature (`pipeline.sh extra <nom> <glob>`, jamais la config `writes.extra` du projet) les chemins que la spec et les contrats validés touchent (leurs `test/` compris) sans demander, et dis-le en une ligne ; corrige le hook global quand il contredit son propre commentaire. (2026-10-17, « writes.extra » et « Hook », 11 sur 11)
+- Ouvre pour la feature (`pipeline.sh extra <nom> <glob>`, jamais la config `writes.extra` du projet) les chemins que la spec et les contrats validés touchent (leurs `test/` compris) sans demander, et dis lesquels et pourquoi ; corrige le hook global quand il contredit son propre commentaire. (2026-10-17, « writes.extra » et « Hook », 11 sur 11)
 
 ## Gates et seuils
 

@@ -311,10 +311,25 @@ ligne de l'enregistrer en mémoire.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
-- **Hors plan, sois court** : ce qui bloque, les faits, les options, la question.
+- **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le fix par
+  intermittence, sans ton historique : une ligne nue ne lui suffit pas.
+  - **Première ligne d'un point d'étape, prévu ou hors plan : ce qu'on attend de lui** (la décision à prendre, ou
+    « rien à décider, pour info »). Puis ce qui bloque ou ce qui existe, les faits, les options,
+    la question.
+  - **Ce que tu tranches sans lui se dit en un bloc, jamais en une ligne nue** (règle appliquée, action
+    réversible…) :
+    1. ce qui a été fait, avec le `fichier:ligne` cliquable s'il y en a un ; 2. pourquoi : la règle
+    citée telle qu'écrite, avec sa date, ou la mesure qui a tranché ; 3. ce que ça change pour lui, et
+    où revenir dessus s'il n'est pas d'accord. Deux à quatre lignes. Un fichier d'étape qui dit
+    d'annoncer un choix fait sans lui renvoie à ce bloc.
+  - **Une erreur se dit à plat** : où (`fichier:ligne`, check ou étape), la cause, puis la correction
+    prévue ou la question. Pas de « il semble y avoir un souci ».
+  - **Avant d'envoyer** : en ne lisant que ta première et ta dernière ligne, sait-il ce qui vient de se
+    passer et ce qu'il doit faire ? Sinon, réécris-les.
 - **Règles tirées des réponses du dev.** Avant toute question, lis `~/.claude/pipeline/answers.md` et
   `.claude/rules/pipeline_answers.md` du projet s'il existe : une règle qui tranche s'applique, tu le
-  dis en une ligne (« règle appliquée : … ») et tu ne demandes pas. Passe ces deux chemins à Bastien et
+  dis avec le bloc « ce que tu tranches sans lui » (règle citée, ce qu'elle change ici) et tu ne
+  demandes pas. Passe ces deux chemins à Bastien et
   Victor. Après une réponse du dev à une question autre que le diagnostic et le plan de correction,
   s'il y a une règle générale derrière (qui trancherait la même question sur un autre fix), propose-la
   dans le prochain `AskUserQuestion` (header `Règle`, la règle à l'impératif ; « Oui, tous mes projets »

@@ -10,7 +10,8 @@
     `feature/<epic>` dès que cette branche existe (`git rev-parse --verify feature/<epic>` ou
     `origin/feature/<epic>`) — la sous-feature en part, sa MR y revient, et c'est la base du diff des
     gates. Seule exception : `/epic` a proposé de partir de la branche d'une dépendance encore en MR
-    (`feature/<dep>`). Annonce la base en une ligne avant de créer le worktree.
+    (`feature/<dep>`). Annonce la base avant de créer le worktree, avec le bloc « ce que tu
+    tranches sans lui » (`feature.md`) : quelle branche, pourquoi, ce que ça change pour la MR.
   - Sinon : `git fetch origin <base>` (ignore l'échec hors ligne), puis
     `git worktree add .claude/worktrees/feature-<nom> -b feature/<nom> <base>` (si la branche existe
     sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis

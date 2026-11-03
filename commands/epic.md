@@ -147,7 +147,7 @@ l'avancement des sous-features.
    - dû à une main humaine (fermé, statut changé à la main) → montré, Thibault dit lequel fait foi ;
      jamais réécrit sans lui.
 3. Toutes les écritures **en un lot**, montrées telles qu'elles partiront, validées une fois.
-   Injoignable → `pending_writes`, une ligne.
+   Injoignable → `pending_writes`, et dis au dev lesquelles attendent et quand elles repartiront.
 4. Toutes `mergé` ou `abandonné` → propose de clore l'epic : commentaire de clôture (ce qui a été
    livré, ce qui a été abandonné et pourquoi) et `set_status(mergé)` sur le parent, montrés et validés.
    Puis propose de supprimer le worktree de l'epic (`git worktree remove`) : son dossier

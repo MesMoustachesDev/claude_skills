@@ -28,8 +28,8 @@ n'est jamais rejouée à la reprise, sauf reclassement.
 
 **Reclassement.** S → M dès qu'un critère de S est dépassé : plus de 2 commentaires
 `DÉCISION (Thibault)` dans le brouillon d'Arthur (mesuré en 0e), plus de 8 scénarios en §4, un
-package ou une dépendance ajoutés en §8 (mesurés au point d'étape « spec »). Dis-le au dev en une ligne, avec
-la mesure, et `AskUserQuestion` « Passer en M (Recommandé) » / « Rester en S : <raison> », dans le
+package ou une dépendance ajoutés en §8 (mesurés au point d'étape « spec »). Dis-le au dev avec
+la mesure et ce que M change (étapes rejouées, plafonds de boucle), et `AskUserQuestion` « Passer en M (Recommandé) » / « Rester en S : <raison> », dans le
 même appel que la question de l'arrêt en cours. En M, une étape déjà `SKIPPED` en S est rejouée avant d'aller plus loin. M → L : plus
 de 5 `DÉCISION (Thibault)` dans le brouillon (mesuré en 0e, avant qu'il édite), ou un imprévu après
 la spec : le dev décide (découper ou continuer en M) ; ce que deviennent les contrats déjà commités
