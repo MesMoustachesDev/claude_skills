@@ -97,6 +97,8 @@ For each commit, indicate:
 Exception: when called by the `/feature` or `/fix` pipeline with « sans validation », show the plan
 and execute it right away (commits are local and reversible; the plan goes into the evidence).
 Pushing and creating a MR always stay subject to the user's explicit approval.
+When the caller says « rien sous `.claude/` », stage nothing under `.claude/` (pipeline documents,
+project rules added by the run): leave those files out of the plan, untracked or modified.
 
 ## 5. EXECUTE
 

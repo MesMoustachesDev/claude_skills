@@ -275,15 +275,36 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 
 Régénère `fix_gauntlet.sh report <nom> evidence` et donne son chemin avec celui de l'evidence (il
 n'est pas commité). **Learn** : `~/.claude/pipeline/learn.md`, en entier (extraire, étiqueter,
-proposer les récurrences, appliquer ce que le dev retient ; ne bloque jamais la livraison). Puis invoque la skill `create_commits` avec « sans validation » (règle du dev : commits créés sans
-attendre, plan dans l'evidence ; le commit de gel existe déjà ; elle découpe la correction et
-l'evidence). Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
-`create_mr` au dev, avec l'issue liée (`issue.md`, partie C), qui
-appliquera ses propres validations. `stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
+proposer les récurrences, appliquer ce que le dev retient ; ne bloque jamais la livraison). Puis,
+dans cet ordre :
+
+1. La skill `create_commits` avec « sans validation » et « rien sous `.claude/` » (règle du dev :
+   commits créés sans attendre, plan dans l'evidence ; le commit de gel existe déjà ; elle découpe la
+   correction).
+2. Depuis le worktree : `python3 ~/.claude/scripts/mr.py archive fix <nom> <base_branch>` puis
+   `python3 ~/.claude/scripts/mr.py untrack fix <nom> <base_branch>`. Le dossier du fix est copié sous
+   `.claude/archive/fixes/<nom>/` du checkout principal (exclu de git, localement), les règles
+   `.claude/rules/` changées y sont recopiées, non commitées ; `untrack` retire de la branche, en un
+   commit, `repro.json` et `diagnosis.md` commités au gel (le gate a fini de s'en servir). Dis au dev
+   les règles recopiées, avec le bloc « ce que tu tranches sans lui ».
+3. Écris `.claude/fixes/<nom>/mr.md`, la description de MR, pour un relecteur qui ne connaît ni le
+   pipeline ni ses agents : les règles de `~/.claude/pipeline/feature/steps/9_evidence.md`, point 3,
+   avec ces sections : **Summary** (le bug vu par l'utilisateur, l'issue), **Changes** (la cause
+   racine et la correction, en 2 à 4 puces), **Review focus** si utile (écart au plan, même défaut
+   corrigé ailleurs), **Test plan** (le test de reproduction, rouge avant et vert après, et le parcours
+   sur device s'il y en a un). Vérifie : `python3 ~/.claude/scripts/mr.py check
+   .claude/fixes/<nom>/mr.md <base_branch>`, et ne montre rien au dev avant `ok`.
+4. Tu ne pushes rien et ne crées rien d'externe (hormis l'issue validée plus haut) : propose
+   `create_mr` au dev, avec `mr.md` comme description (vérifiée, à ne pas regénérer) et l'issue liée
+   (`issue.md`, partie C) ; elle appliquera ses propres validations. MR créée → relance
+   `mr.py archive fix <nom> <base_branch>` (l'archive prend `mr.md`).
+
+`stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
-mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter :
-`git worktree remove .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
+mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter (le
+dossier du fix, non suivi, est archivé : d'où `--force`) :
+`git worktree remove --force .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
 
 **Fin : la page du fix.** Après `stages.evidence = PASSED` : « Rafraîchir » avec `say <nom> ""` — la
 carte de l'Accueil passe dans « Terminées », avec la cause racine. Puis un seul `AskUserQuestion` :

@@ -1,7 +1,8 @@
 # Learn — ce qu'un run apprend aux suivants
 
 Partagé par `/feature` (étape 9b) et `/fix` (étape 5), juste avant `create_commits` : une règle
-ajoutée au projet part dans les commits du run.
+ajoutée au projet ne part pas dans la MR ; `mr.py archive` la recopie dans le checkout principal, où le
+dev la commite à part.
 Une erreur corrigée par un agent de revue (Romain, Victor, Camille, Gaëlle, Denis) ou rattrapée par un
 re-gel coûte une boucle. Si elle revient d'un run à l'autre, c'est qu'une règle manque **en amont**, là
 où l'agent qui l'a produite la lit. Learn repère ces récurrences et propose la règle à Thibault.
@@ -63,8 +64,9 @@ règle (label : le slug ; description : la règle et le fichier), plus « Discut
 ## 4. Appliquer
 
 - Retenue → ajoute la ligne telle qu'il l'a validée dans le fichier cible, puis
-  `learn.py promote <slug> <fichier> "<règle>"`. Un fichier du projet (`.claude/rules/…`) est commité
-  avec le run ; un fichier de `~/.claude` n'est pas commité par toi.
+  `learn.py promote <slug> <fichier> "<règle>"`. Un fichier du projet (`.claude/rules/…`) n'est pas
+  commité sur la branche du run (`mr.py archive` le recopie dans le checkout principal) ; un fichier de
+  `~/.claude` n'est pas commité par toi.
 - Non retenue → `learn.py reject <slug> "<sa raison, ou « non retenue »>"`. Le pattern ne revient
   qu'après deux runs de plus.
 - « Discuter » → tu expliques (les exemples, ce que la règle aurait évité), puis tu reposes la même question.

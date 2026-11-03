@@ -93,7 +93,14 @@ Si `$ARGUMENTS` est fourni et non vide, utilise-le comme indication pour le titr
 
 ### Description / Body
 
-Génère le body en suivant le template défini dans les règles. Typiquement :
+**L'appelant donne un fichier de description** (le pipeline `/feature` ou `/fix` passe `mr.md`, déjà
+vérifié par `~/.claude/scripts/mr.py check`) → c'est le body, mot pour mot. Ne le regénère pas, ne
+l'enrichis pas avec le diff, ne pose pas les questions des règles auxquelles il répond déjà (le ticket
+y est). Si tu dois y toucher à la demande du dev, relance `mr.py check` avant de re-présenter.
+Un rapport interne (`evidence.md`, un rapport de revue) n'est jamais un body : demande un `mr.md`.
+
+Sinon, génère le body en suivant le template défini dans les règles. Il s'adresse à un relecteur de
+l'équipe : rien sur l'outillage qui a produit la MR (agents, pipeline, chemins `.claude/`). Typiquement :
 - Résumé des changements (2-5 bullet points)
 - Détail technique si pertinent
 - Lien vers le ticket si applicable

@@ -1,5 +1,7 @@
 ### 9. Evidence, commits, MR
 
+`evidence.md` est la page du dev ; la MR a sa propre description, `mr.md` (point 3 plus bas).
+
 **9a. Graphe graphify (seulement si le projet en a un).** Contrat : `~/.claude/pipeline/graphify.md`.
 Depuis le worktree :
 `bash ~/.claude/scripts/graphify.sh prepare <worktree> --update`, puis
@@ -82,19 +84,50 @@ Re-gels : <n> (hygiene <n> · technique <n> · contrat <n> · spec <n> · intern
 **9b. Learn.** `~/.claude/pipeline/learn.md`, en entier : extraire, étiqueter, proposer les récurrences à
 Thibault, appliquer ce qu'il retient. Ne bloque jamais la livraison.
 
-Puis, **dans cet ordre** : invoque la skill `create_commits` avec « sans validation » (elle découpe le
-travail restant en commits atomiques et les crée sans attendre : règle du dev ; le plan va dans
-l'evidence ; les commits de contrats et de gel existent déjà), puis la skill `create_mr` en
-lui indiquant que la description de MR est `evidence.md` et le ticket lié (`issue.md`, partie C :
-`Closes`/`Relates to`, et pour une sous-feature d'epic le ticket de l'epic aussi), et la **branche
-cible** : `pipeline.json → base` (`feature/<epic>` pour une sous-feature d'epic, jamais `base_branch`
-à sa place). `create_mr` applique ses propres règles de
-validation du dev avant tout push ou création : tu ne les contournes pas.
+Puis, **dans cet ordre** :
+
+1. **Commits.** Invoque la skill `create_commits` avec « sans validation » et « rien sous `.claude/` »
+   (elle découpe le travail restant en commits atomiques et les crée sans attendre : règle du dev ; le
+   plan va dans l'evidence ; les commits de contrats et de gel existent déjà). Les documents du run et
+   les règles ajoutées par learn ne partent pas dans la MR.
+2. **Archive et nettoyage de la branche**, depuis le worktree :
+   `python3 ~/.claude/scripts/mr.py archive feature <nom> <base>` puis
+   `python3 ~/.claude/scripts/mr.py untrack feature <nom> <base>` (`<base>` = `pipeline.json → base`).
+   Le dossier du run est copié dans le checkout principal, sous `.claude/archive/features/<nom>/`
+   (exclu de git, localement) ; une règle `.claude/rules/` changée par le run y est recopiée, non
+   commitée. `untrack` ramène `.claude/` à son état de la base en un commit. Dis au dev, avec le bloc
+   « ce que tu tranches sans lui », les règles recopiées : il les commitera à part s'il les garde.
+3. **La description de MR : `.claude/features/<nom>/mr.md`, pas `evidence.md`.** Elle est écrite pour
+   un relecteur de l'équipe qui ne connaît ni le pipeline, ni ses agents, ni ce que le dev a répondu.
+   Gabarit et langue : ceux de `create_mr_rules.md` du projet. Contenu :
+   - le ticket, là où le gabarit le met (`Related issue`), dans la syntaxe des règles (cross-projet
+     comprise) : `issue.md`, partie C, `Closes`/`Relates to`, et pour une sous-feature d'epic le
+     ticket de l'epic aussi ;
+   - **Summary** : pourquoi la MR existe, en 2 à 4 puces, en termes de comportement pour l'utilisateur ;
+   - **Changes** : 3 à 6 puces par package ou couche, ce qui change et pourquoi (pas la liste des
+     fichiers, pas l'arbre du changement) ;
+   - **Review focus** (si utile) : les choix qui méritent un œil (décisions de §9, dépendance gardée
+     ou retirée, consommateurs hors package touchés, migration de données), au plus 5 puces ;
+   - **Test plan** : les scénarios d'acceptation regroupés, comment les rejouer (tests, flows Maestro
+     du package), et une ligne de chiffres (tests, couverture des lignes modifiées).
+
+   Jamais : un prénom d'agent ou du dev, ce que le dev a répondu, le vocabulaire du pipeline (gel,
+   gabarit, gauntlet, evidence…), un chemin `.claude/`, la dette, les mutants, les incidents
+   d'outillage. Tout ça reste dans `evidence.md`. Au plus 60 lignes.
+   Vérifie : `python3 ~/.claude/scripts/mr.py check .claude/features/<nom>/mr.md <base>`. Chaque refus
+   se corrige dans `mr.md` (ou dans la branche s'il vise un fichier `.claude/`), puis on revérifie ;
+   on ne montre pas la MR au dev avant `ok`.
+4. **MR.** La skill `create_mr`, en lui indiquant que la description est `mr.md` (vérifiée, à ne pas
+   regénérer) et la **branche cible** : `pipeline.json → base` (`feature/<epic>` pour une sous-feature
+   d'epic, jamais `base_branch` à sa place). `create_mr` applique ses propres règles de validation du
+   dev avant tout push ou création : tu ne les contournes pas. MR créée → relance
+   `mr.py archive feature <nom> <base>` : l'archive prend `mr.md` et l'état final.
 
 `pipeline.sh pass <nom> evidence`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
-pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter :
-`git worktree remove .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
-Termine par un résumé de 5 lignes (la dernière : learn, règles ajoutées ou « aucune récurrence ») et le chemin de l'evidence.
+pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter (le dossier du
+run, non suivi, est archivé : d'où `--force`) :
+`git worktree remove --force .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
+Termine par un résumé de 5 lignes (la dernière : learn, règles ajoutées ou « aucune récurrence »), le chemin de l'evidence et l'URL de la MR.
 
 **Fin : la page de la feature.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh say <nom> ""`
 puis « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) — la carte de l'accueil passe dans

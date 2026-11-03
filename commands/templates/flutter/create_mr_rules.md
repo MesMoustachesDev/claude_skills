@@ -26,7 +26,10 @@ Exemples :
 <!-- 2-5 bullet points décrivant les changements -->
 
 ## Changes
-<!-- Liste des fichiers/modules impactés avec une ligne de contexte -->
+<!-- 3-6 puces par module ou couche : ce qui change et pourquoi, pas la liste des fichiers -->
+
+## Review focus
+<!-- Optionnel : les choix qui méritent un œil (dépendance, migration, consommateurs touchés) -->
 
 ## Related issue
 <!-- Lien vers le ticket GitLab si applicable, sinon supprimer cette section -->
