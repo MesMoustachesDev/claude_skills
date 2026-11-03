@@ -193,3 +193,86 @@ test('le panneau Pipeline attend le premier .feature', async ($, on) => {
   expect((await ui.find({ type: 'Text', text: /Pas encore de \.feature/ }))?.text).toBe('Pas encore de .feature ajouté ou modifié dans app/editor.')
   await ui.unmount()
 })
+
+const PLAN_MD = `# Plan — paywall
+
+## Les chantiers
+
+### Phase 1 — Trial
+
+1. **Écran de fin de trial.** [moi]
+   - Quand : une fois.
+   → \`feature/trial_end_screen\`
+
+2. **Plafonner la pub.** [toi]
+   - À décider.
+
+3. **Primer qui nomme la recette** : codé et mergé. [fait]
+`
+
+const WT = '/repo/.claude/worktrees/feature-trial_end_screen'
+const STRAY = '/repo/.claude/worktrees/trial-end-screen-6c4fb4'
+
+const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
+  on('command.register', () => ({ value: { command: 'pipeline' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('process.run', (_, e) => {
+    const argv = e.argv.join(' ')
+    const out = argv.includes('--git-common-dir')
+      ? '/repo/.git'
+      : argv.includes('--show-toplevel')
+        ? ROOT
+        : argv.includes('branch --show-current')
+          ? 'main'
+          : argv.includes('worktree list')
+            ? `worktree /repo\nbranch refs/heads/main\n\nworktree ${WT}\nbranch refs/heads/feature/trial_end_screen\n\nworktree ${STRAY}\nbranch refs/heads/claude/trial-end-screen-6c4fb4\n`
+            : argv.includes('--verify')
+              ? 'abc123'
+              : argv.includes('@{upstream}')
+                ? ''
+                : argv.includes('develop..feature/trial_end_screen')
+                  ? '3'
+                  : argv.includes('rev-list')
+                    ? '0'
+                    : argv.includes('status --porcelain') && e.init?.cwd === WT
+                      ? ' M lib/a.dart\n?? lib/b.dart'
+                      : ''
+
+    return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('fs.list', (_, e) =>
+    e.path === '/repo/.claude/plans'
+      ? { value: [{ name: 'paywall.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] }
+      : { deny: 'ENOENT' },
+  )
+  on('fs.read', (_, e) =>
+    e.path === '/repo/.claude/plans/paywall.md'
+      ? { value: PLAN_MD }
+      : e.path === `${WT}/.claude/features/trial_end_screen/pipeline.json`
+        ? { value: JSON.stringify({ stages: { green: { status: 'RED', at: '2026-11-03T10:00:00Z' } }, attempts: { green: 2 } }) }
+        : { deny: 'ENOENT' },
+  )
+}
+
+test('le panneau montre le plan du repo, ses branches et les worktrees hors plan', async ($, on) => {
+  planEngine(on)
+  await $.session.start({ cwd: ROOT, surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
+  expect((await ui.find({ type: 'Text', text: /1\. Écran/ }))?.text).toBe('▸ 1. Écran de fin de trial · moi')
+  expect((await ui.find({ type: 'Text', text: /feature\/trial_end_screen ·/ }))?.text).toBe(
+    '    feature/trial_end_screen · feature-trial_end_screen · ✗ impl (vert) 2/5 · 3 commits · jamais poussée · 2 fichiers non commités',
+  )
+  expect((await ui.find({ type: 'Text', text: /2\. Plafonner/ }))?.text).toBe('! 2. Plafonner la pub · toi · décision à toi')
+  expect((await ui.find({ type: 'Text', text: /claude\/trial-end-screen/ }))?.text).toBe(
+    '    claude/trial-end-screen-6c4fb4 · trial-end-screen-6c4fb4 · aucun commit',
+  )
+  await ui.unmount()
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
+  await band.unmount()
+})

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PipelineSnapshot, ScenarioFile } from '../types'
+import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, ScenarioFile } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -21,11 +21,25 @@ import {
   stageOwner,
   toolLabel,
 } from './model'
+import {
+  describeBranch,
+  emptyBranch,
+  isOpen,
+  isToolingBranch,
+  itemState,
+  parseEpic,
+  parsePlanMarkdown,
+  parseWorktrees,
+  summarize,
+} from './plan'
 
 const PANE = 'pipeline-view'
 const REFRESH_MS = 5000
+// Les plans coûtent quelques appels git par branche liée : relus moins souvent que le pipeline.
+const PLAN_REFRESH_MS = 30000
 const DECISION = 'DÉCISION (Thibault)'
 const FOLDER = { feature: 'features', fix: 'fixes' } as const
+const PLAN_MARK = { done: '✓', active: '▸', yours: '!', todo: '·' } as const
 
 const snapshot = atom({ plugin: 'pipeline-view', key: 'snapshot' } as const, null, {
   shape: 'snapshot-1',
@@ -37,6 +51,8 @@ const isAsking = atom({ plugin: 'pipeline-view', key: 'isAsking' } as const, fal
 const now = atom({ plugin: 'pipeline-view', key: 'now' } as const, 0)
 const scenarios = atom({ plugin: 'pipeline-view', key: 'scenarios' } as const, [])
 const selectedScenario = atom({ plugin: 'pipeline-view', key: 'selectedScenario' } as const, '')
+const plans = atom({ plugin: 'pipeline-view', key: 'plans' } as const, [])
+const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -125,6 +141,101 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   return { ...snap, decisions }
 }
 
+/** Ce que git sait d'une branche citée par un plan : worktree, commits, poussée, fichiers, étape du pipeline. */
+const fillBranch = async (
+  $: EngineInterface,
+  b: PlanBranch,
+  base: string,
+  worktrees: Map<string, string>,
+  main: string,
+): Promise<PlanBranch> => {
+  if (!(await git($, ['rev-parse', '--verify', '--quiet', `refs/heads/${b.branch}`], main))) return { ...b, exists: false }
+  const worktree = worktrees.get(b.branch) ?? ''
+  const ahead = Number(await git($, ['rev-list', '--count', `${base}..${b.branch}`], main)) || 0
+  const up = await git($, ['rev-list', '--count', `${b.branch}@{upstream}..${b.branch}`], main)
+  const dirty = worktree ? (await git($, ['status', '--porcelain'], worktree)).split('\n').filter(Boolean).length : 0
+  const filled = { ...b, exists: true, worktree, ahead, unpushed: up === '' ? -1 : Number(up) || 0, dirty }
+  const where = fromBranch(b.branch)
+  if (!worktree || !where) return filled
+  const file = `${worktree}/.claude/${FOLDER[where.kind]}/${where.name}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
+  const snap = parseState(where.kind, where.name, await readText($, file), 5)
+  const focus = snap ? focusStage(snap) : undefined
+  if (!snap || !focus) return filled
+  const tries = focus.attempts > 0 ? ` ${focus.attempts}/${snap.maxAttempts}` : ''
+
+  return { ...filled, stage: `${mark(focus.status)} ${focus.label}${tries}`, stageStatus: focus.status }
+}
+
+/** Les plans ouverts du checkout principal (.claude/plans/*.md, epics des worktrees) et les worktrees hors plan. */
+const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; strays: PlanBranch[] }> => {
+  const common = await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  if (!common) return { plans: [], strays: [] }
+  const main = common.replace(/\/\.git\/?$/, '')
+  const worktrees = parseWorktrees(await git($, ['worktree', 'list', '--porcelain'], main))
+  const config = await readText($, `${main}/.claude/rules/feature_pipeline.md`)
+  const base = /^\s*base_branch\s*=\s*(\S+)/m.exec(config)?.[1] ?? 'develop'
+  const found: PlanView[] = []
+  const cited = new Set<string>()
+  const entries = await $.fs.list(`${main}/.claude/plans`).catch(() => [])
+  for (const entry of [...entries].sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    if (entry.kind !== 'file' || !entry.name.endsWith('.md')) continue
+    const source = `.claude/plans/${entry.name}`
+    const parsed = parsePlanMarkdown(await readText($, `${main}/${source}`))
+    for (const phase of parsed.phases) {
+      for (const item of phase.items) {
+        item.branches.forEach(b => cited.add(b.branch))
+        item.branches = await Promise.all(item.branches.map(b => fillBranch($, b, base, worktrees, main)))
+      }
+    }
+    found.push({ kind: 'plan', title: parsed.title || entry.name.replace(/\.md$/, ''), source, phases: parsed.phases })
+  }
+  for (const [branch, path] of worktrees) {
+    const where = fromBranch(branch)
+    if (where?.kind !== 'feature') continue
+    const source = `.claude/features/${where.name}/pipeline.json`
+    const epic = parseEpic(where.name, await readText($, `${path}/${source}`))
+    if (!epic) continue
+    cited.add(branch)
+    for (const item of epic.phases[0]?.items ?? []) {
+      item.branches.forEach(b => cited.add(b.branch))
+      item.branches = await Promise.all(
+        item.branches.map(b => fillBranch($, b, epic.bases[b.branch] ?? branch, worktrees, main)),
+      )
+    }
+    found.push({ kind: 'epic', title: epic.title, source: `${path.slice(main.length + 1) || '.'}/${source}`, phases: epic.phases })
+  }
+  const open = found.filter(isOpen)
+  if (open.length === 0) return { plans: [], strays: [] }
+  const loose: PlanBranch[] = []
+  for (const [branch, path] of worktrees) {
+    if (path === main || isToolingBranch(branch) || cited.has(branch)) continue
+    loose.push(await fillBranch($, emptyBranch(branch), base, worktrees, main))
+  }
+
+  return { plans: open, strays: loose }
+}
+
+let isPlanning = false
+
+const refreshPlans = async ($: EngineInterface): Promise<void> => {
+  if (isPlanning) return
+  isPlanning = true
+  try {
+    const next = await loadPlans($)
+    if (JSON.stringify(next.plans) !== JSON.stringify(await read($, plans))) await update($, plans, () => next.plans)
+    if (JSON.stringify(next.strays) !== JSON.stringify(await read($, strays))) await update($, strays, () => next.strays)
+    if (next.plans.length > 0 && !autoOpenedPlans) {
+      autoOpenedPlans = true
+      await $.ui.open({ id: PANE, title: 'Pipeline' })
+    }
+  } finally {
+    isPlanning = false
+  }
+}
+
+// Ouvert une fois par session quand un plan ouvert existe dans le repo.
+let autoOpenedPlans = false
+
 const refresh = async ($: EngineInterface): Promise<void> => {
   if ((await read($, agents)).some(a => a.end === 0)) {
     const at = await $.clock.now()
@@ -181,13 +292,16 @@ export const register: Register = on => {
     })
     await update($, agents, () => [])
     await refresh($)
+    await refreshPlans($)
     $.clock.every(REFRESH_MS, () => refresh($))
+    $.clock.every(PLAN_REFRESH_MS, () => refreshPlans($))
 
     return started
   })
 
   on('command.run', { command: 'pipeline' }, async $ => {
     await refresh($)
+    await refreshPlans($)
     await $.ui.open({ id: PANE, title: 'Pipeline' })
 
     return { text: 'Panneau Pipeline ouvert.' }
@@ -266,7 +380,21 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const snap = await read($, snapshot)
-    if (snap === null || e.props.hasSurvey) return next(e)
+    if (e.props.hasSurvey) return next(e)
+    if (snap === null) {
+      const open = await read($, plans)
+      const first = open[0]
+      if (!first) return next(e)
+      const { Text } = $.ui.resolve(e)
+      const more = open.length > 1 ? ` · +${open.length - 1} plan${open.length > 2 ? 's' : ''}` : ''
+
+      return (
+        <Text dimColor wrap="truncate-end">
+          {summarize(first)}
+          {more}
+        </Text>
+      )
+    }
     const { Text } = $.ui.resolve(e)
     const line = describe(snap, await read($, agents), await read($, isAsking), await read($, now))
     const stage = focusStage(snap)
@@ -282,8 +410,79 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Code, Text } = $.ui.resolve(e)
     const snap = await read($, snapshot)
+    const openPlans = await read($, plans)
+    const loose = await read($, strays)
+    const cites = new Map<string, number>()
+    for (const plan of openPlans) {
+      for (const item of plan.phases.flatMap(p => p.items)) {
+        for (const b of item.branches) cites.set(b.branch, (cites.get(b.branch) ?? 0) + 1)
+      }
+    }
+    const branchLine = (b: PlanBranch) => (
+      <Text
+        color={b.stageStatus === 'RED' || b.stageStatus === 'FAILED' ? 'error' : !b.exists ? 'warning' : undefined}
+        dimColor={b.exists && b.stageStatus !== 'RED' && b.stageStatus !== 'FAILED'}
+        wrap="truncate-end"
+      >
+        {'    '}
+        {describeBranch(b)}
+        {(cites.get(b.branch) ?? 0) > 1 ? ` · citée par ${cites.get(b.branch)} points` : ''}
+      </Text>
+    )
+    const planSection =
+      openPlans.length === 0 ? null : (
+        <Box flexDirection="column">
+          <Text> </Text>
+          <Text bold>Plan</Text>
+          {openPlans.map(plan => (
+            <Box flexDirection="column">
+              <Text bold>{summarize(plan)}</Text>
+              <Text dimColor wrap="truncate-start">
+                {plan.source}
+              </Text>
+              {plan.phases.map(phase => (
+                <Box flexDirection="column">
+                  <Text dimColor>{phase.title}</Text>
+                  {phase.items.map(item => {
+                    const state = itemState(item)
+                    const extra = [item.owner, item.note].filter(Boolean).join(' · ')
+
+                    return (
+                      <Box flexDirection="column">
+                        <Text
+                          color={state === 'done' ? 'success' : state === 'yours' ? 'warning' : undefined}
+                          dimColor={state === 'done' || state === 'todo'}
+                          bold={state === 'active'}
+                          wrap="truncate-end"
+                        >
+                          {PLAN_MARK[state]} {item.id}. {item.title}
+                          {extra !== '' ? ` · ${extra}` : ''}
+                          {state === 'yours' ? ' · décision à toi' : ''}
+                        </Text>
+                        {state !== 'done' && item.branches.map(branchLine)}
+                      </Box>
+                    )
+                  })}
+                </Box>
+              ))}
+            </Box>
+          ))}
+          {loose.length > 0 && (
+            <Box flexDirection="column">
+              <Text> </Text>
+              <Text bold>Worktrees cités par aucun plan</Text>
+              {loose.map(branchLine)}
+            </Box>
+          )}
+        </Box>
+      )
     if (snap === null) {
-      return <Text dimColor>Aucun /feature ni /fix en cours dans ce dépôt.</Text>
+      return (
+        <Box flexDirection="column">
+          <Text dimColor>Aucun /feature ni /fix en cours dans ce dépôt.</Text>
+          {planSection}
+        </Box>
+      )
     }
     const list = await read($, agents)
     const at = await read($, now)
@@ -368,6 +567,7 @@ export const register: Register = on => {
             <Code source={shownScenario.source} language="gherkin" path={shownScenario.path} startLine={1} />
           </Box>
         )}
+        {planSection}
       </Box>
     )
   })

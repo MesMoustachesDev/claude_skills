@@ -1,6 +1,6 @@
 {
   "name": "pipeline-view",
-  "version": "0.5.0",
-  "description": "Affiche l'état du pipeline /feature ou /fix en cours : étapes, gates, tentatives, agent actif, ce qui t'attend, et les scénarios Gherkin de la feature. Lecture seule.",
+  "version": "0.6.0",
+  "description": "Affiche l'état du pipeline /feature ou /fix en cours (étapes, gates, tentatives, agent actif, ce qui t'attend, scénarios Gherkin) et les plans du repo (.claude/plans/*.md, epics) avec l'état de chaque branche liée. Lecture seule.",
   "types": "./types/index.d.ts"
 }
