@@ -32,6 +32,7 @@ import {
   parseWorktrees,
   summarize,
 } from './plan'
+import { type Scenario, type Step, parseScenarios } from './gherkin'
 
 const PANE = 'pipeline-view'
 const REFRESH_MS = 5000
@@ -40,6 +41,7 @@ const PLAN_REFRESH_MS = 30000
 const DECISION = 'DÉCISION (Thibault)'
 const FOLDER = { feature: 'features', fix: 'fixes' } as const
 const PLAN_MARK = { done: '✓', active: '▸', yours: '!', todo: '·' } as const
+const STEP_COLOR = { given: 'suggestion', when: 'warning', then: 'success' } as const
 
 const snapshot = atom({ plugin: 'pipeline-view', key: 'snapshot' } as const, null, {
   shape: 'snapshot-1',
@@ -408,7 +410,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Code, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
     const snap = await read($, snapshot)
     const openPlans = await read($, plans)
     const loose = await read($, strays)
@@ -428,6 +430,50 @@ export const register: Register = on => {
         {describeBranch(b)}
         {(cites.get(b.branch) ?? 0) > 1 ? ` · citée par ${cites.get(b.branch)} points` : ''}
       </Text>
+    )
+    const stepLine = (s: Step, isDim: boolean) => (
+      <Box flexDirection="column">
+        <Text dimColor={isDim}>
+          <Text color={STEP_COLOR[s.kind]} bold={!s.isContinuation} dimColor={s.isContinuation}>
+            {s.isContinuation ? `  ${s.keyword}` : s.keyword}
+          </Text>{' '}
+          {s.parts.map(part => (part.isParam ? <Text bold color="claude">{part.text}</Text> : part.text))}
+        </Text>
+        {s.extra.map(line => (
+          <Text dimColor mono>
+            {'    '}
+            {line}
+          </Text>
+        ))}
+      </Box>
+    )
+    const scenarioCard = (s: Scenario) => (
+      <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        {s.feature !== '' && <Text dimColor>{s.feature}</Text>}
+        <Text bold>
+          {s.isOutline ? 'Plan · ' : ''}
+          {s.title}
+        </Text>
+        {s.tags.length > 0 && <Text color="suggestion">{s.tags.join(' ')}</Text>}
+        {s.background.length > 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Contexte</Text>
+            {s.background.map(b => stepLine(b, true))}
+          </Box>
+        )}
+        <Box flexDirection="column" marginTop={1}>
+          {s.steps.length === 0 && <Text dimColor>Aucune étape.</Text>}
+          {s.steps.map(b => stepLine(b, false))}
+        </Box>
+        {s.examples.length > 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Exemples</Text>
+            {s.examples.map(line => (
+              <Text mono>{line}</Text>
+            ))}
+          </Box>
+        )}
+      </Box>
     )
     const planSection =
       openPlans.length === 0 ? null : (
@@ -490,7 +536,12 @@ export const register: Register = on => {
     const current = focusStage(snap)
     const files = await read($, scenarios)
     const wanted = await read($, selectedScenario)
-    const shownScenario = files.find(file => file.path === wanted) ?? files[0]
+    const all = files.flatMap(parseScenarios)
+    // L'ancien choix était un chemin de fichier : on retombe sur son premier scénario.
+    const found = all.findIndex(s => s.id === wanted || s.path === wanted)
+    const index = found === -1 ? 0 : found
+    const shown = all[index]
+    const step = (delta: number) => all[(index + delta + all.length) % all.length]?.id ?? ''
 
     return (
       <Box flexDirection="column">
@@ -549,22 +600,20 @@ export const register: Register = on => {
         {files.length === 0 && (
           <Text dimColor>Pas encore de .feature ajouté ou modifié dans {snap.pkg || 'le package'}.</Text>
         )}
-        {files.length > 0 && (
-          <Box flexDirection="row" flexWrap="wrap" gap={1}>
-            {files.map(file => (
-              <Button
-                key={`scenario-${file.path}`}
-                label={`${file.path.split('/').at(-1)} · ${file.status} · ${file.count} scénario${file.count > 1 ? 's' : ''}`}
-                variant={file.path === shownScenario?.path ? 'primary' : 'secondary'}
-                onPress={() => update($, selectedScenario, () => file.path)}
-              />
-            ))}
-          </Box>
-        )}
-        {shownScenario && (
+        {shown && (
           <Box flexDirection="column">
-            <Text dimColor wrap="truncate-start">{shownScenario.path}</Text>
-            <Code source={shownScenario.source} language="gherkin" path={shownScenario.path} startLine={1} />
+            <Box flexDirection="row" gap={1} alignItems="center">
+              <Button key="scenario-prev" label="‹" onPress={() => update($, selectedScenario, () => step(-1))} />
+              <Text>
+                {index + 1} / {all.length}
+              </Text>
+              <Button key="scenario-next" label="›" onPress={() => update($, selectedScenario, () => step(1))} />
+              <Text dimColor wrap="truncate-end">
+                {shown.file} · {shown.status}
+              </Text>
+            </Box>
+            {all.length > 1 && all.length <= 40 && <Text dimColor>{all.map((_, i) => (i === index ? '●' : '○')).join('')}</Text>}
+            {scenarioCard(shown)}
           </Box>
         )}
         {planSection}

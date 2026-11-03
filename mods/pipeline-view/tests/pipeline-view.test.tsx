@@ -163,23 +163,61 @@ test('le panneau suit Ivan : durée, appels, refus et fichiers modifiés', async
   await band.unmount()
 })
 
-const GHERKIN = 'Feature: Login\n\n  Scenario: Code juste\n    Given un code\n\n  Scénario: Code faux\n    Given un code\n'
+const GHERKIN = `Feature: Login
+
+  Background:
+    Given the login page is displayed
+
+  @smoke
+  Scenario: Code juste
+    Given un code {'123456'}
+    When I tap the {'login_submit_button'} button
+    And I wait {2} seconds
+    Then I am on the home page
+
+  Scénario: Code faux
+    Étant donné un code faux
+    Alors je vois une erreur
+`
 
 const seed = (on: Parameters<Parameters<typeof test>[1]>[1], values: Record<string, unknown>) =>
   on('state.get', (_, e) => (e.key in values ? { value: { value: values[e.key], version: 1 } } : { value: { value: undefined, version: 0 } }))
 
-test('le panneau Pipeline montre le Gherkin que le pipeline a changé', async ($, on) => {
-  seed(on, {
-    snapshot: { shape: 'snapshot-1', value: { kind: 'feature', name: 'two_factor_login', pkg: 'app/login', phase: '', maxAttempts: 5, stages: [], decisions: 0 } },
-    scenarios: [{ path: 'app/login/test/login.feature', status: 'ajouté', source: GHERKIN, count: 2 }],
-  })
+const SNAP = { shape: 'snapshot-1', value: { kind: 'feature', name: 'two_factor_login', pkg: 'app/login', phase: '', maxAttempts: 5, stages: [], decisions: 0 } }
+const FILES = [
+  { path: 'app/login/test/login.feature', status: 'ajouté', source: GHERKIN, count: 2 },
+  { path: 'app/login/test/otp.feature', status: 'modifié', source: 'Feature: OTP\n  Scenario: Renvoi\n    Then le code part\n', count: 1 },
+]
+
+test('le panneau Pipeline montre un scénario à la fois, en carte', async ($, on) => {
+  seed(on, { snapshot: SNAP, scenarios: FILES })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
-  expect((await ui.find({ type: 'Button', key: 'scenario-app/login/test/login.feature' }))?.props.label).toBe(
-    'login.feature · ajouté · 2 scénarios',
-  )
-  expect((await ui.find({ type: 'Code' }))?.props.source).toBe(GHERKIN)
+  expect((await ui.find({ type: 'Text', text: /^1 \/ 3$/ }))?.text).toBe('1 / 3')
+  expect((await ui.find({ type: 'Text', text: /login\.feature/ }))?.text).toBe('login.feature · ajouté')
+  expect((await ui.find({ type: 'Text', text: /^Code juste$/ }))?.text).toBe('Code juste')
+  expect((await ui.find({ type: 'Text', text: /^@smoke$/ }))?.text).toBe('@smoke')
+  expect((await ui.find({ type: 'Text', text: /login page/ }))?.text).toBe('Given the login page is displayed')
+  expect((await ui.find({ type: 'Text', text: /seconds/ }))?.text).toBe('  And I wait 2 seconds')
+  expect((await ui.find({ type: 'Text', text: /^123456$/ }))?.props.bold).toBe(true)
+  expect((await ui.find({ type: 'Text', text: /^●○○$/ }))?.text).toBe('●○○')
+  expect(await ui.find({ type: 'Button', key: 'scenario-next' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('le carousel montre le scénario choisi', async ($, on) => {
+  seed(on, { snapshot: SNAP, scenarios: FILES, selectedScenario: 'app/login/test/login.feature#2' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /^2 \/ 3$/ }))?.text).toBe('2 / 3')
+  expect((await ui.find({ type: 'Text', text: /erreur/ }))?.text).toBe('Alors je vois une erreur')
+  await ui.unmount()
+})
+
+test('un ancien choix de fichier ouvre son premier scénario', async ($, on) => {
+  seed(on, { snapshot: SNAP, scenarios: FILES, selectedScenario: 'app/login/test/otp.feature' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^Renvoi$/ }))?.text).toBe('Renvoi')
   await ui.unmount()
 })
 
