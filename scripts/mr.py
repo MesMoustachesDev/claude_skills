@@ -123,10 +123,20 @@ def cmd_archive(kind, name, base):
     files = sorted(set(git(".", "diff", "--name-only", mb, "--", ".claude/rules").splitlines())
                    | set(git(".", "ls-files", "--others", "--exclude-standard", "--", ".claude/rules").splitlines()))
     for f in files:
-        if os.path.isfile(f):
-            os.makedirs(os.path.dirname(os.path.join(main, f)), exist_ok=True)
-            shutil.copy2(f, os.path.join(main, f))
-            print(f"règle recopiée, à commiter à part : {os.path.join(main, f)}")
+        if not os.path.isfile(f):
+            continue
+        target = os.path.join(main, f)
+        before = subprocess.run(["git", "show", f"{mb}:{f}"], capture_output=True, text=True).stdout
+        now = open(target, encoding="utf-8").read() if os.path.exists(target) else ""
+        if now != before and now != open(f, encoding="utf-8").read():
+            # Le checkout principal a sa propre version : on n'écrase pas, le dev fusionne.
+            print(f"règle à fusionner à la main (le checkout principal l'a changée aussi) : {f} → copie dans {dst}/{f}")
+            os.makedirs(os.path.dirname(os.path.join(dst, f)), exist_ok=True)
+            shutil.copy2(f, os.path.join(dst, f))
+            continue
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(f, target)
+        print(f"règle recopiée, à commiter à part : {target}")
 
 
 def main():
