@@ -1,6 +1,6 @@
 {
   "name": "pipeline-view",
-  "version": "0.8.0",
-  "description": "Affiche l'état du pipeline /feature ou /fix en cours (étapes, gates, tentatives, agent actif, ce qui t'attend, scénarios Gherkin, un par carte en carousel, avec leur test, leur flow Maestro et ses captures) et les plans du repo (.claude/plans/*.md, epics) avec l'état de chaque branche liée. Lecture seule.",
+  "version": "0.9.0",
+  "description": "Affiche l'état du pipeline /feature ou /fix en cours (étapes, gates, tentatives, agent actif, ce qui t'attend, scénarios Gherkin, un par carte en carousel, avec leur test, leur flow Maestro et ses captures) et les plans du repo (.claude/plans/*.md, epics) avec l’état de chaque branche liée et, pour chaque fichier modifié ou commité, la session qui l’a écrit. Lecture seule.",
   "types": "./types/index.d.ts"
 }

@@ -132,6 +132,8 @@ export const emptyBranch = (branch: string): PlanBranch => ({
   dirty: 0,
   stage: '',
   stageStatus: '',
+  files: [],
+  writers: 0,
 })
 
 /** `git worktree list --porcelain` → branche → chemin du worktree. */
@@ -169,6 +171,10 @@ export const describeBranch = (b: PlanBranch): string => {
   if (b.unpushed === -1 && b.ahead > 0) parts.push('jamais poussée')
   else if (b.unpushed > 0) parts.push(`${b.unpushed} non poussé${b.unpushed > 1 ? 's' : ''}`)
   if (b.dirty > 0) parts.push(`${b.dirty} fichier${b.dirty > 1 ? 's' : ''} non commité${b.dirty > 1 ? 's' : ''}`)
+  // Un fichier compte une fois, même indexé et modifié encore (MM).
+  const unattributed = new Set(b.files.filter(f => !f.isAttributed).map(f => f.path)).size
+  if (unattributed > 0) parts.push(`${unattributed} non attribué${unattributed > 1 ? 's' : ''}`)
+  if (b.writers > 1) parts.push(`écrite par ${b.writers} sessions`)
 
   return parts.join(' · ')
 }

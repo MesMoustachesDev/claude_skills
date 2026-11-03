@@ -91,6 +91,22 @@ export type PlanBranch = {
   /** Étape du pipeline du worktree (« ✗ impl (vert) 2/5 »), vide hors pipeline. */
   stage: string
   stageStatus: string
+  /** Fichiers du worktree et des commits de la branche, chacun attribué ou non à une session. */
+  files: BranchFile[]
+  /** Sessions dont un transcript a écrit dans ce worktree. */
+  writers: number
+}
+
+export type FileArea = 'conflict' | 'staged' | 'unstaged' | 'untracked' | 'committed'
+
+export type BranchFile = {
+  /** Depuis la racine du worktree. */
+  path: string
+  /** Lettre git : M A D R C T U ?. */
+  status: string
+  area: FileArea
+  /** Un transcript de session nomme ce fichier parmi ceux que ses outils d'édition ont écrits. */
+  isAttributed: boolean
 }
 
 export type PlanItem = {
@@ -136,6 +152,8 @@ declare module 'claude-code' {
       plans: PlanView[]
       /** Les worktrees du repo qu'aucun point d'aucun plan ne cite. */
       strays: PlanBranch[]
+      /** Branches dont le panneau déplie la liste de fichiers. */
+      openBranches: string[]
     }
   }
 }

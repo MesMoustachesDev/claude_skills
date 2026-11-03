@@ -34,6 +34,7 @@ import {
 } from './plan'
 import { type Scenario, type Step, parseScenarios } from './gherkin'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
+import { AREA_LABEL, AREA_ORDER, attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from './attribution'
 
 const PANE = 'pipeline-view'
 const REFRESH_MS = 5000
@@ -64,6 +65,7 @@ const evidence = atom({ plugin: 'pipeline-view', key: 'evidence' } as const, [])
 const thumbs = atom({ plugin: 'pipeline-view', key: 'thumbs' } as const, [])
 const plans = atom({ plugin: 'pipeline-view', key: 'plans' } as const, [])
 const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
+const openBranches = atom({ plugin: 'pipeline-view', key: 'openBranches' } as const, [])
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -72,6 +74,64 @@ const git = async ($: EngineInterface, args: string[], cwd?: string): Promise<st
   const run = await $.process.run(['git', ...args], { cwd, timeoutMs: 5000 }).catch(() => undefined)
 
   return run?.exitCode === 0 ? run.stdout.trim() : ''
+}
+
+/** Sortie brute, pour les formats `-z` dont le premier caractère compte. */
+const gitRaw = async ($: EngineInterface, args: string[], cwd: string): Promise<string> => {
+  const run = await $.process.run(['git', ...args], { cwd, timeoutMs: 5000 }).catch(() => undefined)
+
+  return run?.exitCode === 0 ? run.stdout : ''
+}
+
+// Les transcripts des sessions récentes, lus une fois puis seulement ce qui s'y ajoute.
+const TRANSCRIPT_DAYS = 14
+const WRITE_PATTERN = '"name":"(Edit|Write|MultiEdit|NotebookEdit)","input":\\{"(file_path|notebook_path)":"([^"\\\\]|\\\\.)*"'
+const transcriptRead = new Map<string, number>()
+const written = new Map<string, Set<string>>()
+
+const noteWrites = (session: string, chunk: string) => {
+  for (const path of parseWrites(chunk)) {
+    const by = written.get(path) ?? new Set<string>()
+    by.add(session)
+    written.set(path, by)
+  }
+}
+
+/** Qui a écrit quel fichier, d'après les transcripts de ~/.claude/projects (sous-agents compris). */
+const scanTranscripts = async ($: EngineInterface): Promise<void> => {
+  const listed = await $.process
+    .run(['/bin/sh', '-c', `find "$HOME/.claude/projects" -name '*.jsonl' -mtime -${TRANSCRIPT_DAYS} -size +0 -exec stat -f '%z %N' {} +`], {
+      timeoutMs: 15000,
+    })
+    .catch(() => undefined)
+  const fresh: string[] = []
+  for (const line of (listed?.stdout ?? '').split('\n')) {
+    const space = line.indexOf(' ')
+    if (space <= 0) continue
+    const size = Number(line.slice(0, space))
+    const path = line.slice(space + 1)
+    const from = transcriptRead.get(path) ?? 0
+    if (size === from) continue
+    transcriptRead.set(path, size)
+    // Un transcript plus court qu'à la dernière lecture a été réécrit : relu en entier.
+    if (from === 0 || size < from) {
+      fresh.push(path)
+      continue
+    }
+    const tail = await $.process
+      .run(['/bin/sh', '-c', 'tail -c +"$2" "$1" | grep -oE "$3"', 'sh', path, String(from + 1), WRITE_PATTERN], { timeoutMs: 15000 })
+      .catch(() => undefined)
+    noteWrites(sessionOfTranscript(path), tail?.stdout ?? '')
+  }
+  // Première lecture : un seul grep pour tous, chaque ligne préfixée de son fichier.
+  for (let i = 0; i < fresh.length; i += 100) {
+    const batch = fresh.slice(i, i + 100)
+    const out = await $.process.run(['grep', '-oHE', WRITE_PATTERN, ...batch], { timeoutMs: 60000 }).catch(() => undefined)
+    for (const line of (out?.stdout ?? '').split('\n')) {
+      const at = line.indexOf('.jsonl:')
+      if (at > 0) noteWrites(sessionOfTranscript(line.slice(0, at + 6)), line.slice(at + 7))
+    }
+  }
 }
 
 const readText = ($: EngineInterface, path: string): Promise<string> =>
@@ -274,7 +334,11 @@ const fillBranch = async (
   const ahead = Number(await git($, ['rev-list', '--count', `${base}..${b.branch}`], main)) || 0
   const up = await git($, ['rev-list', '--count', `${b.branch}@{upstream}..${b.branch}`], main)
   const dirty = worktree ? (await git($, ['status', '--porcelain'], worktree)).split('\n').filter(Boolean).length : 0
-  const filled = { ...b, exists: true, worktree, ahead, unpushed: up === '' ? -1 : Number(up) || 0, dirty }
+  const changed = worktree ? parsePorcelain(await gitRaw($, ['status', '--porcelain=v1', '-z'], worktree)) : []
+  const mergeBase = ahead > 0 ? await git($, ['merge-base', base, b.branch], main) : ''
+  const committed = mergeBase ? parseNameStatus(await gitRaw($, ['diff', '--name-status', '-z', mergeBase, b.branch], main)) : []
+  const owned = worktree ? attribute(worktree, [...changed, ...committed], written) : { files: [], writers: 0 }
+  const filled = { ...b, exists: true, worktree, ahead, unpushed: up === '' ? -1 : Number(up) || 0, dirty, ...owned }
   const where = fromBranch(b.branch)
   if (!worktree || !where) return filled
   const file = `${worktree}/.claude/${FOLDER[where.kind]}/${where.name}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
@@ -296,6 +360,7 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
   const base = /^\s*base_branch\s*=\s*(\S+)/m.exec(config)?.[1] ?? 'develop'
   const found: PlanView[] = []
   const cited = new Set<string>()
+  if (worktrees.size > 0) await scanTranscripts($)
   const entries = await $.fs.list(`${main}/.claude/plans`).catch(() => [])
   for (const entry of [...entries].sort((a, b) => (a.name < b.name ? -1 : 1))) {
     if (entry.kind !== 'file' || !entry.name.endsWith('.md')) continue
@@ -539,17 +604,69 @@ export const register: Register = on => {
         for (const b of item.branches) cites.set(b.branch, (cites.get(b.branch) ?? 0) + 1)
       }
     }
-    const branchLine = (b: PlanBranch) => (
-      <Text
-        color={b.stageStatus === 'RED' || b.stageStatus === 'FAILED' ? 'error' : !b.exists ? 'warning' : undefined}
-        dimColor={b.exists && b.stageStatus !== 'RED' && b.stageStatus !== 'FAILED'}
-        wrap="truncate-end"
-      >
-        {'    '}
-        {describeBranch(b)}
-        {(cites.get(b.branch) ?? 0) > 1 ? ` · citée par ${cites.get(b.branch)} points` : ''}
-      </Text>
-    )
+    const unfolded = await read($, openBranches)
+    const branchFiles = (b: PlanBranch) =>
+      AREA_ORDER.map(area => {
+        const rows = b.files.filter(f => f.area === area)
+        if (rows.length === 0) return null
+
+        return (
+          <Box flexDirection="column">
+            <Text dimColor>
+              {'      '}
+              {AREA_LABEL[area]} ({rows.length})
+            </Text>
+            {rows.slice(0, 50).map(f => (
+              <Text color={f.isAttributed ? undefined : 'warning'} dimColor={f.isAttributed} wrap="truncate-start">
+                {'        '}
+                {f.status} {f.path}
+                {f.isAttributed ? '' : '  ?'}
+              </Text>
+            ))}
+            {rows.length > 50 && (
+              <Text dimColor>
+                {'        '}… et {rows.length - 50} autres
+              </Text>
+            )}
+          </Box>
+        )
+      })
+    const branchLine = (b: PlanBranch) => {
+      const isOpen = unfolded.includes(b.branch)
+
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" gap={1}>
+            <Text
+              color={b.stageStatus === 'RED' || b.stageStatus === 'FAILED' ? 'error' : !b.exists ? 'warning' : undefined}
+              dimColor={b.exists && b.stageStatus !== 'RED' && b.stageStatus !== 'FAILED'}
+              wrap="truncate-end"
+            >
+              {'    '}
+              {describeBranch(b)}
+              {(cites.get(b.branch) ?? 0) > 1 ? ` · citée par ${cites.get(b.branch)} points` : ''}
+            </Text>
+            {b.files.length > 0 && (
+              <Button
+                key={`files-${b.branch}`}
+                plain
+                dimColor
+                label={isOpen ? 'masquer' : 'fichiers'}
+                onPress={() =>
+                  update($, openBranches, list => (isOpen ? list.filter(x => x !== b.branch) : [...list, b.branch]))
+                }
+              />
+            )}
+          </Box>
+          {isOpen && branchFiles(b)}
+          {isOpen && b.files.some(f => !f.isAttributed) && (
+            <Text dimColor>
+              {'      '}? : aucun transcript ne nomme ce fichier (commande, autre session ou toi)
+            </Text>
+          )}
+        </Box>
+      )
+    }
     const stepLine = (s: Step, isDim: boolean) => (
       <Box flexDirection="column">
         <Text dimColor={isDim}>

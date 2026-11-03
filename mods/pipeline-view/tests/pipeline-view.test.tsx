@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
 
 const ROOT = '/repo'
@@ -300,6 +301,8 @@ const PLAN_MD = `# Plan — paywall
 
 const WT = '/repo/.claude/worktrees/feature-trial_end_screen'
 const STRAY = '/repo/.claude/worktrees/trial-end-screen-6c4fb4'
+const TRANSCRIPT = '/home/.claude/projects/-repo--claude-worktrees-feature-trial-end-screen/s1.jsonl'
+const WROTE = `${TRANSCRIPT}:"name":"Edit","input":{"file_path":"${WT}/lib/a.dart"`
 
 const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
@@ -308,7 +311,17 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('process.run', (_, e) => {
     const argv = e.argv.join(' ')
-    const out = argv.includes('--git-common-dir')
+    const out = argv.includes("find \"$HOME/.claude/projects\"")
+      ? `120 ${TRANSCRIPT}`
+      : argv.startsWith('grep -oHE')
+        ? WROTE
+        : argv.includes('status --porcelain=v1 -z')
+          ? e.init?.cwd === WT ? ' M lib/a.dart\0?? lib/b.dart\0' : ''
+          : argv.includes('merge-base develop feature/trial_end_screen')
+            ? 'mb1'
+            : argv.includes('diff --name-status -z mb1 feature/trial_end_screen')
+              ? 'M\0lib/a.dart\0A\0lib/c.dart\0'
+              : argv.includes('--git-common-dir')
       ? '/repo/.git'
       : argv.includes('--show-toplevel')
         ? ROOT
@@ -352,8 +365,14 @@ test('le panneau montre le plan du repo, ses branches et les worktrees hors plan
   expect((await ui.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
   expect((await ui.find({ type: 'Text', text: /1\. Écran/ }))?.text).toBe('▸ 1. Écran de fin de trial · moi')
   expect((await ui.find({ type: 'Text', text: /feature\/trial_end_screen ·/ }))?.text).toBe(
-    '    feature/trial_end_screen · feature-trial_end_screen · ✗ impl (vert) 2/5 · 3 commits · jamais poussée · 2 fichiers non commités',
+    '    feature/trial_end_screen · feature-trial_end_screen · ✗ impl (vert) 2/5 · 3 commits · jamais poussée · 2 fichiers non commités · 2 non attribués',
   )
+  await ui.press({ key: 'files-feature/trial_end_screen' })
+  expect((await ui.find({ type: 'Text', text: /Non suivis/ }))?.text).toBe('      Non suivis (1)')
+  expect((await ui.find({ type: 'Text', text: /lib\/b\.dart/ }))?.text).toBe('        ? lib/b.dart  ?')
+  expect((await ui.find({ type: 'Text', text: /M lib\/a\.dart/ }))?.text).toBe('        M lib/a.dart')
+  expect((await ui.find({ type: 'Text', text: /Commités sur la branche/ }))?.text).toBe('      Commités sur la branche (2)')
+  expect((await ui.find({ type: 'Text', text: /A lib\/c\.dart/ }))?.text).toBe('        A lib/c.dart  ?')
   expect((await ui.find({ type: 'Text', text: /2\. Plafonner/ }))?.text).toBe('! 2. Plafonner la pub · toi · décision à toi')
   expect((await ui.find({ type: 'Text', text: /claude\/trial-end-screen/ }))?.text).toBe(
     '    claude/trial-end-screen-6c4fb4 · trial-end-screen-6c4fb4 · aucun commit',
@@ -363,4 +382,30 @@ test('le panneau montre le plan du repo, ses branches et les worktrees hors plan
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
   await band.unmount()
+})
+
+test('attribution : transcripts, status -z et diff -z', async () => {
+  expect(parseWrites('x"name":"Write","input":{"file_path":"/w/a \\"b\\".md"y"name":"Read","input":{"file_path":"/w/r"')).toEqual(['/w/a "b".md'])
+  expect(sessionOfTranscript('/p/proj/s1.jsonl')).toBe('s1')
+  expect(sessionOfTranscript('/p/proj/s1/subagents/agent-9.jsonl')).toBe('s1')
+  expect(parsePorcelain('MM a\0R  new\0old\0UU c\0?? d\0')).toEqual([
+    { path: 'a', status: 'M', area: 'staged' },
+    { path: 'a', status: 'M', area: 'unstaged' },
+    { path: 'new', status: 'R', area: 'staged' },
+    { path: 'c', status: 'U', area: 'conflict' },
+    { path: 'd', status: '?', area: 'untracked' },
+  ])
+  expect(parseNameStatus('M\0a\0R087\0old\0new\0D\0z\0')).toEqual([
+    { path: 'a', status: 'M', area: 'committed' },
+    { path: 'new', status: 'R', area: 'committed' },
+    { path: 'z', status: 'D', area: 'committed' },
+  ])
+  const writes = new Map([
+    ['/w/a', new Set(['s1'])],
+    ['/w/b', new Set(['s2'])],
+    ['/other/a', new Set(['s3'])],
+  ])
+  const owned = attribute('/w', [{ path: 'a', status: 'M', area: 'unstaged' }, { path: 'c', status: '?', area: 'untracked' }], writes)
+  expect(owned.writers).toBe(2)
+  expect(owned.files.map(f => f.isAttributed)).toEqual([true, false])
 })
