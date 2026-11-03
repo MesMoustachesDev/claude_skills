@@ -79,6 +79,9 @@ features/{feature_name}/
   - `ref.watch()` pour les dépendances réactives
 - **Sealed classes** pour events et states des BLoCs
 - **Equatable** pour entities, events, states
+- **Les entités portent leurs règles** : ce qui ne dépend que de l'état d'une entité (validité, total, statut qui interdit une action) est une méthode de l'entité, testée sans mock. Le use case coordonne (repository, autres use cases), il ne relit pas les champs de l'entité pour décider à sa place.
+- **Le transverse en décorateur** : cache, logs, retry, report d'erreur dans un objet qui implémente la même interface et enveloppe l'autre, nommé par un adjectif (`CachedXRepository`), assemblé dans les providers ; pas recopié dans chaque méthode.
+- **Fakes de test** : une interface du domaine utilisée par plusieurs fichiers de test a un fake en mémoire dans `test/` plutôt qu'un mock reconfiguré dans chaque fichier ; mocktail reste pour vérifier un side-effect.
 - **`resolution: workspace`** dans le pubspec.yaml
 
 ## Error handling avec `Either`

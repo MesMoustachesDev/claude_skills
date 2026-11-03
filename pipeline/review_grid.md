@@ -30,6 +30,7 @@ font partie de la grille.
 
 **Maintenabilité**
 - Nommage ambigu ou trompeur
+- Un nom en `-Manager`, `-Helper`, `-Handler`, `-Util` qui ne dit pas quel concept il porte : nomme le concept (article de Romain Rochegude, « Rethinking hexagonal architecture with Elegant Objects », 2026-11-03)
 - Absence de documentation sur les choix non évidents
 - Tests manquants pour de la logique métier critique
 - Dépendances introduites sans justification
@@ -75,3 +76,14 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
   → finding. Le barrel se comprend sans ouvrir `src/`. Le README du package est encore vrai.
 - **Tests** : pour chaque comportement ajouté dans `lib/`, un test nommé le prouve ; les assertions
   vérifient le contenu, pas le type ; pas de `verify()` d'un appel interne hors side-effect.
+  Une interface du domaine doublée par un mock reconfiguré dans chaque fichier de test, alors qu'un fake
+  (implémentation en mémoire, écrite une fois dans `test/`) suffirait → suggestion.
+- **Règles portées par les objets** : une règle qui ne dépend que de l'état d'une entité (validité, total,
+  statut qui interdit une action) est une méthode de l'entité, pure et testée sans mock. Un BLoC ou un use
+  case qui lit les champs d'une entité pour décider à sa place → `ko`, avec la méthode qui la remplacerait.
+  Le use case par action, même relais, reste la convention : le use case coordonne, l'entité décide.
+  Question à te poser : faut-il connaître l'état interne de l'objet pour appliquer sa règle ? (article de Romain Rochegude, « Rethinking hexagonal architecture with Elegant Objects », 2026-11-03)
+- **Transverse en décorateur** : cache, logs, retry, report d'erreur ou analytics recopiés dans trois
+  méthodes ou plus d'un repository ou d'un use case → suggestion : un décorateur qui implémente la même
+  interface et enveloppe l'autre, nommé par un adjectif (`CachedXRepository`, `LoggedXRepository`),
+  assemblé dans les providers. (article de Romain Rochegude, « Rethinking hexagonal architecture with Elegant Objects », 2026-11-03)
