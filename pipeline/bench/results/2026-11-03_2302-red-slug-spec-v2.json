@@ -1,0 +1,34 @@
+[
+  {
+    "task": "red_slug",
+    "agent": "feature-test-writer",
+    "model": "sonnet",
+    "ok": true,
+    "detail": "mutants tués : 7/7",
+    "turns": 9,
+    "wall_s": 76,
+    "input_tokens": 471666,
+    "output_tokens": 7067,
+    "cost_usd": 0.33539330000000006,
+    "agent_error": false,
+    "denials": 2,
+    "answer": "ai touché ni à `lib/` ni à `spec.md`.\n\nLes cinq règles sont couvertes. Pour la règle 3 (troncature), je vérifie :\n- l'exemple de la spec (`ab cd ef`, 5 → `ab-cd`) ;\n- les limites : tiret juste après `maxLength` caractères, longueur `maxLength+1`, `maxLength` à 1 ;\n- le défaut de 40 : un slug de 40 caractères rendu intact, un titre plus long coupé à 39.\n\nPour le reste, j'ai testé chaque lettre accentuée citée, les majuscules accentuées, les chiffres conservés et les tirets fusionnés ou en bordure. Les erreurs sont couvertes : titre vide, sans lettre ni chiffre, `maxLength` à 0 et négatif.\n\nFINI",
+    "session": ""
+  },
+  {
+    "task": "red_slug",
+    "agent": "feature-test-writer",
+    "model": "opus",
+    "ok": true,
+    "detail": "mutants tués : 7/7",
+    "turns": 5,
+    "wall_s": 57,
+    "input_tokens": 249195,
+    "output_tokens": 5134,
+    "cost_usd": 0.5574861999999999,
+    "agent_error": false,
+    "denials": 0,
+    "answer": "ar défaut de 40 est testée avec des slugs de 40, 41 et 42 caractères.\n- **Règle 4 (titre sans lettre ni chiffre) :** titre vide, fait d'espaces, de ponctuation ou de tirets → `ArgumentError`. À l'inverse, `' œ '` seul donne un slug (`oe`).\n- **Règle 5 (`maxLength` < 1) :** `maxLength` à 0 ou négatif → `ArgumentError`, même avec un titre valide.\n\nUn test applique la spec à la lettre et peut surprendre : `jalapeño` doit donner `jalape-o`. Comme ñ n'est pas dans la liste des accents, la règle 2 le transforme en tiret. Si ce n'est pas le comportement voulu, c'est la spec qu'il faut préciser.\n\nFINI",
+    "session": ""
+  }
+]

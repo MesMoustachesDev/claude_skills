@@ -1,0 +1,1 @@
+{ "agent": "feature-reviewer", "timeout_s": 900, "what": "Trouver les deux défauts plantés dans un diff (pagination décalée, erreur avalée)" }

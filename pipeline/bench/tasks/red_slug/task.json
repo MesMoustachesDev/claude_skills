@@ -1,0 +1,1 @@
+{ "agent": "feature-test-writer", "timeout_s": 900, "what": "Écrire des tests qui prouvent la spec : verts sur la bonne implémentation, rouges sur chaque mutant" }
