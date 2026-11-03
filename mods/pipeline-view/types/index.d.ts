@@ -49,6 +49,33 @@ export type ScenarioFile = {
   count: number
 }
 
+export type QaRun = {
+  /** `ios` ou `android`. */
+  platform: string
+  /** Le dossier daté du dernier run (`2026-10-29_230258`). */
+  run: string
+  /** Statut Maestro du flow (`SUCCESS`, `ERROR`…), vide si report.xml ne le cite pas. */
+  status: string
+  /** Les captures du flow, dans l'ordre des noms, chemin absolu et libellé court. */
+  shots: { path: string; label: string }[]
+}
+
+export type ScenarioEvidence = {
+  /** L'id du scénario (`<chemin>#<n>`). */
+  id: string
+  /** Dernier résultat du test bdd_widget_test, vide s'il n'a pas tourné. */
+  test: '' | 'passed' | 'failed' | 'skipped'
+  qa: QaRun[]
+}
+
+export type Thumb = {
+  path: string
+  /** JPEG réduit, base64. */
+  data: string
+  width: number
+  height: number
+}
+
 export type PlanBranch = {
   branch: string
   /** Chemin du worktree qui porte la branche, vide sans worktree. */
@@ -99,6 +126,12 @@ declare module 'claude-code' {
       /** Les .feature du package ajoutés ou modifiés depuis la base, pour le panneau Scénarios. */
       scenarios: ScenarioFile[]
       selectedScenario: string
+      /** Le panneau Scénarios montre le .feature brut au lieu de la carte. */
+      showSource: boolean
+      /** Test et flow Maestro de chaque scénario. */
+      evidence: ScenarioEvidence[]
+      /** Miniatures des captures du scénario affiché. */
+      thumbs: Thumb[]
       /** Les plans ouverts du repo : .claude/plans/*.md et les epics, avec l'état de chaque branche liée. */
       plans: PlanView[]
       /** Les worktrees du repo qu'aucun point d'aucun plan ne cite. */

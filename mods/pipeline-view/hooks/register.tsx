@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, ScenarioFile } from '../types'
+import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, Thumb } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -33,6 +33,7 @@ import {
   summarize,
 } from './plan'
 import { type Scenario, type Step, parseScenarios } from './gherkin'
+import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 
 const PANE = 'pipeline-view'
 const REFRESH_MS = 5000
@@ -42,6 +43,11 @@ const DECISION = 'DÉCISION (Thibault)'
 const FOLDER = { feature: 'features', fix: 'fixes' } as const
 const PLAN_MARK = { done: '✓', active: '▸', yours: '!', todo: '·' } as const
 const STEP_COLOR = { given: 'suggestion', when: 'warning', then: 'success' } as const
+const TEST_LABEL = { passed: '✓ test vert', failed: '✗ test rouge', skipped: '– test ignoré' } as const
+// Miniature des captures : assez petite pour tenir dans un Svg (131 072 caractères) en JPEG base64.
+const THUMB_PX = 360
+const THUMB_DIR = '/tmp/claude-pipeline-view-thumbs'
+const MAX_SHOTS = 6
 
 const snapshot = atom({ plugin: 'pipeline-view', key: 'snapshot' } as const, null, {
   shape: 'snapshot-1',
@@ -53,6 +59,9 @@ const isAsking = atom({ plugin: 'pipeline-view', key: 'isAsking' } as const, fal
 const now = atom({ plugin: 'pipeline-view', key: 'now' } as const, 0)
 const scenarios = atom({ plugin: 'pipeline-view', key: 'scenarios' } as const, [])
 const selectedScenario = atom({ plugin: 'pipeline-view', key: 'selectedScenario' } as const, '')
+const showSource = atom({ plugin: 'pipeline-view', key: 'showSource' } as const, false)
+const evidence = atom({ plugin: 'pipeline-view', key: 'evidence' } as const, [])
+const thumbs = atom({ plugin: 'pipeline-view', key: 'thumbs' } as const, [])
 const plans = atom({ plugin: 'pipeline-view', key: 'plans' } as const, [])
 const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
 
@@ -121,6 +130,112 @@ const loadScenarios = async ($: EngineInterface, pkg: string, base: string): Pro
   return found
 }
 
+// Le rapport de tests fait plusieurs centaines de Ko : relu seulement quand il change.
+let testCache = { path: '', mtime: -1, results: new Map<string, 'passed' | 'failed' | 'skipped'>() }
+
+const mtimeOf = ($: EngineInterface, path: string): Promise<number> =>
+  $.fs.stat(path).then(
+    s => (s.kind === 'other' ? -1 : s.mtimeMs),
+    () => -1,
+  )
+
+const listNames = ($: EngineInterface, path: string, kind: 'file' | 'dir'): Promise<string[]> =>
+  $.fs.list(path).then(
+    entries => entries.filter(e => e.kind === kind).map(e => e.name).sort(),
+    () => [],
+  )
+
+/** Le test et le flow Maestro de chaque scénario des fichiers montrés, depuis le dossier du run. */
+const loadEvidence = async ($: EngineInterface, dir: string, files: ScenarioFile[]): Promise<ScenarioEvidence[]> => {
+  const all = files.flatMap(parseScenarios)
+  if (all.length === 0) return []
+  const report = `${dir}/.gauntlet/test_report.jsonl`
+  const mtime = await mtimeOf($, report)
+  if (report !== testCache.path || mtime !== testCache.mtime) {
+    testCache = { path: report, mtime, results: mtime === -1 ? new Map() : parseTestReport(await readText($, report)) }
+  }
+  const runs: { platform: string; run: string; statuses: Map<string, string> }[] = []
+  for (const platform of await listNames($, `${dir}/qa`, 'dir')) {
+    const run = latestRun(await listNames($, `${dir}/qa/${platform}`, 'dir'))
+    // report.xml est dans le run, ou (gauntlet actuel) à côté des runs, celui du dernier.
+    const xml = (await readText($, `${dir}/qa/${platform}/${run}/report.xml`)) || (await readText($, `${dir}/qa/${platform}/report.xml`))
+    if (run) runs.push({ platform, run, statuses: parseMaestroReport(xml) })
+  }
+  const found: ScenarioEvidence[] = []
+  for (const s of all) {
+    const qa: QaRun[] = []
+    for (const r of runs) {
+      const flow = `${dir}/qa/${r.platform}/${r.run}/${s.title}`
+      const pngs = (await listNames($, `${flow}/takeScreenshot`, 'file')).filter(n => n.toLowerCase().endsWith('.png'))
+      const status = r.statuses.get(s.title) ?? ''
+      if (pngs.length === 0 && !status) continue
+      const prefix = commonPrefix(pngs)
+      qa.push({
+        platform: r.platform,
+        run: r.run,
+        status,
+        shots: pngs.map(n => ({ path: `${flow}/takeScreenshot/${n}`, label: shotLabel(n, prefix) })),
+      })
+    }
+    found.push({ id: s.id, test: testStateOf(testCache.results, s.feature, s.title), qa })
+  }
+
+  return found
+}
+
+const thumbCache = new Map<string, Thumb>()
+
+/** Une capture réduite en JPEG par sips (macOS), gardée tant que la capture ne change pas. */
+const thumbOf = async ($: EngineInterface, path: string): Promise<Thumb | undefined> => {
+  const mtime = await mtimeOf($, path)
+  const cacheKey = `${path}@${mtime}`
+  const cached = thumbCache.get(cacheKey)
+  if (cached) return cached
+  const out = `${THUMB_DIR}/${hashOf(cacheKey)}.jpg`
+  await $.process.run(['mkdir', '-p', THUMB_DIR], { timeoutMs: 5000 }).catch(() => undefined)
+  const made = await $.process
+    .run(['sips', '-Z', String(THUMB_PX), '-s', 'format', 'jpeg', '-s', 'formatOptions', '55', path, '--out', out], {
+      timeoutMs: 15000,
+    })
+    .catch(() => undefined)
+  if (made?.exitCode !== 0) return undefined
+  const size = await $.process.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', out], { timeoutMs: 5000 }).catch(() => undefined)
+  const width = Number(/pixelWidth: (\d+)/.exec(size?.stdout ?? '')?.[1]) || THUMB_PX
+  const height = Number(/pixelHeight: (\d+)/.exec(size?.stdout ?? '')?.[1]) || THUMB_PX
+  const read = await $.fs.read(out, { as: 'bytes' }).catch(() => undefined)
+  if (!read) return undefined
+  const thumb = { path, data: read.base64, width, height }
+  thumbCache.set(cacheKey, thumb)
+
+  return thumb
+}
+
+const hashOf = (text: string): string => {
+  let h = 5381
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0
+
+  return (h >>> 0).toString(16)
+}
+
+/** Les miniatures du scénario affiché, refaites quand on change de scénario ou qu'une capture change. */
+const refreshThumbs = async ($: EngineInterface): Promise<void> => {
+  const files = await read($, scenarios)
+  const all = files.flatMap(parseScenarios)
+  const wanted = await read($, selectedScenario)
+  const shown = all.find(s => s.id === wanted || s.path === wanted) ?? all[0]
+  const proof = (await read($, evidence)).find(e => e.id === shown?.id)
+  const paths = (proof?.qa ?? []).flatMap(r => r.shots.map(s => s.path)).slice(0, MAX_SHOTS)
+  const made: Thumb[] = []
+  for (const path of paths) {
+    const thumb = await thumbOf($, path)
+    if (thumb) made.push(thumb)
+  }
+  const before = await read($, thumbs)
+  if (JSON.stringify(made.map(t => `${t.path}:${t.data.length}`)) !== JSON.stringify(before.map(t => `${t.path}:${t.data.length}`))) {
+    await update($, thumbs, () => made)
+  }
+}
+
 const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   root = await git($, ['rev-parse', '--show-toplevel'])
   if (!root) return null
@@ -133,6 +248,9 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
   const found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
   if (JSON.stringify(found) !== JSON.stringify(await read($, scenarios))) await update($, scenarios, () => found)
+  const proofs = await loadEvidence($, dir, found)
+  if (JSON.stringify(proofs) !== JSON.stringify(await read($, evidence))) await update($, evidence, () => proofs)
+  await refreshThumbs($)
   if (!snap || !snap.pkg) return snap
   const grep = await git($, ['grep', '--untracked', '-I', '-F', '-c', DECISION, '--', snap.pkg], root)
   const decisions = grep
@@ -410,7 +528,8 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Code, Text } = ui
     const snap = await read($, snapshot)
     const openPlans = await read($, plans)
     const loose = await read($, strays)
@@ -447,6 +566,87 @@ export const register: Register = on => {
         ))}
       </Box>
     )
+    const proofs = await read($, evidence)
+    const pictures = await read($, thumbs)
+    const proofLine = (s: Scenario) => {
+      const proof = proofs.find(p => p.id === s.id)
+      if (!proof || (proof.test === '' && proof.qa.length === 0)) return null
+
+      return (
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
+          {proof.test !== '' && (
+            <Text color={proof.test === 'passed' ? 'success' : proof.test === 'failed' ? 'error' : undefined} dimColor={proof.test === 'skipped'}>
+              {TEST_LABEL[proof.test]}
+            </Text>
+          )}
+          {proof.qa.map(r => (
+            <Text color={r.status === 'SUCCESS' ? 'success' : r.status === '' ? undefined : 'error'} dimColor={r.status === ''}>
+              {r.status === 'SUCCESS' ? '✓' : r.status === '' ? '·' : '✗'} Maestro {r.platform}
+              {r.shots.length > 0 ? ` · ${r.shots.length} capture${r.shots.length > 1 ? 's' : ''}` : ''}
+            </Text>
+          ))}
+        </Box>
+      )
+    }
+    const picture = (shot: { path: string; label: string }) => {
+      const thumb = pictures.find(t => t.path === shot.path)
+      // La table d'éléments répond pour chaque nom : seule la surface dit qui sait dessiner quoi.
+      if (e.surface === 'terminal' && 'Image' in ui) {
+        const { Image } = ui
+
+        return <Image source={{ file: shot.path, format: 'png' }} columns={18} rows={16} alt={shot.label} />
+      }
+      if (!thumb || e.surface === 'terminal' || !('Svg' in ui)) return <Text dimColor>(miniature en cours)</Text>
+      const { Svg } = ui
+      const width = 120
+      const height = Math.round((thumb.height / thumb.width) * width)
+
+      return (
+        <Svg
+          source={`<svg xmlns="http://www.w3.org/2000/svg" width="${thumb.width}" height="${thumb.height}" viewBox="0 0 ${thumb.width} ${thumb.height}"><image href="data:image/jpeg;base64,${thumb.data}" width="${thumb.width}" height="${thumb.height}"/></svg>`}
+          alt={shot.label}
+          width={width}
+          height={height}
+        />
+      )
+    }
+    const shotsOf = (s: Scenario) => {
+      const runs = (proofs.find(p => p.id === s.id)?.qa ?? []).filter(r => r.shots.length > 0)
+      if (runs.length === 0) return null
+      let left = MAX_SHOTS
+
+      return (
+        <Box flexDirection="column" marginTop={1}>
+          {runs.map(r => {
+            const shots = r.shots.slice(0, Math.max(0, left))
+            left -= shots.length
+
+            return (
+              <Box flexDirection="column">
+                <Text dimColor>
+                  Captures {r.platform} · run {r.run}
+                  {r.shots.length > shots.length ? ` · ${shots.length} sur ${r.shots.length}` : ''}
+                </Text>
+                <Box flexDirection="row" flexWrap="wrap" gap={1}>
+                  {shots.map(shot => (
+                    <Box flexDirection="column" key={`shot-${shot.path}`}>
+                      {picture(shot)}
+                      <Button
+                        key={`open-${shot.path}`}
+                        plain
+                        dimColor
+                        label={shot.label}
+                        onPress={() => void $.process.run(['open', shot.path], { timeoutMs: 5000 }).catch(() => undefined)}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )
+          })}
+        </Box>
+      )
+    }
     const scenarioCard = (s: Scenario) => (
       <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
         {s.feature !== '' && <Text dimColor>{s.feature}</Text>}
@@ -455,6 +655,7 @@ export const register: Register = on => {
           {s.title}
         </Text>
         {s.tags.length > 0 && <Text color="suggestion">{s.tags.join(' ')}</Text>}
+        {proofLine(s)}
         {s.background.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Contexte</Text>
@@ -473,6 +674,7 @@ export const register: Register = on => {
             ))}
           </Box>
         )}
+        {shotsOf(s)}
       </Box>
     )
     const planSection =
@@ -541,6 +743,8 @@ export const register: Register = on => {
     const found = all.findIndex(s => s.id === wanted || s.path === wanted)
     const index = found === -1 ? 0 : found
     const shown = all[index]
+    const isSource = await read($, showSource)
+    const sourceOf = (path: string) => files.find(f => f.path === path)?.source ?? ''
     const step = (delta: number) => all[(index + delta + all.length) % all.length]?.id ?? ''
 
     return (
@@ -603,17 +807,33 @@ export const register: Register = on => {
         {shown && (
           <Box flexDirection="column">
             <Box flexDirection="row" gap={1} alignItems="center">
-              <Button key="scenario-prev" label="‹" onPress={() => update($, selectedScenario, () => step(-1))} />
+              <Button key="scenario-prev" label="‹" onPress={async () => {
+                  await update($, selectedScenario, () => step(-1))
+                  await refreshThumbs($)
+                }} />
               <Text>
                 {index + 1} / {all.length}
               </Text>
-              <Button key="scenario-next" label="›" onPress={() => update($, selectedScenario, () => step(1))} />
+              <Button key="scenario-next" label="›" onPress={async () => {
+                  await update($, selectedScenario, () => step(1))
+                  await refreshThumbs($)
+                }} />
+              <Button
+                key="scenario-source"
+                label={isSource ? 'Carte' : 'Fichier brut'}
+                variant={isSource ? 'primary' : 'secondary'}
+                onPress={() => update($, showSource, v => !v)}
+              />
               <Text dimColor wrap="truncate-end">
                 {shown.file} · {shown.status}
               </Text>
             </Box>
             {all.length > 1 && all.length <= 40 && <Text dimColor>{all.map((_, i) => (i === index ? '●' : '○')).join('')}</Text>}
-            {scenarioCard(shown)}
+            {isSource ? (
+              <Code source={sourceOf(shown.path)} language="gherkin" path={shown.path} startLine={1} />
+            ) : (
+              scenarioCard(shown)
+            )}
           </Box>
         )}
         {planSection}

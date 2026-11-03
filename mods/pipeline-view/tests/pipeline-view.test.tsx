@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
+import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
+
 const ROOT = '/repo'
 const PIPELINE = JSON.stringify({
   feature: 'two_factor_login',
@@ -219,6 +221,54 @@ test('un ancien choix de fichier ouvre son premier scénario', async ($, on) => 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /^Renvoi$/ }))?.text).toBe('Renvoi')
   await ui.unmount()
+})
+
+test('la carte montre le test, le flow Maestro et ses captures', async ($, on) => {
+  const shot = '/r/qa/ios/2026-10-29_230258/Code juste/takeScreenshot/01_code_juste_done.png'
+  const evidence = [
+    { id: 'app/login/test/login.feature#1', test: 'passed', qa: [{ platform: 'ios', run: '2026-10-29_230258', status: 'SUCCESS', shots: [{ path: shot, label: 'done' }] }] },
+    { id: 'app/login/test/login.feature#2', test: 'failed', qa: [] },
+  ]
+  seed(on, { snapshot: SNAP, scenarios: FILES, evidence, thumbs: [{ path: shot, data: 'AAAA', width: 165, height: 360 }] })
+
+  const desk = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await desk.find({ type: 'Text', text: /test vert/ }))?.text).toBe('✓ test vert')
+  expect((await desk.find({ type: 'Text', text: /Maestro/ }))?.text).toBe('✓ Maestro ios · 1 capture')
+  expect((await desk.find({ type: 'Svg' }))?.props.source).toContain('data:image/jpeg;base64,AAAA')
+  expect((await desk.find({ type: 'Button', key: `open-${shot}` }))?.props.label).toBe('done')
+  await desk.unmount()
+
+  const term = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await term.find({ type: 'Image' }))?.props.source).toEqual({ file: shot, format: 'png' })
+  await term.unmount()
+})
+
+test('le bouton Fichier brut montre le .feature entier', async ($, on) => {
+  seed(on, { snapshot: SNAP, scenarios: FILES, showSource: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Code' }))?.props.source).toBe(GHERKIN)
+  expect((await ui.find({ type: 'Button', key: 'scenario-source' }))?.props.label).toBe('Carte')
+  await ui.unmount()
+})
+
+test('les rapports de tests et de Maestro se lisent par scénario', () => {
+  const jsonl = [
+    '{"test":{"id":1,"name":"Login Code juste"},"type":"testStart"}',
+    '{"testID":1,"result":"success","hidden":false,"type":"testDone"}',
+    `{"test":{"id":2,"name":"Login Outline: Code faux ('a')"},"type":"testStart"}`,
+    '{"testID":2,"result":"failure","hidden":false,"type":"testDone"}',
+    `{"test":{"id":3,"name":"Login Outline: Code faux ('b')"},"type":"testStart"}`,
+    '{"testID":3,"result":"success","hidden":false,"type":"testDone"}',
+  ].join('\n')
+  const results = parseTestReport(jsonl)
+  expect(testStateOf(results, 'Login', 'Code juste')).toBe('passed')
+  expect(testStateOf(results, 'Login', 'Code faux')).toBe('failed')
+  expect(testStateOf(results, 'Login', 'Autre')).toBe('')
+  const xml = '<testsuite><testcase name="Code &quot;juste&quot;" status="SUCCESS"/><testcase name="Faux" status="ERROR"/></testsuite>'
+  expect([...parseMaestroReport(xml)]).toEqual([['Code "juste"', 'SUCCESS'], ['Faux', 'ERROR']])
+  expect(latestRun(['_runs', '2026-10-29_223213', '2026-10-29_230258', 'report.xml'])).toBe('2026-10-29_230258')
+  expect(shotLabel('03_undoes_cleared.png', commonPrefix(['03_undoes.png', '03_undoes_cleared.png']))).toBe('cleared')
+  expect(shotLabel('03_undoes.png', '03_undoes')).toBe('début')
 })
 
 test('le panneau Pipeline attend le premier .feature', async ($, on) => {
