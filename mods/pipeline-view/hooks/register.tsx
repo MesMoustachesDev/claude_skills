@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, Thumb } from '../types'
+import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -34,6 +34,7 @@ import {
 } from './plan'
 import { type Scenario, type Step, parseScenarios } from './gherkin'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
+import { activityOf, describeActivity, parseActivity } from './activity'
 import { AREA_LABEL, AREA_ORDER, attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from './attribution'
 
 const PANE = 'pipeline-view'
@@ -132,6 +133,50 @@ const scanTranscripts = async ($: EngineInterface): Promise<void> => {
       if (at > 0) noteWrites(sessionOfTranscript(line.slice(0, at + 6)), line.slice(at + 7))
     }
   }
+}
+
+// L'état de cette session, publié pour les autres (~/.claude/activity/<session>.json).
+let home = ''
+let mine: SessionActivity | null = null
+const activityDir = () => `${home}/.claude/activity`
+
+const titleOf = ($: EngineInterface, session: string): Promise<string> =>
+  $.process
+    .run(['/bin/sh', '-c', 'cat "$HOME"/.claude/projects/*/"$1"/custom-title.json 2>/dev/null', 'sh', session], { timeoutMs: 5000 })
+    .then(
+      run => {
+        try {
+          return String((JSON.parse(run.stdout.split('\n')[0] ?? '') as { customTitle?: unknown }).customTitle ?? '')
+        } catch {
+          return ''
+        }
+      },
+      () => '',
+    )
+
+/** Écrit l'état de la session ; ne réécrit pas un état inchangé, sauf pour rafraîchir le contexte. */
+const publish = async ($: EngineInterface, state: SessionActivity['state'], waitingOn = '', isForced = false): Promise<void> => {
+  if (!mine || !home) return
+  if (!isForced && mine.state === state && mine.waitingOn === waitingOn) return
+  const percent = await $.session.usage().then(
+    u => u.context.percent ?? -1,
+    () => -1,
+  )
+  mine = { ...mine, state, waitingOn, percent, at: await $.clock.now() }
+  await $.fs.write(`${activityDir()}/${mine.session}.json`, JSON.stringify(mine)).catch(() => undefined)
+}
+
+/** Les états publiés par toutes les sessions. */
+const readActivity = async ($: EngineInterface): Promise<SessionActivity[]> => {
+  if (!home) return []
+  const found: SessionActivity[] = []
+  for (const name of await listNames($, activityDir(), 'file')) {
+    if (!name.endsWith('.json')) continue
+    const a = parseActivity(await readText($, `${activityDir()}/${name}`))
+    if (a) found.push(a)
+  }
+
+  return found
 }
 
 const readText = ($: EngineInterface, path: string): Promise<string> =>
@@ -328,6 +373,8 @@ const fillBranch = async (
   base: string,
   worktrees: Map<string, string>,
   main: string,
+  sessions: SessionActivity[] = [],
+  at = 0,
 ): Promise<PlanBranch> => {
   if (!(await git($, ['rev-parse', '--verify', '--quiet', `refs/heads/${b.branch}`], main))) return { ...b, exists: false }
   const worktree = worktrees.get(b.branch) ?? ''
@@ -337,8 +384,19 @@ const fillBranch = async (
   const changed = worktree ? parsePorcelain(await gitRaw($, ['status', '--porcelain=v1', '-z'], worktree)) : []
   const mergeBase = ahead > 0 ? await git($, ['merge-base', base, b.branch], main) : ''
   const committed = mergeBase ? parseNameStatus(await gitRaw($, ['diff', '--name-status', '-z', mergeBase, b.branch], main)) : []
-  const owned = worktree ? attribute(worktree, [...changed, ...committed], written) : { files: [], writers: 0 }
-  const filled = { ...b, exists: true, worktree, ahead, unpushed: up === '' ? -1 : Number(up) || 0, dirty, ...owned }
+  const owned = worktree ? attribute(worktree, [...changed, ...committed], written) : { files: [], writers: 0, sessions: [] }
+  const activity = worktree ? activityOf(sessions, worktree, owned.sessions, at) : []
+  const filled = {
+    ...b,
+    exists: true,
+    worktree,
+    ahead,
+    unpushed: up === '' ? -1 : Number(up) || 0,
+    dirty,
+    files: owned.files,
+    writers: owned.writers,
+    activity,
+  }
   const where = fromBranch(b.branch)
   if (!worktree || !where) return filled
   const file = `${worktree}/.claude/${FOLDER[where.kind]}/${where.name}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
@@ -361,6 +419,9 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
   const found: PlanView[] = []
   const cited = new Set<string>()
   if (worktrees.size > 0) await scanTranscripts($)
+  const sessions = await readActivity($)
+  const at = await $.clock.now().catch(() => 0)
+  const fill = (b: PlanBranch, from: string) => fillBranch($, b, from, worktrees, main, sessions, at)
   const entries = await $.fs.list(`${main}/.claude/plans`).catch(() => [])
   for (const entry of [...entries].sort((a, b) => (a.name < b.name ? -1 : 1))) {
     if (entry.kind !== 'file' || !entry.name.endsWith('.md')) continue
@@ -369,7 +430,7 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
     for (const phase of parsed.phases) {
       for (const item of phase.items) {
         item.branches.forEach(b => cited.add(b.branch))
-        item.branches = await Promise.all(item.branches.map(b => fillBranch($, b, base, worktrees, main)))
+        item.branches = await Promise.all(item.branches.map(b => fill(b, base)))
       }
     }
     found.push({ kind: 'plan', title: parsed.title || entry.name.replace(/\.md$/, ''), source, phases: parsed.phases })
@@ -383,9 +444,7 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
     cited.add(branch)
     for (const item of epic.phases[0]?.items ?? []) {
       item.branches.forEach(b => cited.add(b.branch))
-      item.branches = await Promise.all(
-        item.branches.map(b => fillBranch($, b, epic.bases[b.branch] ?? branch, worktrees, main)),
-      )
+      item.branches = await Promise.all(item.branches.map(b => fill(b, epic.bases[b.branch] ?? branch)))
     }
     found.push({ kind: 'epic', title: epic.title, source: `${path.slice(main.length + 1) || '.'}/${source}`, phases: epic.phases })
   }
@@ -394,7 +453,7 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
   const loose: PlanBranch[] = []
   for (const [branch, path] of worktrees) {
     if (path === main || isToolingBranch(branch) || cited.has(branch)) continue
-    loose.push(await fillBranch($, emptyBranch(branch), base, worktrees, main))
+    loose.push(await fill(emptyBranch(branch), base))
   }
 
   return { plans: open, strays: loose }
@@ -450,6 +509,7 @@ const describe = (
   list: ActiveAgent[],
   asking: boolean,
   at: number,
+  percent: number,
 ): string => {
   const parts = [`${snap.kind} ${snap.name}`]
   const stage = focusStage(snap)
@@ -464,6 +524,7 @@ const describe = (
   if (snap.phase) parts.push(`phase ${snap.phase}`)
   if (snap.decisions > 0) parts.push(`${snap.decisions} ${DECISION}`)
   if (asking) parts.push('attend ta réponse')
+  if (percent >= 0) parts.push(`contexte ${percent} %`)
 
   return parts.join(' · ')
 }
@@ -471,6 +532,13 @@ const describe = (
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
+    const session = await $.session.id().catch(() => '')
+    if (home && session) {
+      await $.process.run(['mkdir', '-p', activityDir()], { timeoutMs: 5000 }).catch(() => undefined)
+      mine = { session, cwd: e.cwd, title: await titleOf($, session), state: 'idle', at: 0, percent: -1, waitingOn: '' }
+      await publish($, 'idle', '', true)
+    }
     await $.command.register({
       name: 'pipeline',
       description: "Ouvre le panneau d'état du pipeline /feature ou /fix en cours",
@@ -514,8 +582,34 @@ export const register: Register = on => {
     return spawned
   })
 
+  on('prompt.submit', async ($, e, next) => {
+    const sent = await next(e)
+    await publish($, 'working')
+
+    return sent
+  })
+
+  // Une permission que Thibault doit donner, dans la boucle principale ou celle d'un sous-agent.
+  on('tool.check', async ($, e, next) => {
+    const verdict = await next(e)
+    if (e.tool_use_id && verdict.decision === 'ask' && e.approver === 'person') await publish($, 'waiting', e.tool)
+
+    return verdict
+  })
+
+  on('session.end', async ($, e, next) => {
+    const ended = await next(e)
+    if (mine && home) await $.process.run(['rm', '-f', `${activityDir()}/${mine.session}.json`], { timeoutMs: 5000 }).catch(() => undefined)
+
+    return ended
+  })
+
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
+    if (!e.agentId && mine) {
+      mine = { ...mine, title: (await titleOf($, mine.session)) || mine.title }
+      await publish($, 'idle', '', true)
+    }
     if (e.agentId) {
       const at = await $.clock.now()
       await update($, agents, list => agentEnded(list, e.agentId ?? '', at))
@@ -529,10 +623,16 @@ export const register: Register = on => {
   // Lecture seule : l'appel passe tel quel, on ne fait que compter. Seuls les agents du pipeline
   // sont suivis ; un refus (hook restrict-writes, permission) est compté à part.
   on('tool.call', async ($, e, next) => {
+    // L'outil dont la permission attendait a tourné : elle est donnée (ou refusée), le tour reprend.
+    const settled = async (ran: Awaited<ReturnType<typeof next>>) => {
+      if (mine?.state === 'waiting' && mine.waitingOn === String(e.tool)) await publish($, 'working')
+
+      return ran
+    }
     const id = e.agentId
-    if (!id || !isTracked(String(e.tool))) return next(e)
+    if (!id || !isTracked(String(e.tool))) return settled(await next(e))
     const isOurs = (await read($, agents)).some(a => a.id === id && a.end === 0)
-    if (!isOurs) return next(e)
+    if (!isOurs) return settled(await next(e))
     const args = e as unknown as Record<string, unknown>
     const label = toolLabel(String(e.tool), args, root)
     await update($, agents, list => list.map(a => (a.id === id ? callStarted(a, label) : a)))
@@ -542,7 +642,7 @@ export const register: Register = on => {
       const ran = await next(e)
       isDenied = ran.deny !== undefined
       isError = isDenied || ran.isError === true
-      return ran
+      return await settled(ran)
     } finally {
       const file = typeof args.file_path === 'string' ? args.file_path : undefined
       const isWrite = ['Edit', 'Write', 'MultiEdit'].includes(String(e.tool))
@@ -556,10 +656,12 @@ export const register: Register = on => {
   on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
     if (e.agentId) return next(e)
     await update($, isAsking, () => true)
+    await publish($, 'waiting', 'question')
     try {
       return await next(e)
     } finally {
       await update($, isAsking, () => false)
+      await publish($, 'working')
     }
   })
 
@@ -572,16 +674,24 @@ export const register: Register = on => {
       if (!first) return next(e)
       const { Text } = $.ui.resolve(e)
       const more = open.length > 1 ? ` · +${open.length - 1} plan${open.length > 2 ? 's' : ''}` : ''
+      const waiting = new Set(
+        open
+          .flatMap(p => p.phases.flatMap(ph => ph.items.flatMap(i => i.branches.flatMap(b => b.activity))))
+          .filter(a => a.state === 'waiting' && a.session !== mine?.session)
+          .map(a => a.session),
+      ).size
+      const asks = waiting > 0 ? ` · ${waiting} session${waiting > 1 ? 's attendent' : ' attend'} ta réponse` : ''
 
       return (
         <Text dimColor wrap="truncate-end">
           {summarize(first)}
           {more}
+          {asks}
         </Text>
       )
     }
     const { Text } = $.ui.resolve(e)
-    const line = describe(snap, await read($, agents), await read($, isAsking), await read($, now))
+    const line = describe(snap, await read($, agents), await read($, isAsking), await read($, now), mine?.percent ?? -1)
     const stage = focusStage(snap)
     const isRed = stage?.status === 'RED' || stage?.status === 'FAILED'
 
@@ -605,6 +715,10 @@ export const register: Register = on => {
       }
     }
     const unfolded = await read($, openBranches)
+    const hasActivity = [...openPlans.flatMap(p => p.phases.flatMap(ph => ph.items.flatMap(i => i.branches))), ...loose].some(
+      b => b.activity.length > 0,
+    )
+    const at = hasActivity ? await $.clock.now() : 0
     const branchFiles = (b: PlanBranch) =>
       AREA_ORDER.map(area => {
         const rows = b.files.filter(f => f.area === area)
@@ -658,6 +772,12 @@ export const register: Register = on => {
               />
             )}
           </Box>
+          {b.activity.slice(0, 3).map(a => (
+            <Text color={a.state === 'waiting' ? 'warning' : undefined} dimColor={a.state === 'idle'} wrap="truncate-end">
+              {'      '}
+              {describeActivity(a, at)}
+            </Text>
+          ))}
           {isOpen && branchFiles(b)}
           {isOpen && b.files.some(f => !f.isAttributed) && (
             <Text dimColor>
@@ -850,7 +970,7 @@ export const register: Register = on => {
       )
     }
     const list = await read($, agents)
-    const at = await read($, now)
+    const shownAt = await read($, now)
     const asking = await read($, isAsking)
     const current = focusStage(snap)
     const files = await read($, scenarios)
@@ -893,7 +1013,7 @@ export const register: Register = on => {
         {list.length === 0 && <Text dimColor>Aucun agent du pipeline dans cette session.</Text>}
         {list.map(a => {
           const isRunning = a.end === 0
-          const stats = `${duration((isRunning ? at : a.end) - a.start)} · ${a.calls} appel(s)`
+          const stats = `${duration((isRunning ? shownAt : a.end) - a.start)} · ${a.calls} appel(s)`
 
           return (
             <Box flexDirection="column">

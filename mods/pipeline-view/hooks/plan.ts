@@ -134,6 +134,7 @@ export const emptyBranch = (branch: string): PlanBranch => ({
   stageStatus: '',
   files: [],
   writers: 0,
+  activity: [],
 })
 
 /** `git worktree list --porcelain` → branche → chemin du worktree. */

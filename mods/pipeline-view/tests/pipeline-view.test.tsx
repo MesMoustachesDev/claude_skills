@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { activityOf, describeActivity, parseActivity } from '../hooks/activity'
 import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
 
@@ -304,11 +305,22 @@ const STRAY = '/repo/.claude/worktrees/trial-end-screen-6c4fb4'
 const TRANSCRIPT = '/home/.claude/projects/-repo--claude-worktrees-feature-trial-end-screen/s1.jsonl'
 const WROTE = `${TRANSCRIPT}:"name":"Edit","input":{"file_path":"${WT}/lib/a.dart"`
 
-const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
+const NOW = 1_800_000_000_000
+const ACTIVITY = JSON.stringify({ session: 's2', cwd: WT, title: 'Trial', state: 'waiting', at: NOW - 60_000, percent: 72, waitingOn: 'Bash' })
+
+const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: string[] = []) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('clock.now', () => ({ value: NOW }))
+  on('env.get', () => ({ value: '/home' }))
+  on('session.id', () => ({ value: 's1' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000, tokens: 80000, percent: 40 }, rateLimits: [] } }))
+  on('fs.write', (_, e) => {
+    writes.push(e.path)
+    return { value: undefined }
+  })
   on('process.run', (_, e) => {
     const argv = e.argv.join(' ')
     const out = argv.includes("find \"$HOME/.claude/projects\"")
@@ -346,11 +358,15 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
   on('fs.list', (_, e) =>
     e.path === '/repo/.claude/plans'
       ? { value: [{ name: 'paywall.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] }
-      : { deny: 'ENOENT' },
+      : e.path === '/home/.claude/activity'
+        ? { value: [{ name: 's2.json', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] }
+        : { deny: 'ENOENT' },
   )
   on('fs.read', (_, e) =>
     e.path === '/repo/.claude/plans/paywall.md'
       ? { value: PLAN_MD }
+      : e.path === '/home/.claude/activity/s2.json'
+        ? { value: ACTIVITY }
       : e.path === `${WT}/.claude/features/trial_end_screen/pipeline.json`
         ? { value: JSON.stringify({ stages: { green: { status: 'RED', at: '2026-11-03T10:00:00Z' } }, attempts: { green: 2 } }) }
         : { deny: 'ENOENT' },
@@ -358,8 +374,10 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
 }
 
 test('le panneau montre le plan du repo, ses branches et les worktrees hors plan', async ($, on) => {
-  planEngine(on)
+  const writes: string[] = []
+  planEngine(on, writes)
   await $.session.start({ cwd: ROOT, surface: 'desktop', isInteractive: true })
+  expect(writes).toContain('/home/.claude/activity/s1.json')
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await ui.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
@@ -367,6 +385,7 @@ test('le panneau montre le plan du repo, ses branches et les worktrees hors plan
   expect((await ui.find({ type: 'Text', text: /feature\/trial_end_screen ·/ }))?.text).toBe(
     '    feature/trial_end_screen · feature-trial_end_screen · ✗ impl (vert) 2/5 · 3 commits · jamais poussée · 2 fichiers non commités · 2 non attribués',
   )
+  expect((await ui.find({ type: 'Text', text: /Trial ·/ }))?.text).toBe('      ! Trial · attend ta réponse (Bash) · contexte 72 %')
   await ui.press({ key: 'files-feature/trial_end_screen' })
   expect((await ui.find({ type: 'Text', text: /Non suivis/ }))?.text).toBe('      Non suivis (1)')
   expect((await ui.find({ type: 'Text', text: /lib\/b\.dart/ }))?.text).toBe('        ? lib/b.dart  ?')
@@ -380,7 +399,9 @@ test('le panneau montre le plan du repo, ses branches et les worktrees hors plan
   await ui.unmount()
 
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toBe('Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi')
+  expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toBe(
+    'Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi · 1 session attend ta réponse',
+  )
   await band.unmount()
 })
 
@@ -408,4 +429,15 @@ test('attribution : transcripts, status -z et diff -z', async () => {
   const owned = attribute('/w', [{ path: 'a', status: 'M', area: 'unstaged' }, { path: 'c', status: '?', area: 'untracked' }], writes)
   expect(owned.writers).toBe(2)
   expect(owned.files.map(f => f.isAttributed)).toEqual([true, false])
+})
+
+test('activité : lue, filtrée par worktree, dite en une ligne', async () => {
+  const a = parseActivity(ACTIVITY)
+  expect(a?.state).toBe('waiting')
+  expect(parseActivity('{"session":"x","at":1,"state":"bof"}')).toBe(null)
+  const idle = { ...(a as NonNullable<typeof a>), session: 's3', cwd: '/ailleurs', state: 'idle' as const, at: NOW - 2 * 3600_000, percent: -1, title: '' }
+  const old = { ...idle, session: 's4', at: NOW - 13 * 3600_000 }
+  expect(activityOf([idle, old, a as NonNullable<typeof a>], WT, ['s3', 's4'], NOW).map(x => x.session)).toEqual(['s2', 's3'])
+  expect(describeActivity(idle, NOW)).toBe('· s3 · au repos depuis 2 h')
+  expect(describeActivity({ ...idle, state: 'working', at: NOW - 40 * 60_000 }, NOW)).toBe('▸ s3 · au travail, sans nouvelles depuis 40 min')
 })

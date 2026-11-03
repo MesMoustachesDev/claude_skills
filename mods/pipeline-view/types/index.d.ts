@@ -95,6 +95,23 @@ export type PlanBranch = {
   files: BranchFile[]
   /** Sessions dont un transcript a écrit dans ce worktree. */
   writers: number
+  /** Les sessions de ce worktree et ce qu'elles font, les plus récentes d'abord. */
+  activity: SessionActivity[]
+}
+
+export type SessionActivity = {
+  session: string
+  /** Dossier de lancement de la session. */
+  cwd: string
+  /** Titre de la session dans l'app, vide sans titre. */
+  title: string
+  state: 'working' | 'waiting' | 'idle'
+  /** Dernier changement d'état, ms depuis l'epoch. */
+  at: number
+  /** Part de la fenêtre de contexte remplie, -1 avant la première réponse. */
+  percent: number
+  /** L'outil dont la permission ou la question attend Thibault. */
+  waitingOn: string
 }
 
 export type FileArea = 'conflict' | 'staged' | 'unstaged' | 'untracked' | 'committed'

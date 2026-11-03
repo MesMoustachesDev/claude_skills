@@ -84,7 +84,7 @@ export const attribute = (
   worktree: string,
   files: { path: string; status: string; area: FileArea }[],
   writes: Map<string, Set<string>>,
-): { files: BranchFile[]; writers: number } => {
+): { files: BranchFile[]; writers: number; sessions: string[] } => {
   const sessions = new Set<string>()
   const prefix = `${worktree}/`
   for (const [path, by] of writes) {
@@ -94,6 +94,7 @@ export const attribute = (
   return {
     files: files.map(f => ({ ...f, isAttributed: (writes.get(`${prefix}${f.path}`)?.size ?? 0) > 0 })),
     writers: sessions.size,
+    sessions: [...sessions],
   }
 }
 
