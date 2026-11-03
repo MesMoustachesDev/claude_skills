@@ -31,6 +31,13 @@ case "$agent" in
 esac
 
 GAUNTLET="$HOME/.claude/scripts/fix_gauntlet.sh"
+# Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook
+# (hook_wait.sh, appelé par fix_gauntlet.sh).
+mkdir -p "$FIX_OUT"
+running="$FIX_OUT/hook_${profile}.running"
+echo "$$ $(date +%s) $agent" > "$running"
+trap 'rm -f "$running"' EXIT
+export PIPELINE_GATE_HOOK=1
 max="$(state_get .max_attempts)"; max="${max:-5}"
 attempts="$(state_get ".attempts[\"$profile\"]")"; attempts="${attempts:-0}"
 

@@ -196,6 +196,13 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
   exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
+- **Un agent en arrière-plan a fini à sa notification de fin (`<task-notification>`), pas à son
+  rapport.** Son rapport (« Subagent hand-back ») arrive avant que son hook de fin ait joué le gate
+  (plus d'une minute pour `contracts` ou `red`), et un gate rouge le remet au travail après ce rapport.
+  À son rapport : ne lis pas l'étape, ne rejoue pas le gate, ne lance pas la suite ; attends la
+  notification. `pipeline.sh next` / `join` et `gauntlet.sh` attendent d'eux-mêmes un hook en cours
+  (`hook_wait.sh`). Une étape toujours vide après la notification : le hook n'a pas tourné ; rejoue le
+  gate et dis-le avec le bloc « ce que tu tranches sans lui ».
 - **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le pipeline par
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape : ce qu'on attend de lui** (la décision à prendre, ou

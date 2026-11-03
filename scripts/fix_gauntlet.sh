@@ -289,6 +289,8 @@ esac
 fix_context "$name" || die "pas dans un repo git"
 [ -d "$FIX_DIR" ] || die "fix inconnu : $FIX_DIR"
 mkdir -p "$FIX_OUT"
+# Un hook de fin d'agent (fix-gate.sh) joue peut-être déjà ce gate : on attend qu'il ait fini.
+bash "$HOME/.claude/scripts/hook_wait.sh" "$FIX_OUT" || exit 1
 
 checks="$(profile_checks "$target")"
 if [ -z "$checks" ]; then

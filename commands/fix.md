@@ -332,6 +332,13 @@ ligne de l'enregistrer en mémoire.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
+- **Un agent en arrière-plan a fini à sa notification de fin (`<task-notification>`), pas à son
+  rapport.** Son rapport (« Subagent hand-back ») arrive avant que son hook de fin ait joué le gate
+  (plus d'une minute pour `red` ou `green`), et un gate rouge le remet au travail après ce rapport.
+  À son rapport : ne lis pas l'étape, ne rejoue pas le gate, ne lance pas la suite ; attends la
+  notification. `fix_gauntlet.sh` attend d'eux-mêmes un hook en cours
+  (`hook_wait.sh`). Une étape toujours vide après la notification : le hook n'a pas tourné ; rejoue le
+  gate et dis-le avec le bloc « ce que tu tranches sans lui ».
 - **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le fix par
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape, prévu ou hors plan : ce qu'on attend de lui** (la décision à prendre, ou

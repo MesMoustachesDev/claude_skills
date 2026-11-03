@@ -62,6 +62,13 @@ pipe_set() {
   jq --arg p "$profile" --arg s "$1" --argjson a "$2" '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
   rmdir "$lock" 2>/dev/null
 }
+# Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook ;
+# pipeline.sh next/join et gauntlet.sh attendent qu'il disparaisse (hook_wait.sh).
+mkdir -p "$FEATURE_DIR/.gauntlet"
+running="$FEATURE_DIR/.gauntlet/hook_${profile}.running"
+echo "$$ $(date +%s) $agent" > "$running"
+trap 'rm -f "$running"' EXIT
+export PIPELINE_GATE_HOOK=1
 max="$(cfg pipeline.max_attempts 5)"
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 

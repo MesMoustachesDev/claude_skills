@@ -43,6 +43,9 @@ esac
 # Profil d'une moitié (red_data, green_presentation…) : la couche vient du suffixe.
 case "$target" in *_data|*_presentation) export GAUNTLET_LAYER="${target##*_}" ;; esac
 init_project_context "$feature"
+# Un hook de fin d'agent joue peut-être déjà ce gate : on attend qu'il ait fini plutôt que de lancer
+# un second gauntlet dans le même worktree.
+bash "$(dirname "${BASH_SOURCE[0]}")/hook_wait.sh" "$FEATURE_DIR/.gauntlet" || exit 1
 
 checks="$(profile_checks "$target")"
 if [ -z "$checks" ]; then

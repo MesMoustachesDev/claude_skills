@@ -232,7 +232,20 @@ def inputs(c):
     return out
 
 
+def wait_hooks(c):
+    """Le rapport d'un agent en arrière-plan arrive avant que son hook de fin ait écrit le gate :
+    attend que le hook ait fini (hook_wait.sh), puis relit pipeline.json."""
+    if not c.p:
+        return
+    w = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_wait.sh")
+    if subprocess.run(["bash", w, os.path.join(c.dir, ".gauntlet")]).returncode != 0:
+        die("un hook de fin d'agent joue encore son gate : attends la notification de fin de l'agent "
+            "(<task-notification>), pas son rapport, puis relance", code=3)
+    c.p = c._load()
+
+
 def cmd_next(c, args):
+    wait_hooks(c)
     n = next_step(c.p)
     attempts = (c.p.get("attempts") or {})
     profile = n["key"] if n["key"] and not n["key"].startswith("hg.") else None
@@ -391,6 +404,7 @@ def cmd_join(c, args):
         die("usage : join <nom> red|green")
     profile = args[0]
     halves = [f"{profile}_data", f"{profile}_presentation"]
+    wait_hooks(c)
     stages = c.p.get("stages") or {}
     status = lambda v: v.get("status") if isinstance(v, dict) else v
     # SKIPPED : moitié sans rien à faire (extend qui ne touche qu'une couche), posée par `skip` avec sa raison.
