@@ -58,3 +58,22 @@ export const describeActivity = (a: SessionActivity, at: number): string => {
 
   return `${a.state === 'waiting' ? '!' : a.state === 'working' ? '▸' : '·'} ${name} · ${state}${context}`
 }
+
+/** Les autres sessions qui travaillent en ce moment dans ce worktree (ou attendent Thibault). */
+export const busyIn = (all: SessionActivity[], worktree: string, me: string, at: number): SessionActivity[] =>
+  all.filter(
+    a =>
+      a.session !== me &&
+      a.state !== 'idle' &&
+      at - a.at < SILENT_MS &&
+      (a.cwd === worktree || a.cwd.startsWith(`${worktree}/`)),
+  )
+
+/** `/feature <nom> …` ou `/fix <nom> …` → le nom du pipeline repris, vide pour help, list, init. */
+export const pipelineTarget = (command: string, args: string): { kind: 'feature' | 'fix'; name: string } | null => {
+  if (command !== 'feature' && command !== 'fix') return null
+  const name = args.trim().split(/\s+/)[0] ?? ''
+  if (!/^[a-z0-9][a-z0-9_]*$/.test(name) || ['help', 'list', 'init'].includes(name)) return null
+
+  return { kind: command, name }
+}

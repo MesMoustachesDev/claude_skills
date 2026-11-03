@@ -34,7 +34,7 @@ import {
 } from './plan'
 import { type Scenario, type Step, parseScenarios } from './gherkin'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
-import { activityOf, describeActivity, parseActivity } from './activity'
+import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
 import { AREA_LABEL, AREA_ORDER, attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from './attribution'
 
 const PANE = 'pipeline-view'
@@ -134,6 +134,10 @@ const scanTranscripts = async ($: EngineInterface): Promise<void> => {
     }
   }
 }
+
+// Une reprise refusée parce qu'une autre session tourne dans le worktree, et quand.
+const CONFIRM_MS = 120_000
+let confirmed = { key: '', at: 0 }
 
 // L'état de cette session, publié pour les autres (~/.claude/activity/<session>.json).
 let home = ''
@@ -582,7 +586,27 @@ export const register: Register = on => {
     return spawned
   })
 
+  // Deux sessions dans le même worktree écrivent dans les mêmes fichiers : la reprise d'un /feature ou
+  // d'un /fix qu'une autre session fait tourner est arrêtée une fois ; la même commande renvoyée dans
+  // les deux minutes passe.
   on('prompt.submit', async ($, e, next) => {
+    const target = e.command ? pipelineTarget(e.command.name, e.command.args) : null
+    if (target && mine) {
+      const common = await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+      const main = common.replace(/\/\.git\/?$/, '')
+      const worktree = `${main}/.claude/worktrees/${target.kind}-${target.name}`
+      const at = await $.clock.now()
+      const busy = main ? busyIn(await readActivity($), worktree, mine.session, at) : []
+      const key = `${target.kind}:${target.name}`
+      if (busy.length > 0 && !(confirmed.key === key && at - confirmed.at < CONFIRM_MS)) {
+        confirmed = { key, at }
+        const who = busy.map(a => describeActivity(a, at).slice(2)).join(' ; ')
+
+        return {
+          drop: `Une autre session travaille déjà dans ${worktree.slice(main.length + 1)} : ${who}. Deux sessions y écriraient dans les mêmes fichiers. Renvoie la même commande dans les 2 minutes pour la lancer quand même.`,
+        }
+      }
+    }
     const sent = await next(e)
     await publish($, 'working')
 

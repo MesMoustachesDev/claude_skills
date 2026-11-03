@@ -12,3 +12,21 @@ où en est un point :
   `→ \`a\`, \`b\``. Écris dans le fichier du checkout principal, pas dans une copie d'un worktree.
 - **Un point livré** (mergé, ou réglé sans code) : ajoute `[fait]` à sa première ligne.
 - Un point qui attend Thibault garde `[toi]` ; le panneau le montre comme une décision à prendre.
+
+## Sessions lancées par une autre session
+
+Quand tu lances ou pilotes d'autres sessions (`start_session`, `SendMessage`, sous-features d'un epic) :
+
+- **Jamais deux sessions qui écrivent dans le même dossier.** Avant `use_worktree: false`, regarde
+  `~/.claude/activity/*.json` (publié par le mod pipeline-view) : une session `working` ou `waiting`
+  dans ce dossier depuis moins de 30 min → worktree à part, ou attendre. Le mod arrête aussi la
+  reprise d'un `/feature` ou d'un `/fix` déjà en cours ailleurs.
+- **Tu ne réponds jamais à une permission à la place de Thibault**, ni à une question qu'une session
+  enfant lui pose : tu la lui relaies, avec le nom de la session.
+- **Tu n'écris pas à une session qui attend Thibault** : ton message pourrait passer pour sa réponse.
+- **Pas de troisième niveau** : une session que tu lances n'en lance pas d'autres.
+- **Pas de sondage** : tu attends la note de fin de tour de la session, ou un réveil programmé.
+- **Changer d'agent ou de modèle en cours de route** (relancer une étape sur Opus, reprendre le travail
+  d'une session dans une autre) : vérifie d'abord tout ce qui peut échouer (modèle disponible, dossier,
+  branche, résumé à transmettre), puis seulement arrête l'ancienne, et montre à Thibault le résumé
+  passé à la nouvelle avant de l'envoyer.

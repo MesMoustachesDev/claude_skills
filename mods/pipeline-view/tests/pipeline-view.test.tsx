@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { activityOf, describeActivity, parseActivity } from '../hooks/activity'
+import { activityOf, describeActivity, parseActivity, pipelineTarget } from '../hooks/activity'
 import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
 
@@ -440,4 +440,19 @@ test('activité : lue, filtrée par worktree, dite en une ligne', async () => {
   expect(activityOf([idle, old, a as NonNullable<typeof a>], WT, ['s3', 's4'], NOW).map(x => x.session)).toEqual(['s2', 's3'])
   expect(describeActivity(idle, NOW)).toBe('· s3 · au repos depuis 2 h')
   expect(describeActivity({ ...idle, state: 'working', at: NOW - 40 * 60_000 }, NOW)).toBe('▸ s3 · au travail, sans nouvelles depuis 40 min')
+})
+
+test('la reprise d’un /feature qu’une autre session fait tourner est arrêtée une fois', async ($, on) => {
+  planEngine(on)
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  await $.session.start({ cwd: ROOT, surface: 'desktop', isInteractive: true })
+  const line = { text: '/feature trial_end_screen', command: { name: 'feature', args: 'trial_end_screen' } }
+  const first = await $.prompt.submit(line)
+  expect(String((first as { drop?: string }).drop)).toContain('Une autre session travaille déjà dans .claude/worktrees/feature-trial_end_screen : Trial · attend ta réponse (Bash)')
+  const again = await $.prompt.submit(line)
+  expect((again as { drop?: string }).drop).toBe(undefined)
+  const other = await $.prompt.submit({ text: '/feature autre', command: { name: 'feature', args: 'autre' } })
+  expect((other as { drop?: string }).drop).toBe(undefined)
+  expect(pipelineTarget('fix', 'help')).toBe(null)
+  expect(pipelineTarget('fix', 'crash_upload --from-mr 12')).toEqual({ kind: 'fix', name: 'crash_upload' })
 })
