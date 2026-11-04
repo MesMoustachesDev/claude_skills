@@ -290,6 +290,7 @@ def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
         'turns': result.get('num_turns'), 'wall_s': round(time.time() - started),
         'output_tokens': usage.get('output_tokens') or 0,
         'cost_usd': result.get('total_cost_usd'), 'session': '' if dry else session,
+        'agent_error': not dry and (not result or bool(result.get('is_error'))),
         'worktree': str(wt) if keep else '',
         'answer': (result.get('result') or '')[-500:],
     }
@@ -302,6 +303,16 @@ def table(rows: list[dict]) -> str:
         f"| {r['feature']} | {r['stage']} | {r['model']} | {'oui' if r['ok'] else 'non'} | {r['detail']} "
         f"| {r.get('attempts', '—')} | {r.get('files_written', '—')} | {r.get('turns') or '—'} | {round(r['wall_s'] / 60)} min "
         f"| {'—' if r.get('cost_usd') is None else f'{r['cost_usd']:.2f} $'} |\n" for r in rows)
+
+
+def hollow(row: dict) -> bool:
+    """Une passe qui n'a rien produit : le banc est cassé, pas l'agent (campagne du 2026-11-03,
+    10 h de passes sans review.json ni test compilable)."""
+    if row['detail'].startswith('passe cassée') or row.get('agent_error'):
+        return True
+    if row['stage'] == 'review':
+        return row.get('recall') == 0 and row.get('extra') == 0
+    return row.get('files_written') == 0
 
 
 def summary(rows: list[dict]) -> str:
@@ -359,6 +370,9 @@ def main() -> int:
                     # Écrit au fil de l'eau : une campagne de plusieurs heures interrompue garde ses passes.
                     out.with_suffix('.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
                     out.with_suffix('.md').write_text(summary(rows) + '\n' + table(rows))
+                    if not args.dry and len(rows) >= 2 and all(hollow(r) for r in rows[-2:]):
+                        print('\nDeux passes de suite sans rien produire : campagne arrêtée, le banc est à revoir.')
+                        return 3
     print(f'\n{summary(rows)}\n{table(rows)}\n→ {out}.md')
     return 0
 
