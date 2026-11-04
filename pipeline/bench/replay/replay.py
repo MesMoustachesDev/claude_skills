@@ -88,6 +88,37 @@ def branch_point(repo: Path, name: str, docs: str) -> str:
     return git(repo, 'rev-parse', f'{own[-1]}^').strip()
 
 
+def submodules(repo: Path, wt: Path, commit: str) -> bool:
+    """Pose chaque submodule (dskit) dans la version que `commit` épingle, tirée du clone du checkout
+    principal. Une copie du checkout principal donnerait la version d'aujourd'hui : le code d'il y a
+    un mois ne compile plus contre elle. Vrai si un submodule a changé (pub get à refaire)."""
+    if not (wt / '.gitmodules').exists():
+        return False
+    changed = False
+    paths = sh(['git', '-C', str(wt), 'config', '--file', '.gitmodules', '--get-regexp', r'submodule\..*\.path']).stdout
+    for sub in (l.split()[1] for l in paths.splitlines() if len(l.split()) > 1):
+        pinned = git(wt, 'rev-parse', f'{commit}:{sub}').strip()
+        dest = wt / sub
+        stamp = dest / '.replay-pin'
+        if stamp.exists() and stamp.read_text().strip() == pinned:
+            continue
+        shutil.rmtree(dest, ignore_errors=True)
+        dest.mkdir(parents=True)
+        archive = subprocess.run(['git', '-C', str(repo / sub), 'archive', pinned], capture_output=True)
+        if archive.returncode:
+            raise RuntimeError(f'{sub} @ {pinned[:8]} absent du clone principal : git -C {repo / sub} fetch')
+        subprocess.run(['tar', '-x', '-C', str(dest)], input=archive.stdout, check=True)
+        stamp.write_text(pinned + '\n')
+        changed = True
+    return changed
+
+
+def pub_get(app: Path) -> None:
+    got = sh(['fvm', 'flutter', 'pub', 'get'], cwd=app, timeout=900)
+    if got.returncode or 'Failed to update packages' in got.stdout + got.stderr:
+        raise RuntimeError(f'pub get : {(got.stdout + got.stderr).strip()[-300:]}')
+
+
 def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
     step = case[stage]
     wt = Path(tempfile.mkdtemp(prefix=f'replay-{name[:20]}-{stage}-'))
@@ -125,21 +156,10 @@ def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
         pipe.pop(key, None)
     (fdir / 'pipeline.json').write_text(json.dumps(pipe, ensure_ascii=False, indent=2) + '\n')
     (wt / '.claude' / 'features' / '.current').write_text(name + '\n')
-    # Submodules (dskit) : un worktree ne les initialise pas. Même repli que pr_gauntlet.sh : un commit
-    # introuvable sur le remote est copié du checkout principal.
-    if (wt / '.gitmodules').exists():
-        sh(['git', '-C', str(wt), 'submodule', 'update', '--init', '--recursive', '-q'], timeout=900)
-        paths = sh(['git', '-C', str(wt), 'config', '--file', '.gitmodules', '--get-regexp', r'submodule\..*\.path']).stdout
-        for sub in (l.split()[1] for l in paths.splitlines() if len(l.split()) > 1):
-            dest = wt / sub
-            if not [p for p in dest.iterdir() if p.name != '.git'] if dest.exists() else True:
-                shutil.rmtree(dest, ignore_errors=True)
-                shutil.copytree(repo / sub, dest, ignore=shutil.ignore_patterns('.git'), symlinks=True)
+    submodules(repo, wt, 'HEAD')
     # Worktree neuf : pas de .dart_tool. Le projet est un workspace pub, un seul pub get à sa racine.
     app = wt / case.get('app_dir', 'flutter_app')
-    got = sh(['fvm', 'flutter', 'pub', 'get'], cwd=app, timeout=900)
-    if got.returncode or 'Failed to update packages' in got.stdout + got.stderr:
-        raise RuntimeError(f'pub get : {(got.stdout + got.stderr).strip()[-300:]}')
+    pub_get(app)
     if stage == 'review':
         sh(['bash', str(GAUNTLET), 'maintain', name], cwd=wt)
     return wt
@@ -210,6 +230,8 @@ def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: boo
                 if '/test/' not in p and not p.startswith('.claude/') and not p.endswith('_test.dart')]
         if code:
             git(wt, 'checkout', impl, '--', *code)
+        if submodules(repo, wt, impl):
+            pub_get(wt / case.get('app_dir', 'flutter_app'))
         # Le check `test` seul : le code mergé ne passe pas toujours le formateur d'aujourd'hui.
         green_ok, green_detail = gate(wt, name, 'test')
         detail = f'red {"vert" if red_ok else "rouge"} · suite sur le code mergé : {"verte" if green_ok else "rouge"}'
@@ -243,7 +265,11 @@ def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
     try:
         if not dry:
             argv = ['claude', '-p', prompt(wt, name, case, stage), '--agent', AGENT[stage], '--model', model,
-                    '--output-format', 'json', '--permission-mode', 'acceptEdits',
+                    '--output-format', 'json',
+                    # acceptEdits tient tout `.claude/` pour sensible et refuse review.json : ni règle
+                    # Write(...) ni hook allow n'y font rien. Accordé par Thibault pour le banc seul
+                    # (2026-11-04) : worktree jetable, DENIED et les hooks de l'agent tiennent toujours.
+                    '--permission-mode', 'bypassPermissions',
                     '--allowedTools', TOOLS, '--disallowedTools', DENIED,
                     '--strict-mcp-config', '--session-id', session]
             try:
