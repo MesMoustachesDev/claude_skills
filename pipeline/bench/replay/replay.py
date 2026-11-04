@@ -237,10 +237,11 @@ def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: boo
         detail = f'red {"vert" if red_ok else "rouge"} · suite sur le code mergé : {"verte" if green_ok else "rouge"}'
         score = None
         if mutation and green_ok:
-            _, m = gate(wt, name, 'mutation')
-            found = re.search(r'(\d+(?:[.,]\d+)?)\s*%', m)
-            score = float(found.group(1).replace(',', '.')) if found else None
-            detail += f' · mutation {m}'
+            # Le score est sur la ligne « mutants : …, score : N % », pas sur la dernière.
+            run = sh(['bash', str(GAUNTLET), 'mutation', name], cwd=wt, timeout=5400)
+            found = re.search(r'score : (\d+)%', run.stdout + run.stderr)
+            score = float(found.group(1)) if found else None
+            detail += ' · mutation ' + ('—' if score is None else f'{score:.0f} %')
         return {**out, 'ok': red_ok and green_ok, 'detail': detail if green_ok else f'{detail} ({green_detail})',
                 'mutation': score}
     truth_path = Path(tempfile.mktemp(suffix='.json'))
@@ -312,6 +313,8 @@ def hollow(row: dict) -> bool:
         return True
     if row['stage'] == 'review':
         return row.get('recall') == 0 and row.get('extra') == 0
+    if ' · mutation —' in row['detail']:  # suite verte mais score introuvable : juge à revoir
+        return True
     return row.get('files_written') == 0
 
 
