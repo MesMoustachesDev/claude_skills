@@ -241,7 +241,7 @@ def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: boo
             run = sh(['bash', str(GAUNTLET), 'mutation', name], cwd=wt, timeout=5400)
             found = re.search(r'score : (\d+)%', run.stdout + run.stderr)
             score = float(found.group(1)) if found else None
-            trivial = re.search(r'aucune mutation possible|aucune ligne à muter', run.stdout)
+            trivial = re.search(r'aucune mutation possible|aucune ligne à muter|aucun fichier à muter', run.stdout)
             detail += ' · mutation ' + (f'{score:.0f} %' if score is not None else 'sans mutant' if trivial else '—')
         return {**out, 'ok': red_ok and green_ok, 'detail': detail if green_ok else f'{detail} ({green_detail})',
                 'mutation': score}
