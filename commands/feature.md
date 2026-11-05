@@ -181,8 +181,10 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   section qui convient) / « Oui, ce projet seulement » (→ `.claude/rules/pipeline_answers.md`, créé
   s'il manque, commité avec la feature) / « Non, c'est un cas particulier ». Plusieurs règles au même
   arrêt → une seule question en multiSelect. Oui → ajoute la ligne `- <règle> (<date>, <header de la
-  question d'origine>)`, sans reformuler ce qu'il a validé. Une règle qu'il contredit plus tard :
-  corrige la ligne existante. Pas de règle derrière une réponse de goût ou propre à cette feature :
+  question d'origine>)`, sans reformuler ce qu'il a validé. Pour `~/.claude/pipeline/answers.md`, jamais d'`Edit` (le hook `claude-home-guard.sh` le refuse) :
+  `python3 ~/.claude/scripts/rule_add.py ~/.claude/pipeline/answers.md "<ligne>" --after "<dernière puce de la
+  section>"`, qui l'insère et la commite aussitôt. Une règle qu'il contredit plus tard :
+  corrige la ligne existante, dans un worktree (`claude_change.sh`, ADR 0007). Pas de règle derrière une réponse de goût ou propre à cette feature :
   ne propose rien. Compte dans `pipeline.json → rules_proposed` / `rules_added`.
 - **« Discuter » sur chaque confirmation.** Toute question de confirmation (valider le cadrage, la
   spec, les tests, la visite, un plan, une règle) a une option « Discuter — je veux comprendre avant de

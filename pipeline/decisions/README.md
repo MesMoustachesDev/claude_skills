@@ -16,3 +16,4 @@ se supprime pas.
 | [0004](0004-evidence-par-etape.md) | Chaque étape laisse ses preuves, l'evidence les rassemble | acceptée |
 | [0005](0005-pas-d-arret-sans-thibault.md) | Le pipeline ne s'arrête que pour attendre Thibault (watchdog) | acceptée |
 | [0006](0006-doctrine-injectee.md) | La doctrine d'un agent est injectée dans son contexte, pas demandée | acceptée |
+| [0007](0007-pas-d-ecriture-dans-le-checkout-partage.md) | Personne n'écrit directement dans le checkout principal de ~/.claude | acceptée |

@@ -45,3 +45,10 @@ d'`ecrire-linkedin` et la liste fermée des écritures de `mission-linkedin`.
 Les règles de fond de `/feature`, `/fix`, du gauntlet et des agents ont chacune une ADR. Avant de
 changer l'une de ces règles, lis son ADR. Un changement qui revient dessus met l'ADR à jour dans le
 même commit : statut amendé, ou une nouvelle ADR qui la remplace.
+
+## Changer le pipeline (`~/.claude`)
+
+Le checkout principal de `~/.claude` est lu par toutes les sessions : on n'y écrit pas directement, le
+hook `claude-home-guard.sh` le refuse (ADR 0007). Une règle d'une ligne : `scripts/rule_add.py`, qui la
+commite aussitôt. Tout autre changement : `scripts/claude_change.sh start <nom>`, travail et commits dans
+`~/.claude-wt/<nom>`, puis `claude_change.sh land <nom>` dans le même tour.

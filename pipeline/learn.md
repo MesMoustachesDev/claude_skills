@@ -65,8 +65,10 @@ règle (label : le slug ; description : la règle et le fichier), plus « Discut
 
 - Retenue → ajoute la ligne telle qu'il l'a validée dans le fichier cible, puis
   `learn.py promote <slug> <fichier> "<règle>"`. Un fichier du projet (`.claude/rules/…`) n'est pas
-  commité sur la branche du run (`mr.py archive` le recopie dans le checkout principal) ; un fichier de
-  `~/.claude` n'est pas commité par toi.
+  commité sur la branche du run (`mr.py archive` le recopie dans le checkout principal). Un fichier de
+  `~/.claude` : jamais d'`Edit` (refusé par `claude-home-guard.sh`) ; `python3 ~/.claude/scripts/rule_add.py
+  <fichier> "<règle>" --after "<dernière puce de la section>"` l'insère et la commite aussitôt, rien ne
+  reste en suspens dans le checkout que lisent toutes les sessions (ADR 0007).
 - Non retenue → `learn.py reject <slug> "<sa raison, ou « non retenue »>"`. Le pattern ne revient
   qu'après deux runs de plus.
 - « Discuter » → tu expliques (les exemples, ce que la règle aurait évité), puis tu reposes la même question.

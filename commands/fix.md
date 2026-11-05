@@ -368,7 +368,9 @@ ligne de l'enregistrer en mémoire.
   dans le prochain `AskUserQuestion` (header `Règle`, la règle à l'impératif ; « Oui, tous mes projets »
   → `~/.claude/pipeline/answers.md` / « Oui, ce projet seulement » → `.claude/rules/pipeline_answers.md`
   / « Non, cas particulier »). Oui → ajoute la ligne telle qu'il l'a validée, avec la date et la
-  question d'origine.
+  question d'origine. Pour `~/.claude/pipeline/answers.md`, jamais d'`Edit` (le hook `claude-home-guard.sh` le refuse) :
+  `python3 ~/.claude/scripts/rule_add.py ~/.claude/pipeline/answers.md "<ligne>" --after "<dernière puce de la
+  section>"`, qui l'insère et la commite aussitôt.
 - **Le rapport d'abord.** Tout point d'étape, prévu ou hors plan, commence par `fix_gauntlet.sh report
   <nom> <étape>` et `SendUserFile` `display: render`. Régénéré à chaque fois, jamais réutilisé.
 - **Le plan appartient au dev.** Couche, approche et fichiers de la correction sont validés avant
