@@ -13,8 +13,9 @@ les fichiers modifiés), et `review.json → missing_tests`.
 
 Prompt : nom, package, gabarit, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
 `stages.harden = PASSED` → pas d'arrêt : passe à 8. Les mutants expliqués (`mutants.md`), le score et
-les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape du fichier muté. Note les
-tests ajoutés et les tests existants que Hugo signale suspects dans `pipeline.json → hardening`
-(`{tests_added: [...]}`) et `suspect_tests` (`by: "Hugo"`). `FAILED` → pas de point imprévu ici : la
+les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape du fichier muté. Les tests
+ajoutés, c'est le gate de Hugo qui les note (check `tests_added` du profil `harden` → `pipeline.json →
+hardening.tests_added`, relatifs au package) : ne les écris pas toi-même. Note dans `suspect_tests`
+(`by: "Hugo"`) les tests existants qu'il signale suspects. `FAILED` → pas de point imprévu ici : la
 visite (8b) s'ouvre en le signalant, et ne peut pas être validée tant qu'il l'est.
 

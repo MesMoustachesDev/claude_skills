@@ -538,12 +538,40 @@ def cmd_accept(c, args):
     print(f"acceptation tracée ({args[0]})")
 
 
+def tests_added_paths(c, paths):
+    """hardening.tests_added : chemins relatifs au package (`test/…`) pour le package de la feature, depuis la
+    racine (`<pkg>/test/…`) pour un package de writes_extra — format que lit test_freeze_check. Un chemin depuis la
+    racine dans le package est ramené au package ; tout autre chemin est refusé (die), rien n'est écrit."""
+    if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+        die(f"hardening.tests_added : liste de chemins attendue, reçu {json.dumps(paths, ensure_ascii=False)}")
+    extras = extra_packages(c)
+    out = []
+    for raw in paths:
+        p = raw.strip()
+        if os.path.isabs(p):
+            p = os.path.relpath(os.path.realpath(p), os.path.realpath(c.root))
+        p = os.path.normpath(p) if p else p
+        if p.startswith(c.package + "/test/"):
+            p = p[len(c.package) + 1:]
+        if not (p.startswith("test/") or any(p.startswith(x + "/test/") for x in extras)):
+            die(f"hardening.tests_added : {raw!r} n'est pas un test du package. Attendu : test/… (relatif à "
+                f"{c.package}), {c.package}/test/… (ramené au package)"
+                + (f", ou <package de writes_extra>/test/… ({', '.join(extras)})" if extras else ""))
+        if p not in out:
+            out.append(p)
+    return out
+
+
 def cmd_set(c, args):
     key, raw = args[0], args[1]
     try:
         val = json.loads(raw)
     except json.JSONDecodeError:
         val = raw
+    if key == "hardening.tests_added":
+        val = tests_added_paths(c, val)
+    elif key == "hardening" and isinstance(val, dict) and "tests_added" in val:
+        val["tests_added"] = tests_added_paths(c, val["tests_added"])
     node = c.p
     parts = key.split(".")
     for part in parts[:-1]:

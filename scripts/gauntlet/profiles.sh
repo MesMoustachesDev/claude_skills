@@ -35,7 +35,7 @@ profile_checks() {
     pr)          echo "analyze format test deps error_handling metrics deps_unused reinvented package_readme design_system widget_functions l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
     pr_mutation) echo "$(profile_checks pr) mutation" ;;
     review)    echo "review_report" ;;
-    harden)    echo "test analyze test_freeze_check:additive mutation" ;;
+    harden)    echo "test analyze tests_added test_freeze_check:additive mutation" ;;
     qa)        echo "qa" ;;
     # Polish visuel (8c, sur demande) : la présentation a bougé, mêmes garanties que le clean.
     polish)    profile_checks clean ;;
@@ -64,7 +64,7 @@ Profils (étape → checks) :
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
   pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation
   review     review_report          (hook du reviewer ; verdict : review_verdict)
-  harden     test analyze test_freeze_check:additive mutation
+  harden     test analyze tests_added test_freeze_check:additive mutation
   qa         qa
   polish     = clean                (hook de feature-polisher, étape 8c sur demande)
 
@@ -84,6 +84,7 @@ Checks individuels :
   test_plan_match    les tests écrits sont ceux de tests_plan.json, ni plus ni moins (gate red)
   test_dups          candidats doublons (même nom de test dans deux fichiers) → .gauntlet/test_dups.txt, tranchés par Gaëlle ; ne bloque pas
   test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
+  tests_added        enregistre les tests ajoutés depuis le gel (pipeline.json → hardening.tests_added, relatifs au package)
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
   coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)
   mutation           mutation_test sur les globs configurés, score ≥ seuil

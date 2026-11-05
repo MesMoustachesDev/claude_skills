@@ -55,7 +55,8 @@ liste des tests avant l'écriture.
 
 ## Hors champ
 
-- Les tests ajoutés par Hugo (7) après le gel : nouveaux fichiers seulement, jamais de modification.
+- Les tests ajoutés par Hugo (7) après le gel : nouveaux fichiers seulement, jamais de modification. Son gate
+  les enregistre (check `tests_added` → `hardening.tests_added`), et les gates stricts suivants les tolèrent.
 - `/fix` suit la même logique avec un test de reproduction gelé (Bastien), décrite dans
   `commands/fix.md`.
 - L'orchestrateur corrige un test seulement sur instruction explicite de Thibault, suivie d'un re-gel.

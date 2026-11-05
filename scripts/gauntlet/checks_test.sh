@@ -210,10 +210,11 @@ check_test_freeze_check() {
     untracked="$untracked$(untracked "$pkg/test" 2>/dev/null)"$'\n'
   done
   changes="$(printf '%s' "$changes" | grep -v '^$')"; untracked="$(printf '%s' "$untracked" | grep -v '^$')"
-  # Hugo's additions (pipeline.json → hardening.tests_added, relative to the package) are allowed after
+  # Hugo's additions (pipeline.json → hardening.tests_added, written by check_tests_added) are allowed after
   # the freeze, as long as they are new files: an untracked or added file only, never a modification.
+  # `test/…` is relative to the package; a writes.extra package's file keeps its path from the root.
   local hugo f
-  hugo="$(pipeline_get '.hardening.tests_added[]?' | grep -v '^$' | sed "s#^#$PKG_REL/#")"
+  hugo="$(pipeline_get '.hardening.tests_added[]?' | grep -v '^$' | sed "s#^test/#$PKG_REL/test/#")"
   if [ -n "$hugo" ]; then
     while IFS= read -r f; do
       untracked="$(printf '%s\n' "$untracked" | grep -vxF "$f")"
@@ -236,6 +237,27 @@ check_test_freeze_check() {
   esac
   [ "$rc" = 0 ] && info "gel $sha respecté ($mode)"
   return $rc
+}
+
+# tests_added — enregistre les tests de Hugo (pipeline.json → hardening.tests_added) : les fichiers AJOUTÉS à
+# test/ depuis tests_freeze_sha (non suivis compris), dans le package et dans chaque package de writes.extra qui a
+# des tests de la feature. Ceux du package sont relatifs au package (`test/…`), ceux d'un package de writes.extra
+# relatifs à la racine (`<pkg>/test/…` : `test/…` seul serait ambigu). La liste est remplacée : c'est l'état de
+# l'arbre. Sans elle, les gates stricts qui suivent (green, clean, polish) voient ces fichiers comme des changements.
+check_tests_added() {
+  local sha pkg added="" json
+  [ -f "$FEATURE_DIR/pipeline.json" ] || { info "hors pipeline : rien à enregistrer"; return 0; }
+  sha="$(pipeline_get .tests_freeze_sha)"
+  [ -n "$sha" ] || { info "pas de gel enregistré : rien à enregistrer"; return 0; }
+  for pkg in "$PKG_REL" $(extra_test_packages); do
+    added="$added$(diff_name_status "$sha" "$pkg/test" 2>/dev/null | awk -F'\t' '$1 == "A" { print $2 }')"$'\n'
+    added="$added$(untracked "$pkg/test" 2>/dev/null)"$'\n'
+  done
+  json="$(printf '%s' "$added" | grep -v '^$' | sed "s#^$PKG_REL/test/#test/#" | sort -u | jq -R . | jq -cs .)"
+  (cd "$PROJECT_ROOT" && bash "$GAUNTLET_ROOT/../pipeline.sh" set "$FEATURE" hardening.tests_added "$json" >/dev/null) \
+    || { ko "hardening.tests_added non enregistré ($json)"; return 1; }
+  info "hardening.tests_added : $(jq -r 'length' <<<"$json") fichier(s) ajouté(s) depuis le gel $sha"
+  jq -r '.[]' <<<"$json" | sed 's/^/   /'
 }
 
 # new_lines <base> <chemin> — « fichier:ligne » des lignes ajoutées depuis <base>, fichiers non suivis compris,
