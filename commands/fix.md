@@ -53,7 +53,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 | Learn (récurrences → règles) | `~/.claude/pipeline/learn.md` · `~/.claude/scripts/learn.py` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` |
-| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se font **depuis la page** (« Répondre depuis la page ») : là où ce fichier dit `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte dans la session, sans bloquer |
+| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se posent toujours en `AskUserQuestion`, qui se suffit à lui-même (Règles de conduite) : il ne répond plus depuis la page (2026-11-05, trop contraignant). Là où `cockpit.md` dit « Répondre depuis la page » ou `--ask`, c'est l'`AskUserQuestion` qui s'applique |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|
@@ -119,8 +119,9 @@ Si `fix.json → graphify` vaut `ok` : « graphe : `<fix.json → graphify_graph
 passe-le en `--graph`), voir `~/.claude/pipeline/graphify.md` ».
 **Note l'`agentId` retourné dans `fix.json → agents.reproducer`** : tu en auras besoin pour l'arbitrage.
 
-Au retour :
-- `Besoin du dev : …` dans le rapport → pose la question au dev (`AskUserQuestion` ou texte), puis
+Au rapport de Bastien, dans le même tour : `fix_gauntlet.sh after red <nom>` (`after repro_report` en
+phase `arbitrate` ; Règles de conduite, « Au rapport d'un agent »), puis :
+- `Besoin du dev : …` dans le rapport → pose la question au dev (`AskUserQuestion`), puis
   `SendMessage` à Bastien avec la réponse. Ne relance pas un agent neuf.
 - `stages.red` `FAILED` → point imprévu : rapport de l'agent, 40 dernières lignes de
   `.gauntlet/last_red.log`, options (consigne à Bastien / abandonner).
@@ -174,7 +175,7 @@ mesure qu'on suit d'un fix à l'autre pour savoir où le pipeline perd du temps.
 Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles projet. Note son `agentId`
 (`agents.implementer`).
 
-Au retour :
+Au rapport de Fanny, dans le même tour : `fix_gauntlet.sh after green <nom>`, puis :
 - **Écart au plan** dans le rapport → **point imprévu** : `fix_gauntlet.sh report <nom> repro`,
   « Rafraîchir » avec `say <nom> "Écart au plan de Fanny à trancher" --report repro`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
   ajoute `{at, files, reason}` à `fix.json → plan_deviations` (Victor le lit ; `repro.json` reste
@@ -209,7 +210,8 @@ chemin de `impact.json` va dans le prompt de Victor ; `échec` → note la ligne
 Prompt de `fix-reviewer` : nom, `diagnosis.md`, `repro.json` (dont `fix_plan`), `fix.json →
 plan_deviations`, `freeze_sha`, `base_sha`, règles projet, et le chemin de `impact.json` s'il a été calculé.
 
-Puis `fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
+Au rapport de Victor, dans le même tour : `fix_gauntlet.sh after review_report <nom>`, puis
+`fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
 propre classification : critique, bloquant, erreur) comptent comme des critiques.
 - Dans tous les cas, d'abord : chaque entrée de `review.json → debt` va dans `fix.json → debt`
   (`{source: "review", file, line, issue}`), sans être montrée au dev ; une suggestion qui porte sur
@@ -337,13 +339,27 @@ ligne de l'enregistrer en mémoire.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
-- **Un agent en arrière-plan a fini à sa notification de fin (`<task-notification>`), pas à son
-  rapport.** Son rapport (« Subagent hand-back ») arrive avant que son hook de fin ait joué le gate
-  (plus d'une minute pour `red` ou `green`), et un gate rouge le remet au travail après ce rapport.
-  À son rapport : ne lis pas l'étape, ne rejoue pas le gate, ne lance pas la suite ; attends la
-  notification. `fix_gauntlet.sh` attend d'eux-mêmes un hook en cours
-  (`hook_wait.sh`). Une étape toujours vide après la notification : le hook n'a pas tourné ; rejoue le
-  gate et dis-le avec le bloc « ce que tu tranches sans lui ».
+- **Un tour ne finit que sur une question au dev ou sur la fin du fix.** Jamais sur une attente
+  d'agent, de hook ou de notification : ni le rapport d'un agent ni sa notification de fin
+  (`<task-notification>`) ne relancent un tour à coup sûr (elle peut n'arriver qu'avec le message suivant
+  du dev, ou pendant qu'il écrit). Rien qui tourne et aucune question posée : tu n'as pas le droit de
+  t'arrêter ; vérifie l'état (`fix.json → stages`, `git diff`) et lance la suite. Cas réel : gate green
+  de Fanny passé, l'orchestrateur a écrit « j'attends » et Victor n'a été lancé qu'au retour du dev.
+- **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
+  Son rapport arrive avant que son hook de fin ait joué le gate (plus d'une minute pour `red` ou
+  `green`), et un gate rouge le remet au travail après ce rapport. C'est le script qui attend, pas toi :
+  `fix_gauntlet.sh after <profil> <nom>`, en Bash au premier plan avec `timeout: 600000`, attend que le
+  hook de ce gate ait démarré puis fini ; gate rouge, il attend aussi que l'agent renvoyé au travail se
+  soit arrêté de nouveau et que son hook ait rejugé. Puis il dit ce qu'il a lu dans `fix.json →
+  stages.<profil>` :
+  - `PASSED` → lance l'étape suivante, dans ce tour ;
+  - `FAILED` → point imprévu, le dev décide (`AskUserQuestion`) ;
+  - exit 4 (« relance la même commande ») → l'agent travaille encore après 540 s : relance la même
+    commande, dans ce tour ; ne relance pas l'agent, ne rejoue pas le gate ;
+  - « aucun hook de fin vu » ou étape vide → le hook n'a pas tourné : rejoue le gate et dis-le avec le
+    bloc « ce que tu tranches sans lui ».
+  Ne lis pas l'étape et ne rejoue pas le gate avant `after` : deux gauntlets dans le même worktree. La
+  notification de fin, si elle arrive après, ne déclenche rien de plus : ignore-la.
 - **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le fix par
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape, prévu ou hors plan : ce qu'on attend de lui** (la décision à prendre, ou
@@ -359,6 +375,15 @@ ligne de l'enregistrer en mémoire.
     prévue ou la question. Pas de « il semble y avoir un souci ».
   - **Avant d'envoyer** : en ne lisant que ta première et ta dernière ligne, sait-il ce qui vient de se
     passer et ce qu'il doit faire ? Sinon, réécris-les.
+- **Une question se suffit à elle-même.** Le dev répond souvent depuis Remote Control, où il ne voit
+  que l'`AskUserQuestion`, pas le texte au-dessus. Tout ce qu'il faut pour trancher est donc **dans
+  l'`AskUserQuestion`** — diagnostic, plan, test, écart, arbitrage, suggestion, captures, point imprévu :
+  - le texte de la question dit de quoi on parle et ce qui existe aujourd'hui (le `fichier:ligne`, ce que
+    fait ce code, la cause en une phrase), puis ce qu'on lui demande ;
+  - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code ;
+  - jamais un identifiant seul (`S1`, « le plan B », « l'écart ») : il est toujours suivi de ce qu'il
+    désigne (« S1 — `foo.dart:42` : le mapper avale l'erreur réseau → la remonter en `NetworkError` »).
+  Le message au-dessus peut porter le détail long ; la question ne s'y réfère pas (« voir ci-dessus »).
 - **Règles tirées des réponses du dev.** Avant toute question, lis `~/.claude/pipeline/answers.md` et
   `.claude/rules/pipeline_answers.md` du projet s'il existe : une règle qui tranche s'applique, tu le
   dis avec le bloc « ce que tu tranches sans lui » (règle citée, ce qu'elle change ici) et tu ne

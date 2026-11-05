@@ -5,6 +5,7 @@
 # Usage :
 #   fix_gauntlet.sh <profil|check> <nom>
 #   fix_gauntlet.sh list
+#   fix_gauntlet.sh after <profil> <nom>  au rapport d'un agent : attend son hook, et l'agent si le gate est rouge
 #   fix_gauntlet.sh report <nom> [étape]   rapport HTML pour le dev (.claude/fixes/<nom>/report.html)
 #
 # Exit 0 si tout est vert, 1 sinon. Écrit .claude/fixes/<nom>/.gauntlet/last_<profil>.{log,json}.
@@ -298,11 +299,53 @@ check_review_verdict() {
   return 1
 }
 
+# fix_after <profil> <nom> — au rapport (hand-back) d'un agent, dans le même tour : attend que le hook de fin de
+# son gate ait démarré puis fini, et, gate rouge, que l'agent renvoyé au travail ait un nouveau verdict. Ni le
+# rapport suivant ni la notification de fin ne relancent un tour à coup sûr (cas réel : gate green de Fanny
+# passé, Victor jamais lancé). Budget FIX_WAIT_MAX (540 s, tient dans un appel Bash de 600 s).
+# Exit 0 : verdict lu (PASSED, FAILED, ou aucun hook vu) ; 4 : budget épuisé, relance la même commande.
+fix_after() {
+  local p="$1" t0 seen=0 st at left
+  [ -n "$p" ] && [ -n "$2" ] || die "usage: fix_gauntlet.sh after <profil> <nom>"
+  fix_context "$2" || die "pas dans un repo git"
+  [ -f "$STATE" ] || die "fix inconnu : $STATE"
+  t0="$(date +%s)"
+  left() { echo $(( ${FIX_WAIT_MAX:-540} - ($(date +%s) - t0) )); }
+  # Le rapport peut précéder le démarrage du hook de quelques secondes.
+  while [ $(( $(date +%s) - t0 )) -le "${FIX_AFTER_WAIT:-30}" ]; do
+    at="$(jq -r --arg p "$p" '.stages[$p].at // empty | fromdateiso8601' "$STATE" 2>/dev/null)"
+    if [ -f "$FIX_OUT/hook_$p.running" ] || { [ -n "$at" ] && [ "$at" -ge $((t0 - 120)) ]; }; then seen=1; break; fi
+    sleep 1
+  done
+  if [ "$seen" = 0 ]; then
+    echo "hook      : aucun hook de fin vu pour $p en ${FIX_AFTER_WAIT:-30} s — rejoue le gate (fix_gauntlet.sh $p $FIX_NAME) et dis-le ; ne relance pas l'agent"
+    return 0
+  fi
+  local said=0
+  while :; do
+    bash "$HOME/.claude/scripts/hook_wait.sh" "$FIX_OUT" "$(( $(left) > 5 ? $(left) : 5 ))" 2>/dev/null
+    st="$(state_get ".stages[\"$p\"].status")"
+    [ "$st" != RED ] && [ ! -f "$FIX_OUT/hook_$p.running" ] && break
+    if [ "$said" = 0 ]; then echo "agent au travail : $p rouge, renvoyé au travail par son hook — j'attends son prochain verdict" >&2; said=1; fi
+    if [ "$(left)" -le 5 ]; then
+      echo "hook      : $p toujours rouge après ${FIX_WAIT_MAX:-540} s (tentative $(state_get ".attempts[\"$p\"]")) — l'agent travaille encore : relance la même commande, dans ce tour ; ne relance pas l'agent"
+      return 4
+    fi
+    sleep 2
+  done
+  case "$st" in
+    PASSED) echo "hook      : $p = PASSED — lance l'étape suivante, dans ce tour" ;;
+    FAILED) echo "hook      : $p FAILED après $(state_get ".attempts[\"$p\"]") tentatives — point imprévu : le dev décide (AskUserQuestion)" ;;
+    *)      echo "hook      : $p = ${st:-vide} — le hook n'a rien écrit : rejoue le gate (fix_gauntlet.sh $p $FIX_NAME) et dis-le" ;;
+  esac
+}
+
 # --- main ----------------------------------------------------------------------------------------
 target="${1:-}"; name="${2:-}"
 case "$target" in
-  ""|-h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  ""|-h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
   list) profiles_list; exit 0 ;;
+  after) fix_after "${2:-}" "${3:-}"; exit $? ;;
   report) exec python3 "$HOME/.claude/scripts/report/report.py" fix "$name" "${3:-}" ;;
 esac
 [ -n "$name" ] || die "usage: fix_gauntlet.sh <profil|check> <nom>"

@@ -241,12 +241,22 @@ def inputs(c):
 
 
 AFTER_WAIT = 30   # secondes laissées au hook de fin d'un agent pour démarrer après son rapport
+# Budget d'un appel `--after` : il tient dans un appel Bash (timeout 600 s). Au-delà, exit 4 et l'orchestrateur
+# relance la même commande, dans le même tour.
+WAIT_MAX = int(os.environ.get("PIPELINE_WAIT_MAX", "540"))
+_T0 = None
+
+
+def remaining():
+    return max(5, int(WAIT_MAX - (time_now() - _T0))) if _T0 else WAIT_MAX
 
 
 def pop_after(args):
     """`--after <profil>` : appel fait au rapport (hand-back) de l'agent de ce gate."""
+    global _T0
     if "--after" not in args:
         return args, None
+    _T0 = time_now()
     i = args.index("--after")
     return args[:i] + args[i + 2:], args[i + 1]
 
@@ -258,14 +268,16 @@ def wait_hooks(c, after=None):
     marqueur hook_<profil>.running — ou qu'il ait déjà écrit stages.<profil> : le rapport peut
     précéder le démarrage du hook de quelques secondes."""
     if not c.p:
-        return
+        return False
     gdir = os.path.join(c.dir, ".gauntlet")
+    seen = False
     if after:
         t0 = time_now()
         marker = os.path.join(gdir, f"hook_{after}.running")
         while True:
             st = (c._load().get("stages") or {}).get(after) or {}
             if os.path.exists(marker) or _parse_at(st.get("at") if isinstance(st, dict) else None) >= t0 - 120:
+                seen = True
                 break
             if time_now() - t0 > AFTER_WAIT:
                 print(f"attention : aucun hook de fin vu pour {after} en {AFTER_WAIT} s — rejoue le gate "
@@ -273,15 +285,49 @@ def wait_hooks(c, after=None):
                 break
             subprocess.run(["sleep", "1"])
     w = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_wait.sh")
-    if subprocess.run(["bash", w, gdir]).returncode != 0:
-        die("un hook de fin d'agent joue encore son gate après 9 min : relance la même commande ; "
-            "ne relance pas l'agent", code=3)
+    if subprocess.run(["bash", w, gdir, str(remaining())]).returncode != 0:
+        die("un hook de fin d'agent joue encore son gate : relance la même commande, dans ce tour ; "
+            "ne relance pas l'agent", code=3 if not after else 4)
+    c.p = c._load()
+    return seen
+
+
+def _status(v):
+    return v.get("status") if isinstance(v, dict) else v
+
+
+def wait_agents(c, profiles, missing_too=False):
+    """Gate rouge : le hook a renvoyé l'agent au travail, et son prochain arrêt rejouera le gate. On attend ce
+    verdict dans le même tour : ni le rapport suivant ni la notification de fin ne relancent un tour à coup
+    sûr (cas réel : /fix, gate green de Fanny passé, Victor jamais lancé). `missing_too` : une moitié sans
+    verdict est un agent encore à sa première tentative (étapes 3 et 4, moitiés lancées ensemble).
+    Exit 4 au bout du budget : l'orchestrateur relance la même commande."""
+    gdir = os.path.join(c.dir, ".gauntlet")
+    w = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_wait.sh")
+    said = False
+    while True:
+        stages = c._load().get("stages") or {}
+        busy = [p for p in profiles if _status(stages.get(p)) == "RED" or (missing_too and not stages.get(p))]
+        if not busy:
+            break
+        if not said:
+            print(f"agent au travail : {', '.join(busy)} — j'attends son prochain verdict", file=sys.stderr)
+            said = True
+        if remaining() <= 5:
+            att = c._load().get("attempts") or {}
+            die("toujours au travail après %d s : %s — relance la même commande, dans ce tour ; ne relance pas "
+                "l'agent (sans verdict ni hook : vérifie qu'il a bien été lancé)"
+                % (WAIT_MAX, ", ".join(f"{p} ({_status(stages.get(p)) or 'pas de verdict'}, tentative {att.get(p, 0)})" for p in busy)),
+                code=4)
+        subprocess.run(["sleep", "2"])
+    subprocess.run(["bash", w, gdir, str(remaining())])
     c.p = c._load()
 
 
 def cmd_next(c, args):
     args, after = pop_after(args)
-    wait_hooks(c, after)
+    if wait_hooks(c, after):
+        wait_agents(c, [after])
     n = next_step(c.p)
     attempts = (c.p.get("attempts") or {})
     profile = n["key"] if n["key"] and not n["key"].startswith("hg.") else None
@@ -307,8 +353,8 @@ def cmd_next(c, args):
         st = (c.p.get("stages") or {}).get(after) or {}
         st = st.get("status") if isinstance(st, dict) else st
         if st == "RED":
-            print(f"hook      : {after} rouge, l'agent a été renvoyé au travail — il tourne encore : ne le relance "
-                  "pas ; fin de tour permise, son prochain rapport rappellera next --after")
+            print(f"hook      : {after} rouge et aucun hook de fin vu — rejoue le gate (gauntlet.sh {after} {c.name}) "
+                  "et dis-le ; ne relance pas l'agent")
         elif st == "FAILED":
             print(f"hook      : {after} FAILED après {attempts.get(after)} tentatives — point imprévu, Thibault décide")
         elif st:
@@ -452,6 +498,8 @@ def cmd_join(c, args):
     profile = args[0]
     halves = [f"{profile}_data", f"{profile}_presentation"]
     wait_hooks(c, after)
+    if after:
+        wait_agents(c, halves, missing_too=True)
     stages = c.p.get("stages") or {}
     status = lambda v: v.get("status") if isinstance(v, dict) else v
     # SKIPPED : moitié sans rien à faire (extend qui ne touche qu'une couche), posée par `skip` avec sa raison.

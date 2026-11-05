@@ -61,10 +61,12 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>` :
    `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
    « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
-   sous le bandeau. **Thibault répond depuis la page** : un point d'étape dont la réponse est un choix
-   se publie avec `--ask` et ne bloque pas sur un `AskUserQuestion` (« Répondre depuis la page »,
-   `~/.claude/pipeline/feature/cockpit.md`). Partout où un fichier d'étape dit `AskUserQuestion` pour un
-   choix, c'est cette mécanique qui s'applique. Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
+   sous le bandeau. **Un choix se pose toujours en `AskUserQuestion`**, qui se suffit à lui-même (« Une question se
+   suffit à elle-même », Règles de conduite) : Thibault ne répond plus depuis la page (2026-11-05, trop
+   contraignant). Partout où un fichier d'étape ou `~/.claude/pipeline/feature/cockpit.md` dit
+   « Répondre depuis la page », `--ask` ou « question en texte sans `AskUserQuestion` bloquant », c'est
+   l'`AskUserQuestion` qui s'applique ; `say` reste, c'est lui qui dit au watchdog qu'on attend Thibault.
+   Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
    lien du cockpit (`#<clé>`) ; `SendUserFile` ne sert plus qu'aux captures QA, ou si le cockpit
    échoue. Au retour de sa réponse, `pipeline.sh say <nom> ""`.
 5. Retour en 1.
@@ -195,12 +197,19 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   0c et en complétion : data sources, mappers, providers ; Sophie dans la spec ; Ivan ou Nina : une
   classe, un helper, un découpage) est montré au prochain arrêt dans un tableau `Détail | Proposition |
   Pourquoi c'est utile`, séparé de ses décisions. Les agents le listent dans leur rapport sous ce titre.
-- **Questions avec leur contexte.** Toute question au dev — cadrage, contrats, spec, point imprévu,
-  visite — est précédée, dans ton message, de **ce qui existe aujourd'hui** : l'extrait de code ou de
-  cadrage concerné (`fichier:ligne`, 3 à 8 lignes, en lien cliquable) et ce qu'il fait, en une phrase.
-  Les options de l'`AskUserQuestion` disent ce que chacune change pour l'utilisateur ou pour le code,
-  sans jargon que l'extrait n'explique pas. Une question sans extrait est une question que le dev ne
-  peut trancher qu'en cochant « Recommandé ».
+- **Une question se suffit à elle-même.** Thibault répond souvent depuis Remote Control, où il ne voit
+  que l'`AskUserQuestion`, pas le texte au-dessus. Tout ce qu'il faut pour trancher est donc **dans
+  l'`AskUserQuestion`** — cadrage, contrats, spec, plan, écart, suggestion, point imprévu, visite :
+  - le texte de la question dit de quoi on parle et ce qui existe aujourd'hui (le `fichier:ligne`, ce que
+    fait ce code ou ce que dit la spec, en une ou deux phrases), puis ce qu'on lui demande ;
+  - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code, sans jargon que la question
+    n'explique pas ;
+  - jamais un identifiant seul (`S1`, `K3`, « le point 2 », « l'option B ») : il est toujours suivi de ce
+    qu'il désigne (« S1 — `foo.dart:42` : le mapper avale l'erreur réseau → la remonter en
+    `NetworkError` »).
+  Le message au-dessus peut porter l'extrait long (3 à 8 lignes, lien cliquable) ; la question ne s'y
+  réfère pas (« voir ci-dessus »). Relue seule, elle doit permettre de répondre sans cocher
+  « Recommandé » au hasard.
 - **Une incompréhension n'est jamais une réponse.** Si le dev répond par une question ou une
   incompréhension (« ?? », « c'est quoi », « pas compris », « je vois pas », une réponse qui finit
   par « ? »), tu n'en tires aucune décision et tu ne relances aucun agent : tu expliques (l'extrait,
@@ -218,32 +227,35 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par
   « GATE NON JOUÉ » : rejoue toi-même `gauntlet.sh <profil> <nom>` depuis le worktree avant de
   continuer, et corrige ton prompt.
-- **Jamais de tour qui finit sur « j'attends ».** Le rapport d'un agent ou sa notification `completed`
-  veut dire qu'il a rendu la main : passe à l'étape suivante dans le même tour (`next --after`, ci-dessous),
-  même si elle ajoute « may notify more than once ». Avant de rendre la main, il y a toujours soit un agent qui tourne, soit une question
-  posée à Thibault. Si aucun des deux, tu n'as pas le droit de t'arrêter : vérifie l'état
-  (`git diff`, `pipeline.sh next`, rejoue le gate) et lance la suite. Le watchdog (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas
-  cette règle.
+- **Un tour ne finit que sur une question à Thibault ou sur la fin du pipeline.** Jamais sur une
+  attente d'agent, de hook ou de notification : ni le rapport d'un agent ni sa notification `completed`
+  ne relancent un tour à coup sûr (elle peut arriver avec le message suivant de Thibault, ou pendant
+  qu'il écrit). Le rapport d'un agent veut dire : `next --after` (ci-dessous), puis l'étape suivante,
+  dans le même tour, même s'il ajoute « may notify more than once ». Rien qui tourne et aucune question
+  posée : tu n'as pas le droit de t'arrêter ; vérifie l'état (`git diff`, `pipeline.sh next`, rejoue le
+  gate) et lance la suite. Un tour qui finit sur une question pose `pipeline.sh say` avant. Le watchdog
+  (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas cette règle.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
   exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
-- **Au rapport d'un agent (« Subagent hand-back »), tu agis dans le même tour.** Son hook de fin joue
-  encore le gate (plus d'une minute pour `contracts` ou `red`) : c'est le script qui attend, pas toi.
-  `pipeline.sh next <nom> --after <profil>` (ou `join <nom> red|green --after <moitié>`) attend que le
-  hook de ce gate ait démarré puis fini, et dit ce qu'il a écrit :
+- **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
+  Son hook de fin joue encore le gate (plus d'une minute pour `contracts` ou `red`) : c'est le script qui
+  attend, pas toi. `pipeline.sh next <nom> --after <profil>` (ou `join <nom> red|green --after <moitié>`),
+  en Bash au premier plan avec `timeout: 600000`, attend que le hook de ce gate ait démarré puis fini ;
+  gate rouge, il attend aussi que l'agent renvoyé au travail se soit arrêté de nouveau et que son hook ait
+  rejugé (`join` attend de même l'autre moitié). Puis il dit ce qu'il a lu :
   - `PASSED` → lance la suite, dans ce tour ;
-  - `RED` → le hook a renvoyé l'agent au travail : il tourne encore, ne le relance pas, ne rejoue pas
-    le gate ; tu peux rendre la main (un agent tourne), son prochain rapport te rappellera ;
-  - `FAILED` → point imprévu, Thibault décide ;
+  - `FAILED` → point imprévu, Thibault décide (`AskUserQuestion`) ;
+  - exit 4 (« relance la même commande ») → l'agent travaille encore après 540 s : relance la même
+    commande, dans ce tour ; ne relance pas l'agent, ne rejoue pas le gate ;
   - « aucun hook de fin vu » → le hook n'a pas tourné : rejoue le gate et dis-le avec le bloc « ce que
     tu tranches sans lui ».
-  **Ne finis jamais un tour sur « j'attends le hook » ni « j'attends la notification »** : la
-  notification de fin (`<task-notification>`) peut n'arriver qu'avec le message suivant de Thibault
-  (cas réel : `import_cancel_sync`, après Ivan, Nina deux fois et Denis, il a dû relancer lui-même).
-  Elle ne déclenche rien de plus que le rapport : si tu as déjà joué `next --after`, ignore-la.
+  La notification de fin (`<task-notification>`) ne déclenche rien de plus que le rapport : si tu as déjà
+  joué `next --after`, ignore-la. Cas réels : `import_cancel_sync` (quatre relances à la main), et un
+  `/fix` dont le gate green était passé sans que Victor soit lancé.
 - **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le pipeline par
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape : ce qu'on attend de lui** (la décision à prendre, ou

@@ -69,7 +69,7 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
 5. **Gabarit.** Vérifie la proposition de Sophie contre les critères de « Gabarits » (c'est la
    règle qui tranche, pas l'estimation de l'agent : 3 décisions majeures, c'est M même si elle
    propose S).
-6. **Fin du cadrage** : une seule question (en boutons dans le cockpit, « Répondre depuis la page ») avec une à trois réponses à donner — « C'est bien ça
+6. **Fin du cadrage** : un seul `AskUserQuestion`, qui se suffit à lui-même (le cadrage résumé dans la question), avec une à trois réponses à donner — « C'est bien ça
    qu'on fait, séquences comprises ? » (Oui / Non, je précise), **seulement si le gabarit retenu est
    L** « Découper ? » (le découpage proposé / continuer en M) — un S ou un M s'applique sans question,
    annoncé avec ses mesures et ce qu'il change (règle du dev, bloc « ce que tu tranches sans lui ») — et, seulement si le cadrage propose une vraie alternative, « Package » (la proposition, puis

@@ -32,10 +32,11 @@ l'étape en cours**. L'état vit dans `~/.cache/gauntlet/review/<slug>/review.js
 2. **Lis le fichier d'étape qu'il indique**, puis exécute l'étape.
 3. **Toute écriture d'état passe par `review.sh`** (`pass`, `agent`, `say`, `findings`, `triage-pull`,
    `post`, `cleanup`). `review.sh --help` les liste.
-4. **Chaque arrêt pour Thibault se lit et se tranche dans le cockpit** : `review.sh say <slug> "<ce
-   qu'on attend de lui>" --ask <id> --options "…"` puis « Rafraîchir »
-   (`~/.claude/pipeline/review/cockpit.md`, « Répondre depuis la page »). Partout où une étape dit
-   `AskUserQuestion` pour un choix, la question part en boutons dans la page et en texte ici, sans bloquer.
+4. **Chaque arrêt pour Thibault se tranche en `AskUserQuestion`**, précédé de `review.sh say <slug> "<ce
+   qu'on attend de lui>"` puis « Rafraîchir » : il ne répond plus depuis la page (2026-11-05). La
+   question se suffit à elle-même — il répond souvent depuis Remote Control, où il ne voit qu'elle : de
+   quoi on parle (`fichier:ligne`, le constat en une phrase), ce que chaque option change, jamais un
+   identifiant seul (`F3`, « le point 2 ») sans ce qu'il désigne.
 5. Retour en 1.
 
 `/reviewPR <slug> status` : `review.sh status <slug>` tel quel.

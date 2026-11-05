@@ -39,8 +39,7 @@
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
 - `gauntlet.sh doctor` rouge → exécute `/feature init` d'abord.
 - **Règles du projet absentes** : chaque ligne `RÈGLE ABSENTE : <fichier>` du doctor est une question à
-  Thibault, posée avant le cadrage, toutes dans le même `AskUserQuestion` (ou `pipeline.sh say … --ask`,
-  `feature.md`). Pour chaque fichier, dis à quoi il sert (`create_screen_rules.md` : Arthur, Ivan, Romain et
+  Thibault, posée avant le cadrage, toutes dans le même `AskUserQuestion`. Pour chaque fichier, dis à quoi il sert (`create_screen_rules.md` : Arthur, Ivan, Romain et
   Pauline l'appliquent à chaque écran ; `pr_rules.md` : la référence de Romain et de `/reviewPR`). Un fichier
   de `.claude/rules/` est chargé en entier dans chaque agent par Claude Code : c'est la seule façon sûre de
   le leur donner. Les choix :
@@ -90,8 +89,8 @@
 - **Preflight QA** (nouveau run, ou reprise sans `qa_devices`) : `qa.platforms` vide → rien. Sinon,
   pour chaque plateforme, comment Quentin obtient son appareil à l'étape 8. Un simulateur par worktree,
   jamais le simulateur partagé (`ios.simulator`) ni le modèle (`ios.simulator_base`) : `pipeline.sh
-  devices` les refuse. Une seule question, posée avec la première du cadrage (même arrêt, `--ask
-  devices`), header `Appareil QA`, options :
+  devices` les refuse. Une seule question, posée avec la première du cadrage (même
+  `AskUserQuestion`), header `Appareil QA`, options :
   - « Cloner un neuf (Recommandé) » → `pipeline.sh devices <nom> <pf> fresh` : clone du modèle
     (iOS, `sim.sh`, déjà connecté au compte de test) ; Android : instance jetable `-read-only` de
     `android.avd`.

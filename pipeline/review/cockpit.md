@@ -32,11 +32,11 @@ publiée par la session `/reviewPR` au démarrage et surveillée par elle seule,
 
 ## Répondre depuis la page
 
-Même mécanique que `/feature` (`~/.claude/pipeline/feature/cockpit.md`, « Répondre depuis la page ») :
-`review.sh say <slug> "<…>" --ask <id> --options "A|B|Discuter"`, « Rafraîchir », puis la question en
-texte dans la session, sans `AskUserQuestion` bloquant. Ids : `preflight`, `tri`, `publication`,
-`page-fin`, `imprevu-<n>`. La publication sur la MR garde sa règle : le texte exact est montré avant,
-et seul un « Go » explicite (bouton ou session) déclenche `review.sh post --go`.
+Retirée le 2026-11-05 : trop contraignant, Thibault ne répond plus depuis la page. Un choix se pose
+en `AskUserQuestion`, qui se suffit à lui-même (Règles de conduite de `/feature`, « Une question se suffit à
+elle-même »). `say` reste : c'est lui qui dit qu'on attend Thibault. `--ask` n'est plus utilisé.
+La publication sur la MR garde sa règle : le texte exact est montré avant (dans la question), et
+seul un « Go » explicite déclenche `review.sh post --go`.
 
 ## Être prévenu
 

@@ -31,11 +31,10 @@ Les captures ne sont pas embarquées dans le rapport : elles s'envoient toujours
 
 ## Répondre depuis la page
 
-Même mécanique que `/feature` (`~/.claude/pipeline/feature/cockpit.md`, « Répondre depuis la page ») :
-`fix_cockpit.py say <nom> "<…>" --ask <id> --options "A|B|Discuter"`, « Rafraîchir », puis la question
-en texte dans la session, sans `AskUserQuestion` bloquant. Ids : `plan`, `test`, `ecart`, `arbitrage`,
-`captures`, `page-fin`. Le point d'étape 1 pose deux questions (plan, test) : deux `say` successifs ne se
-cumulent pas, donc une seule question à la fois — le plan d'abord, puis le test.
+Retirée le 2026-11-05 : trop contraignant, Thibault ne répond plus depuis la page. Un choix se pose
+en `AskUserQuestion`, qui se suffit à lui-même (Règles de conduite de `/fix`, « Une question se suffit à
+elle-même »). `say` reste : c'est lui qui dit qu'on attend Thibault. `--ask` n'est plus utilisé.
+Le point d'étape 1 pose deux questions (plan, test) dans le même `AskUserQuestion`.
 
 ## Être prévenu
 

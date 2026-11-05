@@ -5,7 +5,7 @@ qui décide, à chaque feature.
 
 **La question.** Si la feature n'a aucune page (`lib/src/presentation/` sans vue touchée depuis la
 merge-base) : `pipeline.sh gate <nom> polish decision=no_screen`, rien d'autre. Sinon un seul
-`AskUserQuestion` (mécanique du cockpit, `--ask`), précédé des « Défauts visuels » de `qa.md` et
+`AskUserQuestion` (qui dit lui-même les défauts relevés, écran par écran), précédé des « Défauts visuels » de `qa.md` et
 d'une capture par écran (`SendUserFile`) : « On fait un polish visuel des écrans ? » — « Oui, audit
 d'abord » / « Non, on livre » / « Discuter ».
 - **Non** → `pipeline.sh gate <nom> polish decision=skipped`, passe à 9.

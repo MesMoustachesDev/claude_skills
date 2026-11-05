@@ -75,11 +75,18 @@ Toutes les suggestions, une par bloc, dans cet ordre, sans résumer ni regrouper
 ```
 
 Puis un `AskUserQuestion` en `multiSelect: true` : une question par lot de 4 suggestions au plus
-(header `S1–S4`, `S5–S8`…), 4 questions par appel, d'autres appels s'il en reste. Une option par
-suggestion : label `S1 <summary>`, description `effort <S|M|L> · + <pros, en quelques mots> ·
-− <cons, en quelques mots>`. Un lot d'une seule suggestion reçoit une seconde option « Aucune de ce
-lot ». Aucune case cochée = suggestion non retenue. « Other » permet au dev de nuancer
-(« S3 mais sans toucher à X ») : transmets sa phrase telle quelle avec la suggestion.
+(header `S1–S4`, `S5–S8`…), 4 questions par appel, d'autres appels s'il en reste. **La question se suffit
+à elle-même** : le dev répond souvent depuis Remote Control, où il ne voit que la question, jamais les
+blocs au-dessus. Donc :
+- **le texte de la question** dit, pour chaque suggestion du lot, ce qu'elle est en clair :
+  « S1 (`<file>:<line>`) : <problem, une phrase> → <fix, une phrase>. S2 … Lesquelles appliquer ? » ;
+- **chaque option** : label `S1 — <summary>` (le summary dit ce qui change, pas une catégorie),
+  description `<problem en quelques mots> → <fix en quelques mots> · effort <S|M|L> · + <pros> · − <cons>`.
+Un identifiant seul (`S1`, « la suggestion 3 ») n'est jamais une question : relu sans rien d'autre,
+le dev doit savoir de quel code on parle, ce qui ne va pas et ce que le correctif change.
+Un lot d'une seule suggestion reçoit une seconde option « Aucune de ce lot ». Aucune case cochée =
+suggestion non retenue. « Other » permet au dev de nuancer (« S3 mais sans toucher à X ») : transmets
+sa phrase telle quelle avec la suggestion.
 
 Les retenues partent à l'implementer avec leur bloc complet (`problem`, `fix`, et la nuance du dev).
 Les autres vont dans l'evidence avec leur bloc, sous « Suggestions non appliquées ». Ne jamais

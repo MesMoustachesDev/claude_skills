@@ -74,14 +74,31 @@ import json, sys, datetime
 p = json.load(open(sys.argv[1])); now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 p["stages"]["clean"] = {"status": "RED", "at": now}; p.setdefault("attempts", {})["clean"] = 1; json.dump(p, open(sys.argv[1], "w"))
 PY
+# Gate rouge : l'agent renvoyé au travail s'arrête à nouveau 4 s plus tard, son hook écrit PASSED.
+( sleep 4; echo "$$ $(date +%s) feature-cleaner" > "$F/.gauntlet/hook_clean.running"; sleep 1
+  python3 -c 'import json, sys, datetime
+p = json.load(open(sys.argv[1])); now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+p["stages"]["clean"] = {"status": "PASSED", "at": now}; json.dump(p, open(sys.argv[1], "w"))' "$F/pipeline.json"
+  rm -f "$F/.gauntlet/hook_clean.running" ) &
 run_p next demo --after clean
-expect_out "il tourne encore : ne le relance pas" "gate rouge : l'agent renvoyé au travail n'est pas relancé"
+wait
+expect_out "agent au travail : clean" "gate rouge : on attend l'agent renvoyé au travail, dans le même appel"
+expect_out "hook      : clean = PASSED" "puis on lit son nouveau verdict (cas réel : /fix, Victor jamais lancé)"
+expect_rc 0 "verdict vert : la suite peut être lancée"
+python3 -c 'import json, sys, datetime
+p = json.load(open(sys.argv[1])); now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+p["stages"]["clean"] = {"status": "RED", "at": now}; json.dump(p, open(sys.argv[1], "w"))' "$F/pipeline.json"
+SECONDS=0; OUT="$(cd "$R" && PIPELINE_WAIT_MAX=8 bash "$PIPE" next demo --after clean 2>&1)"; RC=$?
+expect_rc 4 "agent toujours au travail au bout du budget : exit 4"
+expect_out "relance la même commande, dans ce tour" "la consigne est de relancer, pas de rendre la main"
+[ "$SECONDS" -le 20 ] && _pass "budget tenu ($SECONDS s)" || _fail "budget tenu ($SECONDS s)"
 python3 - "$F/pipeline.json" <<'PY'
 import json, sys
 p = json.load(open(sys.argv[1])); p["stages"]["clean"] = {"status": "RED", "at": "2026-11-04T21:54:47Z"}; json.dump(p, open(sys.argv[1], "w"))
 PY
 SECONDS=0; run_p next demo --after clean
 expect_out "aucun hook de fin vu pour clean" "pas de hook en 30 s : le dire, rejouer le gate"
+expect_out "rouge et aucun hook de fin vu" "un rouge ancien n'est pas pris pour un agent au travail"
 [ "$SECONDS" -le 40 ] && _pass "attente bornée ($SECONDS s)" || _fail "attente bornée ($SECONDS s)"
 
 echo "devices — preflight QA"
