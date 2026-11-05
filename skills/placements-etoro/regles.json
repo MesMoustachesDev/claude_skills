@@ -1,0 +1,10 @@
+{
+  "profil": "SNIPER 100€",
+  "budget_mensuel": 100,
+  "fraction_jour": 0.10,
+  "score_min": 75,
+  "minimum_ordre": 10,
+  "regrouper_sous_minimum": true,
+  "renforcer_si_detenu": false,
+  "compte": "demo"
+}
