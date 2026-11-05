@@ -319,6 +319,22 @@ drop_format_only() {
 # use_pass_scope — à appeler en tête d'un check, après `local SCOPE_FILE SCOPE_ALL` : ce check (et les
 # helpers qu'il appelle, portée dynamique de bash) jugent la passe en cours, pas toute la feature.
 use_pass_scope() { SCOPE_FILE="$PASS_SCOPE_FILE"; SCOPE_ALL="$PASS_SCOPE_ALL"; }
+# with_package <package> <commande…> — runs <commande> (a check or its per-package helper) against another
+# package of the workspace, a writes.extra package the feature changed. Package, perimeter and outputs are
+# rebound for the duration of the command (bash dynamic scoping): the perimeter is always extend (the feature
+# adds to an existing package), restricted to the current layer under GAUNTLET_LAYER, and the outputs go to
+# .gauntlet[/<couche>]/packages/<package>/, so the feature package's report is never overwritten.
+with_package() {
+  local PKG_REL="${1%/}"; shift
+  local PKG_DIR="$PROJECT_ROOT/$PKG_REL" MODE=extend PKG_NAME SCOPE_FILE SCOPE_ALL PASS_SCOPE_FILE PASS_SCOPE_ALL PASS_BASE \
+        TEST_REPORT TEST_NONE EXTRA_PKG=1
+  # One statement: the right-hand side still reads the caller's GAUNTLET_OUT.
+  local GAUNTLET_OUT="$GAUNTLET_OUT/packages/$(printf '%s' "$PKG_REL" | tr '/' '%')"
+  mkdir -p "$GAUNTLET_OUT"
+  PKG_NAME="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$PKG_DIR/pubspec.yaml" 2>/dev/null | head -1)"
+  scope_init
+  "$@"
+}
 pass_label() { [ -n "${PASS_BASE:-}" ] && printf 'depuis pass_base %s' "${PASS_BASE:0:10}" || printf 'depuis %s' "$BASE_BRANCH"; }
 scope_summary() {
   if [ -n "${LAYER:-}" ] && [ "$MODE" != extend ]; then echo "couche $LAYER, $(grep -c . "$SCOPE_FILE") fichier(s) (create)"; return; fi

@@ -101,6 +101,7 @@ stub.include = lib/src/data/**/*_impl.dart, lib/src/data/mapper/*.dart, lib/src/
 # ---------------------------------------------------------------------------
 deps.domain =
 deps.data = domain
+# Views get their BLoC from their route (injection/<feature>_routes.dart), never from the DI.
 deps.presentation = domain
 deps.injection = domain, data, presentation
 # Packages interdits dans domain/ (pureté du domaine).

@@ -85,6 +85,10 @@ lui, piloter un BLoC mocké avec `whenListen`). Tu ne lances pas l'app.
   le vérifie fichier par fichier. Un test qui passe déjà (`initial state`) est toléré mais listé.
 - Edge cases > happy path. Les bugs vivent dans null, vide, erreur réseau, données invalides.
 - Assertions sur le **contenu**, pas le type. `expect(x, isNotNull)` seul est un déchet.
+- Jamais de Map, List ou Set dans un record comparé (`expect`, `equals`, `verify`, `when`). Le `==` d'un record
+  compare chaque champ avec `==`, et celui d'une collection compare l'identité : le test rougit contre un code
+  juste. Sors ce champ dans un `expect(résultat.champ, {…})` à part, qui compare le contenu. Le gate le refuse
+  (`test_hygiene`).
 - Pas de `verify()` sauf side-effect critique listé dans la spec (analytics, écriture).
 - Widget alimenté par un stream : après chaque émission ou erreur, `await tester.pump(Duration.zero)`,
   jamais un `pump()` nu (l'événement arrive après le frame, le test rougit contre un code correct).

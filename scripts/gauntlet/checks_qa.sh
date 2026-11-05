@@ -199,6 +199,17 @@ check_qa() {
   fi
   # config.yaml is Maestro's workspace config (executionOrder, flow globs), not a flow.
   nflows="$(find "$flows_dir" -maxdepth 1 -name '*.yaml' ! -name config.yaml 2>/dev/null | wc -l | tr -d ' ')"
+  # In extend mode the folder also holds the flows of earlier features (config.yaml includeTags keeps
+  # them from running): only the flows the feature added must bring a capture.
+  if [ "$MODE" = extend ] && [ -z "${GAUNTLET_QA_FLOWS:-}" ]; then
+    local base f rel
+    base="$(merge_base)"; nflows=0
+    for f in "$flows_dir"/*.yaml; do
+      [ -f "$f" ] && [ "$(basename "$f")" != config.yaml ] || continue
+      rel="${f#$PROJECT_ROOT/}"
+      git -C "$PROJECT_ROOT" cat-file -e "$base:$rel" 2>/dev/null || nflows=$((nflows + 1))
+    done
+  fi
   [ "$nflows" -gt 0 ] || { ko "aucun flow dans ${flows_dir#$PROJECT_ROOT/}/"; return 1; }
   # Passed explicitly: without it, `maestro test <dir>` was seen ignoring config.yaml (executionOrder).
   local maestro_cfg=()
@@ -212,7 +223,7 @@ check_qa() {
     "qa_prepare_$platform" || { rc=1; failed_platforms="$failed_platforms $platform"; continue; }
     app_id="$(cfg "$platform.app_id")"
     marker="$GAUNTLET_OUT/qa_${platform}_started"; touch "$marker"
-    maestro test --device "$QA_DEVICE" -e "APP_ID=$app_id" -e "SCREENSHOT_DIR=$out" ${maestro_cfg[@]+"${maestro_cfg[@]}"} \
+    MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000}" maestro test --device "$QA_DEVICE" -e "APP_ID=$app_id" -e "SCREENSHOT_DIR=$out" ${maestro_cfg[@]+"${maestro_cfg[@]}"} \
       --format junit --output "$out/report.xml" --test-output-dir "$out" "$flows_dir" >"$out/maestro.log" 2>&1; prc=$?
     failures="$(grep -oE '(failures|errors)="[0-9]+"' "$out/report.xml" 2>/dev/null | grep -oE '[0-9]+' | paste -sd+ - | bc 2>/dev/null || echo "?")"
     # This run's captures only: archived runs and older Maestro folders stay on disk.

@@ -940,9 +940,32 @@ def cmd_commit_contracts(c, args):
     c.save()
 
 
+def extra_packages(c):
+    """Packages ouverts par writes_extra, hors package de la feature — miroir de extra_packages (checks_test.sh) :
+    le préfixe fixe du glob, remonté jusqu'au dossier qui a un pubspec.yaml."""
+    out = []
+    for g in c.writes_extra:
+        d = g.split("*", 1)[0].rstrip("/")
+        while d and d != "." and not os.path.isfile(os.path.join(c.root, d, "pubspec.yaml")):
+            d = os.path.dirname(d)
+        if d and d != "." and d != c.package and d not in out:
+            out.append(d)
+    return sorted(out)
+
+
+def frozen_test_files(c):
+    """Tests à geler : test/ du package et de chaque package de writes_extra (la feature peut y écrire ses tests,
+    test_freeze_check les surveille), modifiés depuis HEAD. Un package où la feature n'a rien écrit n'apporte rien."""
+    files = []
+    for pkg in [c.package] + extra_packages(c):
+        files += changed_files(c, f"{pkg}/test", "HEAD")
+    return files
+
+
 def cmd_freeze(c, args):
-    test_dir = f"{c.package}/test"
-    files = changed_files(c, test_dir, "HEAD") + [f for f in changed_files(c, c.package, "HEAD") if f.endswith("pubspec.yaml")]
+    # pubspec.yaml : dev_dependencies de test (bdd_widget_test…), du package comme des packages de writes_extra.
+    files = frozen_test_files(c) + [f for f in changed_files(c, c.package, "HEAD") if f.endswith("pubspec.yaml")]
+    files += [f for pkg in extra_packages(c) for f in changed_files(c, pkg, "HEAD") if f == f"{pkg}/pubspec.yaml"]
     sha = commit(c, sorted(set(files)), f"test({c.name}): acceptance and unit tests (frozen)", allow_empty=True)
     c.p["tests_freeze_sha"] = sha
     c.p.setdefault("human_gates", {})["tests"] = {"at": now(), "by": "user", "sha": sha}
@@ -956,7 +979,7 @@ def cmd_refreeze(c, args):
         die(f"usage : refreeze <nom> <{'|'.join(sorted(REFREEZE_CAUSES))}> <étape> [\"<quoi>\"]")
     cause, stage = args[0], args[1]
     what = args[2] if len(args) > 2 else cause
-    files = changed_files(c, f"{c.package}/test", "HEAD")
+    files = frozen_test_files(c)
     if not files:
         die("aucun test modifié : rien à re-geler")
     sha = commit(c, files, f"test({c.name}): {what} (refrozen)")
@@ -1064,7 +1087,7 @@ def package_tree(c):
     """Fichiers du package (suivis et nouveaux, hors ignorés), relatifs à c.root : l'arbre du cockpit."""
     top, pre = repo_of(c, c.package)
     inner = c.package[len(pre):] if pre else c.package
-    names = git("ls-files", "-co", "--exclude-standard", "--", inner, cwd=top).splitlines()
+    names = git("ls-files", "-co", "--exclude-standard", "--", inner or ".", cwd=top).splitlines()
     files = sorted({pre + n for n in names if n})
     return files[:TREE_MAX]
 

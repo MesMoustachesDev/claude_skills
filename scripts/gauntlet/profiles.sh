@@ -9,7 +9,7 @@
 # étapes que l'orchestrateur lance, et du nombre de plateformes QA (checks_qa.sh).
 
 # Maintenabilité que le cleaner peut corriger lui-même (voir checks_maintain.sh).
-MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
+MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system widget_functions l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
 
 profile_checks() {
   case "$1" in
@@ -31,7 +31,7 @@ profile_checks() {
     maintain)  echo "$MAINTAIN_FIXABLE deps_features pub_health" ;;
     # Revue de PR (pr_gauntlet.sh, mode extend sur chaque package touché) : pas de gel, pas de stubs,
     # pas de footprint (une PR peut toucher plusieurs packages). Mutation en option.
-    pr)          echo "analyze format test deps error_handling metrics deps_unused reinvented package_readme design_system l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
+    pr)          echo "analyze format test deps error_handling metrics deps_unused reinvented package_readme design_system widget_functions l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh no_secrets deps_features pub_health coverage" ;;
     pr_mutation) echo "$(profile_checks pr) mutation" ;;
     review)    echo "review_report" ;;
     harden)    echo "test analyze test_freeze_check:additive mutation" ;;
@@ -56,6 +56,9 @@ Profils (étape → checks) :
              moitiés parallèles des étapes 3 et 4 : mêmes checks que red / green (sans test_names ; build_runner
              côté présentation seulement), jugés sur la couche (data = lib|test/src/{data,domain,injection},
              presentation = le reste) ; sorties dans .gauntlet/<couche>/
+  packages de writes.extra modifiés par la feature (depuis la base ; pipeline seulement, pas sous GAUNTLET_PACKAGE) :
+             lib/ ou test/ modifié → analyze, format ; test/ modifié (tests de la feature) → aussi test, red_check,
+             test_freeze_check, test_names, coverage ; couche comprise ; sorties dans .gauntlet[/<couche>]/packages/<pkg>/
   clean      green + metrics + maintenabilité fixable + coverage
   maintain   maintenabilité complète (fixable + deps_features pub_health) — lu par le reviewer, utilisable en audit
   pr         revue de branche (pr_gauntlet.sh) : intégrité + qualité + maintenabilité + coverage, périmètre = diff ; pr_mutation = + mutation
@@ -68,7 +71,7 @@ Checks individuels :
   analyze            flutter analyze --fatal-warnings sur le package
   format             dart format --set-exit-if-changed lib test
   build_runner       build_runner build si le package le déclare (json_serializable, bdd_widget_test)
-  deps               direction des dépendances entre couches + pureté du domain (extend : dette existante signalée, pas bloquante)
+  deps               direction des dépendances entre couches + pureté du domain + presentation sans *Repository (extend : dette existante signalée, pas bloquante)
   error_handling     try/catch uniquement dans lib/src/data/ (I/O) ; ailleurs, Either<ErrorEntity, T>
   stub_check         après ARCHITECT : chaque méthode d'impl est un throw UnimplementedError
   no_stubs           après IMPLEMENTER : plus aucun UnimplementedError dans lib/
@@ -99,6 +102,7 @@ Maintenabilité (checks_maintain.sh) :
   deps_features      dépendances inter-features justifiées dans la spec §8, aucun cycle dans le workspace
   pub_health         packages abandonnés / sans release depuis pub.max_age_months / majeure en retard
   design_system      pas de valeur visuelle brute (ds.forbidden), chaque vue importe le DS (ds.imports)
+  widget_functions   aucune fonction ni méthode (hors build) qui renvoie un widget dans le périmètre : une classe widget
   l10n_strings       pas de chaîne utilisateur en dur dans la présentation
   l10n_arb           les clés ARB ajoutées, et les clés existantes lues par le code modifié (l10n.<clé>), existent dans toutes les locales (l10n.arb_glob)
   barrel_api         le barrel n'exporte ni src/data/ ni *_impl.dart

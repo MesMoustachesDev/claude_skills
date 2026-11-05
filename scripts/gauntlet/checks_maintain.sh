@@ -174,7 +174,7 @@ check_design_system() {
   files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
   local pats=(); local p; while IFS= read -r p; do [ -n "$p" ] && pats+=(-e "$p"); done < <(cfg_list ds.forbidden)
   if [ "${#pats[@]}" -gt 0 ]; then
-    hits="$(printf '%s\n' "$files" | xargs grep -nE "${pats[@]}" 2>/dev/null | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+    hits="$(printf '%s\n' "$files" | xargs grep -nHE "${pats[@]}" 2>/dev/null | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
     [ -n "$hits" ] && { printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "valeurs visuelles en dur : passer par le design system"; rc=1; }
   fi
   imports="$(cfg_list ds.imports)"
@@ -189,13 +189,36 @@ check_design_system() {
   return $rc
 }
 
+# widget_functions — un morceau d'écran est une classe widget, jamais une fonction ou une méthode qui
+# renvoie un widget (_bodyFor, _buildHeader…) : Flutter ne peut ni la reconstruire seule ni la retrouver
+# dans l'arbre. Seule `build` en renvoie un. Jugé sur les déclarations du périmètre (une méthode existante
+# qu'on ne fait que modifier reste de la dette), dans le package et les packages de writes.extra touchés.
+# Détecte les types déclarés Widget, PreferredSizeWidget, *Widget, List/Iterable<Widget> ; pas `Text _x()`.
+check_widget_functions() {
+  local rc=0
+  widget_functions_pkg || rc=1
+  each_extra_package extra_changed_packages widget_functions_pkg || rc=1
+  return $rc
+}
+widget_functions_pkg() {
+  local files hits
+  files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
+  local pat='^[[:space:]]*(static[[:space:]]+)?(Widget|PreferredSizeWidget|[A-Z][A-Za-z0-9_]*Widget|(List|Iterable)<Widget>)\??[[:space:]]+(get[[:space:]]+)?[a-z_][A-Za-z0-9_]*[[:space:]]*(\(|=>|\{|$)'
+  hits="$(printf '%s\n' "$files" | xargs grep -nHE "$pat" 2>/dev/null | grep -vE '[[:space:]]build[[:space:]]*\(' \
+      | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits" ] && { info "aucune fonction qui renvoie un widget"; return 0; }
+  printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'
+  ko "fonctions qui renvoient un widget : en faire des classes widget (StatelessWidget, ou Consumer si besoin)"
+  return 1
+}
+
 # l10n_strings — aucune chaîne utilisateur en dur dans la présentation.
 check_l10n_strings() {
   local files hits
   files="$(presentation_files)"; [ -n "$files" ] || return 0
   local pat="Text\([[:space:]]*['\"][^'\"]*[A-Za-z]{3}|(hintText|labelText|label|title|tooltip|semanticLabel|helperText|errorText|message)[[:space:]]*:[[:space:]]*['\"][^'\"]*[A-Za-z]{3}|SnackBar\([[:space:]]*content:[[:space:]]*Text\([[:space:]]*['\"]"
   # Les interpolations sont retirées avant le test : '${context.l10n.x} ${y}' n'est pas une chaîne en dur.
-  hits="$(printf '%s\n' "$files" | xargs grep -nE "$pat" 2>/dev/null | grep -v "$IGNORE_MARK" \
+  hits="$(printf '%s\n' "$files" | xargs grep -nHE "$pat" 2>/dev/null | grep -v "$IGNORE_MARK" \
       | while IFS= read -r line; do
           stripped="$(sed -E 's/\$\{[^}]*\}//g; s/\$[a-zA-Z_][a-zA-Z0-9_]*//g' <<<"${line#*:*:}")"
           grep -qE "$pat" <<<"$stripped" && printf '%s\n' "$line"
@@ -272,13 +295,25 @@ _unused() {
 check_unused_code()  { _unused check-unused-code; }
 check_unused_files() { _unused check-unused-files; }
 
-# test_hygiene — pas de test désactivé, pas d'attente réelle, pas de print dans test/.
+# test_hygiene — pas de test désactivé, pas d'attente réelle, pas de print dans test/, et pas de Map/List/Set
+# dans un record comparé (expect, equals, verify…) : le == d'un record compare ses champs avec ==, celui d'une
+# collection compare l'identité. Le champ se sort dans un expect à part, qui compare le contenu.
 check_test_hygiene() {
   [ -d "$PKG_DIR/test" ] || return 0
-  local hits; hits="$(grep_src "$PKG_DIR/test" "skip:[[:space:]]*(true|['\"])" "Future\.delayed\(" "sleep\(" "(^|[^a-zA-Z_])print\(" | filter_scope_lines "$PKG_REL/")"
-  [ -z "$hits" ] && { info "test/ propre"; return 0; }
-  printf '%s\n' "$hits" | head -30 | sed 's/^/   ✗ /'; ko "tests désactivés, attentes réelles ou print() dans test/"
-  return 1
+  local hits records rc=0
+  hits="$(grep_src "$PKG_DIR/test" "skip:[[:space:]]*(true|['\"])" "Future\.delayed\(" "sleep\(" "(^|[^a-zA-Z_])print\(" | filter_scope_lines "$PKG_REL/")"
+  records="$(find "$PKG_DIR/test" -name '*.dart' | drop_generated | tr '\n' '\0' \
+    | xargs -0 awk -f "$GAUNTLET_ROOT/record_collections.awk" 2>/dev/null \
+    | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits$records" ] && { info "test/ propre"; return 0; }
+  if [ -n "$hits" ]; then
+    printf '%s\n' "$hits" | head -30 | sed 's/^/   ✗ /'; ko "tests désactivés, attentes réelles ou print() dans test/"; rc=1
+  fi
+  if [ -n "$records" ]; then
+    printf '%s\n' "$records" | head -30 | sed 's/^/   ✗ /'
+    ko "Map/List/Set dans un record comparé : son == compare l'identité ; sors ce champ dans un expect à part"; rc=1
+  fi
+  return $rc
 }
 
 # todo_tickets — un TODO/FIXME référence un ticket (pattern configurable).
@@ -323,7 +358,8 @@ check_footprint() {
   allowed="$PKG_REL/* pubspec.yaml pubspec.lock ${app}pubspec.yaml ${app}pubspec.lock .gitignore .fvmrc ${app}.fvmrc .claude/features/* .claude/rules/* ${app}.claude/rules/* $(writes_extra | tr '\n' ' ')"
   # A submodule zone `x/**` also covers its gitlink `x` (a submodule shows up as one changed path).
   allowed="$allowed $(writes_extra | sed -n 's#/\*\*$##p' | tr '\n' ' ')"
-  changed="$( { git -C "$PROJECT_ROOT" diff --name-only "$base"; git -C "$PROJECT_ROOT" ls-files --others --exclude-standard; } | sort -u)"
+  # quotepath=false: otherwise git escapes non-ASCII paths ("polish/apr\303\250s/") and they never match.
+  changed="$( { git -C "$PROJECT_ROOT" -c core.quotepath=false diff --name-only "$base"; git -C "$PROJECT_ROOT" -c core.quotepath=false ls-files --others --exclude-standard; } | sort -u)"
   bad="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do
       ok_=0; for g in $allowed; do g="${g//\*\*/\*}"; case "$f" in $g) ok_=1; break;; esac; done; [ "$ok_" = 0 ] && printf '%s\n' "$f"; done)"
   [ -z "$bad" ] && { info "$(printf '%s\n' "$changed" | grep -c . ) fichier(s) touché(s), tous dans le périmètre"; return 0; }

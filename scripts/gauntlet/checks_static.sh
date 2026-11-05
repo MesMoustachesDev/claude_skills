@@ -11,11 +11,21 @@ capture() {
 }
 
 # analyze — le package compile ; les issues (warnings, infos) ne bloquent que dans les fichiers du périmètre.
+# Packages de writes.extra modifiés par la feature (extra_test_packages) : analysés de même, à la suite.
 check_analyze() {
+  local rc=0
+  analyze_pkg || rc=1
+  each_extra_package extra_changed_packages analyze_pkg || rc=1
+  return $rc
+}
+analyze_pkg() {
   local out rc issues targets=""
   # Couche : les fichiers de la moitié seulement ; une erreur de compilation dans un fichier que l'autre
   # moitié écrit en même temps n'est pas la sienne (le gate complet, après les deux, analyse tout).
   [ -n "${LAYER:-}" ] && targets="$(layer_files lib test | tr '\n' ' ')"
+  if [ -n "${LAYER:-}" ] && [ -z "$targets" ] && [ "${EXTRA_PKG:-0}" = 1 ]; then
+    info "aucun fichier de la couche $LAYER dans $PKG_REL"; return 0
+  fi
   # shellcheck disable=SC2086
   out="$(cd "$PKG_DIR" && $FLUTTER analyze --fatal-warnings --fatal-infos --no-pub $targets 2>&1)"; rc=$?
   [ "$rc" = 0 ] && { info "aucune issue"; return 0; }
@@ -30,7 +40,14 @@ check_analyze() {
 
 # format [test] — seuls les fichiers du périmètre doivent être formatés.
 #   test : test/ seulement (profil red : le test-writer ne peut pas corriger lib/).
+# Packages de writes.extra modifiés par la feature : leurs fichiers du périmètre aussi.
 check_format() {
+  local rc=0
+  format_pkg "${1:-}" || rc=1
+  each_extra_package extra_changed_packages format_pkg "${1:-}" || rc=1
+  return $rc
+}
+format_pkg() {
   local files dirs='lib|test'
   [ "${1:-}" = test ] && dirs='test'
   files="$(scope_files "$PKG_REL/" | grep -E "^($dirs)/" | while IFS= read -r f; do [ -f "$PKG_DIR/$f" ] && printf '%s\n' "$f"; done)"
@@ -119,7 +136,11 @@ check_error_handling() {
 }
 
 # deps — direction des couches : lib/src/<couche>/ n'importe que les couches listées dans deps.<couche>.
-# Règles supplémentaires : imports package:/dart: uniquement (pas de relatif) ; domain sans packages interdits.
+# Règles supplémentaires : imports package:/dart: uniquement (pas de relatif) ; domain sans packages interdits ;
+# presentation ne référence aucun type *Repository (le BLoC passe par un use case).
+PRESENTATION_REPOSITORY_RE='(^|[^A-Za-z0-9_])[A-Z][A-Za-z0-9_]*Repository([^A-Za-z0-9_]|$)'
+# Type *Usecase / *UseCase, ou import d'un fichier domain/usecase/.
+VIEW_USECASE_RE='(^|[^A-Za-z0-9_])[A-Z][A-Za-z0-9_]*(Usecase|UseCase)([^A-Za-z0-9_]|$)|domain/usecase/'
 check_deps() {
   local layer allowed forbidden f ln line imp target g exempt rc=0 self="$PKG_NAME" viol="" mine debt
   # Mode extend : une violation sur une ligne que la feature n'a pas touchée est de la dette existante —
@@ -154,9 +175,39 @@ check_deps() {
       fi
     done < <(grep -rnE --include='*.dart' "^[[:space:]]*import[[:space:]]" "$PKG_DIR/lib/src/$layer" | sed "s#^$PKG_DIR/##" | drop_generated)
   done
+  # presentation ne voit aucun repository, ni du package ni d'un autre (ErrorRepository de core compris) :
+  # le BLoC appelle des use cases, et c'est le use case qui parle au repository (report d'erreur compris).
+  if [ -d "$PKG_DIR/lib/src/presentation" ]; then
+    while IFS= read -r line; do
+      f="${line%%:*}"; ln="${line#*:}"; ln="${ln%%:*}"
+      for g in $exempt; do
+        # shellcheck disable=SC2053
+        [[ "$f" == $g ]] && continue 2
+      done
+      target="$(printf '%s' "${line#*:*:}" | grep -oE "$PRESENTATION_REPOSITORY_RE" | head -1 | tr -cd 'A-Za-z0-9_')"
+      viol+="$f:$ln: presentation → repository ($target) interdit : passer par un use case"$'\n'
+    done < <(grep -rnE --include='*.dart' \
+               "$PRESENTATION_REPOSITORY_RE" "$PKG_DIR/lib/src/presentation" \
+             | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|/\*)' | grep -v 'gauntlet-ignore' | sed "s#^$PKG_DIR/##" | drop_generated)
+    # Une vue (tout presentation hors bloc/) ne voit aucun use case : elle lit son BLoC (provider de la DI)
+    # et lui envoie des événements ; seul le BLoC appelle les use cases.
+    while IFS= read -r line; do
+      f="${line%%:*}"; ln="${line#*:}"; ln="${ln%%:*}"
+      # Un BLoC hors d'un dossier bloc/ (assembler_view/assembler_bloc.dart) reste un BLoC.
+      [[ "$f" == */bloc/* || "$f" == *_bloc.dart ]] && continue
+      for g in $exempt; do
+        # shellcheck disable=SC2053
+        [[ "$f" == $g ]] && continue 2
+      done
+      target="$(printf '%s' "${line#*:*:}" | grep -oE "$VIEW_USECASE_RE" | head -1 | tr -cd 'A-Za-z0-9_/')"
+      viol+="$f:$ln: vue → use case ($target) interdit : la vue passe par son BLoC"$'\n'
+    done < <(grep -rnE --include='*.dart' \
+               "$VIEW_USECASE_RE" "$PKG_DIR/lib/src/presentation" \
+             | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|/\*)' | grep -v 'gauntlet-ignore' | sed "s#^$PKG_DIR/##" | drop_generated)
+  fi
   mine="$(printf '%s\n' "$viol" | grep -v '^$' | filter_scope_lines "$PKG_REL/")"
   printf '%s\n' "$viol" | grep -v '^$' \
-    | awk -v m="$mine" 'BEGIN { n=split(m, a, "\n"); for (i=1; i<=n; i++) own[a[i]]=1 } !($0 in own)' > "$GAUNTLET_OUT/debt_deps.txt"
+    | M="$mine" awk 'BEGIN { n=split(ENVIRON["M"], a, "\n"); for (i=1; i<=n; i++) own[a[i]]=1 } !($0 in own)' > "$GAUNTLET_OUT/debt_deps.txt"
   if [ -s "$GAUNTLET_OUT/debt_deps.txt" ]; then
     info "dette existante (lignes que la feature n'a pas touchées, non bloquant, voir debt_deps.txt) :"
     sed 's/^/   · /' "$GAUNTLET_OUT/debt_deps.txt" | head -15
@@ -232,6 +283,17 @@ check_metrics() {
             { split($1, a, ":"); f=prefix a[1]; s=a[2]+0; e=a[3]+0; keep=(all==1)||(f in files)
               if (!keep) for (i=s;i<=e;i++) if ((f":"i) in lines) { keep=1; break }
               if (keep) { sub(/:[0-9]+$/, "", $1); print "   ✗ " $0 } }')"
+  # Dette acceptée (fonction déjà hors seuil sur la base) : pipeline.json → metrics_accepted, liste de
+  # "<chemin dans le package> <Fonction>" posée avec sa dette par l'orchestrateur ; affichée, non bloquante.
+  local accepted
+  accepted="$(pipeline_get '.metrics_accepted[]?')"
+  if [ -n "$accepted" ] && [ -n "$viol" ]; then
+    # Liste passée par l'environnement : l'awk de macOS refuse un retour à la ligne dans -v.
+    local acc_awk='BEGIN { n=split(ENVIRON["ACC"], a, "\n"); for (i=1;i<=n;i++) ok[a[i]]=1 }
+                   { split($2, p, ":"); hit=((p[1] " " $3) in ok) }'
+    printf '%s\n' "$viol" | ACC="$accepted" awk "$acc_awk"' hit { sub(/✗/, "(dette acceptée)"); print }'
+    viol="$(printf '%s\n' "$viol" | ACC="$accepted" awk "$acc_awk"' !hit')"
+  fi
   [ -z "$viol" ] && { info "seuils : cyclo ≤ $(cfg threshold.cyclomatic 10), lignes ≤ $(cfg threshold.function_lines 30), imbrication ≤ $(cfg threshold.nesting 3), params ≤ $(cfg threshold.parameters 4) — rien à signaler dans le périmètre"; return 0; }
   printf '%s\n' "$viol" | head -40
   ko "métriques hors seuil dans le périmètre"

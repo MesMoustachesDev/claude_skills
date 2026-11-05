@@ -12,6 +12,7 @@ font partie de la grille.
 
 **Qualité du code**
 - Logique incorrecte ou cas limites non gérés
+- Une décision (garde, « jamais de chiffre inventé ») vérifiée sur le seul chemin nominal : vérifie-la sur chaque chemin et chaque valeur qui y mènent (learn 2026-11-02, decision_checked_on_one_path_only, 2 runs)
 - Code mort ou commenté sans justification
 - Duplication évitable (DRY)
 - Complexité cyclomatique excessive (fonctions > 30 lignes qui gagneraient à être découpées)
@@ -46,7 +47,9 @@ font partie de la grille.
 Pour chaque package touché, tranche explicitement `ok` / `ko` :
 
 - **Architecture** : les couches de `create_feature_rules.md` sont respectées ; aucune logique métier
-  dans un widget ; aucun `DataModel` en présentation ; les `Either` sont dépliés dans le BLoC, pas
+  dans un widget ; aucun `DataModel` en présentation ; aucun repository en présentation, `ErrorRepository`
+  compris (le BLoC appelle un use case, qui reporte l'erreur ; le check `deps` le bloque sur les lignes
+  de la feature, la dette existante sort dans `debt_deps.txt`) ; les `Either` sont dépliés dans le BLoC, pas
   ailleurs ; aucun `try/catch` hors de `lib/src/data/` (l'I/O est attrapée en data et rendue en
   `Either<ErrorEntity, T>`, règle non négociable) ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
 - **Roue réinventée par la responsabilité** : ouvre `dedup_candidates.json`. Pour chaque paire
