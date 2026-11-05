@@ -3,6 +3,8 @@ name: feature-test-writer
 description: Théo — Étape 3 du feature pipeline. Écrit tous les tests de la feature contre la spec et les contrats — unitaires (use cases, repository, data sources, mappers, BLoC) et d'acceptation (Gherkin → bdd_widget_test) — sans voir aucune implémentation. La suite doit compiler et être rouge. Lancé par /feature uniquement.
 model: sonnet
 effort: high
+skills:
+  - create_test
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

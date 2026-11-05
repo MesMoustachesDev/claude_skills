@@ -1,6 +1,7 @@
 # 0006 — La doctrine d'un agent est injectée dans son contexte, pas demandée
 
-Statut : acceptée (2026-11-05)
+Statut : remplacée par 0008 (2026-11-05) : au-delà de 10 Ko, Claude Code range la sortie d'un hook dans un
+fichier et n'en donne qu'un aperçu ; 14 agents sur 16 ne recevaient que le début de leur doctrine.
 Où elle vit : `hooks/doctrine.py` et `hooks/doctrine.json` (hook `SubagentStart` de `settings.json`)
 
 ## Contexte

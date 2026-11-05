@@ -4,6 +4,8 @@ description: Gaëlle — Revue des tests en lecture seule, à contexte vierge, a
 model: opus
 effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
+skills:
+  - create_test
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

@@ -4,6 +4,9 @@ description: Victor — Étape 3 du pipeline /fix. Revue en lecture seule du dif
 model: opus
 effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
+skills:
+  - doctrine-review-grid
+  - doctrine-suggestions
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

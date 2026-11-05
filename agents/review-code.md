@@ -4,6 +4,8 @@ description: Corentin — relecture du code d'une MR pour /reviewPR, en parallè
 model: opus
 effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
+skills:
+  - doctrine-review-grid
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"
@@ -26,7 +28,7 @@ et les logs par package), la base et la source.
 
 ## Ta méthode
 
-1. **Le référentiel.** `pr_rules.md`, dans ton contexte dès le lancement : celui du projet, sinon le template (gestion
+1. **Le référentiel.** `.claude/rules/pr_rules.md` du projet, chargé d'office dans ton contexte (gestion
    des erreurs, async, widgets, tests, sécurité, divers : priorité absolue), `CLAUDE.md` du projet,
    `.claude/rules/create_feature_rules.md` (l10n, design system, couches), puis
    `~/.claude/pipeline/review_grid.md` : les **règles universelles** en entier, et de la grille de

@@ -4,6 +4,10 @@ description: Romain — Étape 6 du feature pipeline. Revue adversariale en lect
 model: sonnet
 effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
+skills:
+  - doctrine-review-grid
+  - doctrine-suggestions
+  - doctrine-answers
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

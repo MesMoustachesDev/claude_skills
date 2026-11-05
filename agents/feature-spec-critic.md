@@ -4,6 +4,9 @@ description: Camille — Critique de spec en lecture seule, à contexte vierge. 
 model: opus
 effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
+skills:
+  - doctrine-spec-template
+  - doctrine-answers
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

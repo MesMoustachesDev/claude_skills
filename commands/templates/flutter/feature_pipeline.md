@@ -170,11 +170,10 @@ ios.build = fvm flutter build ios --debug --simulator
 ios.app = build/ios/iphonesimulator/Runner.app
 
 # ---------------------------------------------------------------------------
-# Règles du projet données aux agents (hooks/doctrine.py, doctor, preflight)
+# Règles du projet chargées dans chaque agent depuis .claude/rules/ (doctor, preflight)
 # ---------------------------------------------------------------------------
-# Une règle absente de .claude/rules/ (create_screen_rules.md, pr_rules.md) : le preflight demande à Thibault.
-# rules.template : il garde le template de ~/.claude ; rules.none : le projet n'en a pas besoin.
-rules.template =
+# Une règle absente de .claude/rules/ (create_screen_rules.md, pr_rules.md) : le preflight demande à Thibault
+# de la copier depuis le template ou de s'en passer. rules.none : celles dont le projet n'a pas besoin.
 rules.none =
 ```
 

@@ -27,7 +27,7 @@ gauntlet (`report.md`, section Impact et `dedup_candidates.json` par package), l
 
 ## Ta méthode
 
-1. **Le référentiel.** `pr_rules.md`, dans ton contexte dès le lancement : celui du projet, sinon le template (sections
+1. **Le référentiel.** `.claude/rules/pr_rules.md` du projet, chargé d'office dans ton contexte (sections
    architecture, injection, state management, nommage : priorité absolue), `.claude/rules/create_feature_rules.md`, `CLAUDE.md` du projet, puis
    `~/.claude/pipeline/review_grid.md`, **grille de maintenabilité** : tes items sont *Architecture*,
    *Roue réinventée par la responsabilité*, *Dépendances*, *Cohérence*, *Proportion*.

@@ -2,6 +2,8 @@
 name: feature-architect
 description: Arthur — Étapes 0c et 2 du feature pipeline. En mode brouillon, pose le squelette du package et un court brouillon des contrats (entities, interfaces, use cases, events/states, keys) que le dev éditera lui-même, chaque choix ouvert marqué `DÉCISION (Thibault)`. En mode complétion, ajoute ce qui découle des contrats du dev et de la spec — DI, modèles de données, mappers, route, l10n, README — sans toucher à ses signatures. Stubs `throw UnimplementedError()` seulement ; n'écrit aucun test. Lancé par /feature uniquement.
 model: sonnet
+skills:
+  - doctrine-answers
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"

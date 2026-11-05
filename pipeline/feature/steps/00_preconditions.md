@@ -41,13 +41,15 @@
 - **Règles du projet absentes** : chaque ligne `RÈGLE ABSENTE : <fichier>` du doctor est une question à
   Thibault, posée avant le cadrage, toutes dans le même `AskUserQuestion` (ou `pipeline.sh say … --ask`,
   `feature.md`). Pour chaque fichier, dis à quoi il sert (`create_screen_rules.md` : Arthur, Ivan, Romain et
-  Pauline l'appliquent à chaque écran ; `pr_rules.md` : la référence de Romain et de `/reviewPR`), puis :
+  Pauline l'appliquent à chaque écran ; `pr_rules.md` : la référence de Romain et de `/reviewPR`). Un fichier
+  de `.claude/rules/` est chargé en entier dans chaque agent par Claude Code : c'est la seule façon sûre de
+  le leur donner. Les choix :
   - « La créer depuis le template » → copie `~/.claude/commands/templates/flutter/<fichier>` dans
     `.claude/rules/<fichier>` du worktree, ouvre-le pour qu'il l'adapte (`open_in_editor`), commit avec la
     feature ;
-  - « Garder le template tel quel » → ajoute le fichier à `rules.template` de `.claude/rules/feature_pipeline.md` ;
-  - « Le projet n'en a pas besoin » → ajoute-le à `rules.none` : les agents ne reçoivent plus rien pour lui.
-  Tant qu'il n'a pas répondu, les agents reçoivent le template (`hooks/doctrine.py`) : jamais rien.
+  - « Prendre le template tel quel » → la même copie, sans l'ouvrir ;
+  - « Le projet n'en a pas besoin » → ajoute le fichier à `rules.none` de `.claude/rules/feature_pipeline.md`.
+
 - **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
   un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si le
   cadrage propose « extension de `features/x` » et que le dev le valide en 0b : tu bascules en
