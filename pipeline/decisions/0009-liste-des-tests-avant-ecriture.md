@@ -33,10 +33,27 @@ demande une passe de mutation par lot.
 
 ## Conséquences
 
-- Mesuré sur la même feature : voir « Mesure » plus bas.
+- Mesuré sur la même feature : voir « Mesure ».
 - Une étape de plus (un agent Sonnet, quelques minutes, puis la relecture de Gaëlle sur une page) avant
   l'écriture, qui en économise plus qu'elle ne coûte dès que la liste retire des tests.
 - La liste devient la table de couverture lisible de la feature : chaque test dit ce qu'il prouve.
+
+## Mesure (2026-11-05, une feature du projet client, 152 tests écrits par Théo avant le gel)
+
+Théo-liste, sur la spec seule, a proposé 61 tests. On a gardé de la vraie suite les tests qui
+correspondent à la liste (correspondance faite par un agent à contexte vierge, sur le corps des tests), et
+mesuré sur le vrai code :
+
+| Suite | Tests ajoutés | Couverture des lignes modifiées | Mutants survivants |
+|---|---|---|---|
+| Théo, avant le gel | 152 | — | 4 (tués ensuite par Hugo) |
+| Réduite à la première liste | 58 | [OK] | 5 sur 51 (90 %) |
+| Réduite à la liste corrigée | 61 (59 retrouvés) | 98,5 % [OK] | 2 sur 51 (96 %) |
+
+Les survivants de la première liste venaient tous d'une règle à deux conditions testée d'un seul côté :
+d'où « un test par condition et par borne » (Théo-liste, Gaëlle). Les 2 qui restent sont deux des 4 que
+la suite de 152 tests laissait aussi, et que Hugo tue à l'étape 7. Limites : une seule feature, et des
+tests réels pris pour ceux que Théo écrirait depuis la liste.
 
 ## Hors champ
 
