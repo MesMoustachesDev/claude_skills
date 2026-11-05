@@ -88,9 +88,14 @@ avec les données du signalement (le rapport cité, le compte de QA) : flow Maes
 `${FIX_SHOTS_DIR}`. Il doit échouer aujourd'hui, sur le symptôme signalé (le chiffre faux, l'écran
 cassé). `repro.json → device_repro = {cmd, expected_failure}` : `cmd` builde la base, installe sans
 désinstaller et joue le flow. L'orchestrateur le lance lui-même (`device_red`, puis `device_green`
-après la correction), aucun hook ne le fait. **Le simulateur est partagé avec d'autres sessions** :
-tu ne l'utilises (build iOS, `simctl`, Maestro) que dans le créneau que l'orchestrateur te donne, et
-tu le libères dès que tes captures sont prises. Regarde chaque capture (`Read`). Le signalement ne se reproduit pas
+après la correction), aucun hook ne le fait. **Chaque fix a son simulateur iOS**, cloné du modèle
+(`ios.simulator_base`, déjà connecté au compte de test, rapports de QA téléchargés) : le gauntlet le
+crée et passe son UDID à `cmd` dans `$FIX_SIM_UDID`. `cmd` vise toujours `$FIX_SIM_UDID`
+(`xcrun simctl install "$FIX_SIM_UDID" …`, `maestro --device "$FIX_SIM_UDID" test …`, et
+`-d "$FIX_SIM_UDID"` au build), échoue s'il est vide (`[ -n "$FIX_SIM_UDID" ] &&`), et ne cherche jamais
+un appareil par son nom ni par `(Booted)`. Pour tes propres essais pendant la reproduction, même
+simulateur : `U=$(~/.claude/scripts/sim.sh ensure fix-<nom>)`. Jamais le modèle ni un autre simulateur
+booté : ils appartiennent à d'autres sessions. Regarde chaque capture (`Read`). Le signalement ne se reproduit pas
 à l'identique (état local de l'appareil perdu) → rejoue ses étapes sur un état propre et dis ce qui
 diffère ; l'assertion porte quand même sur le symptôme. Seule exception : un bug sans parcours dans
 l'app (crash backend, tâche planifiée, Sentry sans écran) → `device_repro = {not_applicable:
@@ -115,7 +120,7 @@ en lecture :
   "target_cmd": "node --test tests/weekly.test.js",
   "expected_failure": "weekly cap resets after a transactional push",
   "suite_cmd": "npm test --silent",
-"device_repro": { "cmd": "<build de la base + install + maestro test maestro/fix_<nom>.yaml>", "expected_failure": "<texte de l'assertion du symptôme>" },
+"device_repro": { "cmd": "[ -n \"$FIX_SIM_UDID\" ] && <build -d \"$FIX_SIM_UDID\"> && xcrun simctl install \"$FIX_SIM_UDID\" <app> && maestro --device \"$FIX_SIM_UDID\" test maestro/fix_<nom>.yaml", "expected_failure": "<texte de l'assertion du symptôme>" },
                   // ou { "not_applicable": "<pourquoi le bug n'a aucun parcours dans l'app>" }
   "lint_cmd": "",
   "test_files": ["functions/push/tests/weekly.test.js"],

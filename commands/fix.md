@@ -236,10 +236,15 @@ propre classification : critique, bloquant, erreur) comptent comme des critiques
 
 Pas de fix livré sans le parcours du signalement rejoué sur device après la correction : c'est la
 seule preuve que le symptôme vu par l'utilisateur a disparu, les tests ne prouvent que la cause.
-**Le simulateur est partagé avec d'autres sessions.** `device_red` et `device_green` ne sont dans aucun
-profil ni hook : tu les lances toi-même (`fix_gauntlet.sh device_green <nom>`), seulement quand le
-build est prêt et après le go explicite du dev pour ce créneau (`AskUserQuestion`), jamais avant que la
-correction soit verte. Un agent ne lance ni build iOS, ni `simctl`, ni Maestro sans ce go.
+**Chaque fix a son simulateur iOS.** `device_red` et `device_green` ne sont dans aucun profil ni hook :
+tu les lances toi-même (`fix_gauntlet.sh device_green <nom>`), jamais avant que la correction soit
+verte. Ils tournent sur « `<ios.simulator_base>` · fix-<nom> », cloné du modèle par
+`~/.claude/scripts/sim.sh ensure fix-<nom>` et passé à `device_repro.cmd` dans `$FIX_SIM_UDID` : pas de
+go du dev, aucune autre session ne s'en sert. Le go du dev par créneau (`AskUserQuestion`) ne reste
+que si le run utilise un simulateur partagé : pas de `ios.simulator_base`, `FIX_SIM_UDID` pointé sur le
+modèle ou un autre appareil, ou un `device_repro.cmd` gelé qui cherche encore `iPhone … (Booted)`.
+Modèle absent ou allumé : `sim.sh` dit comment le créer ou l'éteindre ; tu le montres au dev, tu ne
+crées ni n'éteins le modèle toi-même.
 `shots/green/` contient alors les captures après correction. Regarde-les
 (`Read`) avant de les montrer — une capture qui ne montre pas l'état attendu est un défaut, pas un
 succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction vs plan), puis
@@ -303,8 +308,8 @@ dans cet ordre :
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
 mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter (le
-dossier du fix, non suivi, est archivé : d'où `--force`) :
-`git worktree remove --force .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
+dossier du fix, non suivi, est archivé : d'où `--force` ; le simulateur du fix part avec) :
+`~/.claude/scripts/sim.sh remove fix-<nom>; git worktree remove --force .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
 
 **Fin : la page du fix.** Après `stages.evidence = PASSED` : « Rafraîchir » avec `say <nom> ""` — la
 carte de l'Accueil passe dans « Terminées », avec la cause racine. Puis un seul `AskUserQuestion` :

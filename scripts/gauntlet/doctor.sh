@@ -94,7 +94,11 @@ run_doctor() {
         ;;
       ios)
         need "xcrun simctl" xcrun simctl help
-        need "simulateur '$(cfg ios.simulator)' disponible" sh -c "xcrun simctl list devices available | grep -q '$(cfg ios.simulator) ('"
+        if [ -n "$(cfg ios.simulator_base)" ]; then
+          need "simulateur modèle '$(cfg ios.simulator_base)' disponible (sim.sh)" sh -c "xcrun simctl list devices available | grep -q '    $(cfg ios.simulator_base) ('"
+        else
+          need "simulateur '$(cfg ios.simulator)' disponible" sh -c "xcrun simctl list devices available | grep -q '$(cfg ios.simulator) ('"
+        fi
         need "ios.app_id renseigné" sh -c "[ -n '$(cfg ios.app_id)' ] && [ '$(cfg ios.app_id)' != com.example.app ]"
         ;;
       *) ko "plateforme inconnue : $p"; DOCTOR_RC=1 ;;

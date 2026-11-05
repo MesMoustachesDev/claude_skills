@@ -11,6 +11,8 @@
 # Les commandes de repro.json tournent depuis <racine>/<package>, avec :
 #   FIX_SHOTS_DIR  dossier où déposer les captures (UI) — shots/red/ pendant red, shots/green/ pendant green
 #   FIX_PHASE      red | green
+#   FIX_SIM_UDID   (device_red / device_green) UDID du simulateur iOS propre à ce fix, « <modèle> · fix-<nom> »,
+#                  cloné de ios.simulator_base par sim.sh ; déjà posé dans l'environnement, il est gardé tel quel
 set -u
 set -o pipefail
 
@@ -34,8 +36,10 @@ Profils :
   red             après le REPRODUCER : seuls des tests ont changé, le test cible échoue avec expected_failure
   repro_report    reproducer en arbitrage : repro.json valide, pas de log de debug oublié
   green           après l'IMPLEMENTER : gel intact, du code a changé, cible verte, suite verte, lint
-  (device_red / device_green ne sont dans aucun profil : le simulateur est partagé avec d'autres sessions,
-   l'orchestrateur les lance lui-même, un par un, après le go du dev — jamais un hook)
+  (device_red / device_green ne sont dans aucun profil : l'orchestrateur les lance lui-même, jamais un hook.
+   Ils tournent sur le simulateur du fix, cloné du modèle ios.simulator_base (sim.sh ensure fix-<nom>) :
+   pas de go du dev. Sans ios.simulator_base, ou avec FIX_SIM_UDID pointé sur le modèle ou un appareil
+   partagé, le go du dev reste requis avant chaque lancement)
   review_report   review.json présent et valide (hook du reviewer)
   review_verdict  aucun critique non accepté (lu par l'orchestrateur)
 
@@ -53,7 +57,8 @@ Checks :
                      (sauté sans .claude/rules/feature_pipeline.md)
   device_red         device_repro.cmd (le parcours du signalement, sur device) échoue avec device_repro.expected_failure
   device_green       device_repro.cmd passe
-                     (les deux sautés seulement si device_repro.not_applicable donne une raison)
+                     (les deux sautés seulement si device_repro.not_applicable donne une raison ; la commande
+                     reçoit FIX_SIM_UDID, le simulateur du fix, à supprimer après le merge : sim.sh remove fix-<nom>)
 EOF
 }
 
@@ -62,7 +67,20 @@ run_in_pkg() {
   local label="$1" cmd="$2" pkg out="$FIX_OUT/$1.out"
   pkg="$(repro_get .package)"; pkg="${pkg:-.}"
   mkdir -p "$FIX_SHOTS_DIR"
-  (cd "$PROJECT_ROOT/$pkg" && FIX_SHOTS_DIR="$FIX_SHOTS_DIR" FIX_PHASE="$FIX_PHASE" bash -c "$cmd") > "$out" 2>&1
+  (cd "$PROJECT_ROOT/$pkg" && FIX_SHOTS_DIR="$FIX_SHOTS_DIR" FIX_PHASE="$FIX_PHASE" FIX_SIM_UDID="${FIX_SIM_UDID:-}" \
+     MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000}" bash -c "$cmd") > "$out" 2>&1
+}
+
+# device_sim — FIX_SIM_UDID : le simulateur propre à ce fix (sim.sh ensure fix-<nom>), cloné et booté.
+# Un FIX_SIM_UDID déjà posé (le dev a choisi un appareil) est gardé ; sans ios.simulator_base, il reste vide.
+device_sim() {
+  [ -n "${FIX_SIM_UDID:-}" ] && { info "simulateur imposé : $FIX_SIM_UDID"; return 0; }
+  local sim="$HOME/.claude/scripts/sim.sh"
+  (cd "$PROJECT_ROOT" && "$sim" base) >/dev/null 2>&1 \
+    || { info "pas de ios.simulator_base : FIX_SIM_UDID vide, la commande choisit son appareil"; return 0; }
+  FIX_SIM_UDID="$(cd "$PROJECT_ROOT" && "$sim" ensure "fix-$FIX_NAME" 2>"$FIX_OUT/sim.out")" \
+    || { sed 's/^/  /' "$FIX_OUT/sim.out"; ko "pas de simulateur pour ce fix (sim.sh ensure fix-$FIX_NAME)"; return 1; }
+  info "simulateur du fix : $(cd "$PROJECT_ROOT" && "$sim" base) · fix-$FIX_NAME ($FIX_SIM_UDID)"
 }
 
 check_repro_schema() {
@@ -156,6 +174,7 @@ device_skip() {
 
 check_device_red() {
   device_skip && return 0
+  device_sim || return 1
   local rc expected
   run_in_pkg device "$(repro_get .device_repro.cmd)"; rc=$?
   expected="$(repro_get .device_repro.expected_failure)"
@@ -173,6 +192,7 @@ check_device_red() {
 
 check_device_green() {
   device_skip && return 0
+  device_sim || return 1
   run_in_pkg device "$(repro_get .device_repro.cmd)" && { info "parcours du signalement vert sur device (captures : ${FIX_SHOTS_DIR#$PROJECT_ROOT/})"; return 0; }
   tail -30 "$FIX_OUT/device.out" | sed 's/^/  /'
   ko "device_repro.cmd échoue encore sur device"
