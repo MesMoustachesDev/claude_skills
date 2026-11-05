@@ -2,8 +2,8 @@
 """La liste des tests, décidée avant d'en écrire un (étape 3a).
 
     test_plan.py items <spec.md>
-    test_plan.py check <spec.md> <tests_plan.json> <package>
-    test_plan.py match <tests_plan.json> <racine du projet> <package> <base>
+    test_plan.py check <spec.md> <tests_plan.json> <package>[,<package writes.extra>…]
+    test_plan.py match <tests_plan.json> <racine du projet> <package>[,<package writes.extra>…] <base>
 
 `items` : ce que la spec demande de prouver, numéroté — S<n> les scénarios de §4, K<n> les contrats de §5,
 D<n> les lignes des tables et les règles numérotées de §6, E<n> les erreurs de §7.
@@ -16,6 +16,9 @@ prouvés par beaucoup de tests sont listés pour Gaëlle, sans bloquer : c'est e
 `match` (gate red) : les tests écrits sont ceux de la liste, ni plus ni moins. Un test se compare par son
 fichier et son nom ; un scénario par son titre dans le `.feature`. En mode extend, seuls les tests ajoutés
 depuis <base> comptent.
+
+<package> peut être une liste séparée par des virgules : le package de la feature, puis les packages de
+writes.extra où elle a le droit d'écrire des tests (un appel dans features/user, son acceptation à côté).
 
 Sortie : une ligne « ✗ … » par problème (exit 1), « ? … » pour un signal à Gaëlle.
 """
@@ -85,6 +88,11 @@ def items(spec: str) -> list[dict]:
     return out
 
 
+def packages(arg: str) -> list[str]:
+    """Le package de la feature, puis ceux de writes.extra : « a,b » → [a, b]."""
+    return [p for p in arg.split(',') if p]
+
+
 def decode(raw: str, ids: set[str], package: str) -> tuple[list[dict], list[dict]]:
     data = json.loads(raw)
     if not isinstance(data, dict) or set(data) - {'tests', 'not_tested'} or not isinstance(data.get('tests'), list):
@@ -99,7 +107,7 @@ def decode(raw: str, ids: set[str], package: str) -> tuple[list[dict], list[dict
             raise ValueError(f'{where} : champs attendus {sorted(TEST_FIELDS)}')
         f = t['file']
         if not isinstance(f, str) or f.startswith('/') or '..' in Path(f).parts \
-                or not f.startswith(package.rstrip('/') + '/test/') \
+                or not any(f.startswith(p.rstrip('/') + '/test/') for p in packages(package)) \
                 or not (f.endswith('_test.dart') or f.endswith('.feature')):
             raise ValueError(f"{where} : {f!r} n'est pas un fichier de test du package {package}")
         if not isinstance(t['name'], str) or not t['name'].strip() or len(t['name']) > 300 or '\n' in t['name']:
@@ -174,6 +182,13 @@ def written(root: Path, package: str, base: str) -> set[tuple[str, str]]:
     def scenarios(text: str) -> set[str]:
         return {norm(m.group(1)) for m in map(SCENARIO.match, text.splitlines()) if m}
 
+    out = set()
+    for pkg in packages(package):
+        out |= _written_in(root, pkg, at_base, scenarios)
+    return out
+
+
+def _written_in(root: Path, package: str, at_base, scenarios) -> set[tuple[str, str]]:
     out = set()
     tdir = root / package / 'test'
     for path in sorted(tdir.rglob('*_test.dart')) if tdir.is_dir() else []:
