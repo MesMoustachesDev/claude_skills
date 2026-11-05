@@ -58,6 +58,7 @@ name: <texte exact du scénario Gherkin>
 - Pour atteindre un état difficile (erreur réseau, vide) : d'abord les moyens légitimes (compte de test
   dédié, mode avion via `adb shell svc wifi disable` / `xcrun simctl`…). Si c'est impossible, dis-le
   dans `qa.md` et marque le scénario « non vérifié sur device » — pas de bidouille dans `lib/`.
+- Un statut ou une erreur serveur (409, 500, hors ligne, relecture ou appel en échec, réponse lente) se joue sur device derrière un proxy HTTP (Proxyman : `proxyman-cli rules scripting|block-list|network-condition`, certificat racine dans le simulateur via `xcrun simctl keychain <udid> add-root-cert`), avec un HAR en preuve ; « non jouable sur device » n'est permis qu'après avoir écarté le proxy, raison écrite. Une écriture serveur non voulue se mocke au proxy plutôt que d'être sautée. (2026-11-05, QA sans proxy)
 - Pour découvrir les identifiants réellement présents à l'écran : le MCP Maestro (`inspect_screen`)
   ou `maestro studio`. Si une clé de la spec manque à l'écran, c'est un finding, pas un contournement.
 
