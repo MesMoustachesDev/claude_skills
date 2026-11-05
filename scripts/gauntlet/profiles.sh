@@ -19,7 +19,7 @@ profile_checks() {
     dedup)     echo "dedup_report" ;;
     tests_review) echo "tests_review_report" ;;
     # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
-    red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names" ;;
+    red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names test_dups" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
     # Moitiés parallèles des étapes 3 et 4 (gauntlet.sh pose GAUNTLET_LAYER d'après le suffixe) : chaque
     # check ne juge que la couche. build_runner seulement côté présentation (bdd_widget_test) : deux
@@ -49,7 +49,7 @@ Profils (étape → checks) :
   spec_review   spec_review_report  (hook du spec-critic ; verdict : spec_review_verdict)
   contracts  build_runner analyze deps error_handling stub_check reinvented package_readme
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
-  red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names
+  red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names test_dups
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
   green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
   red_data, red_presentation, green_data, green_presentation
@@ -76,6 +76,7 @@ Checks individuels :
   test               flutter test (rapport JSON conservé)
   red_check          après TEST-WRITER : chaque fichier de test a ≥ 1 échec
   test_names         écrit .claude/features/<f>/tests.md (liste lisible pour le skim du dev)
+  test_dups          candidats doublons (même nom de test dans deux fichiers) → .gauntlet/test_dups.txt, tranchés par Gaëlle ; ne bloque pas
   test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
   coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)

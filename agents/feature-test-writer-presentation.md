@@ -29,7 +29,7 @@ ne dit que ce qui change pour ta moitié ; là où ils diffèrent, c'est lui qui
 
 | Tu écris | Tu n'écris pas (moitié data/domain) |
 |---|---|
-| `test/src/presentation/**` : BLoC (`emitsInOrder` par event), widgets (chaque état de §3) | `test/src/domain/**`, `test/src/data/**`, `test/src/injection/**` |
+| `test/src/presentation/**` : BLoC (`emitsInOrder` par event), widgets (chaque état de §3 qu'aucun scénario d'acceptation n'asserte) | `test/src/domain/**`, `test/src/data/**`, `test/src/injection/**` |
 | `test/<feature>.feature` (§4 recopié tel quel), `test/step/**`, les tests générés | |
 | `pubspec.yaml` : `bdd_widget_test` en dev_dependency si absent | |
 

@@ -29,7 +29,7 @@ diffèrent, c'est lui qui gagne.
 
 | Tu écris | Tu n'écris pas (moitié présentation) |
 |---|---|
-| `test/src/domain/**` : use cases (délégation, propagation des `Left`, cas limites) | `test/src/presentation/**` : BLoC, widgets |
+| `test/src/domain/**` : use cases (délégation, un test de propagation des `Left`, cas limites) | `test/src/presentation/**` : BLoC, widgets |
 | `test/src/data/**` : repository impl, data sources, mappers (exhaustifs sur §6) | `test/<feature>.feature`, `test/step/**`, tests générés |
 | `test/src/injection/**` si la spec en demande un | le `pubspec.yaml` (dev_dependencies) |
 
@@ -49,8 +49,11 @@ oubli d'Arthur : rapporte-le.
 
 Chaque erreur de §7 traverse les deux moitiés : data source (exception → `Left(X)`), repository, use case
 (propage `Left(X)`) — chez toi ; puis BLoC (`Left(X)` → état) et vue — chez l'autre. Pour **chaque** erreur
-de §7, tu prouves ta partie jusqu'au use case inclus. Liste-les dans ton rapport : Gaëlle relit les deux
-moitiés ensemble et cherche le maillon que chacun a cru couvert par l'autre.
+de §7, la data source a son test (exception → `Left(X)`). Le repository et le use case qui ne font que
+transmettre ont **un** test de propagation, valable pour toutes les erreurs ; une erreur qu'ils transforment
+(la remappent, la réessaient, l'avalent) a le sien. Liste dans ton rapport, pour chaque erreur, le test qui
+la prouve à chaque maillon : Gaëlle relit les deux moitiés ensemble et cherche le maillon que chacun a cru
+couvert par l'autre.
 
 ## Ton gate
 
