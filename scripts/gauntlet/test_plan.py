@@ -192,6 +192,8 @@ def _written_in(root: Path, package: str, at_base, scenarios) -> set[tuple[str, 
     out = set()
     tdir = root / package / 'test'
     for path in sorted(tdir.rglob('*_test.dart')) if tdir.is_dir() else []:
+        if path.with_name(path.name[:-len('_test.dart')] + '.feature').exists():
+            continue  # généré par bdd_widget_test depuis le .feature, dont les scénarios comptent déjà
         rel = str(path.relative_to(root))
         old = at_base(rel)
         before = set()
