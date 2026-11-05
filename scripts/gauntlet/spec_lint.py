@@ -26,6 +26,8 @@ SDK_TYPES = {"Either", "Left", "Right", "Unit", "Option", "Some", "None", "Strea
              "Map", "Set", "Iterable", "String", "Object", "Exception", "Error", "Duration", "DateTime", "Uri",
              "Uint8List", "Widget", "BuildContext", "Bloc", "Cubit", "Emitter", "Equatable", "StreamController",
              "StreamSubscription", "Completer", "Timer", "Function", "Record", "Null", "Never", "Type"}
+# Generated files (feature_pipeline.md → generated.exclude), the regex the gauntlet exports.
+GENERATED = re.compile(os.environ.get("GAUNTLET_GENERATED_ERE") or r"\.(g|freezed)\.dart$")
 SKIP_DIRS = {".dart_tool", "build", ".git", "node_modules", "ios", "android", "macos", "linux", "windows", "web"}
 
 
@@ -33,7 +35,7 @@ def dart_files(root):
     for d, dirs, files in os.walk(root):
         dirs[:] = [x for x in dirs if x not in SKIP_DIRS and not x.startswith(".")]
         for f in files:
-            if f.endswith(".dart") and not f.endswith((".g.dart", ".freezed.dart")):
+            if f.endswith(".dart") and not GENERATED.search(os.path.join(d, f)):
                 yield os.path.join(d, f)
 
 

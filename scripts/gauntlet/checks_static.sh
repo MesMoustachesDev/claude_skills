@@ -78,7 +78,7 @@ check_no_temp_markers() {
   local dirs="$PKG_DIR/lib"; [ -d "$PKG_DIR/test" ] && dirs="$dirs $PKG_DIR/test"
   local hits
   # shellcheck disable=SC2086
-  hits="$(grep -rnE --include='*.dart' --exclude='*.g.dart' 'TEMP VISUAL TEST|TEMP PIPELINE|(^|[^a-zA-Z_])print\(' $dirs 2>/dev/null | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  hits="$(grep -rnE --include='*.dart' 'TEMP VISUAL TEST|TEMP PIPELINE|(^|[^a-zA-Z_])print\(' $dirs 2>/dev/null | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
   [ -z "$hits" ] && return 0
   printf '%s\n' "$hits"; printf '\nmarqueurs temporaires ou print() à retirer\n'
   return 1
@@ -93,7 +93,7 @@ ERROR_HANDLING_RE='(^|[^a-zA-Z_])try[[:space:]]*\{|(^|[^a-zA-Z_])catch[[:space:]
 check_error_handling() {
   local hits="" extra g dir base
   if [ -d "$PKG_DIR/lib/src" ]; then
-    hits="$(grep -rnE --include='*.dart' --exclude='*.g.dart' --exclude='*.freezed.dart' \
+    hits="$(grep -rnE --include='*.dart' \
               "$ERROR_HANDLING_RE" "$PKG_DIR/lib/src" 2>/dev/null \
             | grep -v "^$PKG_DIR/lib/src/data/" | grep -v 'gauntlet-ignore' \
             | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
@@ -107,7 +107,7 @@ check_error_handling() {
           | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); n=substr(a[1],2)} /^\+[^+]/{print f":"n": "substr($0,2); n++}'
         untracked "$dir" | grep '\.dart$' \
           | while IFS= read -r f; do grep -nE "" "$PROJECT_ROOT/$f" | sed "s#^#$f:#"; done
-      } | grep '\.dart:' | grep -v '/lib/src/data/' | grep -vE '\.(g|freezed)\.dart:' \
+      } | grep '\.dart:' | grep -v '/lib/src/data/' | drop_generated \
         | grep -E "$ERROR_HANDLING_RE" | grep -v 'gauntlet-ignore'
     done)"
   hits="$(printf '%s\n%s\n' "$hits" "$extra" | grep -v '^$')"
@@ -152,7 +152,7 @@ check_deps() {
           if [[ "$imp" == "package:$p/"* ]]; then viol+="$f:$ln: domain importe $p (domaine impur)"$'\n'; fi
         done
       fi
-    done < <(grep -rnE --include='*.dart' --exclude='*.g.dart' "^[[:space:]]*import[[:space:]]" "$PKG_DIR/lib/src/$layer" | sed "s#^$PKG_DIR/##")
+    done < <(grep -rnE --include='*.dart' "^[[:space:]]*import[[:space:]]" "$PKG_DIR/lib/src/$layer" | sed "s#^$PKG_DIR/##" | drop_generated)
   done
   mine="$(printf '%s\n' "$viol" | grep -v '^$' | filter_scope_lines "$PKG_REL/")"
   printf '%s\n' "$viol" | grep -v '^$' \
@@ -187,7 +187,7 @@ check_stub_check() {
   # Périmètre de la passe : lors d'un rejeu (pass_base), le code implémenté par une passe validée n'est
   # plus un stub et n'a pas à l'être.
   local files SCOPE_FILE SCOPE_ALL; use_pass_scope
-  files="$(expand_globs "$PKG_DIR" $(cfg_list stub.include | tr '\n' ' ') | filter_excluded '*.g.dart' '*.freezed.dart')"
+  files="$(expand_globs "$PKG_DIR" $(cfg_list stub.include | tr '\n' ' ') | drop_generated)"
   if [ -z "$files" ]; then ko "aucun fichier ne correspond à stub.include"; return 1; fi
   # mode extend : seules les méthodes ajoutées doivent être des stubs
   files="$(printf '%s\n' "$files" | filter_scope_files "$PKG_REL/")"
@@ -220,14 +220,14 @@ check_metrics() {
       --source-lines-of-code="$(cfg threshold.function_lines 30)" \
       --maximum-nesting-level="$(cfg threshold.nesting 3)" \
       --number-of-parameters="$(cfg threshold.parameters 4)" \
-      --exclude='{/**.g.dart,/**.freezed.dart}' \
+      --exclude="$(generated_dcl_exclude)" \
       --no-congratulate --reporter=json --json-path="$json" >/dev/null 2>&1)
   [ -s "$json" ] || { ko "dart_code_linter n'a produit aucun rapport"; return 1; }
   viol="$(jq -r '.records[] | .path as $p | (.functions // {}) | to_entries[] | .key as $f
             | .value.codeSpan.start.line as $s | .value.codeSpan.end.line as $e
             | .value.metrics[] | select(.level=="warning" or .level=="alarm")
             | "\($p):\($s):\($e) \($f) \(.metricsId)=\(.value)"' "$json" \
-        | awk -v all="$SCOPE_ALL" -v prefix="$PKG_REL/" -v scope="$SCOPE_FILE" '
+        | drop_generated | awk -v all="$SCOPE_ALL" -v prefix="$PKG_REL/" -v scope="$SCOPE_FILE" '
             BEGIN { while ((getline l < scope) > 0) { if (index(l, ":")) lines[l]=1; else files[l]=1 } }
             { split($1, a, ":"); f=prefix a[1]; s=a[2]+0; e=a[3]+0; keep=(all==1)||(f in files)
               if (!keep) for (i=s;i<=e;i++) if ((f":"i) in lines) { keep=1; break }

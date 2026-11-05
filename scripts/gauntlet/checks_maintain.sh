@@ -28,12 +28,12 @@ pkg_used_packages() { grep -rhoE "package:[a-zA-Z_0-9]+/" "$PKG_DIR/lib" 2>/dev/
 grep_src() {
   local dir="$1"; shift
   local args=(); local p; for p in "$@"; do args+=(-e "$p"); done
-  grep -rnE --include='*.dart' --exclude='*.g.dart' --exclude='*.freezed.dart' "${args[@]}" "$dir" 2>/dev/null \
-    | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##"
+  grep -rnE --include='*.dart' "${args[@]}" "$dir" 2>/dev/null \
+    | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | drop_generated
 }
 presentation_files() { # vues et widgets, hors bloc/keys/events/states
   find "$PKG_DIR/lib/src/presentation" -name '*.dart' 2>/dev/null \
-    | grep -vE '/bloc/|_event\.dart$|_state\.dart$|/keys\.dart$|\.g\.dart$|\.freezed\.dart$' \
+    | grep -vE '/bloc/|_event\.dart$|_state\.dart$|/keys\.dart$' | drop_generated \
     | filter_excluded $(cfg_list ds.exempt | sed "s#^#$PKG_DIR/#" | tr '\n' ' ')
 }
 
@@ -222,7 +222,7 @@ check_l10n_arb() {
   # locale silently falls back to the template language. Only names that are keys of some ARB file count.
   local all used
   all="$(for f in $files; do jq -r 'keys[] | select(startswith("@") | not)' "$PROJECT_ROOT/$f" 2>/dev/null; done | LC_ALL=C sort -u)"
-  used="$( (cd "$PKG_DIR" && grep -rnoE --include='*.dart' --exclude='*.g.dart' --exclude='*.freezed.dart' 'l10n\.[A-Za-z_][A-Za-z0-9_]*' lib 2>/dev/null) \
+  used="$( (cd "$PKG_DIR" && grep -rnoE --include='*.dart' 'l10n\.[A-Za-z_][A-Za-z0-9_]*' lib 2>/dev/null) \
     | filter_scope_lines "$PKG_REL/" | sed 's/.*l10n\.//' | LC_ALL=C sort -u \
     | LC_ALL=C comm -12 - <(printf '%s\n' "$all") | LC_ALL=C comm -23 - <(printf '%s\n' "$added" | LC_ALL=C sort -u))"
   [ -n "$added$used" ] || { info "aucune clé l10n ajoutée depuis $base ni utilisée par le code modifié"; return 0; }
@@ -255,7 +255,7 @@ check_barrel_api() {
 # ou "lib/…dart" (fichiers) sont ramenées en chemins relatifs au package.
 _unused() {
   local out rc
-  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics "$1" lib --fatal-unused --no-congratulate --exclude='{/**.g.dart,/**.freezed.dart}' 2>&1)"; rc=$?
+  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics "$1" lib --fatal-unused --no-congratulate --exclude="$(generated_dcl_exclude)" 2>&1)"; rc=$?
   [ "$rc" = 0 ] && { info "rien d'inutilisé"; return 0; }
   # Strip "at " and the absolute package prefix without putting the path in a regex.
   # Unused code is reported as file:line:col, so it is scoped by line (extend mode: only added
@@ -306,7 +306,7 @@ check_generated_fresh() {
   has_dev_dep build_runner || { info "pas de build_runner"; return 0; }
   # shellcheck disable=SC2086
   (cd "$PKG_DIR" && $DART run build_runner build --delete-conflicting-outputs >/dev/null 2>&1) || { ko "build_runner a échoué"; return 1; }
-  local dirty; dirty="$(git_in "$PKG_REL" status --porcelain -- "$PKG_DIR" | grep -E '\.(g|freezed)\.dart$')"
+  local dirty; dirty="$(git_in "$PKG_REL" status --porcelain -- "$PKG_DIR" | cut -c4- | only_generated)"
   [ -z "$dirty" ] && { info "fichiers générés à jour et commités"; return 0; }
   printf '%s\n' "$dirty" | sed 's/^/   ✗ /'; ko "fichiers générés modifiés ou non commités : relancer build_runner et commiter"
   return 1

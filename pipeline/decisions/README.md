@@ -14,3 +14,4 @@ se supprime pas.
 | [0002](0002-revue-en-lecture-seule.md) | La revue est en lecture seule | acceptée |
 | [0003](0003-gauntlet-seul-juge.md) | Le gauntlet est le seul juge d'une étape | acceptée |
 | [0004](0004-evidence-par-etape.md) | Chaque étape laisse ses preuves, l'evidence les rassemble | acceptée |
+| [0005](0005-pas-d-arret-sans-thibault.md) | Le pipeline ne s'arrête que pour attendre Thibault (watchdog) | acceptée |

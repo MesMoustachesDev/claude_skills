@@ -20,6 +20,7 @@ Argument : **$ARGUMENTS**
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
 /feature <nom> cockpit                         publie ou rafraîchit le cockpit de la feature
+/feature <nom> watchdog                        la feature est-elle bloquée ? relance la suite ou prévient Thibault (lancé par le cron de l'étape 0)
 ```
 
 Une feature trop grosse (gabarit L) devient un **epic** : `/epic` (`~/.claude/commands/epic.md`)
@@ -71,9 +72,30 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 `/feature <nom> status` : `pipeline.sh status <nom>`, affiché tel quel, plus l'issue et le découpage
 s'il y en a. Rien d'autre.
 `/feature <nom> cockpit` : `~/.claude/pipeline/feature/cockpit.md`.
+`/feature <nom> watchdog` : voir « Watchdog » ci-dessous.
 `/feature help` : `~/.claude/pipeline/feature/help.md`. `/feature init` :
 `~/.claude/pipeline/feature/init.md`. Un symptôme déjà vu (gate qui lit 0 test, mutation lente, hook
 qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de chercher.
+
+### Watchdog
+
+Le pipeline n'attend jamais en silence. Deux veilleurs, posés à l'étape 0 (`00_preconditions.md`,
+« Watchdog ») : un `CronCreate` dans ta session, qui t'envoie `/feature <nom> watchdog` toutes les
+`watchdog.minutes` quand la session est inactive, et `watchdog.sh scan` hors session (LaunchAgent), qui
+prévient Thibault par une notification macOS si la session est fermée ou bloquée sur une permission.
+Tous deux lisent le même verdict, déterministe : `pipeline.sh watchdog <nom>`.
+
+| Verdict | Ce que c'est | Ce que tu fais |
+|---|---|---|
+| `working` | un hook joue un gate, ou un sous-agent de ce worktree a écrit depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
+| `idle` | calme depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
+| `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (agent fini sans suite, gate rejoué que personne n'a lu) | **reprends la boucle** (`pipeline.sh next`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Une ligne au cockpit (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
+| `waiting_thibault` | `cockpit.waiting` posé, une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` (plus de `watchdog.minutes`) → `PushNotification` d'une ligne : ce qu'on attend de lui (le texte de `cockpit.waiting`) et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
+| `done` | pipeline terminé | `CronDelete` de `watchdog_cron` |
+
+Pour que le verdict soit juste : **un tour qui finit sur une question à Thibault pose toujours
+`pipeline.sh say`** (cadrage en discussion compris : « cadrage : à toi de répondre ») et le vide à sa
+réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
 
 ---
 
@@ -82,6 +104,9 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 | Quoi | Où |
 |---|---|
 | Gauntlet | `~/.claude/scripts/gauntlet.sh <profil> <nom>` — `doctor`, `list` |
+| Watchdog | `pipeline.sh watchdog <nom>` (verdict) · `~/.claude/scripts/watchdog.sh` (veille hors session, LaunchAgent) |
+| Fichiers non versionnés du worktree | `~/.claude/scripts/worktree_untracked.sh <worktree>` (`worktree.copy_untracked`) |
+| Appareils QA | `pipeline.sh devices <nom>` (preflight, `qa_devices`) · `gauntlet.sh qa_device <nom>` |
 | Rapport pour le dev | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
 | Config projet | `.claude/rules/feature_pipeline.md` (template : `~/.claude/commands/templates/flutter/feature_pipeline.md`) |
 | Règles de code | `.claude/rules/create_feature_rules.md` (template : `~/.claude/commands/templates/flutter/create_feature_rules.md`) |

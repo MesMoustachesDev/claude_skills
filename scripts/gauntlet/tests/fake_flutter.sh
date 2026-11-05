@@ -5,7 +5,7 @@
 #                          fichier ; le test échoue si le fichier contient FAKE_FAIL. Exit 1 si un échec.
 #                          Des chemins en argument (gauntlet par couche) → ces fichiers seulement.
 #   analyze              → FAKE_ANALYZE_ERROR dans un fichier analysé = erreur de compilation (les chemins en
-#                          argument, sinon lib/ et test/)
+#                          argument, sinon lib/ et test/) ; FAKE_ANALYZE_INFO = un lint (info), exit 1
 case "${1:-}" in
   --version) echo "Flutter fake (gauntlet tests)"; exit 0 ;;
   test|analyze) ;;
@@ -20,8 +20,11 @@ done
 if [ "$cmd" = analyze ]; then
   [ ${#paths[@]} -gt 0 ] || paths=(lib test)
   hits="$(grep -rl FAKE_ANALYZE_ERROR "${paths[@]}" 2>/dev/null)"
-  [ -z "$hits" ] && { echo "No issues found!"; exit 0; }
-  printf '  error • fake compile error • %s:1:1 • fake\n' $hits; exit 1
+  infos="$(grep -rl FAKE_ANALYZE_INFO "${paths[@]}" 2>/dev/null)"
+  [ -z "$hits$infos" ] && { echo "No issues found!"; exit 0; }
+  [ -n "$hits" ] && printf '  error • fake compile error • %s:1:1 • fake\n' $hits
+  [ -n "$infos" ] && printf '   info • Cascade consecutive method invocations • %s:1:1 • cascade_invocations\n' $infos
+  exit 1
 fi
 id=0 rc=0
 while IFS= read -r f; do

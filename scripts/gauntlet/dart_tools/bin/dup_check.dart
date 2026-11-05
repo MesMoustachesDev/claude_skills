@@ -117,11 +117,13 @@ void main(List<String> args) {
   final rootDir = Directory(root);
   final pkgDir = p.normalize(p.absolute(package));
 
+  // Generated files (feature_pipeline.md → generated.exclude), the regex the gauntlet exports.
+  final generated = RegExp(Platform.environment['GAUNTLET_GENERATED_ERE'] ?? r'\.(g|freezed)\.dart$');
   final decls = <Decl>[];
   for (final f in rootDir.listSync(recursive: true).whereType<File>()) {
     final path = f.path;
     if (!path.endsWith('.dart')) continue;
-    if (path.endsWith('.g.dart') || path.endsWith('.freezed.dart')) continue;
+    if (generated.hasMatch(path)) continue;
     if (path.contains('/.dart_tool/') || path.contains('/build/') || path.contains('/test/')) continue;
     if (!path.contains('/lib/')) continue;
     final pkgName = _packageOf(path, rootDir.path);

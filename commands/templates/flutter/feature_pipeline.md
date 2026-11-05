@@ -63,6 +63,28 @@ threshold.mutation = 85
 pipeline.max_attempts = 5
 
 # ---------------------------------------------------------------------------
+# Fichiers générés : aucun check ne les juge (analyze, format, métriques, stubs, couverture, design system,
+# mutation…) ; seules la compilation et generated_fresh les regardent. Globs, * traverse les /, un glob sans /
+# vise le nom du fichier. Vide = le défaut ci-dessous ; none = aucun.
+# ---------------------------------------------------------------------------
+generated.exclude = *.g.dart, *.freezed.dart, *.mocks.dart, *.gr.dart, *.gen.dart, *.config.dart, app_localizations*.dart, **/l10n/generated/**, **/generated_l10n/**
+
+# ---------------------------------------------------------------------------
+# Worktree de feature (/feature, étape 0) : fichiers gitignorés copiés du checkout principal s'ils manquent
+# (globs git). Jamais d'écrasement, jamais un keystore ni un secret de signature (refusés même listés).
+# Vide = le défaut de worktree_untracked.sh ; none = rien.
+# ---------------------------------------------------------------------------
+worktree.copy_untracked = **/.env, **/.env.*, **/*.env, **/.ci.env, **/local.properties, **/google-services.json, **/GoogleService-Info.plist, **/firebase_options*.dart, **/firebase_app_id_file.json, **/.fvmrc
+
+# ---------------------------------------------------------------------------
+# Watchdog : au-delà de N minutes sans activité (ni gate, ni sous-agent) et sans question posée à Thibault,
+# la session relance la suite ; une question sans réponse depuis N minutes le notifie, au plus une fois
+# toutes les renotify_minutes. (pipeline.sh watchdog, watchdog.sh)
+# ---------------------------------------------------------------------------
+watchdog.minutes = 20
+watchdog.renotify_minutes = 120
+
+# ---------------------------------------------------------------------------
 # Mutation testing (globs relatifs au package)
 # ---------------------------------------------------------------------------
 mutation.include = lib/src/domain/**.dart, lib/src/data/**.dart, lib/src/presentation/**/bloc/*.dart
@@ -139,6 +161,9 @@ android.app_id = com.example.app
 android.build = fvm flutter build apk --debug
 android.apk = build/app/outputs/flutter-apk/app-debug.apk
 ios.simulator = iPhone 16 Pro
+# Simulateur modèle (éteint, compte de test connecté, données de QA en place) : chaque run /fix et /feature
+# en clone le sien (~/.claude/scripts/sim.sh). Vide : tous les runs partagent ios.simulator.
+ios.simulator_base =
 ios.app_id = com.example.app
 ios.build = fvm flutter build ios --debug --simulator
 ios.app = build/ios/iphonesimulator/Runner.app

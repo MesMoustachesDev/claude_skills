@@ -64,6 +64,8 @@ init_project_context() {
   FLUTTER="$(cfg flutter 'flutter')"
   DART="$(cfg dart 'dart')"
   BASE_BRANCH="$(cfg base_branch 'develop')"
+  # Exported for the Python and Dart tools of the gauntlet (dup_check, spec_lint), which skip the same files.
+  GENERATED_ERE="$(generated_ere)"; export GAUNTLET_GENERATED_ERE="$GENERATED_ERE"
 
   # APP_ROOT : le dossier de l'app Flutter (app_dir), là où vit .fvmrc. Toute commande dart/flutter lancée
   # hors d'un package (outils Dart du gauntlet, pub global) tourne depuis APP_ROOT : depuis la racine du
@@ -275,7 +277,7 @@ layer_files() {
 # red_check…) ne jugent alors que la moitié de l'agent, pas les fichiers que l'autre écrit en même temps.
 layer_scope() {
   local file="$1" all="$2" tmp l; tmp="$(mktemp)"
-  if [ "$all" = 1 ]; then layer_files lib test | sed "s#^#$PKG_REL/#" > "$tmp"
+  if [ "$all" = 1 ]; then layer_files lib test | drop_generated | sed "s#^#$PKG_REL/#" > "$tmp"
   else
     while IFS= read -r l; do
       [[ "$l" == "$PKG_REL/"* ]] || continue
@@ -293,7 +295,7 @@ scope_compute() {
     diff_u0 "$base" "$PKG_REL" --diff-filter=M \
       | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,","); s=substr(a[1],2); n=(a[2]==""?1:a[2]); for(i=0;i<n;i++) print f":"(s+i)}' \
       | drop_format_only "$base"
-  } | sort -u
+  } | drop_generated | sort -u
 }
 # drop_format_only <base> — stdin « fichier:ligne » (relatif à PROJECT_ROOT) → sans les lignes d'un fichier
 # .dart qui ne changent que par le format depuis <base> (dart format : ligne recoupée, recollée, réindentée,
@@ -323,17 +325,18 @@ scope_summary() {
   [ "$SCOPE_ALL" = 1 ] && echo "package entier (create)" || echo "${LAYER:+couche $LAYER, }$(grep -vc ':' "$SCOPE_FILE") fichier(s) nouveau(x), $(grep -c ':' "$SCOPE_FILE") ligne(s) ajoutée(s) dans $(grep ':' "$SCOPE_FILE" | cut -d: -f1 | sort -u | wc -l | tr -d ' ') fichier(s) modifié(s) (extend)"
 }
 # in_scope_file <chemin relatif à PROJECT_ROOT> — fichier nouveau ou touché
-in_scope_file() { [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }
+in_scope_file() { [ -n "$(printf '%s\n' "$1" | drop_generated)" ] || return 1; [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }
 # scope_files <prefix> — fichiers du périmètre, relatifs à <prefix> (ex: "$PKG_REL/"), .dart seulement
 scope_files() {
   local prefix="$1"
-  if [ "$SCOPE_ALL" = 1 ]; then (cd "$PROJECT_ROOT/$prefix" && find lib test -name '*.dart' 2>/dev/null)
+  if [ "$SCOPE_ALL" = 1 ]; then (cd "$PROJECT_ROOT/$prefix" && find lib test -name '*.dart' 2>/dev/null) | drop_generated
   else cut -d: -f1 "$SCOPE_FILE" | grep '\.dart$' | sort -u | sed "s#^$prefix##"; fi
 }
-# filter_scope_lines <prefix> — stdin "chemin:ligne:…" (chemins relatifs à <prefix>) → garde les hits du périmètre
+# filter_scope_lines <prefix> — stdin "chemin:ligne:…" (chemins relatifs à <prefix>) → garde les hits du périmètre.
+# Un fichier généré n'est jamais dans le périmètre, en create comme en extend.
 filter_scope_lines() {
   local prefix="$1"
-  if [ "$SCOPE_ALL" = 1 ]; then cat; return; fi
+  if [ "$SCOPE_ALL" = 1 ]; then drop_generated; return; fi
   awk -v prefix="$prefix" -v scope="$SCOPE_FILE" '
     BEGIN { while ((getline l < scope) > 0) { if (index(l, ":")) lines[l]=1; else files[l]=1 } }
     { split($0, a, ":"); f=prefix a[1]; if ((f in files) || ((f":"a[2]) in lines)) print }'
@@ -341,7 +344,7 @@ filter_scope_lines() {
 # filter_scope_files <prefix> — stdin "chemin…" → garde les lignes dont le fichier est dans le périmètre
 filter_scope_files() {
   local prefix="$1"
-  if [ "$SCOPE_ALL" = 1 ]; then cat; return; fi
+  if [ "$SCOPE_ALL" = 1 ]; then drop_generated; return; fi
   awk -v prefix="$prefix" -v scope="$SCOPE_FILE" '
     BEGIN { while ((getline l < scope) > 0) { sub(/:[0-9]+$/, "", l); files[l]=1 } }
     { split($0, a, ":"); if ((prefix a[1]) in files) print }'
@@ -360,6 +363,47 @@ cfg() {
 }
 # cfg_list <clé> — une valeur par ligne, séparateur virgule, vides ignorés
 cfg_list() { cfg "$1" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$'; }
+
+# ---------------------------------------------------------------------------
+# Fichiers générés
+# ---------------------------------------------------------------------------
+# Aucun check ne juge une sortie de build_runner, de gen-l10n ou d'un autre générateur : un lint dans un
+# .g.dart n'est pas corrigeable par l'agent (il serait écrasé à la prochaine génération). Le motif vient de
+# feature_pipeline.md → generated.exclude (globs, `*` traverse les `/`, un glob sans `/` vise le nom du
+# fichier) ; `none` n'exclut rien. Seuls generated_fresh (génération à jour et commitée) et la compilation
+# (`error •` de l'analyse, qui ne passe pas par le périmètre) les regardent encore.
+GENERATED_DEFAULT='*.g.dart, *.freezed.dart, *.mocks.dart, *.gr.dart, *.gen.dart, *.config.dart, app_localizations*.dart, **/l10n/generated/**, **/generated_l10n/**'
+generated_globs() {
+  local v; v="$(cfg generated.exclude "$GENERATED_DEFAULT")"
+  [ "$v" = none ] && return 0
+  printf '%s' "$v" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$'
+}
+# generated_ere — les globs en une ERE ancrée sur la fin du chemin : (^|/)(alt1|alt2…)$ ; vide si aucun.
+generated_ere() {
+  local alts
+  alts="$(generated_globs | sed -e 's#^\*\*/##' -e 's/[].[^$+(){}|\\]/\\&/g' -e 's/\*\*/*/g' -e 's/\*/.*/g' -e 's#?#[^/]#g' | paste -sd '|' -)"
+  [ -n "$alts" ] && printf '(^|/)(%s)$' "$alts"
+}
+# drop_generated — filtre stdin : lignes « chemin », « chemin:ligne » ou « chemin:ligne:texte » (grep -n)
+# sans celles dont le chemin est un fichier généré. only_generated : l'inverse.
+drop_generated() { _generated_filter 0; }
+only_generated() { _generated_filter 1; }
+_generated_filter() {
+  if [ -z "${GENERATED_ERE:-}" ]; then [ "$1" = 1 ] || cat; return 0; fi
+  # ENVIRON, pas -v : awk interpréterait les \. de l'ERE comme des séquences d'échappement.
+  RE="$GENERATED_ERE" KEEP="$1" awk '{ p = $0; i = index(p, ":"); if (i) p = substr(p, 1, i - 1)
+    if ((p ~ ENVIRON["RE"]) == (ENVIRON["KEEP"] == 1)) print }'
+}
+# generated_dcl_exclude — les mêmes globs pour --exclude de dart_code_linter : {/**.g.dart,/**/x/**,…}
+generated_dcl_exclude() {
+  local g out=""
+  while IFS= read -r g; do
+    g="${g#\*\*/}"
+    case "$g" in \**) g="/**${g#\*}" ;; *) g="/**/$g" ;; esac
+    out="$out${out:+,}$g"
+  done < <(generated_globs)
+  printf '{%s}' "${out:-/**/.no-generated-files}"
+}
 
 # pipeline_get <clé jq> — lit .claude/features/<feature>/pipeline.json
 pipeline_get() { [ -f "$FEATURE_DIR/pipeline.json" ] && jq -r "$1 // empty" "$FEATURE_DIR/pipeline.json"; }

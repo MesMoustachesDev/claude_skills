@@ -24,6 +24,16 @@
     écris-la dans `pipeline.json → graphify_graph` (à la création, ou en remplacement à la reprise ;
     `null` hors `ok`) : tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage, et à tout
     agent relancé plus tard ; 9a le mettra à jour.
+  - **Fichiers non versionnés** (création comme reprise), avant le `pub get` :
+    `bash ~/.claude/scripts/worktree_untracked.sh <worktree>`. Il copie depuis le checkout principal
+    (le premier de `git worktree list`) les fichiers gitignorés que le build et les tests lisent et qui
+    manquent au worktree : `.env*`, `*.env`, `.ci.env`, `local.properties`, configs Firebase, `.fvmrc`…
+    (`worktree.copy_untracked` de la config ; défaut dans l'en-tête du script). Il n'écrase jamais un
+    fichier déjà là et ne copie jamais un keystore ni un secret de signature (`*.jks`, `key.properties`,
+    `*.p8`, `*.p12`…), même s'ils sont demandés. Pas de question : dis-le avec le bloc « ce que tu
+    tranches sans lui » (`feature.md`) — les fichiers copiés (lignes `copié`), la ligne `résumé`, les
+    `refusé` s'il y en a, et que la liste se règle dans `worktree.copy_untracked`. Rien de copié : une
+    ligne suffit, dans le même bloc que la base de branche.
   - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
     worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
@@ -53,6 +63,33 @@
   le rejeu vert.
   Puis **crée la page de la feature** (`~/.claude/pipeline/feature/cockpit.md`, « Créer la page ») ;
   en reprise, réarme-la pour cette session (même section, point 4).
+- **Watchdog** (création comme reprise, une fois par session). Le pipeline ne reste jamais des heures
+  sans avancer : sur `import_cancel_sync`, `red` a été joint à 21 h 54, et 3b n'a été lancée qu'à 9 h.
+  1. `CronCreate` récurrent, `cron` = toutes les `watchdog.minutes` de la config (défaut 20 :
+     `"*/20 * * * *"`, minute de départ décalée), `prompt` = `/feature <nom> watchdog`. Garde l'id
+     dans `pipeline.sh set <nom> watchdog_cron '"<id>"'`. Il ne se déclenche que session inactive :
+     il ne coupe jamais un tour. Il expire au bout de 7 jours : en reprise, recrée-le (`CronList`
+     d'abord, pas de doublon).
+  2. `bash ~/.claude/scripts/watchdog.sh register <worktree> <nom>` : la veille hors session
+     (LaunchAgent, voir `init.md`) suit la feature même session fermée ou bloquée sur une permission.
+     S'il répond « LaunchAgent absent », dis-le une fois avec le bloc « ce que tu tranches sans lui » :
+     seule la veille dans la session tourne.
+  Le traitement de `/feature <nom> watchdog` est dans `feature.md` (« Watchdog »).
+- **Preflight QA** (nouveau run, ou reprise sans `qa_devices`) : `qa.platforms` vide → rien. Sinon,
+  pour chaque plateforme, comment Quentin obtient son appareil à l'étape 8. Un simulateur par worktree,
+  jamais le simulateur partagé (`ios.simulator`) ni le modèle (`ios.simulator_base`) : `pipeline.sh
+  devices` les refuse. Une seule question, posée avec la première du cadrage (même arrêt, `--ask
+  devices`), header `Appareil QA`, options :
+  - « Cloner un neuf (Recommandé) » → `pipeline.sh devices <nom> <pf> fresh` : clone du modèle
+    (iOS, `sim.sh`, déjà connecté au compte de test) ; Android : instance jetable `-read-only` de
+    `android.avd`.
+  - « Cloner un neuf, à préparer » → il décrit l'état (compte, rapport téléchargé, écran de départ…) ;
+    `pipeline.sh devices <nom> <pf> prepared --state "<sa description, telle quelle>"`. Quentin le
+    prépare avant ses flows ; le gate `qa` refuse de tourner tant que ce n'est pas fait.
+  - « Réutiliser un existant » → il nomme l'appareil (nom ou UDID du simulateur, serial ou AVD) ;
+    `pipeline.sh devices <nom> <pf> reuse --device "<nom>"`. Liste-lui les candidats avant
+    (`sim.sh list`, `adb devices`).
+  Montre l'état actuel avant la question : `pipeline.sh devices <nom>` et `sim.sh list`.
   `size` (`S|M|L`, posé à la fin de 0b par `pipeline.sh size`) est lu par `pipeline.sh` et par le
   gauntlet (QA) ; absent ou `null`, c'est `M`.
 - **Ticket** (tracker du projet : `~/.claude/pipeline/tracker.md`) : `~/.claude/pipeline/issue.md`,

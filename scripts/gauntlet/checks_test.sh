@@ -150,7 +150,7 @@ check_coverage() {
   [ -f "$lcov" ] || { ko "pas de $lcov"; return 1; }
   base="$(merge_base)"
   changed="$GAUNTLET_OUT/changed_lines.txt"
-  new_lines "$base" "$PKG_REL/lib" | grep -vE '\.g\.dart:|\.freezed\.dart:' | drop_format_only "$base" | sort -u > "$changed"
+  new_lines "$base" "$PKG_REL/lib" | drop_generated | drop_format_only "$base" | sort -u > "$changed"
   moved="$(cat "$GAUNTLET_OUT/moved_lines.count" 2>/dev/null)"
   [ "${moved:-0}" -gt 0 ] && info "$moved ligne(s) seulement déplacée(s) (code existant découpé ou extrait) : hors couverture"
   formatted="$(cat "$GAUNTLET_OUT/format_lines.count" 2>/dev/null)"
@@ -269,7 +269,7 @@ mutation_worker() {
 # seront mutées). Retour 2 si mutation.include ne correspond à aucun fichier du package.
 mutation_files() {
   local files
-  files="$(expand_globs "$PKG_DIR" $(cfg_list mutation.include | tr '\n' ' ') | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' '))"
+  files="$(expand_globs "$PKG_DIR" $(cfg_list mutation.include | tr '\n' ' ') | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' ') | drop_generated)"
   [ -n "$files" ] || return 2
   printf '%s\n' "$files" | filter_scope_files "$PKG_REL/"
 }
@@ -295,7 +295,7 @@ mutation_extra_report() {
     changed="$( { diff_names "$base" "$pkg/lib" --diff-filter=AM; untracked "$pkg/lib"; } | sed "s#^$pkg/##" | sort -u)"
     [ -n "$changed" ] || continue
     logic="$(expand_globs "$PROJECT_ROOT/$pkg" $(cfg_list mutation.include | tr '\n' ' ') \
-      | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' ') | grep -Fx -f <(printf '%s\n' "$changed"))"
+      | filter_excluded $(cfg_list mutation.exclude | tr '\n' ' ') | drop_generated | grep -Fx -f <(printf '%s\n' "$changed"))"
     [ -n "$logic" ] || continue
     printf '%s\n' "$logic" | sed "s#^#$pkg/#" >> "$out"
     info "non muté : $pkg (writes.extra) — $(printf '%s\n' "$logic" | wc -l | tr -d ' ') fichier(s) de logique modifié(s) par la feature"

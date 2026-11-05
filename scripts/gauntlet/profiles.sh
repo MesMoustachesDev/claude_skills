@@ -89,6 +89,7 @@ Checks individuels :
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
   tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
   qa                 flows Maestro sur chaque plateforme (gabarit S : une seule, qa.platform_s ou la première), captures
+  qa_device          démarre ou clone l'appareil QA de la feature (pipeline.json → qa_devices, preflight), sans build ni flow
 
 Maintenabilité (checks_maintain.sh) :
   deps_unused        chaque dépendance déclarée est importée

@@ -6,6 +6,7 @@ commits de contrats et de gel, documents du cockpit) vit ici, pas dans le prompt
 """
 import datetime
 import fnmatch
+import glob
 import hashlib
 import json
 import os
@@ -343,7 +344,7 @@ def cmd_init(c, args):
         "size": None, "size_reason": None, "size_changes": [], "split": [],
         "created": now(), "stages": {}, "human_gates": {}, "attempts": {}, "contracts": {},
         "tests_freeze_sha": None, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "accepted": [],
-        "issue": None, "graphify_graph": None,
+        "issue": None, "graphify_graph": None, "qa_devices": {},
     }
     parent = opts.get("--parent")
     if parent:
@@ -531,6 +532,219 @@ def cmd_say(c, args):
     c.p["cockpit"]["at"] = now()
     c.save()
     print("message du cockpit écrit")
+
+
+QA_DEVICE_MODES = ("fresh", "prepared", "reuse")
+
+
+def cmd_devices(c, args):
+    """Preflight QA : comment Quentin obtient son simulateur iOS / émulateur Android pour cette feature.
+    devices <nom> <ios|android> fresh|prepared|reuse [--state "<état à préparer>"] [--device <nom|udid|serial>]
+    devices <nom> <ios|android> prepared-done        Quentin a mis l'appareil dans l'état demandé
+    devices <nom>                                    affiche les choix (et les plateformes sans choix)"""
+    platforms = c.cfg_list("qa.platforms")
+    devs = c.p.setdefault("qa_devices", {})
+    if not args:
+        for pf in platforms or ["(qa.platforms vide : pas de QA)"]:
+            d = devs.get(pf)
+            print(f"{pf} : " + (json.dumps(d, ensure_ascii=False) if d else "pas encore choisi"))
+        return
+    pf = args[0]
+    if pf not in ("ios", "android"):
+        die("plateforme : ios | android")
+    if len(args) < 2:
+        die("usage : devices <nom> <ios|android> fresh|prepared|reuse|prepared-done [--state …] [--device …]")
+    mode, opts = args[1], dict(zip(args[2::2], args[3::2]))
+    if mode == "prepared-done":
+        d = devs.get(pf) or {}
+        if d.get("mode") != "prepared":
+            die(f"qa_devices.{pf} n'est pas en mode prepared")
+        d["prepared_at"] = now()
+        c.save()
+        print(f"qa_devices.{pf} : état préparé ({d.get('state')})")
+        return
+    if mode not in QA_DEVICE_MODES:
+        die(f"mode : {' | '.join(QA_DEVICE_MODES)}")
+    entry = {"mode": mode, "at": now()}
+    if mode == "prepared":
+        if not opts.get("--state"):
+            die("prepared : --state \"<compte, rapport téléchargé, écran de départ…>\" est obligatoire")
+        entry["state"] = opts["--state"]
+    if mode == "reuse":
+        dev = opts.get("--device")
+        if not dev:
+            die("reuse : --device <nom ou UDID du simulateur | serial ou AVD Android> est obligatoire")
+        # Un simulateur par worktree, jamais celui que tout le monde partage, ni le modèle qu'on clone.
+        shared = {"ios": [c.cfg("ios.simulator"), c.cfg("ios.simulator_base")],
+                  "android": []}[pf]
+        if dev in [x for x in shared if x]:
+            die(f"{dev} est le simulateur partagé ou le modèle (ios.simulator / ios.simulator_base) : "
+                "un simulateur par worktree — clone-le (fresh) ou nomme un autre appareil")
+        entry["device"] = dev
+    devs[pf] = entry
+    c.save()
+    print(f"qa_devices.{pf} = {json.dumps(entry, ensure_ascii=False)}")
+    missing = [x for x in platforms if x not in devs]
+    if missing:
+        print(f"reste à choisir : {', '.join(missing)}")
+
+
+# ---------------------------------------------------------------------------
+# Watchdog
+# ---------------------------------------------------------------------------
+def _mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return 0
+
+
+def _iso(ts):
+    return datetime.datetime.fromtimestamp(ts).strftime("%H:%M") if ts else "—"
+
+
+def _parse_at(s):
+    try:
+        return datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError):
+        return 0
+
+
+def _worktree_sessions(root):
+    """Sessions Claude dont le cwd est ce worktree (fichiers d'activité publiés par le mod pipeline-view)."""
+    out = []
+    act = os.path.expanduser("~/.claude/activity")
+    for f in (os.listdir(act) if os.path.isdir(act) else []):
+        if not f.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(act, f), encoding="utf-8") as fh:
+                a = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            continue
+        cwd = os.path.realpath(a.get("cwd") or "/nonexistent")
+        root = os.path.realpath(root)
+        if cwd == root or cwd.startswith(root + "/"):
+            out.append(a)
+    return out
+
+
+def _alive_hooks(gdir):
+    alive = []
+    for d, _, files in os.walk(gdir):
+        for f in files:
+            if f.startswith("hook_") and f.endswith(".running"):
+                try:
+                    pid, since, *agent = open(os.path.join(d, f)).read().split()
+                    os.kill(int(pid), 0)
+                    if time_now() - int(since) < 960:
+                        alive.append(f"{f[5:-8]} ({agent[0] if agent else '?'})")
+                except (OSError, ValueError):
+                    continue
+    return alive
+
+
+def time_now():
+    return datetime.datetime.now().timestamp()
+
+
+def watchdog_verdict(c):
+    """Verdict déterministe : done | working | waiting_thibault | stalled | idle.
+    Rien ne tourne (ni hook de gate, ni gauntlet, ni sous-agent) et aucune question n'attend Thibault depuis
+    plus de watchdog.minutes → stalled : la suite ne dépend pas de lui, l'orchestrateur la relance."""
+    minutes = int(c.cfg("watchdog.minutes", "20") or 20)
+    t = time_now()
+    n = next_step(c.p)
+    v = {"feature": c.name, "minutes": minutes, "step": n["step"], "title": n["title"], "now": _iso(t)}
+    if n["key"] in ("done", "split"):
+        return {**v, "verdict": "done", "detail": n["title"]}
+    gdir = os.path.join(c.dir, ".gauntlet")
+    # Dernière activité : écritures du pipeline, du gauntlet, des sous-agents des sessions de ce worktree.
+    events = [(_mtime(c.path), "pipeline.json écrit")]
+    for d, _, files in os.walk(c.dir):
+        if "/history" in d:
+            continue
+        for f in files:
+            if f.startswith(".watchdog"):
+                continue
+            events.append((_mtime(os.path.join(d, f)), os.path.relpath(os.path.join(d, f), c.dir)))
+    sessions = _worktree_sessions(c.root)
+    agents = []
+    for s in sessions:
+        sid = s.get("session") or ""
+        for sub in glob.glob(os.path.expanduser(f"~/.claude/projects/*/{sid}/subagents/*.jsonl")):
+            m = _mtime(sub)
+            events.append((m, "transcript d'un sous-agent"))
+            if t - m < minutes * 60:
+                agents.append(os.path.basename(sub)[:-6])
+    last_ts, last_what = max(events)
+    idle_min = int((t - last_ts) / 60)
+    v.update({"last_activity": _iso(last_ts), "last_what": last_what, "idle_minutes": idle_min})
+    hooks = _alive_hooks(gdir)
+    if hooks or agents:
+        what = (["gate en cours : " + ", ".join(hooks)] if hooks else []) + ([f"{len(agents)} sous-agent(s) actif(s)"] if agents else [])
+        return {**v, "verdict": "working", "detail": " · ".join(what)}
+    # Question posée à Thibault : depuis cockpit.at ; permission ou question en attente dans la session.
+    ck = c.p.get("cockpit") or {}
+    waiting = ck.get("waiting")
+    perm = [s for s in sessions if s.get("state") == "waiting"]
+    if waiting or perm or n["status"] == "FAILED":
+        since = _parse_at(ck.get("at")) if waiting else (min(x.get("at", 0) for x in perm) / 1000 if perm else last_ts)
+        detail = waiting or (f"la session attend : {perm[0].get('waitingOn') or 'une réponse'}" if perm
+                             else f"étape {n['step']} FAILED : Thibault décide")
+        wm = int((t - since) / 60)
+        return {**v, "verdict": "waiting_thibault", "waiting_minutes": wm, "alert": wm >= minutes, "detail": detail}
+    if idle_min >= minutes:
+        st = (c.p.get("stages") or {}).get(n["key"]) if n["key"] else None
+        gate = ""
+        lasts = sorted(((_mtime(os.path.join(gdir, f)), f) for f in (os.listdir(gdir) if os.path.isdir(gdir) else [])
+                        if f.startswith("last_") and f.endswith(".json")), reverse=True)
+        if lasts and lasts[0][0] >= last_ts - 1:
+            try:
+                ok = json.load(open(os.path.join(gdir, lasts[0][1]))).get("ok")
+            except (OSError, json.JSONDecodeError):
+                ok = None
+            gate = f" ; dernier gate joué : {lasts[0][1][5:-5]} ({'vert' if ok else 'rouge'}) à {_iso(lasts[0][0])}, personne ne l'a lu"
+        detail = (f"rien ne tourne depuis {_iso(last_ts)} ({last_what}) et aucune question n'attend Thibault ; "
+                  f"étape suivante {n['step']} — {n['title']} non lancée" + gate)
+        return {**v, "verdict": "stalled", "alert": True, "detail": detail,
+                "action": f"relancer la boucle : pipeline.sh next {c.name}"}
+    return {**v, "verdict": "idle", "detail": f"calme depuis {idle_min} min (seuil {minutes})"}
+
+
+def cmd_watchdog(c, args):
+    """watchdog <nom> [--json] [--notify] : verdict (voir watchdog_verdict). --notify : notification macOS
+    (notify.sh) si alerte, au plus une fois par verdict et par watchdog.renotify_minutes ; l'état de
+    l'envoi vit dans .watchdog.json, pas dans pipeline.json (le scan tourne hors de la session)."""
+    v = watchdog_verdict(c)
+    if "--notify" in args and v.get("alert"):
+        state_f = os.path.join(c.dir, ".watchdog.json")
+        try:
+            last = json.load(open(state_f))
+        except (OSError, json.JSONDecodeError):
+            last = {}
+        renotify = int(c.cfg("watchdog.renotify_minutes", "120") or 120) * 60
+        # Hors session, un blocage n'est signalé qu'après deux délais : la session vivante a eu le temps de se relancer.
+        late_enough = v["verdict"] != "stalled" or v["idle_minutes"] >= 2 * v["minutes"]
+        if late_enough and (last.get("verdict") != v["verdict"] or time_now() - last.get("ts", 0) >= renotify):
+            msg = f"{v['detail']}"
+            title = f"/feature {c.name} — " + ("attend ta réponse" if v["verdict"] == "waiting_thibault" else "bloquée")
+            subprocess.run(["bash", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "notify.sh"),
+                            "--needs-you", title, msg], check=False)
+            with open(state_f, "w") as fh:
+                json.dump({"verdict": v["verdict"], "ts": time_now()}, fh)
+            v["notified"] = True
+    if "--json" in args:
+        print(json.dumps(v, ensure_ascii=False, indent=2))
+        return
+    print(f"verdict   : {v['verdict']} — {v['detail']}")
+    print(f"étape     : {v['step']} — {v['title']}")
+    if "last_activity" in v:
+        print(f"activité  : dernière à {v['last_activity']} ({v['last_what']}), il y a {v['idle_minutes']} min · seuil {v['minutes']} min")
+    if v.get("action"):
+        print(f"à faire   : {v['action']}")
+    if v.get("notified"):
+        print("notifié   : oui (notify.sh)")
 
 
 def cmd_after_architect(c, args):
@@ -1006,6 +1220,7 @@ def cmd_cockpit_page(c, args):
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say,
+    "devices": cmd_devices, "watchdog": cmd_watchdog,
     "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
     "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,

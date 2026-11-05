@@ -8,6 +8,8 @@
 # Un flow écrit ses captures avec : - takeScreenshot: ${SCREENSHOT_DIR}/<scenario>
 # Le run précédent (captures, report.xml, maestro.log) est déplacé dans qa/<platform>/_runs/<date>/, jamais
 # effacé. Un config.yaml dans <package>/maestro/ est passé à Maestro (--config : executionOrder…).
+# iOS : avec ios.simulator_base, chaque run a son simulateur, « <modèle> · feature-<feature> » (sim.sh ensure,
+# nom surchargé par GAUNTLET_SIM_NAME), à supprimer avec le worktree. Sans, ios.simulator, partagé.
 
 wait_until() { # wait_until <secondes> <cmd...>
   local t="$1"; shift
@@ -15,15 +17,57 @@ wait_until() { # wait_until <secondes> <cmd...>
   return 1
 }
 
+EMULATOR="$HOME/Library/Android/sdk/emulator/emulator"
+android_online() { adb -s "$1" get-state 2>/dev/null | grep -q device; }
+# android_boot <avd> <serial> [options emulator…] — démarre l'AVD sur le port du serial, attend la fin du boot
+android_boot() {
+  local avd="$1" serial="$2"; shift 2
+  info "démarrage de l'AVD $avd ($serial${*:+, $*})"
+  nohup "$EMULATOR" -avd "$avd" -port "${serial#emulator-}" -no-snapshot-load "$@" >"$GAUNTLET_OUT/emulator.log" 2>&1 &
+  wait_until 180 sh -c "adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q 1" || { ko "l'émulateur n'a pas booté (voir .gauntlet/emulator.log)"; return 1; }
+}
+# qa_android_serial — l'émulateur de la feature, selon pipeline.json → qa_devices.android (preflight) :
+#   fresh | prepared  instance jetable de android.avd (-read-only : l'AVD n'est pas modifié, plusieurs
+#                     instances possibles), sur un port libre, gardée pour la feature (.gauntlet/android_serial)
+#   reuse             l'appareil nommé (serial en ligne, ou AVD à démarrer)
+#   sans choix        android.serial, partagé (comportement d'avant le preflight)
+qa_android_serial() { # → serial
+  local avd mode dev port
+  avd="$(cfg android.avd)"; mode="$(pipeline_get .qa_devices.android.mode)"; dev="$(pipeline_get .qa_devices.android.device)"
+  case "$mode" in
+    reuse)
+      if android_online "$dev"; then serial="$dev"; info "émulateur réutilisé : $dev"; return 0; fi
+      serial="$(cat "$GAUNTLET_OUT/android_serial" 2>/dev/null)"
+      android_online "${serial:-none}" && { info "émulateur réutilisé : $dev ($serial)"; return 0; }
+      serial="$(android_free_serial)" || return 1
+      android_boot "$dev" "$serial" || return 1
+      echo "$serial" > "$GAUNTLET_OUT/android_serial" ;;
+    fresh|prepared)
+      [ -n "$avd" ] || { ko "android.avd non configuré : pas d'AVD à cloner"; return 1; }
+      serial="$(cat "$GAUNTLET_OUT/android_serial" 2>/dev/null)"
+      if android_online "${serial:-none}"; then info "émulateur de la feature : $avd ($serial)"; return 0; fi
+      serial="$(android_free_serial)" || return 1
+      android_boot "$avd" "$serial" -read-only || return 1
+      echo "$serial" > "$GAUNTLET_OUT/android_serial" ;;
+    *)
+      serial="$(cfg android.serial emulator-5554)"
+      if ! android_online "$serial"; then
+        [ -n "$avd" ] || { ko "android.avd non configuré et $serial hors ligne"; return 1; }
+        android_boot "$avd" "$serial" || return 1
+      fi ;;
+  esac
+}
+android_free_serial() {
+  local p
+  for p in 5560 5562 5564 5566 5568 5570 5572 5574 5576 5578; do
+    android_online "emulator-$p" || adb devices 2>/dev/null | grep -q "emulator-$p" || { printf 'emulator-%s\n' "$p"; return 0; }
+  done
+  ko "aucun port d'émulateur libre (5560-5578)"; return 1
+}
+
 qa_prepare_android() { # → QA_DEVICE
-  local serial avd apk
-  serial="$(cfg android.serial emulator-5554)"; avd="$(cfg android.avd)"
-  if ! adb -s "$serial" get-state 2>/dev/null | grep -q device; then
-    [ -n "$avd" ] || { ko "android.avd non configuré et $serial hors ligne"; return 1; }
-    info "démarrage de l'AVD $avd"
-    nohup "$HOME/Library/Android/sdk/emulator/emulator" -avd "$avd" -no-snapshot-load >"$GAUNTLET_OUT/emulator.log" 2>&1 &
-    wait_until 180 sh -c "adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q 1" || { ko "l'émulateur n'a pas booté (voir .gauntlet/emulator.log)"; return 1; }
-  fi
+  local serial apk
+  qa_android_serial || return 1
   adb -s "$serial" shell settings put global window_animation_scale 0 >/dev/null 2>&1
   adb -s "$serial" shell settings put global transition_animation_scale 0 >/dev/null 2>&1
   adb -s "$serial" shell settings put global animator_duration_scale 0 >/dev/null 2>&1
@@ -36,12 +80,38 @@ qa_prepare_android() { # → QA_DEVICE
   QA_DEVICE="$serial"
 }
 
-qa_prepare_ios() { # → QA_DEVICE
-  local sim udid app
+# qa_ios_udid — the run's own clone of ios.simulator_base (booted by sim.sh), else the shared ios.simulator.
+# Preflight (pipeline.json → qa_devices.ios) : reuse → le simulateur nommé ; fresh | prepared → le clone.
+qa_ios_udid() {
+  local sim name mode dev
+  mode="$(pipeline_get .qa_devices.ios.mode)"; dev="$(pipeline_get .qa_devices.ios.device)"
+  if [ "$mode" = reuse ]; then
+    udid="$(xcrun simctl list devices available -j | jq -r --arg k "$dev" '[.devices[][] | select(.name==$k or .udid==$k)][0].udid // empty')"
+    [ -n "$udid" ] || { ko "simulateur « $dev » (qa_devices.ios.device) introuvable"; return 1; }
+    info "simulateur réutilisé : $dev ($udid)"
+    xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || true
+    return 0
+  fi
+  if [ -n "$mode" ] && [ -z "$(cfg ios.simulator_base)" ]; then
+    ko "qa_devices.ios = $mode mais pas de ios.simulator_base à cloner : configure le modèle, ou choisis reuse"; return 1
+  fi
+  if [ -n "$(cfg ios.simulator_base)" ]; then
+    name="${GAUNTLET_SIM_NAME:-feature-$FEATURE}"
+    udid="$(cd "$PROJECT_ROOT" && SIM_BASE="$(cfg ios.simulator_base)" "$HOME/.claude/scripts/sim.sh" ensure "$name" 2>"$GAUNTLET_OUT/sim.log")" \
+      || { sed 's/^/   /' "$GAUNTLET_OUT/sim.log"; ko "pas de simulateur pour ce run (sim.sh ensure $name)"; return 1; }
+    info "simulateur du run : $(cfg ios.simulator_base) · $name ($udid)"
+    return 0
+  fi
   sim="$(cfg ios.simulator 'iPhone 16 Pro')"
   udid="$(xcrun simctl list devices available -j | jq -r --arg n "$sim" '.devices[][] | select(.name==$n) | .udid' | head -1)"
   [ -n "$udid" ] || { ko "simulateur '$sim' introuvable"; return 1; }
+  info "simulateur partagé : $sim ($udid) — pas de ios.simulator_base"
   xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+}
+
+qa_prepare_ios() { # → QA_DEVICE
+  local udid app
+  qa_ios_udid || return 1
   open -a Simulator >/dev/null 2>&1 || true
   wait_until 120 sh -c "xcrun simctl list devices -j | jq -e '.devices[][] | select(.udid==\"$udid\" and .state==\"Booted\")'" || { ko "le simulateur n'a pas booté"; return 1; }
   local build; build="$(cfg ios.build)"
@@ -92,6 +162,29 @@ qa_fingerprint() {
   } 2>/dev/null | shasum | cut -d' ' -f1
 }
 
+# qa_device — sans build ni flow : démarre (ou clone) l'appareil de chaque plateforme pour cette feature et
+# imprime son identifiant. Quentin s'en sert pour préparer l'état demandé (qa_devices.<pf>.mode = prepared)
+# avant de lancer les flows.
+check_qa_device() {
+  local platform udid serial rc=0
+  for platform in $(qa_platforms); do
+    case "$platform" in
+      ios) qa_ios_udid && info "ios : $udid" || rc=1 ;;
+      android) qa_android_serial && info "android : $serial" || rc=1 ;;
+    esac
+    local st; st="$(pipeline_get ".qa_devices.$platform.state")"
+    [ -n "$st" ] && info "état à préparer ($platform) : $st"
+  done
+  return $rc
+}
+# qa_device_ready <plateforme> — mode prepared : l'état décrit au preflight doit avoir été préparé.
+qa_device_ready() {
+  [ "$(pipeline_get ".qa_devices.$1.mode")" = prepared ] || return 0
+  [ -n "$(pipeline_get ".qa_devices.$1.prepared_at")" ] && return 0
+  ko "qa_devices.$1 = prepared, état pas encore préparé : « $(pipeline_get ".qa_devices.$1.state") » — gauntlet.sh qa_device $FEATURE, préparer l'appareil, puis pipeline.sh devices $FEATURE $1 prepared-done"
+  return 1
+}
+
 # GAUNTLET_QA_REUSE=1 (set by the feature-qa end hook): if a QA run already finished on the same state
 # (qa_fingerprint), its verdict is reused and the flows are not replayed. A manual `gauntlet.sh qa` always runs.
 check_qa() {
@@ -115,6 +208,7 @@ check_qa() {
     section "qa $platform"
     out="$FEATURE_DIR/qa/$platform"; mkdir -p "$out"; qa_archive_previous "$out"
     QA_DEVICE=""
+    qa_device_ready "$platform" || { rc=1; failed_platforms="$failed_platforms $platform"; continue; }
     "qa_prepare_$platform" || { rc=1; failed_platforms="$failed_platforms $platform"; continue; }
     app_id="$(cfg "$platform.app_id")"
     marker="$GAUNTLET_OUT/qa_${platform}_started"; touch "$marker"

@@ -76,3 +76,24 @@
   Cause : le hook rtk réécrit `git …` en `rtk git …`, que le garde-fou du worktree refuse (de même pour
   un glob ou une variable passés à rtk). Le hook rtk reste tel quel : dans ce cas seulement, appeler
   `/usr/bin/git` (non réécrit par rtk). Les autres commandes passent toujours par rtk.
+- **Lint, format ou métrique rouge dans un `.g.dart`, un `.freezed.dart`, un `.mocks.dart`** (cas réel :
+  `cascade_invocations` dans `database/lib/src/model/import/import_snapshot_dao.g.dart:77`, accepté deux fois
+  à la main sur `red_presentation` puis `green_presentation`). En place : aucun check ne juge un fichier
+  qui correspond à `generated.exclude` (`drop_generated`, `lib.sh`), en create comme en extend. Seules la
+  compilation (`error •`) et `generated_fresh` les regardent encore. Si ça revient : le générateur
+  produit un autre suffixe ou dossier, ajoute-le à `generated.exclude`. Ne l'accepte pas à la main.
+- **Le pipeline n'a pas bougé pendant des heures** (cas réel : `import_cancel_sync`, `red` joint à
+  21 h 54, 3b lancée à 9 h). `pipeline.sh watchdog <nom>` dit pourquoi : `stalled` (rien ne tourne,
+  personne n'attend Thibault) → reprendre la boucle ; `waiting_thibault` → ce qu'on attend de lui. Pas de
+  cron dans la session (`CronList` vide, session redémarrée, plus de 7 jours) : recrée-le (étape 0,
+  « Watchdog »). Pas de notification hors session : `watchdog.sh list`, puis `launchctl print
+  gui/$(id -u)/com.claude.feature-watchdog` et `~/.claude/state/feature_watchdog.log`.
+- **Build ou `build_runner` rouge dans le worktree seulement, « .env… not found »** (cas réel :
+  `features/env/.env.staging.secrets` absent du worktree de `import_cancel_sync`). Cause : un fichier
+  gitignoré ne suit pas `git worktree add`. En place : `worktree_untracked.sh` à l'étape 0 (création et
+  reprise). Si ça revient : `worktree_untracked.sh <worktree> --dry-run`, et le fichier manquant dans
+  `worktree.copy_untracked`.
+- **Gate `qa` rouge « état pas encore préparé »**. `qa_devices.<pf>.mode = prepared` : Quentin doit
+  démarrer l'appareil (`gauntlet.sh qa_device <nom>`), le mettre dans l'état décrit, puis `pipeline.sh
+  devices <nom> <pf> prepared-done`. Les flows de ce mode ne font pas `clearState` (ils effaceraient
+  l'état préparé).

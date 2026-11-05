@@ -64,7 +64,23 @@ name: <texte exact du scénario Gherkin>
 **2. Exécute** : `~/.claude/scripts/gauntlet.sh qa <feature>`. Il boote les devices, builde, installe,
 lance tous les flows sur chaque plateforme (en gabarit S, sur une seule : le gauntlet la choisit
 d'après `pipeline.json → size`, ne la force pas), et dépose captures + `report.xml` + `maestro.log` dans
-`.claude/features/<nom>/qa/<plateforme>/`.
+`.claude/features/<nom>/qa/<plateforme>/`. Sur iOS, il joue sur le simulateur de la feature,
+« `<ios.simulator_base>` · feature-<nom> », cloné du modèle (compte de test connecté, rapports de QA
+téléchargés) par `~/.claude/scripts/sim.sh ensure feature-<nom>` : pas de créneau à demander. Pour
+inspecter un écran à la main (MCP Maestro, `simctl`), vise cet UDID (`sim.sh udid feature-<nom>`),
+jamais le modèle ni un autre simulateur booté : ils appartiennent à d'autres sessions.
+
+**Appareil choisi au preflight** (`pipeline.json → qa_devices`, ton prompt le rappelle) :
+- `fresh` : le clone ci-dessus (Android : une instance jetable `-read-only` de `android.avd`, serial
+  dans `.gauntlet/android_serial`). Rien à faire.
+- `prepared` : avant le premier `gauntlet.sh qa`, `gauntlet.sh qa_device <feature>` (démarre l'appareil,
+  imprime son identifiant et l'état à préparer), puis mets-le dans cet état (MCP Maestro sur cet
+  identifiant, ou un flow jetable hors de `maestro/` : connexion avec `${QA_EMAIL}`, rapport à télécharger…),
+  vérifie-le d'une capture, puis `pipeline.sh devices <feature> <plateforme> prepared-done`. Sans ça le gate
+  `qa` est rouge. Tes flows ne font alors **pas** `clearState: true` : ils effaceraient l'état préparé.
+  Un état que tu ne peux pas atteindre : dis-le dans `qa.md`, ne coche pas `prepared-done`.
+- `reuse` : l'appareil nommé (`qa_devices.<pf>.device`), et lui seul. Il n'est pas à toi : ne le
+  supprime pas, ne le réinitialise pas, pas de `clearState` si Thibault l'a préparé.
 
 **3. Regarde chaque capture.** `Read` le `.png` — c'est l'étape qui compte. Pour chacune :
 mise en page, texte tronqué ou débordant, état attendu réellement affiché, bouton hors écran,

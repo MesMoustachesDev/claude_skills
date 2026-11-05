@@ -36,5 +36,15 @@
 5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html`,
    `.claude/features/.current` et `coverage/` (le gate coverage écrit `<package>/coverage/lcov.info`)
    s'ils n'y sont pas.
+5b. **Clés du pipeline sans question** (valeurs par défaut écrites dans le bloc `ini`, à ajuster) :
+   `generated.exclude` (ajoute le dossier de sortie de gen-l10n : `output-dir` de `l10n.yaml`, s'il
+   n'est pas couvert par le défaut), `worktree.copy_untracked` (lance
+   `worktree_untracked.sh <un worktree> --dry-run` pour voir ce que le défaut trouverait ; ajoute les
+   fichiers ignorés que le build lit et que le défaut rate, jamais un keystore), `watchdog.minutes`,
+   `watchdog.renotify_minutes`.
+5c. **Veille hors session** : si `~/Library/LaunchAgents/com.claude.feature-watchdog.plist` manque,
+   propose-la en une question (« Installer la veille hors session ? » : un LaunchAgent qui lance
+   `watchdog.sh scan` toutes les 15 min et notifie quand une feature attend ou est bloquée, même session
+   fermée). Oui → `bash ~/.claude/scripts/watchdog.sh install`. Une fois par machine, pas par projet.
 6. `gauntlet.sh doctor` à nouveau. Tant qu'il est rouge, corrige ou demande. Résume ce qui a été créé.
 

@@ -23,6 +23,9 @@
 #   pipeline.sh commit-contracts <nom> draft|thibault|reedit ["<quoi>"] [fichiers…]
 #   pipeline.sh freeze <nom>                     gel des tests (3b)
 #   pipeline.sh refreeze <nom> <cause> <étape>   re-gel (cause : hygiene|technique|contrat|spec|interne)
+#   pipeline.sh devices <nom> [ios|android fresh|prepared|reuse [--state "…"] [--device X] | ios|android prepared-done]
+#                                                preflight QA : appareil de Quentin (pipeline.json → qa_devices)
+#   pipeline.sh watchdog <nom> [--json] [--notify]  feature bloquée ? done|working|waiting_thibault|stalled|idle
 #   pipeline.sh say <nom> "<texte>" [--report <étape>] [--ask <id> --options "A|B"]  « en attente de toi » du cockpit (+ étape du rapport)
 #   pipeline.sh cockpit-push <nom> <dossier> [--versions id=v,…] [--hub-version N]  documents de la page de la feature (writes) et de sa ligne dans l'accueil (hub_writes)
 #   pipeline.sh cockpit-pull <nom> <dossier>     applique les éditions de contrats lues du cockpit

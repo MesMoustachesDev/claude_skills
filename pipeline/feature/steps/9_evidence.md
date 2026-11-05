@@ -123,10 +123,15 @@ Puis, **dans cet ordre** :
    dev avant tout push ou création : tu ne les contournes pas. MR créée → relance
    `mr.py archive feature <nom> <base>` : l'archive prend `mr.md` et l'état final.
 
-`pipeline.sh pass <nom> evidence`. Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
+`pipeline.sh pass <nom> evidence`. **Arrête le watchdog** : `CronDelete` de `watchdog_cron`, puis
+`bash ~/.claude/scripts/watchdog.sh unregister <nom>` (le scan hors session retire aussi seul une feature
+terminée). Sors du worktree avec `ExitWorktree` `action: "keep"` (la branche reste
 pour la MR) et donne la commande de nettoyage à lancer après le merge, sans l'exécuter (le dossier du
-run, non suivi, est archivé : d'où `--force`) :
-`git worktree remove --force .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
+run, non suivi, est archivé : d'où `--force` ; le simulateur QA de la feature part avec) :
+`~/.claude/scripts/sim.sh remove feature-<nom>; git worktree remove --force .claude/worktrees/feature-<nom> && git branch -d feature/<nom>`.
+`qa_devices.<pf>.mode = reuse` : l'appareil n'appartient pas à la feature, retire `sim.sh remove` de la
+commande. Android `fresh` ou `prepared` : ajoute `adb -s $(cat .claude/features/<nom>/.gauntlet/android_serial) emu kill`
+(instance jetable, rien à supprimer de l'AVD).
 Termine par un résumé de 5 lignes (la dernière : learn, règles ajoutées ou « aucune récurrence »), le chemin de l'evidence et l'URL de la MR.
 
 **Fin : la page de la feature.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh say <nom> ""`
