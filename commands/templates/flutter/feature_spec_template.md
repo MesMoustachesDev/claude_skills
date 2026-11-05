@@ -13,6 +13,7 @@
     les nullables et les cas limites.
   - La section 10 doit être VIDE à la validation. Une question ouverte = spec pas finie.
   - Supprimer les commentaires HTML une fois la section remplie.
+  - Après une décision ou un renvoi tardif (contrat réédité, §9 changé), relire chaque section qui cite le code touché et ses appelants (grep), et la mettre à jour dans le même passage. (learn 2026-11-05, spec_stale_after_late_decision, 2 runs)
 -->
 
 | | |
