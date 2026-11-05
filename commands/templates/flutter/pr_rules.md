@@ -26,7 +26,7 @@
 
 ## Widgets & UI
 
-- Pas de logique conditionnelle complexe inline dans le `build()` — extraire en méthode ou widget dédié si > 2 conditions imbriquées
+- Pas de logique conditionnelle complexe inline dans le `build()` — extraire en classe widget dédiée si > 2 conditions imbriquées ; jamais de fonction ou de méthode qui renvoie un widget (hors `build`)
 - Les widgets réutilisables vont dans un dossier `shared/` ou `core/widgets/` — pas copié-collé entre features
 - Pas de `MediaQuery`, `Theme` ou `Localizations` accédés en dehors de la couche presentation
 - Les `const` constructeurs sont utilisés partout où c'est possible

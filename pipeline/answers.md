@@ -41,9 +41,11 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 ## Revue et suggestions
 
 - Une `DÉCISION` ou un choix par défaut que Thibault n'a pas modifié est gardé tel quel : ne redemande pas « tu gardes bien ces propositions ? ». (2026-10-17, « Décisions », 6 sur 6)
-- Une clé de test manquante dans `keys.dart` : Arthur l'ajoute, sans question. (2026-10-17, « Clés », 2 sur 2)
+- Une clé de test manquante dans `keys.dart` (ou un `Semantics.identifier` à poser) : Arthur l'ajoute aux contrats, sans question. (2026-10-17, « Clés », 3 sur 3 ; confirmée le 2026-10-30 sur error_redirect)
 
 ## QA
+
+- Chaque worktree crée son propre simulateur (clone du simulateur modèle, supprimé avec le worktree) ; ne lance jamais une étape device sur le simulateur partagé. (2026-11-03, « c'est pas "faisable". C'est la règle », fix photo_delete_without_confirm)
 
 ## Code et conventions
 
@@ -54,4 +56,5 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 - Jamais `.first` ni `take(1)` sur un Stream de watch : ajoute une méthode `Future` au repository ou à la data source. (2026-10-17, 2 réponses)
 - Un package tiers déjà exposé par `core` s'importe via `core`, pas en dépendance directe. (2026-10-17, « Core est là pour ça »)
 - Une nouvelle I/O transverse (détection ou ouverture d'app, plugin natif…) vit dans son propre package. (2026-10-17, « Dans sa propre feature ça », 4 réponses)
+- Une transaction Isar faillible se rend en `Either` via `AtomicOperationHelper.executeAtomicallyOrLeft` (core) ; ne crée pas de repository ou de data source juste pour porter la transaction. (2026-10-30, « DÉCISION 1 »)
 - Nomme chaque entité de domaine avec le suffixe `Entity` (classe `XxxEntity`, fichier `xxx_entity.dart`). (2026-10-29, « Contrats »)

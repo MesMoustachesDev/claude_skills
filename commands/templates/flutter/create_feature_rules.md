@@ -38,7 +38,8 @@ features/{feature_name}/
 │       │   └── mapper/
 │       │       └── {feature_name}_mapper.dart
 │       ├── injection/
-│       │   └── {feature_name}_di.dart
+│       │   ├── {feature_name}_di.dart
+│       │   └── {feature_name}_routes.dart  # Routes de la feature (si UI)
 │       └── presentation/
 │           ├── bloc/
 │           │   ├── {feature_name}_bloc.dart
@@ -82,7 +83,14 @@ features/{feature_name}/
 - **Les entités portent leurs règles** : ce qui ne dépend que de l'état d'une entité (validité, total, statut qui interdit une action) est une méthode de l'entité, testée sans mock. Le use case coordonne (repository, autres use cases), il ne relit pas les champs de l'entité pour décider à sa place.
 - **Le transverse en décorateur** : cache, logs, retry, report d'erreur dans un objet qui implémente la même interface et enveloppe l'autre, nommé par un adjectif (`CachedXRepository`), assemblé dans les providers ; pas recopié dans chaque méthode.
 - **Fakes de test** : une interface du domaine utilisée par plusieurs fichiers de test a un fake en mémoire dans `test/` plutôt qu'un mock reconfiguré dans chaque fichier ; mocktail reste pour vérifier un side-effect.
+- **Garde après `await`** : une garde d'état testée avant un `await` est revérifiée après, avec un commentaire qui dit pourquoi. (learn 2026-11-02, guard_not_rechecked_after_await, 2 runs)
+- **Pattern plutôt que cast** : lie les variables dans le pattern (`switch`, `if case`) plutôt que de refaire un `as` ou un `is` après une vérification de type. (learn 2026-11-02, cast_after_type_checked_pattern, 2 runs)
 - **`resolution: workspace`** dans le pubspec.yaml
+- **Sens des dépendances** : `presentation/` n'importe que `domain/` (et sa propre couche). Le câblage vit
+  dans `injection/` : le DI crée use cases et BLoCs, les routes de la feature créent la page et lui
+  donnent son BLoC. Une vue n'importe jamais le DI et ne lit aucun provider de BLoC.
+- **Chaque feature déclare ses routes** dans `injection/{feature_name}_routes.dart` et les exporte ;
+  l'app ne fait que les assembler.
 
 ## Error handling avec `Either`
 
@@ -132,7 +140,8 @@ Si **local data source** → ajouter `database: path: ../database` si le projet 
 library;
 
 export 'src/injection/{feature_name}_di.dart';
-// Exporter domain entities, use cases, et UI si applicable
+export 'src/injection/{feature_name}_routes.dart'; // si UI
+// Exporter domain entities et use cases si un autre package les consomme
 ```
 
 N'exporte **jamais** les implémentations data layer.
@@ -343,7 +352,44 @@ final {featureName}BlocProvider = Provider<{FeatureName}Bloc>(
 
 - Data sources et repository : privés, auto-dispose
 - Use cases : publics, `Provider`
-- BLoC : public, auto-dispose + `ref.onDispose(bloc.close)`, avec `.family` si paramétré
+- BLoC : public, auto-dispose + `ref.onDispose(bloc.close)`, avec `.family` si paramétré. Lu
+  seulement par les routes de la feature (et ses tests), jamais par une vue
+
+### Routes (`lib/src/injection/{feature_name}_routes.dart`)
+
+La route est le point de composition de l'écran : elle lit le provider du BLoC et le pose au-dessus de
+la page. Chemins exportés en constantes : une autre feature navigue par le chemin, sans importer la page.
+
+```dart
+import 'package:core/flutter_bloc.dart';
+import 'package:core/flutter_riverpod.dart';
+import 'package:core/go_router.dart';
+
+abstract final class {FeatureName}Paths {
+  static const root = '/{feature_name}';
+}
+
+final {featureName}Routes = <RouteBase>[
+  GoRoute(
+    path: {FeatureName}Paths.root,
+    builder: (context, state) => Consumer(
+      builder: (context, ref, _) => BlocProvider.value(
+        value: ref.watch({featureName}BlocProvider),
+        child: const {FeatureName}Page(),
+      ),
+    ),
+  ),
+];
+```
+
+- Paramètre de route → provider `.family`, lu avec `state.pathParameters` / `state.extra` ici, jamais
+  dans la page.
+- Une sheet ou un dialogue ouvert depuis une autre feature : la feature exporte, dans ce même fichier,
+  une fonction `show{FeatureName}Sheet(BuildContext context, WidgetRef ref)` qui lit le provider et
+  passe le BLoC à la vue. L'appelant ne connaît ni le BLoC ni le provider.
+- Le router de l'app assemble : `GoRouter(routes: [...homeRoutes, ...{featureName}Routes])`.
+- Adapter l'import de go_router à ce que `core` exporte ; avec `go_router_builder`, les
+  `@TypedGoRoute` se déclarent ici de la même façon, avec leur `part`.
 
 ### BLoC Event (`lib/src/presentation/bloc/{feature_name}_event.dart`)
 
@@ -405,7 +451,9 @@ class {FeatureName}Page extends StatelessWidget {
 }
 ```
 
-- Si BLoC → la page utilise `BlocProvider` et `BlocBuilder`
+- Si BLoC → la page lit le BLoC posé par sa route (`BlocBuilder<{FeatureName}Bloc, {FeatureName}State>`,
+  `context.read<{FeatureName}Bloc>()`) ; elle n'importe pas le DI. En test de widget, on l'enveloppe
+  dans un `BlocProvider.value` avec un BLoC réel sur use cases mockés, sans `ProviderScope`.
 - Si pas de BLoC → la page utilise `ConsumerWidget` avec Riverpod
 
 ---
@@ -517,6 +565,8 @@ dependencies:
     path: features/{feature_name}
 ```
 
+Si la feature a une UI : ajouter `...{featureName}Routes` à la liste des routes du router de l'app.
+
 
 ## Conventions tranchées par Thibault
 
@@ -537,3 +587,4 @@ Tirées des revues de `/feature` et `/fix` par learn (`~/.claude/pipeline/learn.
 - Une règle métier, une borne, une formule ou un mapping n'existe qu'à un endroit : cherche l'existant (grep du nombre, du nom) avant d'en écrire un ; deux mappings qui doivent rester synchrones deviennent une seule fonction. (learn 2026-10-27, duplicated_rule_constant, 7 runs)
 - Retire dans le même diff ce que ton changement rend inutile (variante, branche, paramètre, dépendance du pubspec, export) ; le barrel n'exporte que ce qu'un autre package consomme, jamais un état mutable ni une API dépréciée. (learn 2026-10-27, dead_code_after_change + barrel_overexport, 8 runs)
 - Un invariant non évident (deux codes à garder synchrones, une borne imposée par une API, un choix qui déroge à l'archi) est écrit en une ligne de commentaire là où on pourrait le casser. (learn 2026-10-27, invariant_not_documented, 2 runs)
+- Avant d'écrire un rendu ou un mécanisme (pose de clé, painter, wrapper), cherche s'il existe déjà dans la feature ou le design system et réutilise-le : deux façons de faire la même chose dans une feature sont un défaut. (learn 2026-11-02, same_render_logic_duplicated_in_feature, 2 runs)

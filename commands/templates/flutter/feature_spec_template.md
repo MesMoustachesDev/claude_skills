@@ -49,6 +49,7 @@
   Un bloc par écran ou par dialogue. Pour chaque écran, les quatre états sont obligatoires
   (Loading / Error / Empty / Loaded) — "N/A" avec justification s'il n'y en a pas.
   Wireframe ASCII pour le Loaded. Navigation entrante et sortante.
+  Pour chaque résultat asynchrone, dis ce que voit l'utilisateur et ce qui se passe s'il agit avant son arrivée : durée de vie (instance, session), résultat tardif, résultat en échec. (learn 2026-11-04, spec_state_window_unspecified, 2 runs)
 -->
 
 ### Écran : {ScreenName}
@@ -87,7 +88,21 @@
   - Les steps référencent les widgets par leur clé de la section 5 (keys.dart),
     jamais par leur texte affiché (localisé, donc instable).
   - Formulation en anglais (convention bdd_widget_test), phrases courtes.
+  - Pour chaque valeur attendue qui dépend d'un Given (préférences, état stocké, Background), écrire
+    d'où elle vient d'après §6/§8 et le code existant (fichier:ligne), et vérifier qu'aucun scénario
+    existant avec le même Given n'attend autre chose. (learn 2026-10-30, spec_scenarios_contradict_rules, 2 runs)
+  - Avant d'écrire un step qui lit une clé, vérifier qu'elle est déclarée dans un keys.dart des
+    contrats (y compris ceux des autres packages touchés) ; sinon la remonter comme contrat manquant,
+    jamais l'inventer. (learn 2026-11-02, spec_reads_key_absent_from_contract, 2 runs)
+  - Un comportement de bibliothèque cité par la spec (durée par défaut, erreur levée, crans, debug /
+    release) est vérifié dans son code ou par exécution, avec la référence fichier:ligne ; sinon il est
+    marqué « à vérifier ». (learn 2026-11-02, spec_unverified_library_behavior, 4 runs)
+  - Déclarer chaque step Gherkin de §4 dans les notes du harnais : ce qu'elle pompe et ce que vaut
+    la fixture. (learn 2026-11-02, spec_harness_steps_undeclared, 4 runs)
+  - Un step qui tape ou lit un élément désigne une seule cible (clé et widget exact) ; si deux widgets
+    ou deux mises en page répondent, écrire un step par cible. (learn 2026-11-04, spec_step_ambiguous_target, 2 runs)
 -->
+
 
 ```gherkin
 Feature: {Feature name}
@@ -119,6 +134,10 @@ Feature: {Feature name}
   sert. Le test-writer lit les fichiers, l'implementer les respecte. Un contrat qui empêche un
   comportement du cadrage n'est pas contourné ici : il va dans « Contrats à revoir par Thibault »
   du rapport du specifier.
+  Pour chaque I/O appelée par un contrat (canal plateforme, plugin, moteur de rendu), vérifie que la
+  signature rend `Either<ErrorEntity, T>` ; sinon, remonte un bloquant avant d'écrire la spec. (learn 2026-11-03, spec_error_path_without_contract, 2 runs)
+  Chaque ligne de §5 cite un fichier de contracts.files et un comportement que sa signature permet. (learn 2026-11-04, spec_contradicts_contracts, 2 runs)
+  Un composant que le harnais d'acceptation remplace par un mock (routeur, BLoC appelant, service) a son propre test unitaire, nommé dans §5. (learn 2026-11-04, orchestrator_untested_because_mocked_by_consumers, 2 runs)  Pour chaque donnée que la spec lit, nomme la méthode du contrat qui la fournit ; s'il n'y en a pas, c'est un point §9 à trancher avant la spec. (learn 2026-11-04, contract_missing_input_for_mapping, 2 runs)
 -->
 
 | Contrat | Fichier:ligne | Déclare | Sert |
@@ -237,6 +256,8 @@ stateDiagram-v2
   - Jamais Stream/Future, découpage des BLoCs, data sources, emplacement d'une logique : c'est dans
     le code du dev. Jamais une question qu'une règle tranche, jamais la dette du code existant.
   - ID stable (A1, A2…), jamais renuméroté.
+  - Avant d'écrire une ligne, vérifie qu'aucune règle (create_feature_rules, CLAUDE.md, answers.md,
+    gates) ne la tranche ; si une règle la tranche, écris la décision en citant la règle, sans la proposer. (learn 2026-11-03, spec_asks_what_rules_decide, 2 runs)
 -->
 
 | ID | Sujet | Décision | Alternative | Raison | Statut |

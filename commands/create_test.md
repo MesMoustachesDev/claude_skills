@@ -21,8 +21,15 @@ Tu es un expert en testing Flutter/Dart. Tu écris des tests qui valident le **c
 6. **Mock aux frontières** — Mocker les repositories et services (frontière du système), pas les classes internes.
 7. **Le fake tient le contrat du SDK, pas celui du code** — Un fake de SDK ou de plateforme reproduit le contrat documenté de la vraie dépendance, pas ce que le code attend : null ou vide, événements groupés, callbacks répétés ou dans un autre ordre, exceptions du constructeur, limites de volume. Cite la doc dans le test. (learn 2026-10-27, sdk_contract_assumed, 9 runs)
 8. **Le câblage se teste** — Chaque câblage ajouté ou modifié (provider DI, callback passé à une page, route, page montée dans un parent) a un test qui construit le vrai provider ou monte la vraie page, sans le surcharger en entier. (learn 2026-10-27, wiring_untested, 5 runs)
-9. **Caractériser avant de déplacer** — Le code existant que le changement déplace ou découpe (listé en §8 de la spec) reçoit d'abord des tests de caractérisation de son comportement actuel ; le refactor se fait ensuite, sous ces tests. (learn 2026-10-27, refactor_moved_code_without_tests, 4 runs)
+9. **Caractériser avant de déplacer** — Le code existant que le changement déplace, découpe ou simplifie (listé en §8 de la spec ou non) reçoit d'abord des tests de caractérisation de son comportement actuel, cas limites compris ; le refactor se fait ensuite, sous ces tests. (learn 2026-10-27, refactor_moved_code_without_tests, 4 runs ; learn 2026-11-04, refactor_changes_behavior_silently, 2 runs)
 10. **Un champ de `props`, un test d'égalité** — Un champ ajouté aux `props` d'une entité, d'un event ou d'un état Equatable a un test : deux instances qui ne diffèrent que par ce champ ne sont pas égales. (learn 2026-10-27, equatable_props_untested, 2 runs)
+11. **Chaque step prouve ce qu'il annonce** — Chaque état ou effet que la spec décrit pour un step (désactivé, mis en évidence, déplacé, réémis) a une assertion qui le prouve dans ce step ; un step qui ne fait qu'agir ne prouve rien. (learn 2026-11-02, scenario_step_without_assertion, 2 runs)
+12. **Une règle de spec, un test** — Chaque règle explicite de la spec (cas limite, état vide, annulation, dialogue) a au moins un test nommé d'après elle ; parcours §3, §6 et §8 règle par règle avant de rendre. (learn 2026-11-02, spec_rule_without_test, 2 runs)
+13. **L'échec d'une I/O se teste à chaque maillon** — Chaque I/O nouvelle a un test de son chemin d'échec (exception du canal, `Left`) à chaque maillon, de la data source jusqu'à la vue. (learn 2026-11-02, io_failure_path_untested, 2 runs)
+14. **Chaque branche d'une logique ajoutée** — Chaque branche secondaire d'une logique ajoutée (vide, null, déjà fait, second appel) a son test, pas seulement le chemin nominal. (learn 2026-11-02, edge_branch_of_new_logic_untested, 2 runs)
+15. **Un paramètre optionnel, deux tests** — Pour chaque paramètre optionnel d'un use case, un test l'omet et un test le fournit. (learn 2026-11-02, optional_parameter_path_untested, 2 runs)
+16. **Un service nouveau, un test dans son package** — Tout service, notifier ou utilitaire nouveau a un test unitaire dans son propre package, même s'il est déjà prouvé de bout en bout (flow Maestro, test d'un autre package). (learn 2026-11-02, new_service_tested_only_end_to_end, 2 runs)
+17. **Une condition d'affichage, ses deux branches** — Chaque condition d'affichage ajoutée ou changée (if, état enabled, rôle sémantique) a un test qui vérifie ses deux branches. (learn 2026-11-03, missing-ui-test, 2 runs)
 
 ---
 
@@ -325,4 +332,5 @@ Avant de présenter les tests à l'utilisateur :
 - [ ] Aucun test ne valide simplement "le code fait ce que le code fait"
 - [ ] Les noms de tests forment une documentation lisible du comportement de la feature
 - [ ] Les edge cases dangereux sont couverts
+- [ ] Pour chaque assertion, nommer l'implémentation fausse plausible qu'elle doit faire échouer ; si elle passerait aussi, vérifier en plus l'effet attendu (valeur exacte, appel avec ses arguments). (learn 2026-10-30, weak_assertion_accepts_wrong_impl, 2 runs)
 - [ ] Les tests compilent et passent (ou signalent un vrai bug)

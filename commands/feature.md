@@ -215,6 +215,12 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par
   « GATE NON JOUÉ » : rejoue toi-même `gauntlet.sh <profil> <nom>` depuis le worktree avant de
   continuer, et corrige ton prompt.
+- **Jamais de tour qui finit sur « j'attends ».** Le rapport d'un agent ou sa notification `completed`
+  veut dire qu'il a rendu la main : passe à l'étape suivante dans le même tour (`next --after`, ci-dessous),
+  même si elle ajoute « may notify more than once ». Avant de rendre la main, il y a toujours soit un agent qui tourne, soit une question
+  posée à Thibault. Si aucun des deux, tu n'as pas le droit de t'arrêter : vérifie l'état
+  (`git diff`, `pipeline.sh next`, rejoue le gate) et lance la suite. Le watchdog (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas
+  cette règle.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
