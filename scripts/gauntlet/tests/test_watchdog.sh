@@ -57,6 +57,33 @@ expect_out '"verdict": "waiting_thibault"' "question en attente : waiting_thibau
 expect_out '"alert": true' "attente de plus de 20 min : alerte"
 expect_out "Valide les tests" "ce qu'on attend de lui est repris"
 
+echo "next --after : au rapport d'un agent, attend son hook (cas réel : import_cancel_sync, tours finis sur « j'attends la notification »)"
+# Le hook démarre 3 s après le rapport, joue 2 s, écrit stages.clean = PASSED.
+( sleep 3; echo "$$ $(date +%s) feature-cleaner" > "$F/.gauntlet/hook_clean.running"; sleep 2
+  python3 - "$F/pipeline.json" <<'PY'
+import json, sys, datetime
+p = json.load(open(sys.argv[1])); now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+p["stages"]["clean"] = {"status": "PASSED", "at": now}; json.dump(p, open(sys.argv[1], "w"))
+PY
+  rm -f "$F/.gauntlet/hook_clean.running" ) &
+run_p next demo --after clean
+wait
+expect_out "hook      : clean = PASSED" "le hook démarré après le rapport est attendu, son verdict lu"
+python3 - "$F/pipeline.json" <<'PY'
+import json, sys, datetime
+p = json.load(open(sys.argv[1])); now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+p["stages"]["clean"] = {"status": "RED", "at": now}; p.setdefault("attempts", {})["clean"] = 1; json.dump(p, open(sys.argv[1], "w"))
+PY
+run_p next demo --after clean
+expect_out "il tourne encore : ne le relance pas" "gate rouge : l'agent renvoyé au travail n'est pas relancé"
+python3 - "$F/pipeline.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1])); p["stages"]["clean"] = {"status": "RED", "at": "2026-11-04T21:54:47Z"}; json.dump(p, open(sys.argv[1], "w"))
+PY
+SECONDS=0; run_p next demo --after clean
+expect_out "aucun hook de fin vu pour clean" "pas de hook en 30 s : le dire, rejouer le gate"
+[ "$SECONDS" -le 40 ] && _pass "attente bornée ($SECONDS s)" || _fail "attente bornée ($SECONDS s)"
+
 echo "devices — preflight QA"
 run_p devices demo ios reuse --device "iPhone 16 Pro"
 expect_rc 2 "réutiliser le simulateur partagé est refusé"

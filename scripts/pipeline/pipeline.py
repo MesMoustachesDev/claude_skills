@@ -233,20 +233,48 @@ def inputs(c):
     return out
 
 
-def wait_hooks(c):
+AFTER_WAIT = 30   # secondes laissées au hook de fin d'un agent pour démarrer après son rapport
+
+
+def pop_after(args):
+    """`--after <profil>` : appel fait au rapport (hand-back) de l'agent de ce gate."""
+    if "--after" not in args:
+        return args, None
+    i = args.index("--after")
+    return args[:i] + args[i + 2:], args[i + 1]
+
+
+def wait_hooks(c, after=None):
     """Le rapport d'un agent en arrière-plan arrive avant que son hook de fin ait écrit le gate :
-    attend que le hook ait fini (hook_wait.sh), puis relit pipeline.json."""
+    attend que le hook ait fini (hook_wait.sh), puis relit pipeline.json. Avec `after` (le profil du
+    gate de l'agent qui vient de rendre son rapport), attend d'abord que ce hook ait démarré — son
+    marqueur hook_<profil>.running — ou qu'il ait déjà écrit stages.<profil> : le rapport peut
+    précéder le démarrage du hook de quelques secondes."""
     if not c.p:
         return
+    gdir = os.path.join(c.dir, ".gauntlet")
+    if after:
+        t0 = time_now()
+        marker = os.path.join(gdir, f"hook_{after}.running")
+        while True:
+            st = (c._load().get("stages") or {}).get(after) or {}
+            if os.path.exists(marker) or _parse_at(st.get("at") if isinstance(st, dict) else None) >= t0 - 120:
+                break
+            if time_now() - t0 > AFTER_WAIT:
+                print(f"attention : aucun hook de fin vu pour {after} en {AFTER_WAIT} s — rejoue le gate "
+                      f"(gauntlet.sh {after} {c.name}) et dis-le", file=sys.stderr)
+                break
+            subprocess.run(["sleep", "1"])
     w = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_wait.sh")
-    if subprocess.run(["bash", w, os.path.join(c.dir, ".gauntlet")]).returncode != 0:
-        die("un hook de fin d'agent joue encore son gate : attends la notification de fin de l'agent "
-            "(<task-notification>), pas son rapport, puis relance", code=3)
+    if subprocess.run(["bash", w, gdir]).returncode != 0:
+        die("un hook de fin d'agent joue encore son gate après 9 min : relance la même commande ; "
+            "ne relance pas l'agent", code=3)
     c.p = c._load()
 
 
 def cmd_next(c, args):
-    wait_hooks(c)
+    args, after = pop_after(args)
+    wait_hooks(c, after)
     n = next_step(c.p)
     attempts = (c.p.get("attempts") or {})
     profile = n["key"] if n["key"] and not n["key"].startswith("hg.") else None
@@ -268,6 +296,16 @@ def cmd_next(c, args):
     print(f"agent     : {n['agent']}")
     if c.p:
         print(f"gabarit   : {c.size} · mode : {c.p.get('mode')} · package : {c.p.get('package')}")
+    if after:
+        st = (c.p.get("stages") or {}).get(after) or {}
+        st = st.get("status") if isinstance(st, dict) else st
+        if st == "RED":
+            print(f"hook      : {after} rouge, l'agent a été renvoyé au travail — il tourne encore : ne le relance "
+                  "pas ; fin de tour permise, son prochain rapport rappellera next --after")
+        elif st == "FAILED":
+            print(f"hook      : {after} FAILED après {attempts.get(after)} tentatives — point imprévu, Thibault décide")
+        elif st:
+            print(f"hook      : {after} = {st}")
     if n["status"] in ("RED", "FAILED"):
         print(f"état      : {n['status']} ({info['attempts'] or 0} tentatives) — FAILED : point imprévu, Thibault décide ; ne rejoue pas en silence")
     if n["key"] in ("red", "green"):
@@ -401,11 +439,12 @@ def cmd_pass(c, args):
 def cmd_join(c, args):
     """Étapes 3 et 4 en deux moitiés : une fois les deux gates de couche verts (posés par le hook de chaque
     moitié), le gate complet tranche l'étape — la suite entière, l'analyse de tout le package, tests.md."""
+    args, after = pop_after(args)
     if not args or args[0] not in ("red", "green"):
-        die("usage : join <nom> red|green")
+        die("usage : join <nom> red|green [--after <moitié>]")
     profile = args[0]
     halves = [f"{profile}_data", f"{profile}_presentation"]
-    wait_hooks(c)
+    wait_hooks(c, after)
     stages = c.p.get("stages") or {}
     status = lambda v: v.get("status") if isinstance(v, dict) else v
     # SKIPPED : moitié sans rien à faire (extend qui ne touche qu'une couche), posée par `skip` avec sa raison.

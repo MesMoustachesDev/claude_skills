@@ -221,13 +221,20 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
   exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
-- **Un agent en arrière-plan a fini à sa notification de fin (`<task-notification>`), pas à son
-  rapport.** Son rapport (« Subagent hand-back ») arrive avant que son hook de fin ait joué le gate
-  (plus d'une minute pour `contracts` ou `red`), et un gate rouge le remet au travail après ce rapport.
-  À son rapport : ne lis pas l'étape, ne rejoue pas le gate, ne lance pas la suite ; attends la
-  notification. `pipeline.sh next` / `join` et `gauntlet.sh` attendent d'eux-mêmes un hook en cours
-  (`hook_wait.sh`). Une étape toujours vide après la notification : le hook n'a pas tourné ; rejoue le
-  gate et dis-le avec le bloc « ce que tu tranches sans lui ».
+- **Au rapport d'un agent (« Subagent hand-back »), tu agis dans le même tour.** Son hook de fin joue
+  encore le gate (plus d'une minute pour `contracts` ou `red`) : c'est le script qui attend, pas toi.
+  `pipeline.sh next <nom> --after <profil>` (ou `join <nom> red|green --after <moitié>`) attend que le
+  hook de ce gate ait démarré puis fini, et dit ce qu'il a écrit :
+  - `PASSED` → lance la suite, dans ce tour ;
+  - `RED` → le hook a renvoyé l'agent au travail : il tourne encore, ne le relance pas, ne rejoue pas
+    le gate ; tu peux rendre la main (un agent tourne), son prochain rapport te rappellera ;
+  - `FAILED` → point imprévu, Thibault décide ;
+  - « aucun hook de fin vu » → le hook n'a pas tourné : rejoue le gate et dis-le avec le bloc « ce que
+    tu tranches sans lui ».
+  **Ne finis jamais un tour sur « j'attends le hook » ni « j'attends la notification »** : la
+  notification de fin (`<task-notification>`) peut n'arriver qu'avec le message suivant de Thibault
+  (cas réel : `import_cancel_sync`, après Ivan, Nina deux fois et Denis, il a dû relancer lui-même).
+  Elle ne déclenche rien de plus que le rapport : si tu as déjà joué `next --after`, ignore-la.
 - **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le pipeline par
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape : ce qu'on attend de lui** (la décision à prendre, ou

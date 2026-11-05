@@ -4,12 +4,13 @@
 # L'orchestrateur ne calcule plus l'étape suivante ni ne réécrit pipeline.json à la main : il appelle
 # ce script, qui décide de façon déterministe. À lancer depuis le worktree de la feature.
 #
-#   pipeline.sh next <nom> [--json]              étape suivante, fichier d'étape à lire, entrées à passer
+#   pipeline.sh next <nom> [--json] [--after <profil>]  étape suivante, fichier d'étape à lire, entrées à passer ;
+#                                                --after : au rapport d'un agent, attend que le hook de son gate ait joué
 #   pipeline.sh status <nom>                     tableau d'état (commande /feature <nom> status)
 #   pipeline.sh init <nom> --mode M --package P --base B
 #   pipeline.sh size <nom> S|M|L "<raison>"      gabarit (reclassement tracé dans size_changes)
 #   pipeline.sh pass <nom> <étape>               stages.<étape> = PASSED
-#   pipeline.sh join <nom> red|green             étapes 3 et 4 : les deux moitiés vertes → gate complet → stages.<étape>
+#   pipeline.sh join <nom> red|green [--after <moitié>]  étapes 3 et 4 : les deux moitiés vertes → gate complet → stages.<étape>
 #   pipeline.sh skip <nom> <étape> "<raison>"    stages.<étape> = SKIPPED (gabarit)
 #   pipeline.sh gate <nom> <point> [k=v ...]     human_gates.<point> = {at, by: user, k: v…}
 #   pipeline.sh loop <nom> <boucle>              loops.<boucle> += 1 ; exit 3 au-delà du plafond

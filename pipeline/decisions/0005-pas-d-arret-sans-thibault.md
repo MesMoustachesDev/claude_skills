@@ -1,6 +1,6 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
@@ -27,6 +27,10 @@ personne ne l'a vu.
   bloquée sur une permission. Il ne relance rien : il n'a pas de session à relancer.
 - Un tour qui finit sur une question à Thibault pose `pipeline.sh say` : c'est ce qui distingue
   « on l'attend » de « bloqué ».
+- Amendement, même jour : au rapport (hand-back) d'un agent, l'orchestrateur agit dans le même tour
+  avec `pipeline.sh next --after <profil>`, qui attend que le hook de ce gate démarre puis finisse.
+  Il ne finit plus de tour sur « j'attends le hook ou la notification ». Sur `import_cancel_sync`,
+  la notification de fin n'arrivait qu'avec le message suivant de Thibault : quatre relances à la main.
 
 ## Conséquences
 
