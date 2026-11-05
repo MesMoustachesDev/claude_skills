@@ -54,7 +54,7 @@ des findings critiques à corriger.
    écart rapporté est un critique de revue.
 2. **Comment ce projet fait déjà ça ?** Avant d'écrire : `grep` le pattern dans le code voisin (gestion
    d'erreur, client, helper, logging). Tu réutilises l'existant ; tu n'introduis pas un second moyen
-   de faire la même chose. Conventions du projet et de `~/.claude/CLAUDE.md` : l10n, design system,
+   de faire la même chose. Conventions du projet (`.claude/rules/create_feature_rules.md`) : l10n, design system,
    bonne couche, repositories plutôt que SDK direct.
 3. Corrige **le minimum qui traite la cause**. Pas de refacto opportuniste, pas de reformatage de
    fichiers voisins, pas de changement de comportement hors du bug. Si la vraie correction est plus

@@ -1,0 +1,21 @@
+{
+  "_doc": "Ce que chaque agent du pipeline reçoit dans son contexte à son lancement (hook SubagentStart, doctrine.py), première passe comme relance. Un chemin `~/…` est lu tel quel ; `rules:<fichier>` est la règle du projet (`.claude/rules/<fichier>` à la racine du repo ou dans un dossier de premier niveau), sinon le template `commands/templates/flutter/<fichier>`.",
+  "agents": {
+    "feature-test-writer": ["~/.claude/commands/create_test.md"],
+    "feature-test-writer-data": ["~/.claude/commands/create_test.md"],
+    "feature-test-writer-presentation": ["~/.claude/commands/create_test.md"],
+    "feature-test-reviewer": ["~/.claude/commands/create_test.md"],
+    "feature-hardener": ["~/.claude/commands/create_test.md"],
+    "feature-specifier": ["~/.claude/pipeline/answers.md"],
+    "feature-spec-critic": ["~/.claude/commands/templates/flutter/feature_spec_template.md", "~/.claude/pipeline/answers.md"],
+    "feature-architect": ["rules:create_screen_rules.md", "~/.claude/pipeline/answers.md"],
+    "feature-implementer": ["rules:create_screen_rules.md"],
+    "feature-implementer-presentation": ["rules:create_screen_rules.md"],
+    "feature-polisher": ["rules:create_screen_rules.md"],
+    "feature-reviewer": ["~/.claude/pipeline/review_grid.md", "~/.claude/pipeline/suggestions.md", "rules:pr_rules.md", "rules:create_screen_rules.md", "~/.claude/pipeline/answers.md"],
+    "fix-reproducer": ["~/.claude/commands/debug_issue.md", "~/.claude/commands/create_test.md"],
+    "fix-reviewer": ["~/.claude/pipeline/review_grid.md", "~/.claude/pipeline/suggestions.md"],
+    "review-architect": ["rules:pr_rules.md"],
+    "review-code": ["rules:pr_rules.md", "~/.claude/pipeline/review_grid.md"]
+  }
+}

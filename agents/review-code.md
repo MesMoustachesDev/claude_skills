@@ -26,8 +26,9 @@ et les logs par package), la base et la source.
 
 ## Ta méthode
 
-1. **Le référentiel.** `.claude/rules/pr_rules.md` (gestion des erreurs, async, widgets, tests,
-   sécurité, divers : priorité absolue), `CLAUDE.md` du projet, `~/.claude/CLAUDE.md`, puis
+1. **Le référentiel.** `pr_rules.md`, dans ton contexte dès le lancement : celui du projet, sinon le template (gestion
+   des erreurs, async, widgets, tests, sécurité, divers : priorité absolue), `CLAUDE.md` du projet,
+   `.claude/rules/create_feature_rules.md` (l10n, design system, couches), puis
    `~/.claude/pipeline/review_grid.md` : les **règles universelles** en entier, et de la grille de
    maintenabilité tes items *Design system et l10n*, *Lisibilité à froid*, *Tests*.
 2. **Le gauntlet d'abord.** Chaque `[FAIL]` du rapport devient une remarque `critical` telle quelle
