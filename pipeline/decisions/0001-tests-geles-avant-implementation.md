@@ -2,7 +2,7 @@
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-05
 (tests sobres, plus bas)
-Où elle vit : `commands/feature.md` (étapes 3, 3b, 4) · `pipeline/feature/steps/3_tests.md` (gel,
+Où elle vit : `commands/feature.md` (étapes 3, 3b, 4) · `commands/prune_tests.md` · `agents/test-pruner.md` · `scripts/gauntlet/prune.py` · `pipeline/feature/steps/3_tests.md` (gel,
 re-gel) · `hooks/pipeline-restrict-writes.sh` · `scripts/gauntlet/checks_test.sh`
 (`red_check`, `test_freeze_check`) · `scripts/pipeline.sh freeze|refreeze`
 
@@ -49,6 +49,12 @@ demandaient le doublon. Désormais :
 
 Une règle que `learn` propose et qui ajouterait des tests se relit à la lumière du principe 18 :
 elle précise l'étage où le test manquait, pas « à chaque maillon ».
+
+Pour les suites déjà gelées, `/prune_tests <feature>` élague après coup : Élise (`test-pruner`) propose des candidats,
+`gauntlet.sh prune` (`scripts/gauntlet/prune.py`) en retire chacun seulement si la suite reste verte, les
+lignes couvertes de `lib/` identiques et le score de mutation intact, et Thibault relit le diff avant
+tout commit. Sur une feature du projet client, l'essai a retiré 37 tests sur 143 sans rien perdre ; un
+test qui ressemblait à un doublon a été gardé parce qu'il était le seul à tuer un mutant.
 
 ## Hors champ
 

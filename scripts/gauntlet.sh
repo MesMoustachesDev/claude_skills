@@ -7,6 +7,8 @@
 #   gauntlet.sh list
 #   gauntlet.sh report <feature> [étape]   rapport HTML pour le dev (.claude/features/<feature>/report.html) ;
 #                                          étapes : cadrage | contracts | spec | tests | tour | evidence
+#   gauntlet.sh prune <feature> <candidates.json> [--no-mutation]
+#                                          élagage vérifié des tests (gauntlet/prune.py, commande /prune_tests)
 #
 # Profils : contracts | red | green | clean | harden | qa   (voir gauntlet/profiles.sh)
 #           red_data | red_presentation | green_data | green_presentation : une couche (étapes 3 et 4 en parallèle)
@@ -37,6 +39,10 @@ case "$target" in
   list)  profiles_list; exit 0 ;;
   doctor) init_project_context ""; run_doctor; exit $? ;;
   report) exec python3 "$(dirname "${BASH_SOURCE[0]}")/report/report.py" feature "$feature" "$@" ;;
+  prune)
+    init_project_context "$feature"
+    exec python3 "$GAUNTLET_ROOT/prune.py" --root "$PROJECT_ROOT" --package "$PKG_REL" --feature "$feature" \
+      --flutter "$FLUTTER" --gauntlet "${BASH_SOURCE[0]}" "$@" ;;
 esac
 
 [ -n "$feature" ] || die "usage: gauntlet.sh <profil|check> <feature>"
