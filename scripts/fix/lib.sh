@@ -54,10 +54,26 @@ is_test_path() { # is_test_path <chemin relatif>
 # Manifestes que le reproducer peut toucher pour brancher un runner de test absent.
 is_manifest_path() { case "$1" in package.json|*/package.json|pubspec.yaml|*/pubspec.yaml) return 0 ;; esac; return 1; }
 
-# changed_since <sha> — fichiers modifiés, ajoutés, supprimés ou non suivis depuis <sha>, relatifs à la racine
+# changed_since <sha> — fichiers modifiés, ajoutés, supprimés ou non suivis depuis <sha>, relatifs à la racine.
+# Descend dans les sous-modules : un sous-module changé (flutter_app/dskit) donne ses fichiers, préfixés de
+# son chemin, pas un seul chemin opaque que is_test_path ne sait pas classer.
 changed_since() {
+  local f
   { git -C "$PROJECT_ROOT" diff --name-only "$1" 2>/dev/null
-    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard 2>/dev/null; } | sort -u
+    git -C "$PROJECT_ROOT" ls-files --others --exclude-standard 2>/dev/null; } | sort -u \
+  | while IFS= read -r f; do
+      if [ -e "$PROJECT_ROOT/$f/.git" ]; then submodule_changed_since "$1" "$f"; else printf '%s\n' "$f"; fi
+    done | sort -u
+}
+
+# submodule_changed_since <sha> <chemin> — fichiers du sous-module changés depuis le commit qu'il pointait à
+# <sha>, préfixés de <chemin>. Sous-module absent à <sha> ou commit introuvable : le chemin seul.
+submodule_changed_since() {
+  local sub="$PROJECT_ROOT/$2" old
+  old="$(git -C "$PROJECT_ROOT" ls-tree "$1" -- "$2" 2>/dev/null | awk '$2=="commit"{print $3}')"
+  if [ -z "$old" ] || ! git -C "$sub" cat-file -e "$old^{commit}" 2>/dev/null; then printf '%s\n' "$2"; return; fi
+  { git -C "$sub" diff --name-only "$old" 2>/dev/null
+    git -C "$sub" ls-files --others --exclude-standard 2>/dev/null; } | sed "s#^#$2/#"
 }
 
 DEBUG_MARKER='[DEBUG_ISSUE]'
