@@ -39,3 +39,9 @@ donnée, décodée strictement (JSON attendu, champs connus, valeurs bornées), 
 pas, jamais exécutée telle quelle. Avant d'écrire : la dire en mots à Thibault, et l'essayer à blanc
 quand c'est possible (ce qu'elle changerait, sur quoi). C'est ce que font déjà `verifier.py`
 d'`ecrire-linkedin` et la liste fermée des écritures de `mission-linkedin`.
+
+## Décisions du pipeline (`~/.claude/pipeline/decisions/`)
+
+Les règles de fond de `/feature`, `/fix`, du gauntlet et des agents ont chacune une ADR. Avant de
+changer l'une de ces règles, lis son ADR. Un changement qui revient dessus met l'ADR à jour dans le
+même commit : statut amendé, ou une nouvelle ADR qui la remplace.
