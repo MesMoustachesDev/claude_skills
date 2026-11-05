@@ -1,7 +1,7 @@
 ---
 name: feature-test-writer-presentation
 description: Théo, moitié présentation — Étape 3 du feature pipeline, en parallèle de la moitié data/domain. Écrit les tests du BLoC, des widgets et d'acceptation (Gherkin → bdd_widget_test, vrai BLoC sur use cases mockés) contre la spec et les contrats, sans voir aucune implémentation. Sa couche doit compiler et être rouge. Lancé par /feature uniquement.
-model: opus
+model: sonnet
 effort: high
 hooks:
   PreToolUse:
