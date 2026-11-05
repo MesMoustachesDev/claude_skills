@@ -45,3 +45,7 @@ neuf, cloner et préparer, réutiliser) ; les fichiers générés (`generated.ex
 aucun check ; un watchdog relance ce qui ne dépend pas de lui et le prévient de ce qui l'attend, au-delà de
 `watchdog.minutes` sans rien.
 
+
+Les décisions de fond du pipeline, et pourquoi, sont dans `~/.claude/pipeline/decisions/` (une ADR par
+décision). Une règle de projet absente (`create_screen_rules.md`, `pr_rules.md`) est signalée au
+démarrage : tu choisis de la créer, de garder le template ou de t'en passer.
