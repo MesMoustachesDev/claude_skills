@@ -1,7 +1,7 @@
 ---
 name: feature-test-writer-data
 description: Théo, moitié data/domain — Étape 3 du feature pipeline, en parallèle de la moitié présentation. Écrit les tests unitaires des use cases, du repository, des data sources et des mappers contre la spec et les contrats, sans voir aucune implémentation. Sa couche doit compiler et être rouge. Lancé par /feature uniquement.
-model: opus
+model: sonnet
 effort: high
 hooks:
   PreToolUse:
