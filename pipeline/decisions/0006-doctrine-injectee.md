@@ -24,6 +24,10 @@ que Claude Code les charge lui-même.
   de premier niveau) ; sans elle, le template `commands/templates/flutter/<fichier>`. Un agent n'a plus
   de « si présent » qui le laisse sans règle.
 - Une doctrine nouvelle pour un agent s'ajoute dans `doctrine.json`, pas en « lis X » dans son prompt.
+- Le template n'est qu'un filet. Une règle projet absente (`create_screen_rules.md`, `pr_rules.md`) est
+  signalée par le doctor (`RÈGLE ABSENTE`), et le preflight de `/feature` demande à Thibault : la créer
+  depuis le template, garder le template (`rules.template`), ou s'en passer (`rules.none`, le hook ne donne
+  plus rien pour elle).
 
 ## Conséquences
 

@@ -168,6 +168,14 @@ ios.simulator_base =
 ios.app_id = com.example.app
 ios.build = fvm flutter build ios --debug --simulator
 ios.app = build/ios/iphonesimulator/Runner.app
+
+# ---------------------------------------------------------------------------
+# Règles du projet données aux agents (hooks/doctrine.py, doctor, preflight)
+# ---------------------------------------------------------------------------
+# Une règle absente de .claude/rules/ (create_screen_rules.md, pr_rules.md) : le preflight demande à Thibault.
+# rules.template : il garde le template de ~/.claude ; rules.none : le projet n'en a pas besoin.
+rules.template =
+rules.none =
 ```
 
 ## Notes pour les agents

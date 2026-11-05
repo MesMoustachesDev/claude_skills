@@ -64,6 +64,14 @@ run_doctor() {
   need "package_path défini" test -n "$(cfg package_path)"
   need "base_branch existe ($BASE_BRANCH)" git -C "$PROJECT_ROOT" rev-parse --verify "$BASE_BRANCH"
   need "create_feature_rules.md présent" test -f "$PROJECT_ROOT/.claude/rules/create_feature_rules.md"
+  # Règles que les agents reçoivent dans leur contexte (hooks/doctrine.py). Absente, le hook donne le template :
+  # le preflight (steps/00_preconditions.md) demande à Thibault de la créer, de garder le template ou de s'en passer.
+  for r in create_screen_rules.md pr_rules.md; do
+    if [ -f "$PROJECT_ROOT/.claude/rules/$r" ] || compgen -G "$PROJECT_ROOT/*/.claude/rules/$r" >/dev/null; then ok "$r (règle du projet)"
+    elif cfg_list rules.template | grep -qxF "$r"; then ok "$r : le template, choisi par Thibault (rules.template)"
+    elif cfg_list rules.none | grep -qxF "$r"; then ok "$r : sans objet pour ce projet (rules.none)"
+    else printf '[WARN] RÈGLE ABSENTE : %s — les agents reçoivent le template à sa place ; à trancher au preflight\n' "$r"; fi
+  done
   # Le gate coverage écrit <package>/coverage/lcov.info : non ignoré, il finit dans un commit ou une revue.
   need ".gitignore ignore coverage/ (lcov du gate coverage) — /feature init" \
     git -C "$PROJECT_ROOT" check-ignore -q --no-index "$(cfg package_path | sed 's/{name}/x/')/coverage/lcov.info"

@@ -11,6 +11,7 @@ Entrée : agent_type, cwd. Sortie : rien (agent hors liste), ou
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -25,10 +26,21 @@ def repo_root(cwd: str) -> Path | None:
     return Path(run.stdout.strip()) if run.returncode == 0 else None
 
 
+def without(root: Path | None) -> set[str]:
+    """Les règles que Thibault a dites inutiles pour ce projet (`rules.none` de feature_pipeline.md)."""
+    cfg = root / '.claude/rules/feature_pipeline.md' if root else None
+    if not cfg or not cfg.is_file():
+        return set()
+    m = re.search(r'^\s*rules\.none\s*=\s*(.*)$', cfg.read_text(), re.M)
+    return {v.strip() for v in m.group(1).split(',') if v.strip()} if m else set()
+
+
 def resolve(ref: str, root: Path | None) -> tuple[Path, str] | None:
     """(fichier, d'où il vient), ou None s'il n'existe nulle part."""
     if ref.startswith('rules:'):
         name = ref[len('rules:'):]
+        if name in without(root):
+            return None
         if root:
             for found in [root / '.claude/rules' / name, *sorted(root.glob(f'*/.claude/rules/{name}'))]:
                 if found.is_file():
@@ -63,7 +75,7 @@ def main() -> int:
             'Applique-les ; ne les relis pas, et ne les cherche pas ailleurs. Là où ton prompt de lancement '
             'te demande de « lire » l\'un d\'eux, c\'est fait.')
     if missing:
-        head += f" Introuvables, donc absents : {', '.join(missing)}."
+        head += f" Absents (introuvables, ou sans objet pour ce projet : rules.none) : {', '.join(missing)}."
     out = {'hookSpecificOutput': {'hookEventName': 'SubagentStart', 'additionalContext': head + '\n\n' + '\n\n'.join(parts)}}
     print(json.dumps(out, ensure_ascii=False))
     return 0
