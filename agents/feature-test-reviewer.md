@@ -37,15 +37,16 @@ l'utilisateur).
 Lis `spec.md` §3, §4, §6, §7, puis **chaque fichier** de `test/` (pas seulement la liste).
 
 *Couverture de sens* — construis la table `coverage` : chaque scénario de §4 et chaque erreur de §7
-→ le test qui le prouve, ou `missing`. Chaque état de §3 par écran → un test de widget. Chaque champ
+→ le test qui le prouve, ou `missing`. Chaque état de §3 par écran → un test de widget, ou le scénario d'acceptation qui l'asserte déjà. Chaque champ
 de la table de mapping §6 → un test de mapper, cas limites inclus.
 
 *Jonction des deux moitiés* — les tests ont été écrits par deux Théo en parallèle : data/domain
 (`test/src/{data,domain,injection}/`) et présentation (le reste). Un maillon que chacun a cru couvert par
 l'autre est invisible dans chaque moitié prise seule. Pour **chaque erreur de §7**, une ligne de
 `coverage` par maillon : `§7 <X> : data source` (exception → `Left(X)`), `repository`, `use case`
-(propage `Left(X)`), `BLoC` (`Left(X)` → état), `vue` (l'état est visible). Un maillon `missing` est un
-**bloquant**. L'orchestrateur te passe la ligne « Jonction §7 » de chaque Théo : vérifie-la sur le code,
+(propage `Left(X)`), `BLoC` (`Left(X)` → état), `vue` (l'état est visible). Un repository ou un use case qui
+ne fait que transmettre est couvert par son unique test de propagation : cite-le pour chaque erreur, n'en
+exige pas un par erreur. Un maillon `missing` est un **bloquant**. L'orchestrateur te passe la ligne « Jonction §7 » de chaque Théo : vérifie-la sur le code,
 ne la recopie pas.
 
 *Niveau du mock* — l'acceptation tourne sur le vrai BLoC et des use cases mockés. Un test d'acceptation ou
@@ -63,6 +64,16 @@ qui retourne n'importe quoi du bon type. Bloquant.
 *Rouge pour la bonne raison* — un test rouge contre les stubs parce qu'il attend `UnimplementedError`
 ne prouve rien. Un test qui passe déjà (liste dans `tests.md`) doit être un cas structurel
 (`initial state`), pas un test vide.
+
+*Doublons* — `create_test.md`, principes 18 et 19 : un comportement se prouve une fois, au plus bas
+étage qui le peut. Un test qui prouve ce qu'un autre prouve déjà (le même état asserté par un test de
+widget et par un scénario, le même widget testé dans deux fichiers, une propagation de `Left` répétée par
+erreur), ou qui asserte une taille, une couleur, un rayon ou un token sans règle de §5 derrière, est un
+**bloquant** dont le `fix` est « supprimer <test>, déjà prouvé par <fichier:ligne> ». Une suite trop
+grosse coûte à chaque refactor et à chaque re-gel : retirer un doublon est un gain, pas une perte. Pars de `.claude/features/<nom>/.gauntlet/test_dups.txt` :
+le gauntlet y liste les noms de test présents dans deux fichiers. Tranche chaque nom : vrai doublon
+(bloquant) ou deux comportements distincts sous un nom générique (rien à faire, ou une note pour renommer).
+Cherche aussi les doublons qui ne partagent pas leur nom : le script ne les voit pas.
 
 *Doctrine* — `create_test.md` : un comportement par test, nom = documentation, mocks aux frontières,
 edge cases (null, vide, erreur, limites). Une violation nette est un bloquant ; une nuance, une note.

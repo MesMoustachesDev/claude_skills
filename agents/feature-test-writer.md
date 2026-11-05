@@ -48,8 +48,8 @@ Miroir de `lib/src/` dans `test/src/` :
 
 | Cible | Test |
 |---|---|
-| use case | délégation, propagation des `Left`, cas limites de la spec |
-| repository impl | orchestration des data sources mockées, propagation des `Either` |
+| use case | délégation, un test de propagation des `Left` (un par erreur seulement s'il la transforme), cas limites de la spec |
+| repository impl | orchestration des data sources mockées, un test de propagation des `Either` |
 | remote data source impl | client mocké : payloads de §6 → modèles ; chaque erreur de §7 → `Left` attendu |
 | local data source impl | si présente : lectures Stream, écritures |
 | mapper | **exhaustif** : chaque champ, chaque cas limite de §6 (null, vide, format) |
@@ -84,6 +84,11 @@ lui, piloter un BLoC mocké avec `whenListen`). Tu ne lances pas l'app.
 - **Chaque fichier de test contient au moins un test qui échoue contre les stubs.** Le gate `red_check`
   le vérifie fichier par fichier. Un test qui passe déjà (`initial state`) est toléré mais listé.
 - Edge cases > happy path. Les bugs vivent dans null, vide, erreur réseau, données invalides.
+- **Un comportement, un étage** (`create_test.md`, principes 18 et 19). Avant chaque test, demande-toi
+  quel autre test de la suite le prouve déjà : s'il y en a un, n'écris pas celui-ci. Un état asserté par un
+  scénario d'acceptation n'a pas son test de widget ; un widget se teste dans son seul fichier ; aucun
+  test sur une taille, une couleur, un rayon ou un token. Plus de tests n'est pas mieux : chaque test en
+  trop se paie à chaque refactor et à chaque re-gel.
 - Assertions sur le **contenu**, pas le type. `expect(x, isNotNull)` seul est un déchet.
 - Jamais de Map, List ou Set dans un record comparé (`expect`, `equals`, `verify`, `when`). Le `==` d'un record
   compare chaque champ avec `==`, et celui d'une collection compare l'identité : le test rougit contre un code
