@@ -86,6 +86,7 @@ features/{feature_name}/
 - **Garde après `await`** : une garde d'état testée avant un `await` est revérifiée après, avec un commentaire qui dit pourquoi. (learn 2026-11-02, guard_not_rechecked_after_await, 2 runs)
 - **Pattern plutôt que cast** : lie les variables dans le pattern (`switch`, `if case`) plutôt que de refaire un `as` ou un `is` après une vérification de type. (learn 2026-11-02, cast_after_type_checked_pattern, 2 runs)
 - **La décision dans la couche qui décide** : une règle métier vit dans la couche qui décide (entité, résolveur, use case de lecture), jamais seulement dans celle qui exécute l'écriture (apply, use case d'écriture) ; sinon l'écran, qui lit la décision, contredit ce que fait l'écriture. (learn 2026-11-05, decision-in-executor, 2 runs)
+- **Handler relançable, transformer explicite** : un handler BLoC asynchrone que l'utilisateur peut relancer prend un transformer `restartable()` (ou `droppable()`), jamais le concurrent par défaut, qui laisse la réponse la plus lente écraser la plus récente. (learn 2026-11-05, concurrent_event_without_transformer, 2 runs)
 - **`resolution: workspace`** dans le pubspec.yaml
 - **Sens des dépendances** : `presentation/` n'importe que `domain/` (et sa propre couche). Le câblage vit
   dans `injection/` : le DI crée use cases et BLoCs, les routes de la feature créent la page et lui
