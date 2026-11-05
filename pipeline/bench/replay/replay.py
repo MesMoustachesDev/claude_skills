@@ -41,6 +41,8 @@ import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+LOCAL = Path.home() / '.claude-local' / 'bench'
+CASES = LOCAL / 'cases.json'
 CLAUDE = HERE.parent.parent.parent
 GAUNTLET = CLAUDE / 'scripts' / 'gauntlet.sh'
 AGENT = {'red': 'feature-test-writer', 'green': 'feature-implementer', 'review': 'feature-reviewer'}
@@ -348,7 +350,8 @@ def main() -> int:
     parser.add_argument('--label', default='')
     args = parser.parse_args()
 
-    cases = json.loads((HERE / 'cases.json').read_text())
+    # Les cas nomment un projet client : hors du repo, dans ~/.claude-local/bench/cases.json.
+    cases = json.loads(CASES.read_text())
     repo = Path(os.path.expanduser(cases['repo']))
     models = args.model or ['sonnet']
     if not args.dry:
@@ -356,8 +359,8 @@ def main() -> int:
         if check.returncode:
             print(check.stdout.strip())
             return 2
-    out = HERE.parent / 'results' / f"replay-{datetime.datetime.now():%Y-%m-%d_%H%M}{'-' + args.label if args.label else ''}"
-    out.parent.mkdir(exist_ok=True)
+    out = LOCAL / 'results' / f"replay-{datetime.datetime.now():%Y-%m-%d_%H%M}{'-' + args.label if args.label else ''}"
+    out.parent.mkdir(parents=True, exist_ok=True)
     rows = []
     for name in args.feature or list(cases['features']):
         for stage in args.stage or list(AGENT):

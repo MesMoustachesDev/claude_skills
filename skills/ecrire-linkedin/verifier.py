@@ -7,6 +7,7 @@ Sortie : ERREUR (à corriger, code 1) et ATTENTION (à juger). Ne remplace pas l
 import re
 import sys
 import unicodedata
+from pathlib import Path
 
 if len(sys.argv) != 3 or sys.argv[1] not in ("post", "commentaire", "message"):
     sys.exit(__doc__)
@@ -48,7 +49,13 @@ if re.search(r"(^|\s)#\w", texte):
 
 # Faits interdits
 cherche([r"runrox[^.\n]{0,40}flutter", r"flutter[^.\n]{0,40}runrox"], erreurs, "RunRox n'est pas en Flutter")
-cherche([r"\baudin\b", r"my-?center", r"\bwifirst\b"], erreurs, "client cité par son nom")
+# Les noms des clients ne sont pas dans ce repo (public) : une ligne par nom, dans ~/.claude-local/clients.txt.
+_clients = Path.home() / ".claude-local" / "clients.txt"
+if _clients.is_file():
+    noms = [l.strip() for l in _clients.read_text().splitlines() if l.strip() and not l.startswith("#")]
+    cherche([rf"\b{re.escape(n)}\b" for n in noms], erreurs, "client cité par son nom")
+else:
+    attentions.append("~/.claude-local/clients.txt absent : les noms des clients ne sont pas vérifiés")
 cherche([r"\[à compléter", r"\[x\]", r"\btodo\b", r"\[\.\.\.\]"], erreurs, "trou laissé dans le texte")
 cherche([r"\d[\d  .]*\s?k?\s(vues|votes|upvotes|likes|réactions|points|impressions|abonnés)\b",
          r"\d[\d  .]*\s?k?\s(commentaires|reposts|partages)\b"],

@@ -52,3 +52,11 @@ Le checkout principal de `~/.claude` est lu par toutes les sessions : on n'y éc
 hook `claude-home-guard.sh` le refuse (ADR 0007). Une règle d'une ligne : `scripts/rule_add.py`, qui la
 commite aussitôt. Tout autre changement : `scripts/claude_change.sh start <nom>`, travail et commits dans
 `~/.claude-wt/<nom>`, puis `claude_change.sh land <nom>` dans le même tour.
+
+## Aucun client ni projet nommé dans `~/.claude`
+
+Ce repo est public et sert à tous les projets. Ce qui nomme un client, un projet ou une feature va dans
+les `.md` de ce projet (`.claude/rules/`, `.claude/features/`), pas ici : dans `~/.claude`, un exemple
+dit « une feature de refactor », « le design system du projet ». Les valeurs dont un skill a besoin
+(noms à ne jamais publier, hôte GitLab, cas du banc de rejeu) vivent dans `~/.claude-local/`, hors du
+repo. Un hook `pre-push` refuse un push qui contient un nom de `~/.claude-local/clients.txt`.
