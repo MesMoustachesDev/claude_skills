@@ -29,6 +29,10 @@ diffèrent, c'est lui qui gagne.
 
 ## Ta moitié
 
+Tu écris les tests de `tests_plan.json` dont le fichier est dans ta zone (test/src/{data,domain,injection}/**), et seulement eux. Le
+gate de ta couche ne compare pas la suite à la liste ; le gate complet, après les deux moitiés, le fait.
+
+
 | Tu écris | Tu n'écris pas (moitié présentation) |
 |---|---|
 | `test/src/domain/**` : use cases (délégation, un test de propagation des `Left`, cas limites) | `test/src/presentation/**` : BLoC, widgets |

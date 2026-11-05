@@ -18,8 +18,9 @@ profile_checks() {
     contracts) echo "build_runner analyze deps error_handling stub_check reinvented package_readme" ;;
     dedup)     echo "dedup_report" ;;
     tests_review) echo "tests_review_report" ;;
+    test_plan)    echo "test_plan" ;;
     # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
-    red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_names test_dups" ;;
+    red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_plan_match test_names test_dups" ;;
     green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
     # Moitiés parallèles des étapes 3 et 4 (gauntlet.sh pose GAUNTLET_LAYER d'après le suffixe) : chaque
     # check ne juge que la couche. build_runner seulement côté présentation (bdd_widget_test) : deux
@@ -79,6 +80,8 @@ Checks individuels :
   test               flutter test (rapport JSON conservé)
   red_check          après TEST-WRITER : chaque fichier de test a ≥ 1 échec
   test_names         écrit .claude/features/<f>/tests.md (liste lisible pour le skim du dev)
+  test_plan          tests_plan.json (étape 3a) : chaque item de la spec prouvé ou écarté, chaque test prouve un item
+  test_plan_match    les tests écrits sont ceux de tests_plan.json, ni plus ni moins (gate red)
   test_dups          candidats doublons (même nom de test dans deux fichiers) → .gauntlet/test_dups.txt, tranchés par Gaëlle ; ne bloque pas
   test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres

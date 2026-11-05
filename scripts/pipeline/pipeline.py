@@ -26,6 +26,8 @@ ORDER = [
     ("hg.contracts", "0e", "Point d'étape « contrats » : Thibault les écrit", "0e_contracts.md", "Thibault (+ Arthur en mode application)"),
     ("spec", "1", "Spec, critique, point d'étape « spec »", "1_spec.md", "Sophie (feature-specifier) puis Camille (feature-spec-critic)"),
     ("contracts", "2", "Complétion du scaffold", "2_scaffold.md", "Arthur (feature-architect, mode complétion)"),
+    ("test_plan", "3a", "Liste des tests", "3_tests.md", "Théo-liste (feature-test-planner)"),
+    ("test_plan_review", "3a", "Relecture de la liste", "3_tests.md", "Gaëlle (feature-test-reviewer, mode liste)"),
     ("red", "3", "Tests", "3_tests.md", "Théo en deux moitiés parallèles (feature-test-writer-data + feature-test-writer-presentation), puis join"),
     ("hg.tests", "3b", "Revue des tests, point d'étape « tests », gel", "3_tests.md", "Gaëlle (feature-test-reviewer)"),
     ("green", "4", "Implémentation", "4_impl.md", "Ivan en deux moitiés parallèles (feature-implementer-data + feature-implementer-presentation), puis join"),
@@ -40,9 +42,10 @@ ORDER = [
     ("evidence", "9", "Evidence, commits, MR", "9_evidence.md", "toi"),
 ]
 DONE = {"PASSED", "SKIPPED"}
-LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "tests": 2, "review": 2, "dedup_clean": 2, "tour": 2, "polish": 2}
+PLAN_KEYS = ("test_plan", "test_plan_review")
+LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "test_plan": 2, "tests": 2, "review": 2, "dedup_clean": 2, "tour": 2, "polish": 2}
 # Verdict archivé dans history/ à chaque boucle (lu par learn.py).
-LOOP_VERDICT = {"spec": "spec_review.json", "tests": "tests_review.json", "review": "review.json", "dedup_clean": "dedup.json"}
+LOOP_VERDICT = {"spec": "spec_review.json", "test_plan": "tests_review.json", "tests": "tests_review.json", "review": "review.json", "dedup_clean": "dedup.json"}
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
 GATE_LABELS = {
     "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Spec validée",
@@ -205,6 +208,10 @@ def next_step(p):
     for key, step, title, fname, agent in ORDER:
         status = state_of(p, key)
         if status in DONE:
+            continue
+        # Une feature dont les tests étaient déjà écrits avant l'étape 3a (2026-11-05) n'a pas de liste :
+        # on ne la renvoie pas en arrière.
+        if key in PLAN_KEYS and state_of(p, "red") in DONE:
             continue
         return {"key": key, "step": step, "title": title, "file": fname, "agent": agent, "status": status}
     return {"key": "done", "step": "—", "title": "Pipeline terminé", "file": None, "agent": "—", "status": "DONE"}

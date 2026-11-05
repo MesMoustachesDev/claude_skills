@@ -132,6 +132,10 @@ case "$agent" in
     match "$rel" "$PKG_REL/lib/*" "$PKG_REL/pubspec.yaml" "$PKG_REL/README.md" "$PKG_REL/maestro/*" "pubspec.yaml" $extra \
       || deny "architect : zone autorisée = $PKG_REL/lib/**, $PKG_REL/README.md, pubspec.yaml${extra:+, $extra}. Refusé : $rel$via"
     ;;
+  feature-test-planner)
+    match "$rel" "$FEAT_REL/tests_plan.json" \
+      || deny "test-planner : tu n'écris que $FEAT_REL/tests_plan.json, la liste ; les tests s'écrivent après sa validation. Refusé : $rel$via"
+    ;;
   feature-test-writer)
     match "$rel" "$PKG_REL/test/*" "$PKG_REL/pubspec.yaml" "$FEAT_REL/tests.md" $extra_tests $extra_pubspecs \
       || deny "test-writer : tu n'écris que dans $PKG_REL/test/**${extra_tests:+, $extra_tests} (et pubspec.yaml pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"

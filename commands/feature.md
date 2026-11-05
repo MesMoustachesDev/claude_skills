@@ -128,7 +128,8 @@ réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
 | 1 | spec | Sophie | `feature-specifier` | — | non | plafond 15 Ko | — |
 | 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : la spec, et dans le même appel les lignes de §9 encore `proposée` (boucle vers 1 avant) | une seule passe (`loops.spec` max 0) | — |
 | 2 | complétion du scaffold | Arthur (mode complétion) | `feature-architect` | `contracts` | non | identique | — |
-| 3 | tests | Théo, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Théo complet | `feature-test-writer-data` + `feature-test-writer-presentation` ; relances `feature-test-writer` | `red_data` + `red_presentation`, puis `red` au join | non | identique | — |
+| 3a | liste des tests | Théo-liste, puis Gaëlle (mode liste) | `feature-test-planner`, puis `feature-test-reviewer` | `test_plan`, puis `tests_review_verdict` | non | identique | — |
+| 3 | tests | Théo, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Théo complet | `feature-test-writer-data` + `feature-test-writer-presentation` ; relances `feature-test-writer` | `red_data` + `red_presentation`, puis `red` au join (dont `test_plan_match` : la suite est la liste) | non | identique | — |
 | 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : séquences cadrage ↔ tests réels, `tests.md`, puis gel (boucle vers 3 avant) | identique | — |
 | 4 | impl | Ivan, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Ivan complet | `feature-implementer-data` + `feature-implementer-presentation` ; relances `feature-implementer` | `green_data` + `green_presentation`, puis `green` au join | non | identique | — |
 | 5 | clean | Nina | `feature-cleaner` | `clean` | non | identique | — |

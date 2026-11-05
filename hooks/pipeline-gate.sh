@@ -14,6 +14,7 @@ cwd="$(jq -r '.cwd // empty' <<<"$input")"
 case "$agent" in
   feature-architect)   profile=contracts ;;
   feature-specifier)   profile=spec_lint ;;       # vert sans spec.md (cadrage, exploration)
+  feature-test-planner) profile=test_plan ;;
   feature-test-writer) profile=red ;;
   feature-implementer) profile=green ;;
   # Moitiés parallèles des étapes 3 et 4 : gate de leur couche ; le gate complet se joue après les deux

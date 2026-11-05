@@ -28,6 +28,8 @@ qui le contraindra. Un comportement que tu ne testes pas n'existera pas, ou exis
 ## Ce que tu reçois
 
 Le nom de la feature, `spec.md`, `cadrage.md`, le chemin du package, et la liste de ce que tu as le droit de lire.
+Et **`tests_plan.json`**, la liste des tests validée à l'étape 3a : pour chacun, son fichier, son nom, son
+étage et les items de la spec qu'il prouve (`test_plan.py items <spec.md>` les numérote).
 
 ## Ce que tu lis — et rien d'autre
 
@@ -45,6 +47,13 @@ Le nom de la feature, `spec.md`, `cadrage.md`, le chemin du package, et la liste
 des stubs, mais l'habitude compte : tu testes un contrat, pas une structure.
 
 ## Ce que tu produis
+
+**Exactement les tests de `tests_plan.json`**, chacun dans son fichier et sous son nom (le gate `red`
+compare la suite à la liste : `test_plan_match`). Un test qui manque à la liste ne s'écrit pas : dis-le
+dans ton rapport (« manque à la liste : <ce qu'il prouverait> ») et l'orchestrateur fait compléter la
+liste. Un test de la liste que tu juges faux ou impossible, pareil. Les helpers, fixtures et step
+definitions ne sont pas des tests : écris ceux qu'il faut.
+
 
 Miroir de `lib/src/` dans `test/src/` :
 
@@ -86,11 +95,8 @@ lui, piloter un BLoC mocké avec `whenListen`). Tu ne lances pas l'app.
 - **Chaque fichier de test contient au moins un test qui échoue contre les stubs.** Le gate `red_check`
   le vérifie fichier par fichier. Un test qui passe déjà (`initial state`) est toléré mais listé.
 - Edge cases > happy path. Les bugs vivent dans null, vide, erreur réseau, données invalides.
-- **Un comportement, un étage** (`create_test.md`, principes 18 et 19). Avant chaque test, demande-toi
-  quel autre test de la suite le prouve déjà : s'il y en a un, n'écris pas celui-ci. Un état asserté par un
-  scénario d'acceptation n'a pas son test de widget ; un widget se teste dans son seul fichier ; aucun
-  test sur une taille, une couleur, un rayon ou un token. Plus de tests n'est pas mieux : chaque test en
-  trop se paie à chaque refactor et à chaque re-gel.
+- **La liste fixe le nombre de tests.** Elle a déjà tranché « un comportement, un étage » (`create_test.md`,
+  principes 18 et 19) : à toi de bien écrire chaque test, pas d'en ajouter.
 - Assertions sur le **contenu**, pas le type. `expect(x, isNotNull)` seul est un déchet.
 - Jamais de Map, List ou Set dans un record comparé (`expect`, `equals`, `verify`, `when`). Le `==` d'un record
   compare chaque champ avec `==`, et celui d'une collection compare l'identité : le test rougit contre un code
@@ -114,7 +120,8 @@ que la suite ne compile pas ou qu'un fichier est tout vert.
 ## Ton rapport final
 
 ```
-Tests : <n> dans <n> fichiers  — Scénarios Gherkin : <n>
+Tests : <n> dans <n> fichiers  — Scénarios Gherkin : <n> — Liste : conforme | <écarts>
+Manque à la liste : aucun | <liste>
 Passent déjà contre les stubs : <liste, avec pourquoi c'est acceptable>
 Contrats manquants ou incohérents : aucun | <liste>
 Gate red : vert

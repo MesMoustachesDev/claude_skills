@@ -1,7 +1,7 @@
 # 0001 — Les tests sont écrits et gelés avant l'implémentation
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-05
-(tests sobres, plus bas)
+(tests sobres, plus bas) ; amendée par 0009 (liste des tests avant l'écriture)
 Où elle vit : `commands/feature.md` (étapes 3, 3b, 4) · `pipeline/feature/steps/3_tests.md` (gel,
 re-gel) · `hooks/pipeline-restrict-writes.sh` · `scripts/gauntlet/checks_test.sh`
 (`red_check`, `test_freeze_check`) · `scripts/pipeline.sh freeze|refreeze`
@@ -49,6 +49,9 @@ demandaient le doublon. Désormais :
 
 Une règle que `learn` propose et qui ajouterait des tests se relit à la lumière du principe 18 :
 elle précise l'étage où le test manquait, pas « à chaque maillon ».
+
+Ces règles agissaient pendant l'écriture et Gaëlle jugeait les doublons une fois écrits : 0009 décide la
+liste des tests avant l'écriture.
 
 ## Hors champ
 

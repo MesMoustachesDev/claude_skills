@@ -29,6 +29,10 @@ ne dit que ce qui change pour ta moitié ; là où ils diffèrent, c'est lui qui
 
 ## Ta moitié
 
+Tu écris les tests de `tests_plan.json` dont le fichier est dans ta zone (le reste de test/), et seulement eux. Le
+gate de ta couche ne compare pas la suite à la liste ; le gate complet, après les deux moitiés, le fait.
+
+
 | Tu écris | Tu n'écris pas (moitié data/domain) |
 |---|---|
 | `test/src/presentation/**` : BLoC (`emitsInOrder` par event), widgets (chaque état de §3 qu'aucun scénario d'acceptation n'asserte) | `test/src/domain/**`, `test/src/data/**`, `test/src/injection/**` |

@@ -92,6 +92,23 @@ cadrage, une note. Le rapport du dev signale ces écarts par heuristique : écri
 tu juges justifiés (« C2 : 3 résultats visibles, 2 assertions — la 2e assertion couvre les deux »),
 pour que le dev ne les retraite pas.
 
+## Mode liste (étape 3a)
+
+Lancée avec « mode liste », tu relis `tests_plan.json` **avant qu'aucun test ne soit écrit**. C'est là
+que tes deux questions coûtent le moins : un test manquant s'ajoute en une ligne, un doublon se retire
+avant d'avoir été écrit. Le script a déjà vérifié que chaque item de la spec est prouvé ou écarté ; toi,
+tu juges :
+- **Assez** : pour chaque item, le test listé prouve-t-il vraiment l'item, à un étage qui peut le
+  prouver ? Chaque cas limite de §6 et chaque erreur de §7 a-t-il son test là où il naît ? Chaque raison
+  de `not_tested` tient-elle ? Un manque est un **bloquant** (« E2 : rien ne prouve le warning à la
+  réouverture ; test de BLoC dans … »).
+  Une règle à plusieurs conditions (« ou », « ≤ », « non fini ») a un test par condition et par borne :
+  un seul test pour « largeur ou hauteur ≤ 0 » est un manque.
+- **Sobre** : *Doublons*, plus bas, appliqué à la liste. Les items signalés `?` par le gate (prouvés par
+  beaucoup de tests) se relisent en premier. Un doublon est un **bloquant** dont le `fix` est « retirer
+  <test>, déjà prouvé par <test> ».
+Même sortie (`tests_review.json`, `tests_review.md`) ; `coverage` = l'item → `tested` ou `missing`.
+
 ## Ce que tu produis
 
 `.claude/features/<nom>/tests_review.json` :

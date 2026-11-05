@@ -1,3 +1,21 @@
+### 3a. La liste des tests — Théo-liste (`feature-test-planner`), puis Gaëlle
+
+Avant d'écrire un test, on décide **lesquels** : un test jamais écrit ne coûte rien, ni à écrire, ni à
+relire, ni à faire tourner. Lance Théo-liste (`feature-test-planner`, prompt : nom, `spec.md`,
+`cadrage.md`, `archi.json`, package). Il écrit `tests_plan.json` : chaque test avec son fichier, son nom,
+son étage et les items de la spec qu'il prouve (`test_plan.py items` les numérote : scénarios, contrats,
+données, erreurs). Son gate (`test_plan`) refuse une liste où un item n'est ni prouvé ni écarté avec sa
+raison, un scénario sans test d'acceptation, un test qui ne prouve rien. C'est le filet du « assez ».
+
+Puis Gaëlle (`feature-test-reviewer`, « mode liste », même prompt + `tests_plan.json`) relit la liste, qui
+tient en une page : un test qui manque, une raison d'écart faible, un doublon (même comportement à deux
+étages, variante qui passe par la même branche). Puis `gauntlet.sh tests_review_verdict <nom>` : rouge →
+`pipeline.sh loop <nom> test_plan`, Théo-liste reprend avec `tests_review.md` (il corrige la liste, il ne
+la refait pas), puis Gaëlle ; code 3 (au-delà de 2) : point d'étape avec les bloquants restants. Vert →
+`pipeline.sh pass <nom> test_plan_review`.
+
+**Gabarit S :** identique. **En L :** n'a pas lieu.
+
 ### 3. Tests — Théo en deux moitiés parallèles
 
 Le premier passage s'écrit en **deux agents lancés dans le même message**, chacun sur sa couche, avec sa
@@ -8,7 +26,8 @@ zone d'écriture (hook) et son gate de couche :
 | data/domain | `feature-test-writer-data` | `test/src/{data,domain,injection}/**` | `red_data` |
 | présentation | `feature-test-writer-presentation` | le reste de `test/`, `.feature`, steps, pubspec | `red_presentation` |
 
-Prompt commun (15 lignes max) : nom, `spec.md`, package, `~/.claude/commands/create_test.md`, et « tu
+Prompt commun (15 lignes max) : nom, `spec.md`, `tests_plan.json` (« tu écris les tests de la liste dont
+le fichier est dans ta zone, ni plus ni moins »), package, `~/.claude/commands/create_test.md`, et « tu
 écris en parallèle de l'autre moitié ; ton fichier d'agent dit ce que tu lis et où tu écris ». En plus,
 pour la présentation : `cadrage.md` et `archi.json` (« chaque séquence C<n> est un scénario d'acceptation,
 relié à son titre de §4 par `archi.json → sequences` : chaque action, réponse du use case mocké et
@@ -31,7 +50,8 @@ complet (`red` : toute la suite, l'analyse du package entier, `tests.md`) et éc
   accepte une moitié `SKIPPED`.
 
 Les **relances suivantes** — boucle de Gaëlle (3b), « Il manque des scénarios » de Thibault, Théo réaligné
-en 0e — vont à **Théo complet** (`feature-test-writer`) : un retour cite des fichiers des deux couches, et
+en 0e — passent d'abord par la liste (Théo-liste la complète, `test_plan` vert), puis vont à **Théo complet**
+(`feature-test-writer`) : un retour cite des fichiers des deux couches, et
 la suite est déjà écrite. Après lui, `gauntlet.sh red <nom>` comme avant.
 
 **Contrat manquant** (Théo ou Gaëlle signalent un type, une clé ou un state absent des contrats) :
@@ -45,6 +65,9 @@ et le parallèle ne coûte pas de temps. **En L :** n'a pas lieu.
 ### 3b. Revue des tests — Gaëlle (`feature-test-reviewer`)
 
 Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, `cadrage.md`, `archi.json`, package, `tests.md`, `create_test.md`).
+La liste a déjà tranché quels tests existent (3a) et le gate `red` a vérifié que la suite est la liste :
+Gaëlle juge ici **comment** ils sont écrits (assertions, couplage, séquences). Un test qu'elle veut ajouter
+passe d'abord par la liste : Théo-liste l'y ajoute, puis Théo l'écrit.
 Gaëlle relit **les deux moitiés ensemble** (sa matrice de jonction §7 croise les deux rapports de Théo :
 passe-lui la ligne « Jonction §7 » de chacun).
 Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance **Théo complet** (`feature-test-writer`) avec
