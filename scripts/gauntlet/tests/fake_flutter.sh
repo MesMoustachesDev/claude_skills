@@ -12,9 +12,9 @@ case "${1:-}" in
   *) exit 0 ;;
 esac
 cmd="$1"; shift
-paths=() coverage=""
+paths=()
 while [ $# -gt 0 ]; do
-  case "$1" in --reporter) shift ;; --coverage) coverage=1 ;; -*) ;; *) paths+=("$1") ;; esac
+  case "$1" in --reporter) shift ;; -*) ;; *) paths+=("$1") ;; esac
   shift
 done
 if [ "$cmd" = analyze ]; then
@@ -35,9 +35,4 @@ while IFS= read -r f; do
   printf '{"type":"testStart","test":{"id":%d,"name":"%s","suiteID":%d,"url":"file://%s"}}\n' "$id" "$(basename "$f" .dart)" "$id" "$abs"
   printf '{"type":"testDone","testID":%d,"result":"%s","hidden":false,"skipped":false}\n' "$id" "$result"
 done < <(if [ ${#paths[@]} -gt 0 ]; then printf '%s\n' "${paths[@]}"; else find test -name '*_test.dart' 2>/dev/null | sort; fi)
-if [ -n "$coverage" ]; then
-  mkdir -p coverage
-  grep -rhoE 'COVERS [^ ]+:[0-9]+' test 2>/dev/null | sort -u \
-    | awk '{ split($2, a, ":"); print "SF:" a[1]; print "DA:" a[2] ",1"; print "end_of_record" }' > coverage/lcov.info
-fi
 exit $rc
