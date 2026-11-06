@@ -176,6 +176,7 @@ def cmd_say(fx, args):
         c["report_step"] = args[i + 1]
         args = args[:i] + args[i + 2:]
     c["waiting"] = args[0] if args and args[0] else None
+    c["at"] = now()   # depuis quand on l'attend : fix/watchdog.py
     fx.save()
     print("message du cockpit écrit")
 

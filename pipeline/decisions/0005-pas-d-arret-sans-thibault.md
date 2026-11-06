@@ -1,11 +1,12 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
 `commands/feature.md` et `commands/fix.md` (« Un tour ne finit que sur une question… », « Au rapport d'un agent ») ·
-`scripts/fix_gauntlet.sh after` · `pipeline.py` → `wait_agents` · `feature_pipeline.md` →
+`scripts/fix_gauntlet.sh after` · `pipeline.py` → `wait_agents` · `scripts/fix_gauntlet.sh watchdog`
+(`scripts/fix/watchdog.py`) · `commands/fix.md` (« Watchdog », étape 0) · `feature_pipeline.md` →
 `watchdog.minutes`, `watchdog.renotify_minutes`
 
 ## Contexte
@@ -43,6 +44,13 @@ personne ne l'a vu.
     `fix_gauntlet.sh after <profil> <nom>` fait pour `/fix` ce que `next --after` fait pour `/feature`.
   Un appel est borné à 540 s (il tient dans un appel Bash de 600 s) ; au-delà, exit 4 et
   l'orchestrateur relance la même commande, dans le même tour.
+- Amendement 3 (2026-11-06) : **le watchdog suit aussi `/fix`**. L'attente bloquante ne couvre que
+  l'oubli au rapport d'un agent ; un orchestrateur `/fix` qui s'arrête ailleurs n'était rattrapé par
+  personne. `fix_gauntlet.sh watchdog <nom>` rend les mêmes verdicts sur `.claude/fixes/<nom>/`
+  (étape de `fix_cockpit.py → steps`, attente de `cockpit.waiting`, `done` = `stages.evidence`
+  `PASSED`), avec les mêmes seuils et les helpers de `pipeline.py`. `/fix` pose à l'étape 0 le même
+  `CronCreate` (`/fix <nom> watchdog`) et `watchdog.sh register <wt> <nom> --fix` ; la liste suivie
+  prend une 3e colonne `feature|fix` (sans elle : feature). `say` du fix note désormais `cockpit.at`.
 
 ## Conséquences
 
@@ -60,5 +68,4 @@ personne ne l'a vu.
 
 - Le watchdog ne répond jamais à la place de Thibault, ne valide aucun point d'étape et ne rejoue
   pas une étape `FAILED` (0003) : il le notifie.
-- Le watchdog ne suit pas `/fix` ni `/reviewPR` : pour `/fix`, seule l'attente bloquante dans le tour
-  (amendement 2) empêche l'arrêt ; un oubli de l'orchestrateur n'y est rattrapé par personne.
+- Le watchdog ne suit pas `/reviewPR`.

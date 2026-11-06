@@ -6,6 +6,7 @@
 #   fix_gauntlet.sh <profil|check> <nom>
 #   fix_gauntlet.sh list
 #   fix_gauntlet.sh after <profil> <nom>  au rapport d'un agent : attend son hook, et l'agent si le gate est rouge
+#   fix_gauntlet.sh watchdog <nom> [--json] [--notify]  le fix est-il bloqué ? (fix/watchdog.py, ADR 0005)
 #   fix_gauntlet.sh report <nom> [étape]   rapport HTML pour le dev (.claude/fixes/<nom>/report.html)
 #
 # Exit 0 si tout est vert, 1 sinon. Écrit .claude/fixes/<nom>/.gauntlet/last_<profil>.{log,json}.
@@ -343,9 +344,10 @@ fix_after() {
 # --- main ----------------------------------------------------------------------------------------
 target="${1:-}"; name="${2:-}"
 case "$target" in
-  ""|-h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  ""|-h|--help) sed -n '2,16p' "${BASH_SOURCE[0]}"; exit 0 ;;
   list) profiles_list; exit 0 ;;
   after) fix_after "${2:-}" "${3:-}"; exit $? ;;
+  watchdog) shift; exec python3 "$(dirname "${BASH_SOURCE[0]}")/fix/watchdog.py" "$@" ;;
   report) exec python3 "$HOME/.claude/scripts/report/report.py" fix "$name" "${3:-}" ;;
 esac
 [ -n "$name" ] || die "usage: fix_gauntlet.sh <profil|check> <nom>"

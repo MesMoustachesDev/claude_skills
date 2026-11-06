@@ -15,6 +15,7 @@ Argument : **$ARGUMENTS**
 /fix <nom> "<description>"         nouveau fix : branche fix/<nom>, dossier .claude/fixes/<nom>/
 /fix <nom>                         reprise là où on en était
 /fix <nom> status                  état sans rien lancer
+/fix <nom> watchdog                le fix est-il bloqué ? reprend la suite ou prévient Thibault (lancé par le cron de l'étape 0)
 /fix <nom> accept review "<raison>"  accepte les critiques restantes de Victor, avec une raison
 ```
 
@@ -47,6 +48,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 | Quoi | Où |
 |---|---|
 | Gauntlet | `~/.claude/scripts/fix_gauntlet.sh <profil> <nom>` — `list` |
+| Watchdog | `fix_gauntlet.sh watchdog <nom>` (verdict, `scripts/fix/watchdog.py`) · `~/.claude/scripts/watchdog.sh` (veille hors session, LaunchAgent) |
 | Rapport pour le dev | `~/.claude/scripts/fix_gauntlet.sh report <nom> <étape>` → `.claude/fixes/<nom>/report.html` |
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
@@ -106,6 +108,15 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 - **Cockpit** : crée la page du fix (`~/.claude/pipeline/fix/cockpit.md`, « Créer la page ») ; en
   reprise, réarme-la pour cette session (même section, point 4). Puis « Rafraîchir » avec `say <nom>
   "Bastien reproduit le bug"` : la carte apparaît dans l'Accueil.
+- **Watchdog** (création comme reprise, une fois par session) :
+  1. `CronCreate` récurrent, `cron` = toutes les `watchdog.minutes` de `.claude/rules/feature_pipeline.md`
+     (défaut 20 : `"*/20 * * * *"`, minute de départ décalée), `prompt` = `/fix <nom> watchdog`. Garde
+     l'id dans `fix.json → watchdog_cron`. Il ne se déclenche que session inactive. Il expire au bout de
+     7 jours : en reprise, recrée-le (`CronList` d'abord, pas de doublon).
+  2. `bash ~/.claude/scripts/watchdog.sh register <worktree> <nom> --fix` : la veille hors session suit
+     le fix même session fermée ou bloquée sur une permission. « LaunchAgent absent » → dis-le une fois
+     avec le bloc « ce que tu tranches sans lui ».
+  Le traitement de `/fix <nom> watchdog` est dans « Watchdog », plus bas.
 - **Ticket** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
   seulement). Un ticket existant fait partie de l'entrée de Bastien.
 
@@ -306,7 +317,8 @@ dans cet ordre :
    (`issue.md`, partie C) ; elle appliquera ses propres validations. MR créée → relance
    `mr.py archive fix <nom> <base_branch>` (l'archive prend `mr.md`).
 
-`stages.evidence = PASSED`, supprime `.claude/fixes/.current`.
+`stages.evidence = PASSED`, supprime `.claude/fixes/.current`, `CronDelete` de `fix.json → watchdog_cron` et
+`bash ~/.claude/scripts/watchdog.sh unregister <nom>`.
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
 mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter (le
@@ -324,6 +336,25 @@ Termine par 6 lignes : cause, pourquoi raté, test, correction, learn (règles a
 récurrence »), chemin de l'evidence. Si la cause
 racine révèle un piège non évident du projet (un comportement d'API, un invariant), propose en une
 ligne de l'enregistrer en mémoire.
+
+---
+
+## Watchdog
+
+`/fix <nom> watchdog` (envoyé par le cron de l'étape 0) : `fix_gauntlet.sh watchdog <nom>`, le même verdict
+que `/feature` (ADR 0005), lu par la veille hors session (`watchdog.sh scan`, notification macOS) :
+
+| Verdict | Ce que c'est | Ce que tu fais |
+|---|---|---|
+| `working` | un hook joue un gate, ou un sous-agent de ce worktree a écrit depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
+| `idle` | calme depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
+| `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (gate green passé et Victor jamais lancé, gate rejoué que personne n'a lu) | **reprends à l'étape qu'il nomme** (la première non `PASSED` de `fix.json`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Dis-le en une ligne (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
+| `waiting_thibault` | `cockpit.waiting` posé (`say`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` → `PushNotification` d'une ligne : ce qu'on attend de lui et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
+| `done` | `stages.evidence` `PASSED` | `CronDelete` de `watchdog_cron` |
+
+Pour que le verdict soit juste : **toute question au dev passe d'abord par « Rafraîchir » avec `say <nom>
+"<ce qu'on attend de lui>"`**, vidé (`say <nom> ""`) à sa réponse. Sans ça, le watchdog prend son silence
+pour un blocage et relance.
 
 ---
 
@@ -345,6 +376,7 @@ ligne de l'enregistrer en mémoire.
   du dev, ou pendant qu'il écrit). Rien qui tourne et aucune question posée : tu n'as pas le droit de
   t'arrêter ; vérifie l'état (`fix.json → stages`, `git diff`) et lance la suite. Cas réel : gate green
   de Fanny passé, l'orchestrateur a écrit « j'attends » et Victor n'a été lancé qu'au retour du dev.
+  Le watchdog (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas cette règle.
 - **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
   Son rapport arrive avant que son hook de fin ait joué le gate (plus d'une minute pour `red` ou
   `green`), et un gate rouge le remet au travail après ce rapport. C'est le script qui attend, pas toi :
