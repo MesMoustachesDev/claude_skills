@@ -466,13 +466,16 @@ const SPEC_DIR = `${ROOT}/.claude/features/two_factor_login`
 const WAITING = JSON.stringify({ ...JSON.parse(PIPELINE), cockpit: { waiting: 'Valide la spec' } })
 const NEXT = JSON.stringify({ key: 'spec', step: '1', title: 'Spec, critique, point d’étape « spec »' })
 
-const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>) => {
+// `opens` : les commandes `open` lancées ; `open <chemin>` seul échoue, comme pour un .dart sans app par défaut.
+const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>, opens: string[] = []) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('process.run', (_, e) => {
     const argv = e.argv.join(' ')
+    if (argv.startsWith('open')) opens.push(argv)
+    const code = argv.startsWith('open /') ? 1 : 0
     const out = argv.includes('pipeline.sh')
       ? NEXT
       : argv.includes('rev-parse')
@@ -481,7 +484,7 @@ const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Rec
           ? 'feature/two_factor_login'
           : ''
 
-    return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    return { value: { exitCode: code, stdout: out, stderr: code ? 'No application knows how to open' : '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('fs.read', (_, e) => (e.path in files ? { value: files[e.path] } : { deny: 'ENOENT' }))
 }
@@ -566,5 +569,25 @@ test('l’encart montre le diff des contrats, puis le fichier entier avec ses ch
   await ui.press({ type: 'Button', key: 'doc-diff' })
   expect((await ui.find({ type: 'Code' }))?.text).toBe(FULL_DIFF)
   expect((await ui.find({ type: 'Button', key: 'doc-diff' }))?.props.label).toBe('diff')
+  await ui.unmount()
+})
+
+test('ouvrir : l’app par défaut, sinon Android Studio, et le dit', async ($, on) => {
+  const runs: string[] = []
+  const toasts: string[] = []
+  readingEngine(on, {
+    [`${SPEC_DIR}/pipeline.json`]: WAITING,
+    [`${SPEC_DIR}/spec.md`]: '# Spec',
+  }, runs)
+  on('ui.toast', (_, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ type: 'Button', key: 'doc-open' })
+  expect(runs).toEqual([`open ${SPEC_DIR}/spec.md`, `open -a Android Studio ${SPEC_DIR}/spec.md`])
+  expect(toasts).toEqual(['Ouvert dans Android Studio : spec.md'])
   await ui.unmount()
 })

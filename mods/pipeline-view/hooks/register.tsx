@@ -81,6 +81,26 @@ const git = async ($: EngineInterface, args: string[], cwd?: string): Promise<st
   return run?.exitCode === 0 ? run.stdout.trim() : ''
 }
 
+/** Ouvre un fichier : l'app par défaut, sinon Android Studio (un .dart n'a pas d'app par défaut sur macOS), sinon
+ * l'éditeur de texte. Dit en toast ce qui l'a ouvert, ou pourquoi rien ne l'a pu. */
+const openFile = async ($: EngineInterface, path: string): Promise<void> => {
+  const tries: [string[], string][] = [
+    [['open', path], ''],
+    [['open', '-a', 'Android Studio', path], ' dans Android Studio'],
+    [['open', '-t', path], " dans l'éditeur de texte"],
+  ]
+  let error = ''
+  for (const [argv, where] of tries) {
+    const run = await $.process.run(argv, { timeoutMs: 10000 }).catch((e: unknown) => ({ exitCode: -1, stderr: String(e) }))
+    if (run.exitCode === 0) {
+      $.ui.toast(`Ouvert${where} : ${path.slice(path.lastIndexOf('/') + 1)}`)
+      return
+    }
+    error = run.stderr.trim() || error
+  }
+  $.ui.toast(`Impossible d'ouvrir ${path} : ${error || 'open a échoué'}`)
+}
+
 /** Sortie brute, pour les formats `-z` dont le premier caractère compte. */
 const gitRaw = async ($: EngineInterface, args: string[], cwd: string): Promise<string> => {
   const run = await $.process.run(['git', ...args], { cwd, timeoutMs: 5000 }).catch(() => undefined)
@@ -981,7 +1001,7 @@ export const register: Register = on => {
                         plain
                         dimColor
                         label={shot.label}
-                        onPress={() => void $.process.run(['open', shot.path], { timeoutMs: 5000 }).catch(() => undefined)}
+                        onPress={() => openFile($, shot.path)}
                       />
                     </Box>
                   ))}
@@ -1131,7 +1151,7 @@ export const register: Register = on => {
                 plain
                 dimColor
                 label="ouvrir"
-                onPress={() => void $.process.run(['open', `${root}/${doc.path}`], { timeoutMs: 5000 }).catch(() => undefined)}
+                onPress={() => openFile($, `${root}/${doc.path}`)}
               />
             </Box>
             <Text dimColor wrap="truncate-start">
