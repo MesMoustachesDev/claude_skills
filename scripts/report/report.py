@@ -28,6 +28,10 @@ import re
 import subprocess
 import unicodedata
 import sys
+import fnmatch
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import stacklib  # noqa: E402  (scripts/stacklib.py : le langage d'un package et ses valeurs, ADR 0011)
 from datetime import datetime
 
 MARKED = "https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"
@@ -310,17 +314,28 @@ def hosted_deps(root: str, pkg_rel: str) -> list[str]:
     return re.findall(r"^  (\w+):\s*['\"]?[\^~>=<\d]", m.group(1), re.M)
 
 
+def is_test_file(pkg_dir: str, name: str) -> bool:
+    """name est un fichier de test pour le langage du package (stack.ini → test_globs sans `/` : *_test.dart…)."""
+    return any(fnmatch.fnmatch(name, g) for g in stacklib.get_list("test_globs", pkg_dir)
+               if "/" not in g and not g.endswith(".feature"))
+
+
 def test_inventory(root: str, pkg_rel: str) -> tuple[list[list[str]], list[str]]:
+    """Fichiers de test du package (dossiers de test du langage) et noms de leurs tests. Les noms sont lus avec
+    TEST_RE (test, testWidgets, blocTest : Dart) ; un autre langage a ses fichiers listés, sans noms."""
     rows = []
     scenarios = []
-    for path in sorted(glob.glob(os.path.join(root, pkg_rel, "test", "**", "*"), recursive=True)):
+    pkg_dir = os.path.join(root, pkg_rel)
+    tds = stacklib.get_list("test_dirs", pkg_dir)
+    paths = sorted(p for td in tds for p in glob.glob(os.path.join(pkg_dir, td, "**", "*"), recursive=True))
+    for path in paths:
         if path.endswith(".feature"):
             scenarios += spec_scenarios(read(path) or "")
-        if not path.endswith("_test.dart"):
+        if not is_test_file(pkg_dir, os.path.basename(path)):
             continue
         src = read(path) or ""
         names = [m.group(3) for m in TEST_RE.finditer(src) if m.group(1) != "group"]
-        rel = os.path.relpath(path, os.path.join(root, pkg_rel, "test"))
+        rel = os.path.relpath(path, os.path.join(pkg_dir, tds[0])) if len(tds) == 1 else os.path.relpath(path, pkg_dir)
         rows.append([rel, str(len(names)), "".join(f"<li>{esc(n)}</li>" for n in names[:40])
                      + ("<li>…</li>" if len(names) > 40 else "")])
     return rows, scenarios
@@ -750,7 +765,11 @@ def contracts_section(root: str, pkg_rel: str, state: dict, fdir: str, page: "Pa
     draft, mine = c.get("draft_sha"), c.get("sha")
     out = []
     marks = []
-    for p in sorted(glob.glob(os.path.join(root, pkg_rel, "lib", "**", "*.dart"), recursive=True)):
+    pkg_dir = os.path.join(root, pkg_rel)
+    exts = tuple(stacklib.get_list("extensions", pkg_dir))
+    srcs = [p for d in stacklib.get_list("src_dirs", pkg_dir)
+            for p in glob.glob(os.path.join(pkg_dir, d, "**", "*"), recursive=True) if exts and p.endswith(exts)]
+    for p in sorted(srcs):
         for i, ln in enumerate((read(p) or "").splitlines(), 1):
             if DECISION_MARK in ln:
                 marks.append([f"<code>{esc(os.path.relpath(p, root))}:{i}</code>", esc(ln.strip().lstrip("/ "))])
@@ -763,8 +782,9 @@ def contracts_section(root: str, pkg_rel: str, state: dict, fdir: str, page: "Pa
     elif draft:
         files = sh("git", "diff", "--name-only", f"{draft}~1", draft, "--", pkg_rel, cwd=root).split()
     else:
+        globs = stacklib.get_list("contract_globs", pkg_dir)
         files = [f["path"] for f in changed_files(root, state.get("base") or "HEAD", pkg_rel)
-                 if re.search(r"/domain/|keys\.dart$|_event\.dart$|_state\.dart$", f["path"])]
+                 if any(fnmatch.fnmatch(f["path"], g) for g in globs)]
     if files:
         out.append("<h3>Fichiers de contrats</h3><ul class='loc'>" + "".join(f"<li><code>{esc(f)}</code></li>" for f in files) + "</ul>")
     if draft and mine:

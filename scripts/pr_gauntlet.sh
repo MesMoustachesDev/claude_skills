@@ -31,8 +31,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-GAUNTLET="$HOME/.claude/scripts/gauntlet.sh"
-GAUNTLET_ROOT="$HOME/.claude/scripts/gauntlet"
+SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GAUNTLET="$SCRIPTS/gauntlet.sh"
+GAUNTLET_ROOT="$SCRIPTS/gauntlet"
+# Le langage de chaque package : scripts/stack.sh, avec les langages de ce checkout (ADR 0011).
+STACK_SH="$SCRIPTS/stack.sh"
+export CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$(cd "$SCRIPTS/../stacks" && pwd)}"
 PROJECT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "pas dans un repo git" >&2; exit 2; }
 # Le remote n'est pas forcément "origin".
 remote="$(git -C "$PROJECT" remote | grep -x origin || git -C "$PROJECT" remote | head -1)"
@@ -61,11 +65,29 @@ slug="$(printf '%s' "$branch" | sed 's#^origin/##; s#[^A-Za-z0-9_]#_#g')"
 out="${out:-$HOME/.cache/gauntlet/pr/$slug}"; rm -rf "$out"; mkdir -p "$out"
 report="$out/report.md"
 
-# --- config : celle du projet, sinon le template global ----------------------------------------
+# --- config : celle du projet, sinon le template du langage du projet --------------------------
+MARKERS="$(bash "$STACK_SH" markers | tr '\n' ' ')"
+has_marker() { local m; for m in $MARKERS; do [ -e "$1/$m" ] && return 0; done; return 1; }
+# lang_dir — un dossier du projet qui porte un marqueur : la racine, sinon le premier trouvé sous elle (app dans
+# un sous-dossier)
+lang_dir() {
+  has_marker "$PROJECT" && { printf '%s' "$PROJECT"; return; }
+  local m f
+  for m in $MARKERS; do
+    f="$(find "$PROJECT" -maxdepth 3 -name "$m" -not -path '*/.git/*' -not -path '*/build/*' 2>/dev/null | head -1)"
+    [ -n "$f" ] && { dirname "$f"; return; }
+  done
+}
 cfg_file="$PROJECT/.claude/rules/feature_pipeline.md"
-[ -f "$cfg_file" ] || cfg_file="$HOME/.claude/commands/templates/flutter/feature_pipeline.md"
+if [ ! -f "$cfg_file" ]; then
+  ld="$(lang_dir)"; tpl="$(bash "$STACK_SH" get templates "${ld:-$PROJECT}" 2>/dev/null)"
+  cfg_file="$tpl/feature_pipeline.md"
+  [ -f "$cfg_file" ] || { echo "ni config du projet (.claude/rules/feature_pipeline.md) ni gabarit du langage ($tpl)" >&2; exit 2; }
+fi
 cfg() { awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfg_file" | grep -E "^[[:space:]]*$1[[:space:]]*=" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'; }
-FLUTTER="$(cfg flutter)"; FLUTTER="${FLUTTER:-flutter}"
+# stack_vals <dossier> <clé>… — valeurs du langage de <dossier>, une par ligne (config du projet, sinon stack.ini)
+stack_vals() { local d="$1"; shift; STACK_CFG="$cfg_file" bash "$STACK_SH" vals "$d" "$@" 2>/dev/null; }
+FLUTTER="$(cfg flutter)"
 features_root="$(cfg features_root)"; features_root="${features_root:-features}"
 # base : option > cible de la MR > config > HEAD du remote
 [ -n "$base" ] || base="$mr_base"
@@ -124,13 +146,14 @@ stat="$(git -C "$wt" diff --shortstat "$mb" HEAD)"
 commits="$(git -C "$wt" log --no-merges --format='%h %s' "$mb"..HEAD)"
 ncommits="$(printf '%s\n' "$commits" | grep -c . || true)"
 
-# packages touchés : le pubspec.yaml le plus proche de chaque fichier modifié — package d'un workspace
-# (features/x), app dans un sous-dossier (autre-client/), ou la racine elle-même (".").
-pkg_of() { local d; d="$(dirname "$1")"; while [ "$d" != "." ] && [ "$d" != "/" ] && [ ! -f "$wt/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done; [ -f "$wt/$d/pubspec.yaml" ] && printf '%s\n' "$d"; }
+# packages touchés : le marqueur de package (pubspec.yaml, build.gradle.kts… : stack.sh markers) le plus proche
+# de chaque fichier modifié — package d'un workspace (features/x), app dans un sous-dossier (autre-client/), ou
+# la racine elle-même (".").
+pkg_of() { local d; d="$(dirname "$1")"; while [ "$d" != "." ] && [ "$d" != "/" ] && ! has_marker "$wt/$d"; do d="$(dirname "$d")"; done; has_marker "$wt/$d" && printf '%s\n' "$d"; }
 pkgs="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do pkg_of "$f"; done | sort -u)"
 outside="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do [ -z "$(pkg_of "$f")" ] && printf '%s\n' "$f"; done || true)"
 
-[ -z "$pkgs" ] && echo "[WARN] aucun package Dart touché (pas de pubspec.yaml au-dessus des fichiers modifiés) : seuls les checks PR tournent" >&2
+[ -z "$pkgs" ] && echo "[WARN] aucun package touché (aucun marqueur — $MARKERS— au-dessus des fichiers modifiés) : seuls les checks PR tournent" >&2
 project_cfg=0; [ "$cfg_file" = "$PROJECT/.claude/rules/feature_pipeline.md" ] && project_cfg=1
 {
   printf '# Gauntlet PR — `%s` → `%s`\n\n' "$branch" "$base"
@@ -158,18 +181,32 @@ warn() { printf '[WARN] %s\n' "$*"; }
     printf '%s\n' "$bad" | sed 's/^/         /'
   else ok "commits_format : $ncommits commit(s) conventionnels"; fi
   [ -n "$wip" ] && { ko "commits_wip : commits de travail à squasher :"; printf '%s\n' "$wip" | sed 's/^/         /'; }
-  # lock
-  if printf '%s\n' "$changed" | grep -qE '(^|/)pubspec\.yaml$'; then
-    if printf '%s\n' "$changed" | grep -qE '(^|/)pubspec\.lock$'; then ok "pubspec_lock : lock mis à jour avec les pubspec"; else warn "pubspec_lock : un pubspec.yaml change sans pubspec.lock — pub get non commité ?"; fi
-  fi
-  # tests touchés (par package)
+  # lock : le manifeste d'un package (stack.ini → package_manifest) change, son verrou (lock_file) doit suivre
+  locks=""
   for p in $pkgs; do
-    if printf '%s\n' "$changed" | grep -q "^$p/lib/" && ! printf '%s\n' "$changed" | grep -q "^$p/test/"; then
-      ko "tests_touched : $p — lib/ modifié sans aucun test modifié ou ajouté"
+    vals="$(stack_vals "$wt/$p" package_manifest lock_file)"
+    lock="$(printf '%s\n' "$vals" | sed -n 2p)"; [ -n "$lock" ] || continue
+    for man in $(printf '%s\n' "$vals" | sed -n 1p | tr ',' ' '); do
+      case " $locks " in *" $man:$lock "*) ;; *) locks="$locks $man:$lock" ;; esac
+    done
+  done
+  for pair in $locks; do
+    man="${pair%%:*}"; lock="${pair#*:}"; label="${man%%.*}_lock"
+    printf '%s\n' "$changed" | grep -qE "(^|/)${man//./\\.}\$" || continue
+    if printf '%s\n' "$changed" | grep -qE "(^|/)${lock//./\\.}\$"; then ok "$label : lock mis à jour avec les ${man%%.*}"; else warn "$label : un $man change sans $lock — dépendances résolues mais non commitées ?"; fi
+  done
+  # tests touchés (par package) : le code du langage modifié (src_dirs) sans aucun test (test_dirs)
+  for p in $pkgs; do
+    vals="$(stack_vals "$wt/$p" src_dirs test_dirs)"
+    src_re="$(printf '%s\n' "$vals" | sed -n 1p | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | paste -sd '|' -)"
+    test_re="$(printf '%s\n' "$vals" | sed -n 2p | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | paste -sd '|' -)"
+    [ -n "$src_re" ] && [ -n "$test_re" ] || continue
+    if printf '%s\n' "$changed" | grep -qE "^$p/($src_re)/" && ! printf '%s\n' "$changed" | grep -qE "^$p/($test_re)/"; then
+      ko "tests_touched : $p — $(printf '%s/' "$src_re" | sed 's#|#/, #g') modifié sans aucun test modifié ou ajouté"
     fi
   done
   # hors packages
-  [ -n "$outside" ] && { warn "fichiers hors de tout package Dart :"; printf '%s\n' "$outside" | head -15 | sed 's/^/         /'; }
+  [ -n "$outside" ] && { warn "fichiers hors de tout package :"; printf '%s\n' "$outside" | head -15 | sed 's/^/         /'; }
   echo '```'; echo
 } | tee -a "$report"
 
@@ -189,14 +226,17 @@ if [[ "$FLUTTER" == fvm* ]]; then
   done
 fi
 if [ -n "$pkgs" ] && [ "$sdk_ok" = 1 ]; then
-  echo "pub get dans le worktree…" >&2
+  echo "dépendances dans le worktree (prepare_cmd du langage)…" >&2
+  # Workspace pub (pubspec.yaml racine avec `workspace:`) : une seule résolution, à la racine.
   if grep -qE '^workspace:' "$wt/pubspec.yaml" 2>/dev/null; then
+    prep="$(stack_vals "$wt" prepare_cmd)"
     # shellcheck disable=SC2086
-    (cd "$wt" && $FLUTTER pub get >"$out/pub_get.log" 2>&1) || { warn "pub get a échoué (voir $out/pub_get.log) — les checks qui compilent seront rouges"; }
+    [ -n "$prep" ] && { (cd "$wt" && $prep >"$out/pub_get.log" 2>&1) || { warn "$prep a échoué (voir $out/pub_get.log) — les checks qui compilent seront rouges"; }; }
   else
     for p in $pkgs; do
+      prep="$(stack_vals "$wt/$p" prepare_cmd)"; [ -n "$prep" ] || continue
       # shellcheck disable=SC2086
-      (cd "$wt/$p" && $FLUTTER pub get >>"$out/pub_get.log" 2>&1) || { warn "pub get a échoué dans $p (voir $out/pub_get.log)"; }
+      (cd "$wt/$p" && $prep >>"$out/pub_get.log" 2>&1) || { warn "$prep a échoué dans $p (voir $out/pub_get.log)"; }
     done
   fi
 fi
@@ -211,8 +251,8 @@ for p in $pkgs; do
   (cd "$wt" && "$GAUNTLET" dedup_candidates "$name") >/dev/null 2>&1 || true
   {
     echo '```'
-    grep -E '^\[(OK|FAIL|WARN)\]|^   ✗|^\[WARN\]' "$out/$name.log" | grep -vE '^\[(OK|FAIL)\] +[a-z_]+$' | head -80
-    echo; grep -E '^  (passés|échoués|sautés)' "$out/$name.log"
+    grep -E '^\[(OK|FAIL|WARN|N/A)\]|^   ✗|^\[WARN\]' "$out/$name.log" | grep -vE '^\[(OK|FAIL)\] +[a-z_]+$' | head -80
+    echo; grep -E '^  (passés|échoués|sautés|non applicables)' "$out/$name.log"
     echo '```'
     cand="$out/features/$name/dedup_candidates.json"
     [ -f "$cand" ] && printf '\nCandidats roue réinventée (à juger) : `%s` — %s paire(s), %s widget(s) vs %s composant(s) du DS\n' "$cand" "$(jq .pairs "$cand")" "$(jq '.widgets|length' "$cand")" "$(jq '.design_catalog|length' "$cand")"
@@ -221,7 +261,7 @@ for p in $pkgs; do
 done
 
 # --- graphify : impact de la PR (AST, sans Flutter : tourne même si sdk_ok=0 ; ne touche jamais à pr_rc) -----------
-GRAPHIFY="$HOME/.claude/scripts/graphify.sh"
+GRAPHIFY="$SCRIPTS/graphify.sh"
 "$GRAPHIFY" prepare "$wt" --update >"$out/graphify.log" 2>&1 || true
 prep_line="$(tail -1 "$out/graphify.log" 2>/dev/null)"
 "$GRAPHIFY" impact "$wt" "$mb" --out "$out/graphify" >>"$out/graphify.log" 2>&1 || true

@@ -26,8 +26,10 @@ find_graph_dir() {
 
 # read_cfg <root> <clé> — valeur dans le bloc ini de <root>/.claude/rules/feature_pipeline.md (même awk que cfg() de pr_gauntlet.sh)
 read_cfg() {
-  local f="$1/.claude/rules/feature_pipeline.md" k="${2//./\\.}"
-  [ -f "$f" ] || f="$HOME/.claude/commands/templates/flutter/feature_pipeline.md"
+  local f="$1/.claude/rules/feature_pipeline.md" k="${2//./\\.}" here
+  # Sans config du projet : le gabarit du langage de <root> (stack.sh get templates, langages de ce checkout).
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  [ -f "$f" ] || f="$(CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$here/../stacks}" bash "$here/stack.sh" get templates "$1" 2>/dev/null)/feature_pipeline.md"
   [ -f "$f" ] || return 0
   awk '/^```ini/{f=1;next} /^```/{f=0} f' "$f" | grep -E "^[[:space:]]*$k[[:space:]]*=" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'
 }

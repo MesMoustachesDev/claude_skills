@@ -5,6 +5,10 @@
 #   stack.sh dir [chemin]          ~/.claude/stacks/<langage>
 #   stack.sh get <clé> [chemin]    valeur de la clé : config du projet (bloc ini de .claude/rules/feature_pipeline.md)
 #                                  si elle la donne, sinon stacks/<langage>/stack.ini ; vide si aucun ne la donne
+#   stack.sh vals <chemin> <clé>…  une valeur par ligne, dans l'ordre des clés (un seul processus, pour les hooks)
+#   stack.sh package <chemin>      le dossier du package qui contient <chemin> : le plus proche, en remontant
+#                                  jusqu'à la racine du repo, qui porte un marqueur d'un langage connu ; exit 1 sinon
+#   stack.sh markers               marqueurs de tous les langages, un par ligne
 #   stack.sh list                  langages connus, leur priorité et leurs marqueurs
 #
 # Détection : on remonte de <chemin> vers la racine du repo ; le premier dossier qui contient un marqueur d'un
@@ -15,6 +19,9 @@
 # La prose propre à un langage (règles, conseils aux agents) n'est pas ici : elle vit dans
 # ~/.claude/rules/stacks/<langage>*.md, chargée par Claude Code seulement quand un fichier de ce langage est lu
 # (frontmatter `paths:`). Voir ~/.claude/stacks/README.md et l'ADR 0011.
+#
+# STACK_CFG=<fichier> : la config du projet à lire à la place de <racine>/.claude/rules/feature_pipeline.md
+# (GAUNTLET_CFG du gauntlet, template de pr_gauntlet.sh). Une valeur qui commence par `~/` est rendue absolue.
 set -u
 STACKS="${CLAUDE_STACKS_DIR:-$HOME/.claude/stacks}"
 
@@ -32,7 +39,7 @@ ini_get() {
 
 # project_cfg <racine> <clé> — même lecture que cfg() du gauntlet : blocs ```ini de feature_pipeline.md
 project_cfg() {
-  local f="$1/.claude/rules/feature_pipeline.md"
+  local f="${STACK_CFG:-$1/.claude/rules/feature_pipeline.md}"
   [ -f "$f" ] || return 0
   awk '/^```ini/{f=1;next} /^```/{f=0} f' "$f" \
     | grep -E "^[[:space:]]*${2//./\\.}[[:space:]]*=" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'
@@ -90,7 +97,24 @@ value() {
     v="${v//\{$ref\}/$(value "$1" "$2" "$ref")}"
     depth=$((depth + 1))
   done
+  case "$v" in "~/"*) v="$HOME/${v#\~/}" ;; esac
   printf '%s' "$v"
+}
+
+# package <chemin> — le dossier le plus proche, de <chemin> à la racine du repo, qui porte un marqueur
+package() {
+  local dir root m
+  dir="$(start_dir "${1:-}")"; root="$(root_of "$dir")"
+  while :; do
+    for m in $(all_markers); do [ -e "$dir/$m" ] && { echo "$dir"; return 0; }; done
+    [ "$dir" = "$root" ] || [ "$dir" = / ] && return 1
+    dir="$(dirname "$dir")"
+  done
+}
+all_markers() {
+  local name
+  while IFS=$'\t' read -r _ name; do ini_get "$STACKS/$name/stack.ini" markers | tr ',' '\n'; done < <(known) \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | awk '!seen[$0]++'
 }
 
 case "${1:-}" in
@@ -100,9 +124,16 @@ case "${1:-}" in
     [ -n "${2:-}" ] || { echo "usage : stack.sh get <clé> [chemin]" >&2; exit 2; }
     s="$(detect "${3:-}")" || exit $?
     printf '%s\n' "$(value "$s" "$(root_of "$(start_dir "${3:-}")")" "$2")" ;;
+  vals)
+    s="$(detect "${2:-}")" || exit $?
+    r="$(root_of "$(start_dir "${2:-}")")"
+    shift 2
+    for k in "$@"; do printf '%s\n' "$(value "$s" "$r" "$k")"; done ;;
+  package) package "${2:-}" ;;
+  markers) all_markers ;;
   list)
     while IFS=$'\t' read -r p name; do
       printf '%-10s priorité %-3s marqueurs : %s\n' "$name" "$p" "$(ini_get "$STACKS/$name/stack.ini" markers)"
     done < <(known) ;;
-  *) sed -n '2,17p' "${BASH_SOURCE[0]}"; [ "${1:-}" = -h ] || [ "${1:-}" = --help ] ;;
+  *) sed -n '2,24p' "${BASH_SOURCE[0]}"; [ "${1:-}" = -h ] || [ "${1:-}" = --help ] ;;
 esac

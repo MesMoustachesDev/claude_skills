@@ -7,7 +7,7 @@ inversement (ADR `pipeline/decisions/0011-un-dossier-par-langage.md`).
 | Quoi | Où | Qui le lit |
 |---|---|---|
 | Valeurs pour les scripts (marqueurs, commandes, globs) | `stacks/<langage>/stack.ini` | `scripts/stack.sh get <clé>` |
-| Checks du gauntlet propres au langage | `stacks/<langage>/checks.sh` (fonctions `check_*` qui remplacent les génériques) | `gauntlet.sh`, `fix_gauntlet.sh` |
+| Checks du gauntlet propres au langage | `stacks/<langage>/checks.sh` (fonctions `check_*` qui remplacent les communes, `stack_doctor`) | `gauntlet.sh` (`stack_load_checks`), `fix_gauntlet.sh` |
 | Gabarits de règles projet, brick, scaffold | `stacks/<langage>/templates/` | `/feature init`, le doctor |
 | Doctrine pour Claude (conventions, tests, architecture, conseils aux agents) | `~/.claude/rules/stacks/<langage>*.md`, avec un frontmatter `paths:` | Claude Code, seulement quand un fichier de ce langage est lu |
 
@@ -20,6 +20,20 @@ dans `lib/` et du Kotlin dans `android/app/`. `stack = <langage>` dans le bloc i
 
 `stack.sh get <clé> <chemin>` rend la valeur de la config du projet si elle la donne, sinon celle de
 `stack.ini`. Dans une valeur, `{flutter}`, `{dart}`, `{gradle}` renvoient aux clés du même nom.
+
+Les scripts Python (`pipeline.py`, `review.py`, `report.py`) passent par `scripts/stacklib.py`, qui appelle
+`stack.sh`. `stack.sh vals <chemin> <clé>…` rend plusieurs valeurs d'un coup (hooks) ; `stack.sh package
+<chemin>` le dossier du package qui contient un chemin ; `STACK_CFG=<fichier>` lit une autre config que celle
+du projet (`GAUNTLET_CFG`, gabarit).
+
+## Les checks du gauntlet
+
+`gauntlet.sh` source les checks communs (`scripts/gauntlet/checks_*.sh` : gel des tests, empreinte, secrets,
+TODO, QA, rapports des agents), puis `stacks/<langage>/checks.sh` du langage du package. Un check qu'un autre
+langage définit et pas celui-ci est **non applicable** : `[N/A]  <check> : non applicable à <langage>` dans le
+journal, `not_applicable` dans `last_<profil>.json`, jamais compté dans `passed`. Il ne bloque pas le profil :
+le langage n'a simplement pas encore ce gate (Android, point 6 du plan `langages.md`). Les checks communs lisent
+les valeurs du langage (`extensions`, `src_dirs`, `test_dirs`, `manifests`, `tool_files`).
 
 ## La doctrine : des règles chargées à la demande
 
@@ -44,7 +58,9 @@ test du langage », « les conventions de test du langage », et la règle charg
 
 ## Ajouter un langage
 
-1. `stacks/<langage>/stack.ini` : `priority`, `markers`, `extensions`, `manifests`, `test_globs`, les commandes.
+1. `stacks/<langage>/stack.ini` : `priority`, `markers`, `extensions`, `manifests`, `test_globs`, `src_dirs`,
+   `test_dirs`, `package_manifest`, `layer.data`, `presentation_dirs`, `contract_globs`, `generated.exclude`, les
+   commandes (`test_cmd`, `test_files_cmd`, `prepare_cmd`…). `stacks/flutter/stack.ini` documente chaque clé.
 2. `~/.claude/rules/stacks/<langage>.md` avec `paths:` sur ses extensions.
 3. `stacks/<langage>/checks.sh` pour les checks qui ne se réduisent pas à une commande.
 4. Un test dans `scripts/gauntlet/tests/test_stack.sh`.

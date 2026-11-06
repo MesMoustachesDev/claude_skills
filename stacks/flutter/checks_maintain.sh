@@ -1,0 +1,390 @@
+#!/usr/bin/env bash
+# checks_maintain.sh — maintenabilité à long terme d'un package Flutter, en scripts. Sourcé par
+# stacks/flutter/checks.sh, après scripts/gauntlet/checks_maintain.sh (todo_tickets, footprint, no_secrets,
+# grep_src, IGNORE_MARK).
+#
+# Fixables par le cleaner (profil clean) : deps_unused design_system l10n_strings l10n_arb barrel_api
+#   unused_code unused_files test_hygiene deprecated_api generated_fresh
+# Jugement / décision (profil maintain, lu par le reviewer) : deps_features pub_health
+#
+# Conventions : `// gauntlet-ignore` en fin de ligne exempte cette ligne des greps (avec une raison à côté).
+
+# has_dev_dep <pkg> — le package feature déclare-t-il cette dev dependency ?
+has_dev_dep() { awk '/^dev_dependencies:/{f=1;next} /^[^ ]/{f=0} f' "$PKG_DIR/pubspec.yaml" | grep -qE "^[[:space:]]+$1:"; }
+
+# ---------------------------------------------------------------------------
+# pubspec du package
+# ---------------------------------------------------------------------------
+# pkg_deps <dependencies|dev_dependencies> → "nom<TAB>path|hosted" par ligne
+pkg_deps() {
+  awk -v sect="$1" '
+    $0 ~ "^"sect":" {f=1; next}
+    /^[^ ]/ {f=0}
+    f && /^  [a-zA-Z_0-9]+:/ { if (cur!="") print cur"\t"kind; cur=$1; sub(/:$/,"",cur); kind="hosted" }
+    f && /^    path:/ { kind="path" }
+    f && /^    sdk:/  { kind="sdk" }
+    END { if (cur!="") print cur"\t"kind }
+  ' "$PKG_DIR/pubspec.yaml"
+}
+pkg_used_packages() { grep -rhoE "package:[a-zA-Z_0-9]+/" "$PKG_DIR/lib" 2>/dev/null | sed 's#package:##; s#/$##' | sort -u; }
+presentation_files() { # vues et widgets, hors bloc/keys/events/states
+  find "$PKG_DIR/lib/src/presentation" -name '*.dart' 2>/dev/null \
+    | grep -vE '/bloc/|_event\.dart$|_state\.dart$|/keys\.dart$' | drop_generated \
+    | filter_excluded $(cfg_list ds.exempt | sed "s#^#$PKG_DIR/#" | tr '\n' ' ')
+}
+
+# ---------------------------------------------------------------------------
+# Dépendances
+# ---------------------------------------------------------------------------
+# deps_unused — chaque dépendance déclarée est importée quelque part dans lib/.
+check_deps_unused() {
+  local used rc=0 dep kind
+  used="$(pkg_used_packages)"
+  while IFS=$'\t' read -r dep kind; do
+    [ "$kind" = sdk ] && continue
+    grep -qx "$dep" <<<"$used" || { ko "dépendance déclarée mais jamais importée : $dep"; rc=1; }
+  done < <(pkg_deps dependencies)
+  [ "$rc" = 0 ] && info "toutes les dépendances déclarées sont utilisées"
+  return $rc
+}
+
+# deps_features — les dépendances vers d'autres features sont justifiées dans la spec (§8) et
+# n'introduisent aucun cycle dans le graphe des packages du workspace.
+# Mode extend : seul ce que la feature ajoute bloque — une dépendance absente du pubspec à la base, un
+# cycle qui emprunte une arête ajoutée depuis la base. Les dépendances et cycles préexistants sont de la
+# dette du package : signalés (WARN), jamais bloquants. Mode create : tout est ajouté par la feature.
+check_deps_features() {
+  local shared rc=0 dep kind spec="$FEATURE_DIR/spec.md" arch fanout=0 base="" base_pubspec="" pre=0
+  shared="$(cfg_list deps.shared_packages | tr '\n' ' ')"
+  arch="$( [ -f "$spec" ] && awk '/^## 8/{f=1;next} /^## 9/{f=0} f' "$spec" )"
+  if [ "$MODE" = extend ]; then base="$(merge_base)"; base_pubspec="$(show_at "$base" "$PKG_REL/pubspec.yaml")"; fi
+  while IFS=$'\t' read -r dep kind; do
+    [ "$kind" = path ] || continue
+    grep -qw "$dep" <<<"$shared" && continue
+    fanout=$((fanout+1))
+    if [ -n "$base" ] && pubspec_path_deps <<<"$base_pubspec" | grep -qx "$dep"; then
+      grep -qw "$dep" <<<"$arch" || { printf '[WARN] dépendance inter-features %s préexistante (déjà sur %s), non justifiée en §8 — dette du package, hors de la feature\n' "$dep" "$BASE_BRANCH"; pre=$((pre+1)); }
+      continue
+    fi
+    if [ ! -f "$spec" ]; then
+      # hors pipeline (revue de PR, audit) : pas de spec → on liste, on ne bloque pas
+      if [ -f "$FEATURE_DIR/pipeline.json" ]; then ko "dépendance inter-features $dep : pas de spec pour la justifier"; rc=1
+      else printf '[WARN] dépendance inter-features %s — pas de spec pour la justifier (à vérifier en revue)\n' "$dep"; fi
+    elif ! grep -qw "$dep" <<<"$arch"; then ko "dépendance inter-features $dep$( [ -n "$base" ] && printf ' (ajoutée par la feature)') absente de la spec §8 Architecture — à justifier ou à retirer"; rc=1
+    fi
+  done < <(pkg_deps dependencies)
+  # Graphe "package dépendance nouvelle(0|1)" sur tous les pubspec du dossier des features. Une arête est
+  # nouvelle si le pubspec de la base ne la déclare pas (tout est nouveau en create).
+  local root p n deps_base graph
+  root="$PROJECT_ROOT/$(cfg features_root features)"
+  graph="$(find "$root" -name pubspec.yaml -not -path '*/build/*' -not -path '*/.dart_tool/*' 2>/dev/null | while read -r p; do
+      n="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$p" | head -1)"
+      deps_base=""; [ -n "$base" ] && deps_base="$(show_at "$base" "${p#"$PROJECT_ROOT"/}" | pubspec_path_deps | tr '\n' ' ')"
+      pubspec_path_deps < "$p" | while read -r d; do
+        if [ -n "$base" ] && grep -qw -- "$d" <<<"$deps_base"; then echo "$n $d 0"; else echo "$n $d 1"; fi
+      done
+    done)"
+  # Un cycle qui passe par le package est celui de la feature s'il emprunte une arête nouvelle u → v :
+  # start ⇝ u → v ⇝ start. Sinon il préexiste (WARN). Un cycle de la feature qui passe par un package
+  # partagé (core, router…) reste un warning ; entre features non partagées, il bloque.
+  local cycles; cycles="$(awk -v start="$PKG_NAME" '
+    { adj[$1]=adj[$1]" "$2; if ($3==1) { nu[++k]=$1; nv[k]=$2 } }
+    function path(a, b,   q, h, t, x, i, m, arr, par, seen, out) {   # chemin le plus court a ⇝ b, "" sinon
+      if (a == b) return a
+      h=1; t=1; q[1]=a; seen[a]=1
+      while (h <= t) {
+        x=q[h++]; m=split(adj[x], arr, " ")
+        for (i=1; i<=m; i++) {
+          if (arr[i] in seen) continue
+          seen[arr[i]]=1; par[arr[i]]=x; q[++t]=arr[i]
+          if (arr[i] == b) { out=b; x=b; while (x != a) { x=par[x]; out=x" → "out } return out }
+        }
+      }
+      return ""
+    }
+    END {
+      for (i=1; i<=k; i++) {
+        a=path(start, nu[i]); if (a == "") continue
+        b=path(nv[i], start); if (b == "") continue
+        c=a" → "b; if (!(c in done)) { done[c]=1; found++; print "new\t"c }
+      }
+      if (!found) { m=split(adj[start], arr, " "); for (i=1; i<=m; i++) { b=path(arr[i], start); if (b != "") { print "old\t"start" → "b; break } } }
+    }' <<<"$graph")"
+  local kind_ cyc viashared node
+  while IFS=$'\t' read -r kind_ cyc; do
+    [ -n "$cyc" ] || continue
+    if [ "$kind_" = old ]; then printf '[WARN] cycle préexistant (déjà sur %s, aucune arête ajoutée par la feature) : %s\n' "$BASE_BRANCH" "$cyc"; pre=$((pre+1)); continue; fi
+    viashared=0
+    for node in $(printf '%s' "$cyc" | tr '→' '\n'); do grep -qw "$node" <<<"$shared" && viashared=1; done
+    if [ "$viashared" = 1 ]; then printf '[WARN] cycle via un package partagé (hors de la feature) : %s\n' "$cyc"
+    else ko "cycle de dépendances entre features$( [ -n "$base" ] && printf ' introduit par la feature') : $cyc"; rc=1; fi
+  done <<<"$cycles"
+  [ "$rc" = 0 ] && info "inter-features : $fanout dépendance(s) hors packages partagés, celles de la feature justifiées, aucun cycle ajouté$( [ "$pre" -gt 0 ] && printf ' ; %d préexistant(s) signalé(s)' "$pre")"
+  return $rc
+}
+# pubspec_path_deps — stdin : un pubspec ; stdout : ses dependencies en path, une par ligne.
+pubspec_path_deps() { awk '/^dependencies:/{f=1;next} /^[^ ]/{f=0} f && /^  [a-zA-Z_0-9]+:/{cur=$1; sub(/:$/,"",cur)} f && /^    path:/{print cur}'; }
+
+# pub_health — dépendances hébergées : abandonnées, majeure en retard, ou non publiées depuis trop longtemps.
+# Bloquant pour les dépendances AJOUTÉES par la feature ; informatif (warn) pour les préexistantes.
+check_pub_health() {
+  local rc=0 max_months out dep kind base_pubspec added cache="$HOME/.cache/gauntlet/pub"
+  max_months="$(cfg pub.max_age_months 24)"; mkdir -p "$cache"
+  out="$GAUNTLET_OUT/outdated.json"
+  # --show-all : sinon les packages déjà à jour sont omis du JSON.
+  (cd "$PKG_DIR" && $DART pub outdated --json --show-all > "$out" 2>/dev/null) || { printf '[WARN] dart pub outdated indisponible (hors ligne ?) — check sauté\n'; return 0; }
+  base_pubspec="$(show_at "$(merge_base)" "$PKG_REL/pubspec.yaml" || true)"
+  printf '   %-28s %-10s %-10s %-10s %s\n' "package" "actuel" "résolvable" "dernier" "état"
+  while IFS=$'\t' read -r dep kind; do
+    [ "$kind" = hosted ] || continue
+    added=0; grep -qE "^  $dep:" <<<"$base_pubspec" || added=1
+    local cur res lat disc pubd age_m state=""
+    read -r cur res lat disc < <(jq -r --arg p "$dep" '.packages[] | select(.package==$p) | "\(.current.version // "-") \(.resolvable.version // "-") \(.latest.version // "-") \(.latest.isDiscontinued // false)"' "$out" | head -1)
+    [ -n "$cur" ] || { cur="?"; res="?"; lat="?"; disc=false; }
+    local meta="$cache/$dep.json"
+    if [ ! -f "$meta" ] || [ -n "$(find "$meta" -mtime +7 2>/dev/null)" ]; then
+      curl -sL --compressed --max-time 10 "https://pub.dev/api/packages/$dep" -o "$meta" 2>/dev/null || rm -f "$meta"
+    fi
+    pubd="$( [ -f "$meta" ] && jq -r '.latest.published // empty' "$meta" 2>/dev/null | cut -c1-10)"
+    [ "$( [ -f "$meta" ] && jq -r '.isDiscontinued // false' "$meta" 2>/dev/null)" = true ] && disc=true
+    age_m=""; [ -n "$pubd" ] && age_m=$(( ( $(date +%s) - $(date -j -f '%Y-%m-%d' "$pubd" +%s 2>/dev/null || date -d "$pubd" +%s) ) / 2592000 ))
+    if [ "$disc" = true ]; then state="ABANDONNÉ$( [ -f "$meta" ] && jq -r '.replacedBy // empty' "$meta" | sed 's/^/ → /')"
+    elif [ -n "$age_m" ] && [ "$age_m" -gt "$max_months" ]; then state="pas de release depuis $age_m mois"
+    elif [ "$lat" != "-" ] && [ "${lat%%.*}" != "${res%%.*}" ]; then state="majeure $lat disponible, contrainte bloque à $res"
+    fi
+    if [ -n "$state" ]; then
+      if [ "$disc" = true ] || [ "$added" = 1 ]; then ko "$dep : $state$( [ "$added" = 1 ] && printf ' (ajouté par cette feature)')"; rc=1
+      else printf '[WARN] %s : %s (préexistant)\n' "$dep" "$state"; fi
+    fi
+    printf '   %-28s %-10s %-10s %-10s %s\n' "$dep" "$cur" "$res" "$lat" "${state:-ok}$( [ "$added" = 1 ] && printf ' · nouveau')"
+  done < <(pkg_deps dependencies)
+  return $rc
+}
+
+# ---------------------------------------------------------------------------
+# Présentation : design system, localisation
+# ---------------------------------------------------------------------------
+# design_system — pas de valeur visuelle brute dans la présentation ; chaque vue importe le DS.
+check_design_system() {
+  local rc=0 hits files imports f
+  files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
+  local pats=(); local p; while IFS= read -r p; do [ -n "$p" ] && pats+=(-e "$p"); done < <(cfg_list ds.forbidden)
+  if [ "${#pats[@]}" -gt 0 ]; then
+    hits="$(printf '%s\n' "$files" | xargs grep -nHE "${pats[@]}" 2>/dev/null | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+    [ -n "$hits" ] && { printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "valeurs visuelles en dur : passer par le design system"; rc=1; }
+  fi
+  imports="$(cfg_list ds.imports)"
+  if [ -n "$imports" ]; then
+    for f in $(printf '%s\n' "$files" | grep -E '/view/|/widget' | sed "s#^$PKG_DIR/##" | filter_scope_files "$PKG_REL/" | sed "s#^#$PKG_DIR/#"); do
+      if ! grep -qE "^import '($(printf '%s\n' "$imports" | paste -sd'|' -))" "$f"; then
+        ko "${f#$PKG_DIR/} n'importe pas le design system ($(printf '%s' "$imports" | tr '\n' ' '))"; rc=1
+      fi
+    done
+  fi
+  [ "$rc" = 0 ] && info "$(printf '%s\n' "$files" | wc -l | tr -d ' ') fichier(s) de présentation conformes"
+  return $rc
+}
+
+# widget_functions — un morceau d'écran est une classe widget, jamais une fonction ou une méthode qui
+# renvoie un widget (_bodyFor, _buildHeader…) : Flutter ne peut ni la reconstruire seule ni la retrouver
+# dans l'arbre. Seule `build` en renvoie un. Jugé sur les déclarations du périmètre (une méthode existante
+# qu'on ne fait que modifier reste de la dette), dans le package et les packages de writes.extra touchés.
+# Détecte les types déclarés Widget, PreferredSizeWidget, *Widget, List/Iterable<Widget> ; pas `Text _x()`.
+check_widget_functions() {
+  local rc=0
+  widget_functions_pkg || rc=1
+  each_extra_package extra_changed_packages widget_functions_pkg || rc=1
+  return $rc
+}
+widget_functions_pkg() {
+  local files hits
+  files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
+  local pat='^[[:space:]]*(static[[:space:]]+)?(Widget|PreferredSizeWidget|[A-Z][A-Za-z0-9_]*Widget|(List|Iterable)<Widget>)\??[[:space:]]+(get[[:space:]]+)?[a-z_][A-Za-z0-9_]*[[:space:]]*(\(|=>|\{|$)'
+  hits="$(printf '%s\n' "$files" | xargs grep -nHE "$pat" 2>/dev/null | grep -vE '[[:space:]]build[[:space:]]*\(' \
+      | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits" ] && { info "aucune fonction qui renvoie un widget"; return 0; }
+  printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'
+  ko "fonctions qui renvoient un widget : en faire des classes widget (StatelessWidget, ou Consumer si besoin)"
+  return 1
+}
+
+# l10n_strings — aucune chaîne utilisateur en dur dans la présentation.
+check_l10n_strings() {
+  local files hits
+  files="$(presentation_files)"; [ -n "$files" ] || return 0
+  local pat="Text\([[:space:]]*['\"][^'\"]*[A-Za-z]{3}|(hintText|labelText|label|title|tooltip|semanticLabel|helperText|errorText|message)[[:space:]]*:[[:space:]]*['\"][^'\"]*[A-Za-z]{3}|SnackBar\([[:space:]]*content:[[:space:]]*Text\([[:space:]]*['\"]"
+  # Les interpolations sont retirées avant le test : '${context.l10n.x} ${y}' n'est pas une chaîne en dur.
+  hits="$(printf '%s\n' "$files" | xargs grep -nHE "$pat" 2>/dev/null | grep -v "$IGNORE_MARK" \
+      | while IFS= read -r line; do
+          stripped="$(sed -E 's/\$\{[^}]*\}//g; s/\$[a-zA-Z_][a-zA-Z0-9_]*//g' <<<"${line#*:*:}")"
+          grep -qE "$pat" <<<"$stripped" && printf '%s\n' "$line"
+        done | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits" ] && { info "aucune chaîne en dur"; return 0; }
+  printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "chaînes utilisateur en dur : passer par context.l10n"
+  return 1
+}
+
+# l10n_arb — les clés ajoutées par la feature, et les clés existantes que son code modifié utilise,
+# existent dans toutes les locales.
+check_l10n_arb() {
+  local glob files added f missing rc=0 base old
+  glob="$(cfg l10n.arb_glob)"; [ -n "$glob" ] || { info "l10n.arb_glob non configuré, sauté"; return 0; }
+  files="$(expand_globs "$PROJECT_ROOT" "$glob")"; [ -n "$files" ] || { ko "aucun fichier ARB pour $glob"; return 1; }
+  base="$(merge_base)"
+  # Top-level keys only: nested @meta keys (placeholders, type, example…) are not translations.
+  added="$( { for f in $files; do
+      old="$(show_at "$base" "$f" | jq -c 'keys' 2>/dev/null)"
+      jq -n -r --argjson cur "$(jq -c 'keys' "$PROJECT_ROOT/$f")" --argjson old "${old:-[]}" \
+        '($cur - $old)[] | select(startswith("@") | not)'
+    done; } | sort -u)"
+  # Existing keys that the feature's code (scope lines) now reads through `l10n.<key>`: a key missing from a
+  # locale silently falls back to the template language. Only names that are keys of some ARB file count.
+  local all used
+  all="$(for f in $files; do jq -r 'keys[] | select(startswith("@") | not)' "$PROJECT_ROOT/$f" 2>/dev/null; done | LC_ALL=C sort -u)"
+  used="$( (cd "$PKG_DIR" && grep -rnoE --include='*.dart' 'l10n\.[A-Za-z_][A-Za-z0-9_]*' lib 2>/dev/null) \
+    | filter_scope_lines "$PKG_REL/" | sed 's/.*l10n\.//' | LC_ALL=C sort -u \
+    | LC_ALL=C comm -12 - <(printf '%s\n' "$all") | LC_ALL=C comm -23 - <(printf '%s\n' "$added" | LC_ALL=C sort -u))"
+  [ -n "$added$used" ] || { info "aucune clé l10n ajoutée depuis $base ni utilisée par le code modifié"; return 0; }
+  for f in $files; do
+    missing="$(for k in $added; do jq -e --arg k "$k" 'has($k)' "$PROJECT_ROOT/$f" >/dev/null 2>&1 || printf '%s ' "$k"; done)"
+    [ -n "$missing" ] && { ko "$f : clés manquantes : $missing"; rc=1; }
+    missing="$(for k in $used; do jq -e --arg k "$k" 'has($k)' "$PROJECT_ROOT/$f" >/dev/null 2>&1 || printf '%s ' "$k"; done)"
+    [ -n "$missing" ] && { ko "$f : clés existantes utilisées par le code modifié, absentes ici : $missing"; rc=1; }
+  done
+  [ "$rc" = 0 ] && info "$(printf '%s' "$added" | grep -c .) clé(s) ajoutée(s) et $(printf '%s' "$used" | grep -c .) clé(s) existante(s) utilisée(s), présentes dans $(printf '%s\n' "$files" | wc -l | tr -d ' ') locale(s)"
+  return $rc
+}
+
+# ---------------------------------------------------------------------------
+# Surface publique, code mort, hygiène
+# ---------------------------------------------------------------------------
+# barrel_api — le barrel n'expose ni la couche data ni les implémentations.
+check_barrel_api() {
+  local barrel="$PKG_DIR/lib/$PKG_NAME.dart" bad
+  is_app_package && { info "package applicatif (lib/main.dart), pas de barrel"; return 0; }
+  [ -f "$barrel" ] || { ko "barrel absent : lib/$PKG_NAME.dart"; return 1; }
+  # Existing leaks marked `// gauntlet-ignore: …` are debt, not a feature regression.
+  bad="$(grep -nE "^export '.*(src/data/|_impl\.dart)" "$barrel" | grep -v "$IGNORE_MARK")"
+  [ -z "$bad" ] && { info "barrel : $(grep -c '^export' "$barrel") export(s), aucune fuite de la couche data"; return 0; }
+  printf '%s\n' "$bad" | sed 's/^/   ✗ /'; ko "le barrel exporte la couche data ou une implémentation"
+  return 1
+}
+
+# _unused <commande> — sortie de dart_code_linter filtrée au périmètre : les entrées "at <abs>:l:c" (code)
+# ou "lib/…dart" (fichiers) sont ramenées en chemins relatifs au package.
+_unused() {
+  local out rc
+  out="$(cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics "$1" lib --fatal-unused --no-congratulate --exclude="$(generated_dcl_exclude)" 2>&1)"; rc=$?
+  [ "$rc" = 0 ] && { info "rien d'inutilisé"; return 0; }
+  # Strip "at " and the absolute package prefix without putting the path in a regex.
+  # Unused code is reported as file:line:col, so it is scoped by line (extend mode: only added
+  # lines count); unused files are scoped by file.
+  local scoped filter=filter_scope_files
+  [ "$1" = check-unused-code ] && filter=filter_scope_lines
+  scoped="$(printf '%s\n' "$out" | grep -E '^[[:space:]]*at |^lib/.*\.dart$' \
+      | awk -v p="$PKG_DIR/" '{ sub(/^[[:space:]]*at /, ""); if (index($0, p) == 1) $0 = substr($0, length(p) + 1); sub(/:$/, ""); print }' \
+      | "$filter" "$PKG_REL/")"
+  if [ -z "$scoped" ]; then info "code inutilisé hors périmètre uniquement (préexistant)"; return 0; fi
+  printf '%s\n' "$scoped" | head -30 | sed 's/^/   ✗ /'
+  return 1
+}
+check_unused_code()  { _unused check-unused-code; }
+check_unused_files() { _unused check-unused-files; }
+
+# test_hygiene — pas de test désactivé, pas d'attente réelle, pas de print dans test/, et pas de Map/List/Set
+# dans un record comparé (expect, equals, verify…) : le == d'un record compare ses champs avec ==, celui d'une
+# collection compare l'identité. Le champ se sort dans un expect à part, qui compare le contenu.
+check_test_hygiene() {
+  [ -d "$PKG_DIR/test" ] || return 0
+  local hits records rc=0
+  hits="$(grep_src "$PKG_DIR/test" "skip:[[:space:]]*(true|['\"])" "Future\.delayed\(" "sleep\(" "(^|[^a-zA-Z_])print\(" | filter_scope_lines "$PKG_REL/")"
+  records="$(find "$PKG_DIR/test" -name '*.dart' | drop_generated | tr '\n' '\0' \
+    | xargs -0 awk -f "$GAUNTLET_ROOT/record_collections.awk" 2>/dev/null \
+    | grep -v "$IGNORE_MARK" | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits$records" ] && { info "test/ propre"; return 0; }
+  if [ -n "$hits" ]; then
+    printf '%s\n' "$hits" | head -30 | sed 's/^/   ✗ /'; ko "tests désactivés, attentes réelles ou print() dans test/"; rc=1
+  fi
+  if [ -n "$records" ]; then
+    printf '%s\n' "$records" | head -30 | sed 's/^/   ✗ /'
+    ko "Map/List/Set dans un record comparé : son == compare l'identité ; sors ce champ dans un expect à part"; rc=1
+  fi
+  return $rc
+}
+
+# deprecated_api — aucun usage d'API dépréciée (flutter analyze, niveau info).
+check_deprecated_api() {
+  local out hits
+  out="$(cd "$PKG_DIR" && $FLUTTER analyze --no-pub 2>&1)"
+  hits="$(printf '%s\n' "$out" | grep -E 'deprecated_member_use' | sed -E 's/^.* • ([^ ]+\.dart):([0-9]+):[0-9]+ • (.*)$/\1:\2: \3/' | filter_scope_lines "$PKG_REL/")"
+  [ -z "$hits" ] && { info "aucune API dépréciée dans le périmètre"; return 0; }
+  printf '%s\n' "$hits" | head -20 | sed 's/^/   ✗ /'; ko "API dépréciées : migrer avant que ça casse"
+  return 1
+}
+
+# generated_fresh — les fichiers générés sont à jour et commités.
+check_generated_fresh() {
+  has_dev_dep build_runner || { info "pas de build_runner"; return 0; }
+  # shellcheck disable=SC2086
+  (cd "$PKG_DIR" && $DART run build_runner build --delete-conflicting-outputs >/dev/null 2>&1) || { ko "build_runner a échoué"; return 1; }
+  local dirty; dirty="$(git_in "$PKG_REL" status --porcelain -- "$PKG_DIR" | cut -c4- | only_generated)"
+  [ -z "$dirty" ] && { info "fichiers générés à jour et commités"; return 0; }
+  printf '%s\n' "$dirty" | sed 's/^/   ✗ /'; ko "fichiers générés modifiés ou non commités : relancer build_runner et commiter"
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# Roue réinventée
+# ---------------------------------------------------------------------------
+# reinvented — une déclaration du package existe déjà ailleurs : même nom public (fonction top-level,
+# membre d'extension sur le même type, statique, classe, extension, enum, typedef) ou même corps à
+# renommage près (clone de type 2, ≥ dup.min_tokens tokens), workspace entier et package lui-même.
+# dup_root — la racine du workspace pour dup_check ; un monolithe (pas de features/) est son propre workspace
+dup_root() { local r; r="$(cfg features_root features)"; [ -d "$PROJECT_ROOT/$r" ] && printf '%s' "$r" || printf '%s' "$PKG_REL"; }
+is_app_package() { [ ! -f "$PKG_DIR/lib/$PKG_NAME.dart" ] && [ -f "$PKG_DIR/lib/main.dart" ]; }
+
+check_reinvented() {
+  ensure_dart_tools || return 1
+  local root; root="$(dup_root)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    --min-tokens "$(cfg dup.min_tokens 40)" ${ignore:+--ignore-names "$ignore"} \
+    --scope "$(scope_for_tool "$root/" "$GAUNTLET_OUT/scope_root.txt"; echo "$GAUNTLET_OUT/scope_root.txt")"
+}
+
+# dedup_candidates — entrée de l'agent feature-dedup : pour chaque déclaration réutilisable du
+# package, les déclarations du workspace qui lui ressemblent (tokens de nom pondérés IDF, type
+# étendu, signature). Toujours vert : c'est un producteur, le verdict vient de l'agent.
+check_dedup_candidates() {
+  ensure_dart_tools || return 1
+  local root; root="$(dup_root)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    ${ignore:+--ignore-names "$ignore"} --ds-package "$(cfg ds.package design)" \
+    --scope "$(scope_for_tool "$root/" "$GAUNTLET_OUT/scope_root.txt"; echo "$GAUNTLET_OUT/scope_root.txt")" \
+    --candidates "$FEATURE_DIR/dedup_candidates.json"
+}
+
+# ---------------------------------------------------------------------------
+# README du package : but + API publique, en phase avec le barrel
+# ---------------------------------------------------------------------------
+check_package_readme() {
+  local readme="$PKG_DIR/README.md" barrel="$PKG_DIR/lib/$PKG_NAME.dart" rc=0 sec exp f names n missing=""
+  is_app_package && { info "package applicatif, README de package non exigé"; return 0; }
+  [ -f "$readme" ] || { ko "README.md absent dans $PKG_REL — but du package et API publique"; return 1; }
+  while IFS= read -r sec; do
+    [ -n "$sec" ] || continue
+    grep -qE "$sec" "$readme" || { ko "README.md : section manquante ($sec)"; rc=1; }
+  done < <(cfg_list readme.sections)
+  [ -f "$barrel" ] || { ko "barrel absent : lib/$PKG_NAME.dart"; return 1; }
+  # Chaque déclaration publique exportée par le barrel doit être nommée dans le README.
+  while IFS= read -r exp; do
+    f="$PKG_DIR/lib/$exp"; [ -f "$f" ] || continue
+    names="$(grep -hoE "^(abstract |final |sealed |base |mixin )*(class|enum|extension|mixin|typedef) [A-Za-z_][A-Za-z0-9_]*|^final [a-z][A-Za-z0-9_]*Provider\b" "$f" \
+             | awk '{print $NF}' | grep -v '^_' | sort -u)"
+    for n in $names; do grep -qw "$n" "$readme" || missing="$missing $n"; done
+  done < <(grep -oE "^export '[^']+'" "$barrel" | sed "s/^export '//; s/'$//" | grep -v '^package:')
+  [ -n "$missing" ] && { ko "README.md ne mentionne pas :$missing"; rc=1; }
+  [ "$rc" = 0 ] && info "README : sections présentes, API publique documentée"
+  return $rc
+}

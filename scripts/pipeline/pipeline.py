@@ -15,6 +15,9 @@ import shutil
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import stacklib  # noqa: E402  (scripts/stacklib.py : le langage d'un package et ses valeurs, ADR 0011)
+
 STEPS_DIR = os.path.expanduser("~/.claude/pipeline/feature/steps")
 
 # Ordre de reprise : (clé d'état, étape, titre, fichier d'étape, agent).
@@ -599,12 +602,15 @@ def tests_added_paths(c, paths):
         if os.path.isabs(p):
             p = os.path.relpath(os.path.realpath(p), os.path.realpath(c.root))
         p = os.path.normpath(p) if p else p
-        if p.startswith(c.package + "/test/"):
+        tds = test_dirs(c, c.package)
+        if any(p.startswith(f"{c.package}/{td}/") for td in tds):
             p = p[len(c.package) + 1:]
-        if not (p.startswith("test/") or any(p.startswith(x + "/test/") for x in extras)):
-            die(f"hardening.tests_added : {raw!r} n'est pas un test du package. Attendu : test/… (relatif à "
-                f"{c.package}), {c.package}/test/… (ramené au package)"
-                + (f", ou <package de writes_extra>/test/… ({', '.join(extras)})" if extras else ""))
+        if not (any(p.startswith(td + "/") for td in tds)
+                or any(p.startswith(f"{x}/{td}/") for x in extras for td in test_dirs(c, x))):
+            td = tds[0] if tds else "test"
+            die(f"hardening.tests_added : {raw!r} n'est pas un test du package. Attendu : {td}/… (relatif à "
+                f"{c.package}), {c.package}/{td}/… (ramené au package)"
+                + (f", ou <package de writes_extra>/{td}/… ({', '.join(extras)})" if extras else ""))
         if p not in out:
             out.append(p)
     return out
@@ -905,7 +911,24 @@ def parse_ask(args):
 # ---------------------------------------------------------------------------
 # Git : contrats, gel
 # ---------------------------------------------------------------------------
-CONTRACT_GLOBS = ("*/domain/*", "*/keys.dart", "*_event.dart", "*_state.dart")
+def stack_list(c, key, rel="."):
+    """Valeur à virgules du langage du package rel (config du projet, sinon stacks/<langage>/stack.ini)."""
+    return stacklib.get_list(key, os.path.join(c.root, rel))
+
+
+def src_dirs(c, rel):
+    """Dossiers du code d'un package, relatifs à lui (lib pour Flutter)."""
+    return stack_list(c, "src_dirs", rel)
+
+
+def test_dirs(c, rel):
+    """Dossiers de test d'un package, relatifs à lui (test pour Flutter)."""
+    return stack_list(c, "test_dirs", rel)
+
+
+def contract_globs(c):
+    """Fichiers de contrat du langage du package (stack.ini → contract_globs ; Flutter : domain, keys, events, states)."""
+    return stack_list(c, "contract_globs", c.package)
 
 
 def repo_of(c, rel_path):
@@ -937,11 +960,12 @@ def changed_files(c, rel_dir, since):
 
 
 def compute_contract_files(c):
-    lib = f"{c.package}/lib"
-    top, _ = repo_of(c, lib)
+    globs = contract_globs(c)
+    top, _ = repo_of(c, c.package)
     since = merge_base(c, top)
-    files = [f for f in changed_files(c, lib, since) if os.path.isfile(os.path.join(c.root, f))]
-    return [f for f in files if any(fnmatch.fnmatch(f, g) for g in CONTRACT_GLOBS)]
+    files = [f for d in src_dirs(c, c.package) for f in changed_files(c, f"{c.package}/{d}", since)
+             if os.path.isfile(os.path.join(c.root, f))]
+    return sorted({f for f in files if any(fnmatch.fnmatch(f, g) for g in globs)})
 
 
 def cmd_contracts_files(c, args):
@@ -953,9 +977,10 @@ def cmd_contracts_files(c, args):
 
 def allowed_for_commit(c, f):
     app = c.cfg("app_dir", ".").strip("/")
-    roots = {"pubspec.yaml", "pubspec.lock"}
+    # Manifestes du langage (stack.ini → manifests : pubspec.yaml, pubspec.lock pour Flutter), à la racine et dans l'app.
+    roots = set(stack_list(c, "manifests", c.package))
     if app and app != ".":
-        roots |= {f"{app}/pubspec.yaml", f"{app}/pubspec.lock"}
+        roots |= {f"{app}/{m}" for m in roots}
     if f.startswith(c.package + "/") or f in roots:
         return True
     for g in c.writes_extra:
@@ -1025,11 +1050,11 @@ def cmd_commit_contracts(c, args):
 
 def extra_packages(c):
     """Packages ouverts par writes_extra, hors package de la feature — miroir de extra_packages (checks_test.sh) :
-    le préfixe fixe du glob, remonté jusqu'au dossier qui a un pubspec.yaml."""
+    le préfixe fixe du glob, remonté jusqu'au dossier qui porte un marqueur de package (pubspec.yaml, build.gradle.kts…)."""
     out = []
     for g in c.writes_extra:
         d = g.split("*", 1)[0].rstrip("/")
-        while d and d != "." and not os.path.isfile(os.path.join(c.root, d, "pubspec.yaml")):
+        while d and d != "." and not stacklib.is_package(os.path.join(c.root, d)):
             d = os.path.dirname(d)
         if d and d != "." and d != c.package and d not in out:
             out.append(d)
@@ -1041,14 +1066,18 @@ def frozen_test_files(c):
     test_freeze_check les surveille), modifiés depuis HEAD. Un package où la feature n'a rien écrit n'apporte rien."""
     files = []
     for pkg in [c.package] + extra_packages(c):
-        files += changed_files(c, f"{pkg}/test", "HEAD")
+        for td in test_dirs(c, pkg):
+            files += changed_files(c, f"{pkg}/{td}", "HEAD")
     return files
 
 
 def cmd_freeze(c, args):
-    # pubspec.yaml : dev_dependencies de test (bdd_widget_test…), du package comme des packages de writes_extra.
-    files = frozen_test_files(c) + [f for f in changed_files(c, c.package, "HEAD") if f.endswith("pubspec.yaml")]
-    files += [f for pkg in extra_packages(c) for f in changed_files(c, pkg, "HEAD") if f == f"{pkg}/pubspec.yaml"]
+    # Manifeste du package (pubspec.yaml) : dev_dependencies de test (bdd_widget_test…), du package comme des
+    # packages de writes_extra.
+    manifests = set(stack_list(c, "package_manifest", c.package))
+    files = frozen_test_files(c) + [f for f in changed_files(c, c.package, "HEAD") if os.path.basename(f) in manifests]
+    files += [f for pkg in extra_packages(c) for f in changed_files(c, pkg, "HEAD")
+              if f in {f"{pkg}/{m}" for m in stack_list(c, "package_manifest", pkg)}]
     sha = commit(c, sorted(set(files)), f"test({c.name}): acceptance and unit tests (frozen)", allow_empty=True)
     c.p["tests_freeze_sha"] = sha
     c.p.setdefault("human_gates", {})["tests"] = {"at": now(), "by": "user", "sha": sha}

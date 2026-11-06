@@ -32,7 +32,7 @@ case "$agent" in
   *) exit 0 ;;
 esac
 
-GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$HOME/.claude/scripts/gauntlet}"   # surcharge : tests du hook
+GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
 GAUNTLET="$GAUNTLET_ROOT/../gauntlet.sh"
 # shellcheck source=../scripts/gauntlet/lib.sh
 source "$GAUNTLET_ROOT/lib.sh"

@@ -54,29 +54,25 @@ hook_feature_root() {
 # Contexte projet
 # ---------------------------------------------------------------------------
 # Variables exportées : PROJECT_ROOT CFG_FILE FEATURE PKG_REL PKG_DIR PKG_NAME FEATURE_DIR
-#                       GAUNTLET_OUT FLUTTER DART BASE_BRANCH MODE SIZE
+#                       GAUNTLET_OUT STACK STACK_DIR FLUTTER DART BASE_BRANCH MODE SIZE
 init_project_context() {
   PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "pas dans un repo git"
   # GAUNTLET_CFG : surcharge de la config (tests du gauntlet lui-même, dry-run sur un projet non initialisé).
   CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/rules/feature_pipeline.md}"
   [ -f "$CFG_FILE" ] || die "config absente : $CFG_FILE (lancer /feature init)"
 
-  FLUTTER="$(cfg flutter 'flutter')"
-  DART="$(cfg dart 'dart')"
   BASE_BRANCH="$(cfg base_branch 'develop')"
-  # Exported for the Python and Dart tools of the gauntlet (dup_check, spec_lint), which skip the same files.
-  GENERATED_ERE="$(generated_ere)"; export GAUNTLET_GENERATED_ERE="$GENERATED_ERE"
 
   # APP_ROOT : le dossier de l'app Flutter (app_dir), là où vit .fvmrc. Toute commande dart/flutter lancée
   # hors d'un package (outils Dart du gauntlet, pub global) tourne depuis APP_ROOT : depuis la racine du
   # repo, `fvm dart` ne trouve pas de .fvmrc et retombe sur le SDK global (Dart 2.18 sur cette machine).
   APP_ROOT="$PROJECT_ROOT/$(cfg app_dir .)"; APP_ROOT="${APP_ROOT%/}"; APP_ROOT="${APP_ROOT%/.}"
+  # Langage : celui de l'app, puis celui du package de la feature une fois connu (stack_init).
+  stack_init "$(lang_dir "$APP_ROOT")"
   # Les exécutables pub (mason, metrics, mutation_test) et leur `dart` doivent être ceux du SDK du
   # projet : avec fvm, on met le SDK épinglé en tête de PATH. Sans ça, un vieux `dart` système
-  # (celui de /usr/local/bin) casse tout silencieusement.
-  export PATH="$HOME/.pub-cache/bin:$PATH"
-  local fv; fv="$(fvm_pinned_version)"
-  [ -n "$fv" ] && [ -d "$HOME/fvm/versions/$fv/bin" ] && export PATH="$HOME/fvm/versions/$fv/bin:$PATH"
+  # (celui de /usr/local/bin) casse tout silencieusement. Sans `dart` (autre langage), rien ne change.
+  sdk_path
 
   FEATURE="$1"
   if [ -n "$FEATURE" ]; then
@@ -103,11 +99,109 @@ init_project_context() {
     PKG_REL="${PKG_REL%/}"
     PKG_DIR="$PROJECT_ROOT/$PKG_REL"
     [ -d "$PKG_DIR" ] || die "package introuvable : $PKG_DIR"
-    PKG_NAME="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$PKG_DIR/pubspec.yaml" | head -1)"
+    stack_init "$PKG_DIR"; sdk_path
+    PKG_NAME="$(pkg_name_of "$PKG_DIR")"
     scope_init
   fi
 }
 
+# ---------------------------------------------------------------------------
+# Langage du package (ADR 0011, scripts/stack.sh, stacks/<langage>/)
+# ---------------------------------------------------------------------------
+# Ce qui est propre à un langage (commandes, marqueurs, dossiers, fichiers générés) vient de
+# stacks/<langage>/stack.ini, la config du projet primant clé par clé ; les checks propres au langage, de
+# stacks/<langage>/checks.sh (stack_load_checks). Les langages lus sont ceux de ce checkout : un worktree de
+# ~/.claude se teste avec les siens.
+GAUNTLET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STACK_SH="$GAUNTLET_LIB_DIR/../stack.sh"
+export CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$(cd "$GAUNTLET_LIB_DIR/../../stacks" 2>/dev/null && pwd)}"
+# Clés lues d'un coup par stack_init ; une autre clé passe par stack_val, qui interroge stack.sh.
+STACK_KEYS="extensions manifests package_manifest src_dirs test_dirs layer.data generated.exclude tool_files flutter dart"
+STACK=""; STACK_DIR=""; STACK_VALS=""
+# stack_sh <args…> — stack.sh, avec la config que lit le gauntlet (GAUNTLET_CFG compris)
+stack_sh() { STACK_CFG="${CFG_FILE:-}" bash "$STACK_SH" "$@"; }
+# stack_init <chemin> — STACK, STACK_DIR et les valeurs du langage de <chemin> ; FLUTTER, DART, fichiers générés.
+# Aucun langage reconnu : STACK vide, les checks propres à un langage sont non applicables.
+stack_init() {
+  local k
+  STACK="$(stack_sh detect "$1" 2>/dev/null)" || STACK=""
+  STACK_DIR="${STACK:+$CLAUDE_STACKS_DIR/$STACK}"
+  if [ -n "$STACK" ]; then
+    # stack.sh vals : une ligne par clé, vide comprise ; paste les remet en face de leur clé.
+    # shellcheck disable=SC2086
+    STACK_VALS="$(paste <(for k in $STACK_KEYS; do printf '%s\n' "$k"; done) <(stack_sh vals "$1" $STACK_KEYS))"
+  else
+    STACK_VALS=""
+  fi
+  FLUTTER="$(stack_val flutter)"
+  DART="$(stack_val dart)"
+  LAYER_DATA_DIRS="$(stack_list layer.data | tr '\n' ' ')"
+  # Exported for the Python and Dart tools of the gauntlet (dup_check, spec_lint), which skip the same files.
+  GENERATED_ERE="$(generated_ere)"; export GAUNTLET_GENERATED_ERE="$GENERATED_ERE"
+}
+# lang_dir <dossier> — <dossier> s'il a un langage (un marqueur en remontant) ; sinon le package le plus proche
+# sous lui (app dont les packages vivent dans features/, sans pubspec.yaml à sa racine) ; sinon <dossier>.
+lang_dir() {
+  stack_sh detect "$1" >/dev/null 2>&1 && { printf '%s' "$1"; return; }
+  local m f
+  for m in $(bash "$STACK_SH" markers); do
+    f="$(find "$1" -maxdepth 4 -name "$m" -not -path '*/.git/*' -not -path '*/build/*' -not -path '*/.dart_tool/*' 2>/dev/null \
+         | awk '{ print gsub("/", "/"), $0 }' | sort -n | head -1 | cut -d' ' -f2-)"
+    [ -n "$f" ] && { dirname "$f"; return; }
+  done
+  printf '%s' "$1"
+}
+# stack_val <clé> — valeur pour le langage courant (config du projet, sinon stack.ini) ; vide sans langage
+stack_val() {
+  [ -n "$STACK" ] || return 0
+  case " $STACK_KEYS " in
+    *" $1 "*) printf '%s\n' "$STACK_VALS" | awk -F'\t' -v k="$1" '$1 == k { sub(/^[^\t]*\t/, ""); print; exit }' ;;
+    *) stack_sh get "$1" "${PKG_DIR:-$APP_ROOT}" 2>/dev/null ;;
+  esac
+}
+# stack_list <clé> — une valeur par ligne (séparateur virgule), vides ignorés
+stack_list() { stack_val "$1" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$'; }
+# stack_ext_ere — les extensions du langage en ERE ancrée sur la fin : \.(dart)$ ; rien ne correspond sans langage
+stack_ext_ere() {
+  local alts; alts="$(stack_list extensions | sed 's/^\.//; s/[].[^$+(){}|\\]/\\&/g' | paste -sd '|' -)"
+  if [ -n "$alts" ]; then printf '\\.(%s)$' "$alts"; else printf '^$a'; fi
+}
+# stack_includes — les extensions du langage en options --include de grep (--include=*.dart …)
+stack_includes() { stack_list extensions | sed 's/^/--include=*/'; }
+# stack_dirs — dossiers du code puis des tests, relatifs au package (lib test pour Flutter)
+stack_dirs() { { stack_list src_dirs; stack_list test_dirs; } | tr '\n' ' '; }
+# stack_check_known <nom> — un langage au moins a un check_<nom> (stacks/*/checks*.sh)
+stack_check_known() { grep -qsE "^check_${1}\(\)" "$CLAUDE_STACKS_DIR"/*/checks*.sh; }
+# stack_load_checks — les checks du langage courant, sourcés après les génériques : un check_<nom> du langage
+# remplace le générique du même nom. Un check qu'un autre langage a et pas celui-ci est non applicable
+# (run_checks le dit, il n'est pas vert en silence).
+stack_load_checks() {
+  [ -n "$STACK_DIR" ] && [ -f "$STACK_DIR/checks.sh" ] || return 0
+  # shellcheck source=/dev/null
+  source "$STACK_DIR/checks.sh"
+}
+# is_package_dir <dossier> — le dossier porte le marqueur d'un langage connu (pubspec.yaml, build.gradle.kts…)
+STACK_MARKERS=""
+is_package_dir() {
+  local m
+  [ -n "$STACK_MARKERS" ] || STACK_MARKERS="$(bash "$STACK_SH" markers | tr '\n' ' ')"
+  for m in $STACK_MARKERS; do [ -e "$1/$m" ] && return 0; done
+  return 1
+}
+# pkg_name_of <dossier> — le nom du package : `name:` de son pubspec.yaml s'il en a un, sinon le nom du dossier
+pkg_name_of() {
+  local n=""
+  [ -f "$1/pubspec.yaml" ] && n="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$1/pubspec.yaml" | head -1)"
+  printf '%s' "${n:-$(basename "$1")}"
+}
+
+# sdk_path — le SDK du projet en tête de PATH : exécutables pub, puis SDK épinglé par fvm (rien hors fvm)
+sdk_path() {
+  case ":$PATH:" in *":$HOME/.pub-cache/bin:"*) ;; *) export PATH="$HOME/.pub-cache/bin:$PATH" ;; esac
+  local fv; fv="$(fvm_pinned_version)"
+  [ -n "$fv" ] && [ -d "$HOME/fvm/versions/$fv/bin" ] && export PATH="$HOME/fvm/versions/$fv/bin:$PATH"
+  return 0
+}
 # fvmrc_path — le .fvmrc que fvm lit depuis APP_ROOT (APP_ROOT ou un parent jusqu'à PROJECT_ROOT), vide sinon.
 fvmrc_path() {
   local d="$APP_ROOT"
@@ -255,12 +349,14 @@ scope_init() {
 # Couches d'une moitié (étapes 3 et 4 en parallèle). data = data, domain et injection, lib et test ;
 # presentation = tout le reste du package (presentation, barrel, test/step, .feature, tests générés).
 # Chemins relatifs au package.
-LAYER_DATA_DIRS="lib/src/data lib/src/domain lib/src/injection test/src/data test/src/domain test/src/injection"
+# Les dossiers de la couche data viennent du langage (stack.ini → layer.data, posés par stack_init).
+LAYER_DATA_DIRS=""
 # in_layer <couche> <chemin relatif au package>
 in_layer() {
   local d
   for d in $LAYER_DATA_DIRS; do
-    case "$2" in "$d"/*) [ "$1" = data ]; return ;; esac
+    # shellcheck disable=SC2254
+    case "$2" in $d/*) [ "$1" = data ]; return ;; esac
   done
   [ "$1" = presentation ]
 }
@@ -331,7 +427,7 @@ with_package() {
   # One statement: the right-hand side still reads the caller's GAUNTLET_OUT.
   local GAUNTLET_OUT="$GAUNTLET_OUT/packages/$(printf '%s' "$PKG_REL" | tr '/' '%')"
   mkdir -p "$GAUNTLET_OUT"
-  PKG_NAME="$(sed -n "s/^name:[[:space:]]*['\"]\{0,1\}\([A-Za-z0-9_]*\)['\"]\{0,1\}.*/\1/p" "$PKG_DIR/pubspec.yaml" 2>/dev/null | head -1)"
+  PKG_NAME="$(pkg_name_of "$PKG_DIR")"
   scope_init
   "$@"
 }
@@ -342,11 +438,13 @@ scope_summary() {
 }
 # in_scope_file <chemin relatif à PROJECT_ROOT> — fichier nouveau ou touché
 in_scope_file() { [ -n "$(printf '%s\n' "$1" | drop_generated)" ] || return 1; [ "$SCOPE_ALL" = 1 ] || grep -qxE "$1(:[0-9]+)?" "$SCOPE_FILE" 2>/dev/null || grep -q "^$1:" "$SCOPE_FILE" 2>/dev/null; }
-# scope_files <prefix> — fichiers du périmètre, relatifs à <prefix> (ex: "$PKG_REL/"), .dart seulement
+# scope_files <prefix> — fichiers du périmètre, relatifs à <prefix> (ex: "$PKG_REL/"), sources du langage
+# seulement (stack.ini → extensions ; en create, sous src_dirs et test_dirs)
 scope_files() {
-  local prefix="$1"
-  if [ "$SCOPE_ALL" = 1 ]; then (cd "$PROJECT_ROOT/$prefix" && find lib test -name '*.dart' 2>/dev/null) | drop_generated
-  else cut -d: -f1 "$SCOPE_FILE" | grep '\.dart$' | sort -u | sed "s#^$prefix##"; fi
+  local prefix="$1" ere; ere="$(stack_ext_ere)"
+  # shellcheck disable=SC2046
+  if [ "$SCOPE_ALL" = 1 ]; then (cd "$PROJECT_ROOT/$prefix" && find $(stack_dirs) -type f 2>/dev/null | grep -E "$ere") | drop_generated
+  else cut -d: -f1 "$SCOPE_FILE" | grep -E "$ere" | sort -u | sed "s#^$prefix##"; fi
 }
 # filter_scope_lines <prefix> — stdin "chemin:ligne:…" (chemins relatifs à <prefix>) → garde les hits du périmètre.
 # Un fichier généré n'est jamais dans le périmètre, en create comme en extend.
@@ -387,10 +485,11 @@ cfg_list() { cfg "$1" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
 # .g.dart n'est pas corrigeable par l'agent (il serait écrasé à la prochaine génération). Le motif vient de
 # feature_pipeline.md → generated.exclude (globs, `*` traverse les `/`, un glob sans `/` vise le nom du
 # fichier) ; `none` n'exclut rien. Seuls generated_fresh (génération à jour et commitée) et la compilation
-# (`error •` de l'analyse, qui ne passe pas par le périmètre) les regardent encore.
-GENERATED_DEFAULT='*.g.dart, *.freezed.dart, *.mocks.dart, *.gr.dart, *.gen.dart, *.config.dart, app_localizations*.dart, **/l10n/generated/**, **/generated_l10n/**'
+# (`error •` de l'analyse, qui ne passe pas par le périmètre) les regardent encore. Défaut : celui du langage
+# (stack.ini → generated.exclude).
 generated_globs() {
-  local v; v="$(cfg generated.exclude "$GENERATED_DEFAULT")"
+  local v; v="$(stack_val generated.exclude)"
+  [ -n "$v" ] || v="$(cfg generated.exclude)"
   [ "$v" = none ] && return 0
   printf '%s' "$v" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$'
 }
@@ -490,9 +589,6 @@ merge_base() {
   fi
 }
 
-# has_dev_dep <pkg> — le package feature déclare-t-il cette dev dependency ?
-has_dev_dep() { awk '/^dev_dependencies:/{f=1;next} /^[^ ]/{f=0} f' "$PKG_DIR/pubspec.yaml" | grep -qE "^[[:space:]]+$1:"; }
-
 # ---------------------------------------------------------------------------
 # Exécution des checks
 # ---------------------------------------------------------------------------
@@ -508,13 +604,18 @@ run_checks() {
   # Le bloc tourne dans un sous-shell (pipe vers tee) : le verdict passe par le fichier JSON,
   # pas par des variables — elles seraient perdues à la sortie du pipe.
   {
-    local failed="" skipped="" passed="" timings="" spec name mode rc t0 dt fast_failed=0
+    local failed="" skipped="" passed="" na="" timings="" spec name mode rc t0 dt fast_failed=0
     printf 'gauntlet %s — feature %s — package %s — périmètre : %s — %s\n' "$label" "$FEATURE" "$PKG_REL" "$(scope_summary)" "$(date '+%Y-%m-%d %H:%M:%S')"
     for spec in "$@"; do
       name="${spec%%:*}"; mode=""; [[ "$spec" == *:* ]] && mode="${spec#*:}"
       section "$name${mode:+ ($mode)}"
       if is_expensive "$name" && [ "$fast_failed" = 1 ]; then
         info "sauté : un check rapide a échoué"; skipped="$skipped $name"; continue
+      fi
+      # Check propre à un langage, sans version pour celui du package : dit, compté à part, jamais « passé ».
+      if ! declare -F "check_$name" >/dev/null; then
+        printf '[N/A]  %s : non applicable à %s (aucune version de ce check pour ce langage)\n' "$name" "${STACK:-ce package, langage non reconnu}"
+        na="$na $name"; continue
       fi
       t0=$SECONDS; "check_$name" "$mode"; rc=$?; dt=$((SECONDS-t0))
       if [ "$rc" -eq 0 ]; then ok "$name (${dt}s)"; passed="$passed $name"
@@ -525,13 +626,15 @@ run_checks() {
     [ -n "$passed" ]  && printf '  passés  :%s\n' "$passed"
     [ -n "$failed" ]  && printf '  échoués :%s\n' "$failed"
     [ -n "$skipped" ] && printf '  sautés  :%s\n' "$skipped"
-    jq -n --arg profile "$label" --arg feature "$FEATURE" \
+    [ -n "$na" ]      && printf '  non applicables à %s :%s\n' "${STACK:-ce langage}" "$na"
+    jq -n --arg profile "$label" --arg feature "$FEATURE" --arg stack "$STACK" --arg na "$na" \
           --argjson ok "$([ -z "$failed" ] && echo true || echo false)" \
           --arg passed "$passed" --arg failed "$failed" --arg skipped "$skipped" --arg timings "$timings" \
           '{profile:$profile, feature:$feature, ok:$ok, date:(now|todate),
             passed:($passed|split(" ")|map(select(.!=""))),
             failed:($failed|split(" ")|map(select(.!=""))),
             skipped:($skipped|split(" ")|map(select(.!=""))),
+            stack:$stack, not_applicable:($na|split(" ")|map(select(.!=""))),
             seconds:($timings|split(" ")|map(select(.!="")|split("=")|{(.[0]):(.[1]|tonumber)})|add // {})}' > "$json"
   } 2>&1 | tee -a "$log"
   [ "$(jq -r '.ok' "$json" 2>/dev/null)" = true ]

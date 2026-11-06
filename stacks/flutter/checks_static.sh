@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# checks_static.sh — analyse, format, génération, dépendances, stubs, métriques.
-# Chaque check : fonction check_<nom> [mode], exit 0 = vert. Sourcé par gauntlet.sh.
+# checks_static.sh — analyse, format, génération, dépendances, stubs, métriques d'un package Flutter.
+# Chaque check : fonction check_<nom> [mode], exit 0 = vert. Sourcé par stacks/flutter/checks.sh.
 
 # capture <cmd...> — exécute dans PKG_DIR, affiche les 40 dernières lignes, retourne le code.
 capture() {

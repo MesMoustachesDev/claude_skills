@@ -6,12 +6,16 @@ la publication sur la MR vivent ici, pas dans le prompt de l'orchestrateur.
 """
 import datetime
 import difflib
+import fnmatch
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import stacklib  # noqa: E402  (scripts/stacklib.py : le langage d'un package et ses valeurs, ADR 0011)
 
 HOME = os.path.expanduser("~")
 STATE_ROOT = os.path.join(HOME, ".cache", "gauntlet", "review")
@@ -339,36 +343,31 @@ def cmd_qa(r, args):
     sys.exit(p.returncode)
 
 
-def project_flutter(wt):
-    """La commande flutter du projet (clé `flutter` de la config, ex. « fvm flutter »)."""
-    try:
-        for line in open(os.path.join(wt, ".claude", "rules", "feature_pipeline.md"), encoding="utf-8"):
-            m = re.match(r"\s*flutter\s*=\s*(.+?)\s*$", line)
-            if m:
-                return m.group(1).split()
-    except OSError:
-        pass
-    return ["flutter"]
-
-
 def package_dir(r, package):
     wt = r.s.get("worktree")
     if not wt or not os.path.isdir(wt):
         die("pas de worktree : review.sh gauntlet d'abord")
     d = os.path.normpath(os.path.join(wt, package))
-    if not d.startswith(os.path.normpath(wt)) or not os.path.isfile(os.path.join(d, "pubspec.yaml")):
-        die(f"{package} n'est pas un package Dart du worktree (pas de pubspec.yaml)")
+    if not d.startswith(os.path.normpath(wt)) or not stacklib.is_package(d):
+        die(f"{package} n'est pas un package du worktree (aucun marqueur : {', '.join(stacklib.markers())})")
     return wt, d
 
 
-def flutter_test(r, wt, pkg_dir, targets, log_name):
+def run_test_files(r, wt, pkg_dir, targets, log_name):
+    """Joue des fichiers de test donnés avec la commande du langage (stack.ini → test_files_cmd, la config du
+    projet primant : « fvm flutter test --reporter expanded »)."""
+    lang = stacklib.detect(pkg_dir) or "inconnu"
+    cmd = stacklib.get("test_files_cmd", pkg_dir).split()
+    if not cmd:
+        print(f"non applicable à {lang} : pas de test_files_cmd pour ce langage — tests non joués")
+        return 127
     # Même PATH que le gauntlet : les exécutables pub (fvm…) d'abord.
     env = dict(os.environ, PATH=os.pathsep.join([os.path.join(HOME, ".pub-cache", "bin"), os.environ.get("PATH", "")]))
-    cmd = [*project_flutter(wt), "test", *targets, "--reporter", "expanded"]
+    cmd = [*cmd, *targets]
     try:
         p = subprocess.run(cmd, cwd=pkg_dir, capture_output=True, text=True, stdin=subprocess.DEVNULL, env=env)
     except FileNotFoundError:
-        print(f"« {cmd[0]} » introuvable : clé `flutter` de feature_pipeline.md, ou SDK absent de ce PATH — tests non joués")
+        print(f"« {cmd[0]} » introuvable : clé test_files_cmd (ou ce qu'elle cite) de feature_pipeline.md, ou SDK absent de ce PATH — tests non joués")
         return 127
     log = r.file(log_name)
     with open(log, "w", encoding="utf-8") as f:
@@ -382,31 +381,37 @@ def flutter_test(r, wt, pkg_dir, targets, log_name):
 def cmd_run_tests(r, args):
     """Rejoue des tests EXISTANTS du worktree (ceux qui prouvent un scénario promis par la MR)."""
     if len(args) < 2:
-        die("usage : run-tests <slug> <package> <test/…_test.dart>…")
+        die("usage : run-tests <slug> <package> <fichier de test>…")
     wt, d = package_dir(r, args[0])
     for t in args[1:]:
         if not os.path.isfile(os.path.join(d, t)):
             die(f"test introuvable dans {args[0]} : {t}")
-    sys.exit(flutter_test(r, wt, d, args[1:], f"run_tests_{doc_id(args[0])}.log"))
+    sys.exit(run_test_files(r, wt, d, args[1:], f"run_tests_{doc_id(args[0])}.log"))
 
 
 def cmd_probe(r, args):
     """Joue des tests JETABLES écrits par Maëlle dans <revue>/probes/ : copiés le temps du run dans
-    <package>/test/_review_probe/ du worktree, puis retirés. Le repo n'est jamais modifié."""
+    <package>/<probe_dir> du worktree (stack.ini ; test/_review_probe pour Flutter), puis retirés. Le repo n'est jamais modifié."""
     if not args:
         die("usage : probe <slug> <package> [fichiers de probes/…]")
     wt, d = package_dir(r, args[0])
     src = r.file("probes")
-    files = args[1:] or (sorted(f for f in os.listdir(src) if f.endswith("_test.dart")) if os.path.isdir(src) else [])
+    # Un test jetable est un fichier que les globs de test du langage reconnaissent (Flutter : *_test.dart).
+    globs = stacklib.get_list("test_globs", d)
+    is_test = lambda f: any(fnmatch.fnmatch(f, g) for g in globs if "/" not in g)  # noqa: E731
+    files = args[1:] or (sorted(f for f in os.listdir(src) if is_test(f)) if os.path.isdir(src) else [])
     if not files:
-        die(f"aucun test jetable dans {src} (fichiers *_test.dart)")
-    dest = os.path.join(d, "test", "_review_probe")
+        die(f"aucun test jetable dans {src} (fichiers {', '.join(g for g in globs if '/' not in g) or '?'})")
+    probe = stacklib.get("probe_dir", d)
+    if not probe:
+        die(f"non applicable à {stacklib.detect(d) or 'ce langage'} : pas de probe_dir dans stack.ini")
+    dest = os.path.join(d, probe)
     shutil.rmtree(dest, ignore_errors=True)
     os.makedirs(dest)
     try:
         for f in files:
             shutil.copy(os.path.join(src, os.path.basename(f)), dest)
-        rc = flutter_test(r, wt, d, ["test/_review_probe"], f"probe_{doc_id(args[0])}.log")
+        rc = run_test_files(r, wt, d, [probe], f"probe_{doc_id(args[0])}.log")
     finally:
         shutil.rmtree(dest, ignore_errors=True)
     sys.exit(rc)

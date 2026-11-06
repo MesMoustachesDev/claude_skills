@@ -35,7 +35,7 @@ shift 2 2>/dev/null || true
 case "$target" in
   ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
   list)  profiles_list; exit 0 ;;
-  doctor) init_project_context ""; run_doctor; exit $? ;;
+  doctor) init_project_context ""; stack_load_checks; run_doctor; exit $? ;;
   report) exec python3 "$(dirname "${BASH_SOURCE[0]}")/report/report.py" feature "$feature" "$@" ;;
 esac
 
@@ -43,13 +43,17 @@ esac
 # Profil d'une moitié (red_data, green_presentation…) : la couche vient du suffixe.
 case "$target" in *_data|*_presentation) export GAUNTLET_LAYER="${target##*_}" ;; esac
 init_project_context "$feature"
+# Les checks du langage du package (stacks/<langage>/checks.sh), après les communs.
+stack_load_checks
 # Un hook de fin d'agent joue peut-être déjà ce gate : on attend qu'il ait fini plutôt que de lancer
 # un second gauntlet dans le même worktree.
 bash "$(dirname "${BASH_SOURCE[0]}")/hook_wait.sh" "$FEATURE_DIR/.gauntlet" || exit 1
 
 checks="$(profile_checks "$target")"
 if [ -z "$checks" ]; then
-  if declare -F "check_${target%%:*}" >/dev/null; then checks="$target"; else die "profil ou check inconnu : $target"; fi
+  # Un check d'un autre langage reste connu : run_checks le dit non applicable à celui du package.
+  if declare -F "check_${target%%:*}" >/dev/null || stack_check_known "${target%%:*}"; then checks="$target"
+  else die "profil ou check inconnu : $target"; fi
 fi
 
 run_checks "$target" $checks
