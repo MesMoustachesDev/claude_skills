@@ -1,6 +1,6 @@
 # 0011 — Ce qui est propre à un langage vit dans son dossier, et ne se charge que pour ce langage
 
-Statut : acceptée (2026-11-06)
+Statut : acceptée (2026-11-06), amendée le 2026-11-06 (check non applicable)
 Où elle vit : `scripts/stack.sh` (détection, valeurs) · `stacks/<langage>/` (`stack.ini`, `checks.sh`,
 `templates/`) · `rules/stacks/<langage>*.md` (doctrine, frontmatter `paths:`) · `stacks/README.md` ·
 `scripts/gauntlet/tests/test_stack.sh` · plan `.claude/plans/langages.md`
@@ -30,6 +30,11 @@ des projets qui ne l'utilisent pas.
   langage », « les conventions de test du langage ». Aucune règle sans `paths:` dans `~/.claude/rules/`.
 - Les gabarits sortent de `commands/` vers `stacks/<langage>/templates/` : sous `commands/`, chacun était un
   skill listé dans toutes les sessions.
+- **Un check sans version pour le langage du package est signalé, pas bloquant** (choix de Thibault,
+  2026-11-06) : `[N/A] <check> : non applicable à <langage>` dans le journal, `not_applicable` dans
+  `last_<profil>.json`, jamais compté dans `passed`, et le profil peut passer. Sans ça, tout `/feature`
+  d'un langage neuf serait rouge tant que ses checks ne sont pas écrits. Le revers, accepté : un check
+  oublié pour un langage ne bloque rien ; le rapport et l'evidence montrent la liste des `[N/A]`.
 
 ## Conséquences
 
