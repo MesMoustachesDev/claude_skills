@@ -15,6 +15,7 @@ Ajout uniquement sur accord explicite de Thibault (voir « Chaque réponse peut 
 dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrigée, pas doublée.
 
 ## Pipeline et livraison
+- Les contrats que Thibault écrit sont seulement les interfaces (repository, data source, use case, state) ; clés de test, DI et l10n sont de l'implémentation, posée par Arthur sans lui demander (2026-11-06, Règle)
 
 - Crée les commits du plan sans demander de validation : ils sont locaux et réversibles, le plan va dans l'evidence. Le push et la MR restent soumis à sa validation. (2026-10-17, « Commits », 11 réponses « Go » sur 11)
 - Applique le gabarit S ou M qui sort des critères sans le demander, annoncé avec ses mesures et ce qu'il change pour la suite ; ne pose que la question du découpage quand le gabarit est L. (2026-10-17, « Gabarit », 8 sur 8)
