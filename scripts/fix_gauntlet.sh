@@ -282,11 +282,18 @@ check_conventions() {
     lang="$(bash "$SCRIPTS/stack.sh" detect "$PROJECT_ROOT/$pkg" 2>/dev/null)"
     for c in design_system l10n_strings; do
       if ! grep -qsE "^check_${c}\(\)" "$CLAUDE_STACKS_DIR/$lang"/checks*.sh "$SCRIPTS"/gauntlet/checks_*.sh; then
-        info "$pkg : $c non applicable à ${lang:-ce langage} (aucune version de ce check)"; continue
+        info "$pkg : $c non applicable à ${lang:-ce langage} (aucune version de ce check)"
+        FIX_NA="$FIX_NA $c@$pkg"; continue
       fi
-      GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$pkg" GAUNTLET_FEATURES_ROOT="$FIX_OUT/conventions" GAUNTLET_KEEP_FORMAT_LINES=1 \
-        "$SCRIPTS/gauntlet.sh" "$c" "$(printf '%s' "$pkg" | tr '/' '_')" > "$FIX_OUT/conventions_$c.out" 2>&1 \
-        && { info "$pkg : $c conforme"; continue; }
+      if GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$pkg" GAUNTLET_FEATURES_ROOT="$FIX_OUT/conventions" GAUNTLET_KEEP_FORMAT_LINES=1 \
+        "$SCRIPTS/gauntlet.sh" "$c" "$(printf '%s' "$pkg" | tr '/' '_')" > "$FIX_OUT/conventions_$c.out" 2>&1; then
+        # Vert ou non applicable (outil absent du projet) : le second se dit, il n'est pas « conforme ».
+        if grep -q '^\[N/A\]' "$FIX_OUT/conventions_$c.out"; then
+          info "$pkg : $c non applicable ($(grep -m1 '^\[N/A\]' "$FIX_OUT/conventions_$c.out" | sed 's/^\[N\/A\][[:space:]]*//'))"
+          FIX_NA="$FIX_NA $c@$pkg"
+        else info "$pkg : $c conforme"; fi
+        continue
+      fi
       grep -E '✗|\[FAIL\]' "$FIX_OUT/conventions_$c.out" | sed 's/^/  /'
       ko "$pkg : $c"; rc=1
     done
@@ -382,7 +389,7 @@ FIX_SHOTS_DIR="$FIX_DIR/shots/$FIX_PHASE"
 log="$FIX_OUT/last_${target}.log"; json="$FIX_OUT/last_${target}.json"
 : > "$log"
 {
-  passed=""; failed=""
+  passed=""; failed=""; FIX_NA=""   # FIX_NA : checks non applicables (check@package), posés par conventions
   printf 'fix_gauntlet %s — fix %s — %s\n' "$target" "$FIX_NAME" "$(date '+%Y-%m-%d %H:%M:%S')"
   for c in $checks; do
     section "$c"
@@ -391,9 +398,11 @@ log="$FIX_OUT/last_${target}.log"; json="$FIX_OUT/last_${target}.json"
   section "résumé $target"
   [ -n "$passed" ] && printf '  passés  :%s\n' "$passed"
   [ -n "$failed" ] && printf '  échoués :%s\n' "$failed"
+  [ -n "$FIX_NA" ] && printf '  non applicables :%s\n' "$FIX_NA"
   jq -n --arg p "$target" --arg f "$FIX_NAME" --argjson ok "$([ -z "$failed" ] && echo true || echo false)" \
-        --arg passed "$passed" --arg failed "$failed" \
+        --arg passed "$passed" --arg failed "$failed" --arg na "$FIX_NA" \
         '{profile:$p, fix:$f, ok:$ok, date:(now|todate),
-          passed:($passed|split(" ")|map(select(.!=""))), failed:($failed|split(" ")|map(select(.!="")))}' > "$json"
+          passed:($passed|split(" ")|map(select(.!=""))), failed:($failed|split(" ")|map(select(.!=""))),
+          not_applicable:($na|split(" ")|map(select(.!="")))}' > "$json"
 } 2>&1 | tee -a "$log"
 [ "$(jq -r '.ok' "$json" 2>/dev/null)" = true ]

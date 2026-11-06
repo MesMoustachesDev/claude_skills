@@ -4,8 +4,8 @@
 #   - fix/lib.sh : is_test_path et is_manifest_path ajoutent ceux du langage du package de repro.json (à défaut,
 #     du package qui contient le chemin) aux génériques ;
 #   - fix-restrict-writes.sh : le reproducer branche son runner dans les manifestes du langage ;
-#   - fix_gauntlet.sh conventions : un .kt modifié est une source, et les checks sans version Android sont dits
-#     non applicables, pas verts en silence.
+#   - fix_gauntlet.sh conventions : un .kt modifié est une source, jugée par les versions Android de
+#     design_system et l10n_strings (plan langages point 6) ; le JSON du gate porte not_applicable.
 source "$(dirname "$0")/fixture.sh"
 
 FIX_LIB="$TESTS_DIR/../../fix/lib.sh"
@@ -73,16 +73,24 @@ hook_write fix-reproducer "$A/src/main/kotlin/x/Login.kt";            expect_out
 expect_out "build.gradle.kts" "le refus nomme les manifestes du langage"
 hook_write fix-implementer "$A/src/test/kotlin/x/LoginTest.kt";       expect_out "GELÉS" "implementer : les tests Kotlin sont gelés"
 
-echo "fix_gauntlet.sh conventions — les sources du langage, non applicable dit"
+echo "fix_gauntlet.sh conventions — les sources du langage, versions Android"
 printf 'package x\nfun login() = 2\n' > "$R/$A/src/main/kotlin/x/Login.kt"
 echo '<manifest/>' > "$R/$A/src/main/AndroidManifest.xml"
 OUT="$(cd "$R" && bash "$FIX_G" conventions crash 2>&1)"; RC=$?
-expect_rc 0 "conventions ne bloque pas un fix Android"
-expect_out "$A : design_system non applicable à android" "design_system dit non applicable à android"
-expect_out "$A : l10n_strings non applicable à android" "l10n_strings dit non applicable à android"
+expect_rc 0 "conventions : un fix Android sans présentation passe"
+expect_out "$A : design_system conforme" "design_system tourne sur le package Android"
+expect_out "$A : l10n_strings conforme" "l10n_strings tourne sur le package Android"
 expect_out "non applicable (pas une source du langage de leur package) : $A/src/main/AndroidManifest.xml" \
   "un fichier qui n'est pas une source du langage est nommé"
 expect_no_out "aucun fichier source" "le .kt modifié compte comme source"
+OUT="$(jq -c '.not_applicable' "$R/.claude/fixes/crash/.gauntlet/last_conventions.json")"
+expect_out '[]' "last_conventions.json porte not_applicable (vide ici)"
+mkdir -p "$R/$A/src/main/kotlin/x/ui"
+printf 'package x.ui\nfun LoginScreen() { Text("Bienvenue a bord") }\n' > "$R/$A/src/main/kotlin/x/ui/LoginScreen.kt"
+OUT="$(cd "$R" && bash "$FIX_G" conventions crash 2>&1)"; RC=$?
+expect_rc 1 "conventions : une chaîne en dur dans un écran Compose du fix bloque"
+expect_out "LoginScreen.kt" "l'écran est nommé"
+rm -rf "$R/$A/src/main/kotlin/x/ui"
 echo "int a() => 2;" > "$R/$F/lib/a.dart"
 OUT="$(cd "$R" && bash "$FIX_G" conventions crash 2>&1)"; RC=$?
 expect_out "$F : design_system conforme" "contrôle Flutter : design_system tourne sur le .dart modifié"

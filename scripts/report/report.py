@@ -162,13 +162,25 @@ def timeline(state: dict | None) -> str:
 
 
 def gauntlet_results(out_dir: str) -> str:
-    rows = []
+    """Un gate par ligne. Les checks non applicables (ADR 0011 : pas de version pour le langage, ou outil absent du
+    projet) ne bloquent pas : ils sont listés à part, pour qu'un vert ne cache pas ce qui n'a pas été vérifié."""
+    rows, na_all, stack = [], {}, ""
     for p in sorted(glob.glob(os.path.join(out_dir, "last_*.json"))):
         j = read_json(p) or {}
         ok = j.get("ok")
+        na = j.get("not_applicable") or []
+        stack = j.get("stack") or stack
+        for c in na:
+            na_all.setdefault(c, []).append(j.get("profile", ""))
         rows.append([badge("vert" if ok else "rouge", "ok" if ok else "ko"), esc(j.get("profile", "")),
-                     esc(j.get("date", "")), esc(" ".join(j.get("failed") or []))])
-    return table(["", "profil", "date", "checks en échec"], rows, raw=True)
+                     esc(j.get("date", "")), esc(" ".join(j.get("failed") or [])), esc(" ".join(na))])
+    out = table(["", "profil", "date", "checks en échec", "non applicables"], rows, raw=True)
+    if na_all:
+        items = "".join(f"<li><code>{esc(c)}</code> <span class='muted'>({esc(', '.join(p))})</span></li>"
+                        for c, p in sorted(na_all.items()))
+        out += (f"<p><b>Non vérifiés</b> : {len(na_all)} check(s) non applicable(s)"
+                f"{' à ' + esc(stack) if stack else ''}, signalés, pas bloquants (ADR 0011).</p><ul>{items}</ul>")
+    return out
 
 
 def images(base_dir: str, pattern: str, caption_from_dir: bool = True) -> str:

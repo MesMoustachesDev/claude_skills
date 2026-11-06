@@ -51,6 +51,13 @@ Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) | sautée (gabarit S) · Complexité max : <n> · Dépendances : ✓
 Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/8
 
+## Non vérifiés                       ← .gauntlet/last_*.json → not_applicable (et .gauntlet/<couche>/), ADR 0011
+| Check | Gates | Pourquoi |           ← « aucun » si la liste est vide ; jamais omise
+Un check non applicable (pas de version pour le langage du package, ou outil absent du projet : pas de
+formateur, pas de couverture, pas de mutation) n'a pas bloqué : il n'a rien prouvé. La raison est la ligne
+`[N/A]` du journal du gate (last_<profil>.log). Une mesure qu'il aurait donnée s'écrit « — (non applicable) »
+dans Mesures, jamais un chiffre.
+
 ## Maintenabilité                    ← last_maintain.log + review.json → rules_checked.maintainability
 Dépendances inter-features : <liste, justifiées §8> · Packages ajoutés : <liste avec date de release>
 Roue réinventée : <n> paires jugées, <n> doublons résolus, <n> verdicts acceptés par le dev (<raisons>)   ← dedup.json
