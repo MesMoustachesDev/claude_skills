@@ -1,6 +1,6 @@
 # 0011 — Ce qui est propre à un langage vit dans son dossier, et ne se charge que pour ce langage
 
-Statut : acceptée (2026-11-06), amendée le 2026-11-06 (check non applicable)
+Statut : acceptée (2026-11-06), amendée le 2026-11-06 (check non applicable ; outil absent du projet, rapport et evidence)
 Où elle vit : `scripts/stack.sh` (détection, valeurs) · `stacks/<langage>/` (`stack.ini`, `checks.sh`,
 `templates/`) · `rules/stacks/<langage>*.md` (doctrine, frontmatter `paths:`) · `stacks/README.md` ·
 `scripts/gauntlet/tests/test_stack.sh` · plan `.claude/plans/langages.md`
@@ -34,12 +34,25 @@ des projets qui ne l'utilisent pas.
   2026-11-06) : `[N/A] <check> : non applicable à <langage>` dans le journal, `not_applicable` dans
   `last_<profil>.json`, jamais compté dans `passed`, et le profil peut passer. Sans ça, tout `/feature`
   d'un langage neuf serait rouge tant que ses checks ne sont pas écrits. Le revers, accepté : un check
-  oublié pour un langage ne bloque rien. Aujourd'hui seuls le journal et le JSON du gate le montrent ;
-  le rapport HTML et l'evidence doivent reprendre la liste des `[N/A]` (plan `langages.md`, point 6).
+  oublié pour un langage ne bloque rien.
+- **Un check du langage dont l'outil manque au projet est non applicable aussi** (point 6, Android) : pas de
+  formateur (ni ktlint ni Spotless), pas de couverture (ni Kover ni JaCoCo), pas de pitest. Le check rend
+  `NA_RC` (4, `not_applicable "<raison>"` dans `lib.sh`) : `[N/A]` avec la raison, `not_applicable` dans le JSON,
+  jamais vert. Un check ne rend jamais 0 pour « je n'ai rien pu vérifier ».
+- **Le rapport HTML et l'evidence listent les `[N/A]`** : colonne « non applicables » et liste « Non vérifiés »
+  dans la section Gauntlet de `report.py` (/feature et /fix) ; section « Non vérifiés » de l'evidence
+  (`pipeline/feature/steps/9_evidence.md`, `commands/fix.md`), jamais omise. `fix_gauntlet.sh` écrit aussi
+  `not_applicable` (conventions sans version pour le langage, ou outil absent).
 
 ## Conséquences
 
 - Ajouter un langage = un dossier `stacks/<langage>/`, une règle `rules/stacks/<langage>.md`, un test.
+  Android (point 6) : `stacks/android/` (checks Gradle, `gradle_run.sh`, `reports.py`, `android_cli.sh`,
+  gabarits), `rules/stacks/android*.md`, `test_android.sh` (Gradle simulé) et `test_android_gradle.sh` (vrai
+  Gradle hors ligne).
+- Le déroulé de la suite, du rouge et des noms de tests est commun (`run_suite_check`, `run_red_check`,
+  `run_test_names` dans `scripts/gauntlet/checks_test.sh`) ; un langage fournit `run_tests_json`,
+  `test_results` et `feature_tests_here`.
 - La doctrine d'un langage n'arrive qu'au premier fichier lu de ce langage : un agent qui conclut sans
   avoir lu de code du package ne l'a pas. Les agents du pipeline lisent le code avant d'écrire ; un agent
   qui écrit d'abord (test-writer sur un package vide) doit lire un fichier existant du langage avant.

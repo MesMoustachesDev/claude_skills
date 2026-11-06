@@ -32,8 +32,27 @@ du projet (`GAUNTLET_CFG`, gabarit).
 TODO, QA, rapports des agents), puis `stacks/<langage>/checks.sh` du langage du package. Un check qu'un autre
 langage définit et pas celui-ci est **non applicable** : `[N/A]  <check> : non applicable à <langage>` dans le
 journal, `not_applicable` dans `last_<profil>.json`, jamais compté dans `passed`. Il ne bloque pas le profil :
-le langage n'a simplement pas encore ce gate (Android, point 6 du plan `langages.md`). Les checks communs lisent
-les valeurs du langage (`extensions`, `src_dirs`, `test_dirs`, `manifests`, `tool_files`).
+le langage n'a pas ce gate. Un check du langage dont l'outil manque au projet (Android sans ktlint ni Spotless,
+sans Kover ni JaCoCo, sans pitest) rend `NA_RC` (`not_applicable "<raison>"`) : non applicable lui aussi, avec
+sa raison. Le rapport HTML (section Gauntlet) et l'evidence (« Non vérifiés ») reprennent la liste. Les checks
+communs lisent les valeurs du langage (`extensions`, `src_dirs`, `test_dirs`, `manifests`, `tool_files`).
+
+Suite, rouge et noms de tests : le déroulé est commun (`run_suite_check`, `run_red_check`, `run_test_names` de
+`scripts/gauntlet/checks_test.sh`) ; le langage fournit `run_tests_json` (lance la suite, écrit
+`test_report.jsonl`), `test_results` (une ligne JSON par test : `file`, `name`, `result`, `skipped`) et
+`feature_tests_here`, et ses `check_test` / `check_red_check` / `check_test_names` appellent le déroulé.
+
+## Les langages
+
+| Langage | Marqueurs | Checks | Outils de la machine |
+|---|---|---|---|
+| `flutter` | `pubspec.yaml` | tous (dart_code_linter, mutation_test, outils AST Dart) | fvm, mason |
+| `android` | `settings.gradle(.kts)`, `build.gradle(.kts)` | compilation, lint, detekt*, ktlint/Spotless*, tests JUnit XML, Kover/JaCoCo*, pitest*, couches, stubs `TODO()`, design system, `strings.xml` (* : si le build l'applique, sinon `[N/A]`) | JDK, `./gradlew`, Android CLI (`android_cli.sh` : previews Compose, `layout`, `emulator`), adb |
+
+Android : `gradle_run.sh` lance une tâche depuis le dossier d'un module (racine Gradle, tâches qualifiées,
+alias `:@unitTest` / `:@compile` / `:@lint` selon que le module est Android ou Kotlin/JVM, fichiers de test en
+`--tests`) ; `reports.py` lit les rapports XML (JUnit, JaCoCo/Kover, lint, detekt, pitest). Pas de brick : le
+scaffold d'un module se fait en copiant le module voisin (`rules/stacks/android.md`, Contrats).
 
 ## La doctrine : des règles chargées à la demande
 
