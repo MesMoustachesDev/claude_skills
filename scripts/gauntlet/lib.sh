@@ -12,6 +12,12 @@ ko()      { printf '%s[FAIL]%s %s\n' "$C_KO" "$C_0" "$*"; }
 die()     { printf '%s[ABORT]%s %s\n' "$C_KO" "$C_0" "$*" >&2; exit 2; }
 # STAR — `*` en variable : bash 3.2 (macOS) garde l'antislash de ${x//\*\*/\*} (« a/\* »), pas de ${x//\*\*/$STAR}.
 STAR='*'
+# adb et emulator du SDK Android : une session Claude n'a souvent pas platform-tools dans son PATH (le shell
+# interactif, si). Ajoutés en fin de PATH, seulement s'ils manquent : un adb déjà trouvé garde la main.
+_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+command -v adb >/dev/null 2>&1 || { [ -x "$_sdk/platform-tools/adb" ] && PATH="$PATH:$_sdk/platform-tools"; }
+command -v emulator >/dev/null 2>&1 || { [ -x "$_sdk/emulator/emulator" ] && PATH="$PATH:$_sdk/emulator"; }
+export PATH; unset _sdk
 
 # ---------------------------------------------------------------------------
 # Worktree de la feature, pour les hooks
