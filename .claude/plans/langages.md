@@ -31,10 +31,16 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
 
 ## Android / Kotlin
 
-6. **`stacks/android/`** : `checks.sh` (Gradle test, lint, detekt / ktlint, couverture Kover, mutation à
+6. **`stacks/android/`** : `checks.sh` (Gradle test, lint, detekt / ktlint, couverture Kover, mutation à [fait]
    choisir), `rules/stacks/android.md` (Compose, MockK, Turbine, coroutines, Hilt), gabarits, et Android CLI :
    `preview render --component-tree` pour les écrans sans appareil, `layout` pour la QA, `emulator`.
    Le rapport HTML et l'evidence listent les checks `[N/A]` d'un gate (ADR 0011 : signalés, pas bloquants).
    → `pipeline/langages_android`
+   Reste `[N/A]` pour Android : build_runner, metrics (detekt via analyze s'il est appliqué), reinvented,
+   dedup_candidates, barrel_api, unused_code, unused_files, widget_functions, deps_unused, deps_features,
+   pub_health, generated_fresh, test_plan, test_plan_match, test_dups ; format / coverage / mutation quand le
+   build n'applique ni ktlint/Spotless, ni Kover/JaCoCo, ni pitest. Non essayé : Android CLI (`android_cli.sh`,
+   `android.emulator = cli`, `layout.json` d'un flow rouge, `--no-metrics`), lint / detekt / ktlint / Kover /
+   pitest réels (pas en cache : simulés), un module `com.android.library` réel (AGP), la QA Maestro Android.
 7. **Installer Android CLI** (téléchargement depuis developer.android.com, `--no-metrics`). [toi]
 8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`. [toi : quel projet]
