@@ -3,7 +3,7 @@
 Statut : acceptée (2026-11-05), amende 0001
 Où elle vit : `pipeline/feature/steps/3_tests.md` (3a) · `agents/feature-test-planner.md` ·
 `agents/feature-test-reviewer.md` (mode liste) · `agents/feature-test-writer*.md` ·
-`scripts/gauntlet/test_plan.py` · `scripts/gauntlet/checks_test_plan.sh` (`test_plan`, `test_plan_match`
+`scripts/gauntlet/test_plan.py` · `stacks/flutter/checks_test_plan.sh` (`test_plan`, `test_plan_match`
 dans le gate `red`) · `hooks/pipeline-restrict-writes.sh` · `hooks/pipeline-gate.sh` ·
 `scripts/pipeline/pipeline.py` (`ORDER`)
 

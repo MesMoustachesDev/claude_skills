@@ -17,15 +17,16 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    → `pipeline/langages_doctrine`
 3. **Gabarits → `stacks/flutter/templates/`** (plus exposés en skills), brick `flutter_feature` à côté ; [fait]
    `/feature init` copie les gabarits du langage détecté ; mettre à jour la douzaine de références.
-   Reste le lien `commands/templates/flutter` → `../../stacks/flutter/templates`, à retirer quand `pr_gauntlet.sh`
-   et `graphify.sh` (point 4) lisent le nouveau chemin.
+   Le lien `commands/templates/flutter` est retiré au point 4 : `pr_gauntlet.sh` et `graphify.sh` lisent
+   `stack.sh get templates`.
    → `pipeline/langages_doctrine`
-4. **Scripts du /feature** : gauntlet (`checks_*.sh` → génériques + `stacks/flutter/checks.sh`), hooks
+4. **Scripts du /feature** : [fait] gauntlet (`checks_*.sh` → génériques + `stacks/flutter/checks.sh`), hooks
    `pipeline-restrict-writes.sh`, `pipeline.py` (`CONTRACT_GLOBS`, marqueur de package), `review.py`,
    `pr_gauntlet.sh`, `report.py`, doctor : tout passe par `stack.sh`. Les tests du gauntlet existants gardent
    le comportement Flutter à l'identique.
    → `pipeline/langages_scripts`
-5. **/fix** : `is_manifest_path`, globs de test et `conventions` par `stack.sh` ; reproducer sans `fvm` en dur.
+5. **/fix** : [fait] `is_manifest_path`, globs de test et `conventions` par `stack.sh` ; reproducer sans `fvm` en dur
+   (prose de l'agent : point 2).
    → `pipeline/langages_scripts`
 
 ## Android / Kotlin
