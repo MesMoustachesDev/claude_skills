@@ -159,6 +159,10 @@ export type PendingDoc = {
   text: string
   /** Taille d'origine quand le texte a été coupé, 0 sinon. */
   cut: number
+  /** Diff unifié du fichier depuis la base du pipeline (contrats), vide sinon. */
+  diff: string
+  /** Le même diff avec tout le fichier en contexte : le fichier entier, changements marqués. */
+  fullDiff: string
 }
 
 export type PendingView = {
@@ -198,6 +202,8 @@ declare module 'claude-code' {
       pending: PendingView | null
       /** Le chemin du document affiché dans l'encart, vide pour le premier. */
       selectedDoc: string
+      /** L'encart montre le fichier entier au lieu de son diff. */
+      showFullDoc: boolean
     }
   }
 }

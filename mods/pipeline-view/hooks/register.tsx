@@ -70,6 +70,7 @@ const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
 const openBranches = atom({ plugin: 'pipeline-view', key: 'openBranches' } as const, [])
 const pending = atom({ plugin: 'pipeline-view', key: 'pending' } as const, null)
 const selectedDoc = atom({ plugin: 'pipeline-view', key: 'selectedDoc' } as const, '')
+const showFullDoc = atom({ plugin: 'pipeline-view', key: 'showFullDoc' } as const, false)
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -218,11 +219,26 @@ const baseOf = (text: string, kind: 'feature' | 'fix'): string => {
   }
 }
 
+/** Le point où HEAD a quitté la base du pipeline (locale, sinon origin/<base>). */
+const mergeBaseOf = async ($: EngineInterface, base: string): Promise<string> =>
+  base ? (await git($, ['merge-base', 'HEAD', base], root)) || (await git($, ['merge-base', 'HEAD', `origin/${base}`], root)) : ''
+
+/** Diff d'un fichier depuis <from>, copie de travail comprise ; un fichier non suivi sort en entier, ajouté.
+ * `context` : lignes de contexte (`-U`) ; un nombre plus grand que le fichier le montre en entier. */
+const diffOf = async ($: EngineInterface, from: string, file: string, context = 3): Promise<string> => {
+  const tracked = from ? await gitRaw($, ['diff', `-U${context}`, from, '--', file], root) : ''
+  if (tracked.trim()) return tracked
+  if (await git($, ['ls-files', '--error-unmatch', '--', file], root)) return ''
+  // --no-index sort en 1 quand les fichiers diffèrent : gitRaw le prendrait pour une erreur.
+  const run = await $.process.run(['git', 'diff', '--no-index', '--', '/dev/null', file], { cwd: root, timeoutMs: 5000 }).catch(() => undefined)
+
+  return run?.stdout ?? ''
+}
+
 /** Les .feature que le pipeline a ajoutés ou modifiés dans son package depuis sa base, lus en entier. */
 const loadScenarios = async ($: EngineInterface, pkg: string, base: string): Promise<ScenarioFile[]> => {
   if (!pkg || !base) return []
-  const mergeBase =
-    (await git($, ['merge-base', 'HEAD', base], root)) || (await git($, ['merge-base', 'HEAD', `origin/${base}`], root))
+  const mergeBase = await mergeBaseOf($, base)
   if (!mergeBase) return []
   const changed = await git($, ['diff', '--name-status', '--diff-filter=AMR', mergeBase, '--', pkg], root)
   const untracked = await git($, ['ls-files', '--others', '--exclude-standard', '--', pkg], root)
@@ -397,9 +413,10 @@ const loadPending = async (
       if (files.length === 0 && pkg) {
         files = (await git($, ['grep', '--untracked', '-I', '-F', '-l', DECISION, '--', pkg], root)).split('\n').filter(Boolean)
       }
+      const from = await mergeBaseOf($, baseOf(text, kind))
       for (const file of files) {
         const body = await readText($, `${root}/${file}`)
-        if (body) docs.push(toDoc(file.slice(file.lastIndexOf('/') + 1), file, body))
+        if (body) docs.push(toDoc(file.slice(file.lastIndexOf('/') + 1), file, body, await diffOf($, from, file), await diffOf($, from, file, 100_000)))
       }
       continue
     }
@@ -1077,6 +1094,8 @@ export const register: Register = on => {
     const reading = await read($, pending)
     const wantedDoc = await read($, selectedDoc)
     const doc = reading?.docs.find(d => d.path === wantedDoc) ?? reading?.docs[0]
+    const isFull = await read($, showFullDoc)
+    const isDiff = doc !== undefined && doc.diff !== '' && !isFull
     const readingSection = reading && (
       <Box flexDirection="column">
         <Text> </Text>
@@ -1098,6 +1117,15 @@ export const register: Register = on => {
                   onPress={() => update($, selectedDoc, () => d.path)}
                 />
               ))}
+              {doc.diff !== '' && (
+                <Button
+                  key="doc-diff"
+                  plain
+                  dimColor
+                  label={isFull ? 'diff' : 'fichier entier'}
+                  onPress={() => update($, showFullDoc, v => !v)}
+                />
+              )}
               <Button
                 key="doc-open"
                 plain
@@ -1108,10 +1136,15 @@ export const register: Register = on => {
             </Box>
             <Text dimColor wrap="truncate-start">
               {doc.path}
-              {doc.cut > 0 ? ` · coupé à ${doc.text.length} caractères sur ${doc.cut}` : ''}
+              {isDiff ? ' · diff depuis la base' : isFull && doc.fullDiff !== '' ? ' · fichier entier, changements marqués' : ''}
+              {doc.cut > 0 && !isDiff ? ` · coupé à ${doc.text.length} caractères sur ${doc.cut}` : ''}
             </Text>
             <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-              {doc.format === 'markdown' ? (
+              {isDiff ? (
+                <Code source={doc.diff} format="diff" path={doc.path} />
+              ) : isFull && doc.fullDiff !== '' ? (
+                <Code source={doc.fullDiff} format="diff" path={doc.path} />
+              ) : doc.format === 'markdown' ? (
                 <Markdown key={`md-${doc.path}`} text={doc.text} />
               ) : (
                 <Code source={doc.text} language={doc.language || undefined} path={doc.path} startLine={1} />

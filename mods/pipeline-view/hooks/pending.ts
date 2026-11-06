@@ -142,7 +142,7 @@ const LANG: Record<string, string> = {
 export const MAX_DOC = 40_000
 
 /** Un document de l'encart : markdown rendu pour un .md, code coloré pour le reste. */
-export const toDoc = (label: string, path: string, text: string): PendingDoc => {
+export const toDoc = (label: string, path: string, text: string, diff = '', fullDiff = ''): PendingDoc => {
   const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
   const isCut = text.length > MAX_DOC
   const body = isCut ? text.slice(0, MAX_DOC) : text
@@ -154,5 +154,7 @@ export const toDoc = (label: string, path: string, text: string): PendingDoc => 
     language: LANG[ext] ?? '',
     text: body,
     cut: isCut ? text.length : 0,
+    diff: diff.length > MAX_DOC ? diff.slice(0, MAX_DOC) : diff,
+    fullDiff: fullDiff.length > MAX_DOC ? fullDiff.slice(0, MAX_DOC) : fullDiff,
   }
 }

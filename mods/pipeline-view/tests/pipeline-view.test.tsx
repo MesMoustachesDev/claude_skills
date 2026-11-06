@@ -523,3 +523,48 @@ test('à lire : documents par étape, étape d’un fix, plan de correction', ()
   expect([long.format, long.text.length, long.cut]).toEqual(['markdown', MAX_DOC, MAX_DOC + 10])
   expect(toDoc('a.dart', 'lib/a.dart', 'x').language).toBe('dart')
 })
+
+const SMALL_DIFF = 'diff --git a/lib/a.dart b/lib/a.dart\n@@ -1,1 +1,2 @@\n class A {}\n+abstract class Login {}\n'
+const FULL_DIFF = 'diff --git a/lib/a.dart b/lib/a.dart\n@@ -1,3 +1,4 @@\n// tête\n class A {}\n+abstract class Login {}\n// fin\n'
+
+test('l’encart montre le diff des contrats, puis le fichier entier avec ses changements', async ($, on) => {
+  const pipeline = JSON.stringify({ ...JSON.parse(PIPELINE), base: 'develop', contracts: { files: ['lib/a.dart'] } })
+  on('command.register', () => ({ value: { command: 'pipeline' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('process.run', (_, e) => {
+    const argv = e.argv.join(' ')
+    const out = argv.includes('pipeline.sh')
+      ? JSON.stringify({ key: 'hg.contracts', step: '0e', title: 'Contrats' })
+      : argv.includes('merge-base')
+        ? 'abc123'
+        : argv.includes('-U3 ')
+          ? SMALL_DIFF
+          : argv.includes('-U100000')
+            ? FULL_DIFF
+            : argv.includes('rev-parse')
+              ? ROOT
+              : argv.includes('branch')
+                ? 'feature/two_factor_login'
+                : ''
+
+    return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  const files: Record<string, string> = {
+    [`${SPEC_DIR}/pipeline.json`]: pipeline,
+    [`${ROOT}/lib/a.dart`]: '// tête\nclass A {}\nabstract class Login {}\n// fin\n',
+  }
+  on('fs.read', (_, e) => (e.path in files ? { value: files[e.path] } : { deny: 'ENOENT' }))
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Button', key: 'doc-lib/a.dart' }))?.props.label).toBe('a.dart')
+  expect((await ui.find({ type: 'Text', text: /diff depuis la base/ }))?.text).toBe('lib/a.dart · diff depuis la base')
+  const diff = await ui.find({ type: 'Code' })
+  expect([diff?.text, diff?.props.format]).toEqual([SMALL_DIFF, 'diff'])
+  await ui.press({ type: 'Button', key: 'doc-diff' })
+  expect((await ui.find({ type: 'Code' }))?.text).toBe(FULL_DIFF)
+  expect((await ui.find({ type: 'Button', key: 'doc-diff' }))?.props.label).toBe('diff')
+  await ui.unmount()
+})

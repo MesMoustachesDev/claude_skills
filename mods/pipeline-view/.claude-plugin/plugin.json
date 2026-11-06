@@ -1,6 +1,6 @@
 {
   "name": "pipeline-view",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Affiche l'état du pipeline /feature ou /fix en cours (étapes, gates, tentatives, agent actif, ce qui t'attend et, dans un encart « à lire », les documents de l'étape courante (spec et sa critique, contrats, revue, diagnostic et plan d'un fix…), scénarios Gherkin, un par carte en carousel, avec leur test, leur flow Maestro et ses captures) et les plans du repo (.claude/plans/*.md, epics) avec l’état de chaque branche liée et, pour chaque fichier modifié ou commité, la session qui l’a écrit, et ce que font les sessions de chaque worktree. Chaque session y publie son état (au travail, attend ta réponse, au repos) et son contexte rempli dans ~/.claude/activity ; le reste est en lecture seule.",
   "types": "./types/index.d.ts"
 }
