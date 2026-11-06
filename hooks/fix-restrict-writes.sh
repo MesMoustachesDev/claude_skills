@@ -2,7 +2,7 @@
 # fix-restrict-writes.sh — PreToolUse (Edit|Write|MultiEdit|NotebookEdit|Bash) déclaré dans le
 # frontmatter des agents fix-*. Le reproducer écrit les tests, l'implementer écrit le code, jamais l'inverse.
 #
-#   fix-reproducer  : tests, manifestes (package.json / pubspec.yaml), .claude/fixes/<nom>/ ;
+#   fix-reproducer  : tests, manifestes (package.json, pubspec.yaml et ceux du langage : stack.sh), .claude/fixes/<nom>/ ;
 #                     dans le code source, uniquement des lignes de log [DEBUG_ISSUE] (ajout ou retrait).
 #   fix-implementer : tout le projet SAUF les tests et .claude/fixes/<nom>/ (repro.json est gelé).
 #   fix-reviewer    : .claude/fixes/<nom>/review.{md,json} seulement.
@@ -19,7 +19,7 @@ agent="$(jq -r '.agent_type // empty' <<<"$input")"
 cwd="$(jq -r '.cwd // empty' <<<"$input")"
 scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
 tool="$(jq -r '.tool_name // empty' <<<"$input")"
-GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$HOME/.claude/scripts/gauntlet}"   # surcharge : tests du hook
+GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
 if [ "$tool" = Bash ]; then
   targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
 else
@@ -36,7 +36,7 @@ deny() {
 # Contexte illisible : Edit/Write refusés ; Bash laissé passer (le gauntlet reste le filet).
 ctx_deny() { [ "$tool" = Bash ] && exit 0; deny "$1"; }
 
-source "${FIX_LIB:-$HOME/.claude/scripts/fix/lib.sh}"
+source "${FIX_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/fix" && pwd)/lib.sh}"
 cd "$cwd" 2>/dev/null || exit 0
 name="$(current_fix)"
 [ -n "$name" ] || ctx_deny "fix : fix courant inconnu (branche fix/<nom> ou .claude/fixes/.current)"
@@ -80,7 +80,7 @@ check() {
       is_test_path "$rel" && return 0
       is_manifest_path "$rel" && return 0
       debug_only && return 0
-      deny "reproducer : tu n'écris que des tests, $fix_rel/, et package.json/pubspec.yaml pour brancher un runner. Dans le code source, seulement des lignes de log contenant $DEBUG_MARKER (une ligne par log, via Edit ; leur retrait aussi). La correction est le travail de l'implementer. Refusé : $rel"
+      deny "reproducer : tu n'écris que des tests, $fix_rel/, et les manifestes ($(manifest_label)) pour brancher un runner. Dans le code source, seulement des lignes de log contenant $DEBUG_MARKER (une ligne par log, via Edit ; leur retrait aussi). La correction est le travail de l'implementer. Refusé : $rel"
       ;;
     fix-implementer)
       is_test_path "$rel" && deny "implementer : les tests sont GELÉS. Si un test te semble faux, arrête-toi et dis-le dans ton rapport final (fichier:ligne, ce qu'il attend, pourquoi c'est faux) — le reproducer tranchera. Refusé : $rel"

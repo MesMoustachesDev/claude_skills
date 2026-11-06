@@ -35,15 +35,47 @@ state_set() { # state_set <filtre jq> [--arg k v]...
   jq "$@" "$f" "$STATE" > "$tmp" && mv "$tmp" "$STATE"
 }
 
+# --- Langage du package (scripts/stack.sh, ADR 0011) ----------------------------------------------------
+# Les globs de test et les manifestes du langage complètent les génériques ci-dessous. Le package qui décide :
+# celui de repro.json (.package), sinon celui qui contient le chemin jugé (le reproducer écrit ses tests et
+# branche son runner avant d'écrire repro.json). Langages de ce checkout, comme le gauntlet.
+FIX_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$(cd "$FIX_SCRIPTS/../stacks" 2>/dev/null && pwd)}"
+FIX_STACK_PKG="-"; FIX_STACK=""; FIX_STACK_TEST_GLOBS=""; FIX_STACK_MANIFESTS=""; FIX_STACK_EXTS=""
+# fix_stack_load <chemin relatif> — FIX_STACK (langage), FIX_STACK_TEST_GLOBS (relatifs à la racine),
+# FIX_STACK_MANIFESTS, FIX_STACK_EXTS pour le package qui décide ; rien à refaire si c'est le même package.
+fix_stack_load() {
+  local pkg rel vals g
+  pkg="$(repro_get .package 2>/dev/null)"
+  if [ -n "$pkg" ]; then pkg="${pkg%/}"; [ "$pkg" = . ] && pkg=""; pkg="$PROJECT_ROOT${pkg:+/$pkg}"
+  else pkg="$(bash "$FIX_SCRIPTS/stack.sh" package "$PROJECT_ROOT/$1" 2>/dev/null)"; fi
+  [ "$pkg" = "$FIX_STACK_PKG" ] && return 0
+  FIX_STACK_PKG="$pkg"; FIX_STACK=""; FIX_STACK_TEST_GLOBS=""; FIX_STACK_MANIFESTS=""; FIX_STACK_EXTS=""
+  [ -n "$pkg" ] || return 0
+  FIX_STACK="$(bash "$FIX_SCRIPTS/stack.sh" detect "$pkg" 2>/dev/null)" || { FIX_STACK=""; return 0; }
+  vals="$(bash "$FIX_SCRIPTS/stack.sh" vals "$pkg" test_globs manifests extensions 2>/dev/null)"
+  rel="${pkg#"$PROJECT_ROOT"}"; rel="${rel#/}"
+  set -f
+  # Globs du langage relatifs au package : tels quels, et préfixés du package.
+  for g in $(printf '%s\n' "$vals" | sed -n 1p | tr ',' ' '); do
+    FIX_STACK_TEST_GLOBS="$FIX_STACK_TEST_GLOBS $g${rel:+ $rel/$g}"
+  done
+  set +f
+  FIX_STACK_MANIFESTS="$(printf '%s\n' "$vals" | sed -n 2p | tr ',' ' ' | xargs)"
+  FIX_STACK_EXTS="$(printf '%s\n' "$vals" | sed -n 3p | tr ',' ' ' | xargs)"
+}
+
 # Chemins de test, relatifs à la racine. `*` traverse les `/` (motifs case).
-# repro.json → test_paths complète la liste si le projet a une convention à lui.
+# Génériques, puis ceux du langage (stack.ini → test_globs) ; repro.json → test_paths complète la liste si le
+# projet a une convention à lui.
 FIX_TEST_GLOBS_DEFAULT='test/* */test/* tests/* */tests/* */__tests__/* integration_test/* */integration_test/* maestro/* */maestro/* *.test.* *.spec.* *_test.* *.feature'
 
 is_test_path() { # is_test_path <chemin relatif>
   local p="$1" g extra=""
   [ -f "${REPRO:-}" ] && extra="$(jq -r '(.test_paths // [])[]' "$REPRO" 2>/dev/null | tr '\n' ' ')"
+  fix_stack_load "$p"
   set -f
-  for g in $FIX_TEST_GLOBS_DEFAULT $extra; do
+  for g in $FIX_TEST_GLOBS_DEFAULT $extra $FIX_STACK_TEST_GLOBS; do
     # shellcheck disable=SC2254
     case "$p" in $g) set +f; return 0 ;; esac
   done
@@ -51,8 +83,17 @@ is_test_path() { # is_test_path <chemin relatif>
   return 1
 }
 
-# Manifestes que le reproducer peut toucher pour brancher un runner de test absent.
-is_manifest_path() { case "$1" in package.json|*/package.json|pubspec.yaml|*/pubspec.yaml) return 0 ;; esac; return 1; }
+# Manifestes que le reproducer peut toucher pour brancher un runner de test absent : package.json et
+# pubspec.yaml partout, plus ceux du langage (stack.ini → manifests : build.gradle.kts, libs.versions.toml…).
+is_manifest_path() {
+  local m
+  case "$1" in package.json|*/package.json|pubspec.yaml|*/pubspec.yaml) return 0 ;; esac
+  fix_stack_load "$1"
+  for m in $FIX_STACK_MANIFESTS; do case "$1" in "$m"|*/"$m") return 0 ;; esac; done
+  return 1
+}
+# manifest_label — les manifestes permis, pour un message
+manifest_label() { printf 'package.json, pubspec.yaml%s' "$(for m in $FIX_STACK_MANIFESTS; do case "$m" in package.json|pubspec.yaml) ;; *) printf ', %s' "$m" ;; esac; done)"; }
 
 # changed_since <sha> — fichiers modifiés, ajoutés, supprimés ou non suivis depuis <sha>, relatifs à la racine.
 # Descend dans les sous-modules : un sous-module changé (flutter_app/dskit) donne ses fichiers, préfixés de

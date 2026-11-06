@@ -18,8 +18,9 @@
 set -u
 set -o pipefail
 
-source "$HOME/.claude/scripts/gauntlet/lib.sh"   # info ok ko die section
-source "$HOME/.claude/scripts/fix/lib.sh"
+SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # ce checkout (~/.claude/scripts en usage normal)
+source "$SCRIPTS/gauntlet/lib.sh"   # info ok ko die section, stack_check_known
+source "$SCRIPTS/fix/lib.sh"
 
 profile_checks() {
   case "$1" in
@@ -47,7 +48,7 @@ Profils :
 
 Checks :
   repro_schema       repro.json : package, target_cmd, expected_failure, suite_cmd, test_files existants et reconnus comme tests, fix_plan
-  only_tests_changed depuis base_sha : uniquement tests, manifestes (package.json/pubspec.yaml) et .claude/fixes/<nom>/
+  only_tests_changed depuis base_sha : uniquement tests, manifestes (package.json, pubspec.yaml, ceux du langage) et .claude/fixes/<nom>/
   no_debug_markers   aucun [DEBUG_ISSUE] dans le repo
   target_red         target_cmd échoue ET sa sortie contient expected_failure (rouge pour la bonne raison)
   freeze_check       depuis freeze_sha : aucun test ni repro.json modifié, aucun test ajouté
@@ -77,7 +78,7 @@ run_in_pkg() {
 # Un FIX_SIM_UDID déjà posé (le dev a choisi un appareil) est gardé ; sans ios.simulator_base, il reste vide.
 device_sim() {
   [ -n "${FIX_SIM_UDID:-}" ] && { info "simulateur imposé : $FIX_SIM_UDID"; return 0; }
-  local sim="$HOME/.claude/scripts/sim.sh"
+  local sim="$SCRIPTS/sim.sh"
   (cd "$PROJECT_ROOT" && "$sim" base) >/dev/null 2>&1 \
     || { info "pas de ios.simulator_base : FIX_SIM_UDID vide, la commande choisit son appareil"; return 0; }
   FIX_SIM_UDID="$(cd "$PROJECT_ROOT" && "$sim" ensure "fix-$FIX_NAME" 2>"$FIX_OUT/sim.out")" \
@@ -254,24 +255,37 @@ check_lint() {
 
 # conventions — the feature gauntlet's presentation checks, scoped to the lines this fix changed. A fix is
 # held to the same design system and l10n rules as a feature, even on a line it only re-indents.
+# Packages jugés : ceux qui contiennent un fichier source modifié hors tests, source au sens du langage du package
+# (stack.ini → extensions : .dart pour Flutter, .kt/.kts/.java pour Android). Un check sans version pour ce langage
+# est dit non applicable, pas vert en silence.
 check_conventions() {
   [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] || { info "pas de feature_pipeline.md : sauté"; return 0; }
-  local base f d pkgs="" pkg c rc=0
+  local base f d pkgs="" pkg c rc=0 lang ext ok_ext others=""
   base="$(state_get .base_sha)"
   [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }
   while IFS= read -r f; do
-    case "$f" in *.dart) ;; *) continue ;; esac
     is_test_path "$f" && continue
-    d="$(dirname "$f")"
-    while [ "$d" != . ] && [ ! -f "$PROJECT_ROOT/$d/pubspec.yaml" ]; do d="$(dirname "$d")"; done
-    [ "$d" != . ] && pkgs="$pkgs"$'\n'"$d"
+    d="$(bash "$SCRIPTS/stack.sh" package "$PROJECT_ROOT/$f" 2>/dev/null)" || continue
+    d="${d#"$PROJECT_ROOT"}"; d="${d#/}"
+    [ -n "$d" ] || continue                       # package racine : hors conventions, comme avant
+    ok_ext=0
+    for ext in $(bash "$SCRIPTS/stack.sh" get extensions "$PROJECT_ROOT/$d" 2>/dev/null | tr ',' ' '); do
+      case "$f" in *"$ext") ok_ext=1 ;; esac
+    done
+    if [ "$ok_ext" = 1 ]; then pkgs="$pkgs"$'\n'"$d"; else others="$others"$'\n'"$f"; fi
   done < <(changed_since "$base")
   pkgs="$(printf '%s\n' "$pkgs" | grep -v '^$' | sort -u)"
-  [ -n "$pkgs" ] || { info "aucun package Dart touché hors tests"; return 0; }
+  others="$(printf '%s\n' "$others" | grep -v '^$')"
+  [ -n "$others" ] && info "non applicable (pas une source du langage de leur package) : $(printf '%s' "$others" | tr '\n' ' ')"
+  [ -n "$pkgs" ] || { info "aucun fichier source d'un langage connu modifié hors tests"; return 0; }
   while IFS= read -r pkg; do
+    lang="$(bash "$SCRIPTS/stack.sh" detect "$PROJECT_ROOT/$pkg" 2>/dev/null)"
     for c in design_system l10n_strings; do
+      if ! grep -qsE "^check_${c}\(\)" "$CLAUDE_STACKS_DIR/$lang"/checks*.sh "$SCRIPTS"/gauntlet/checks_*.sh; then
+        info "$pkg : $c non applicable à ${lang:-ce langage} (aucune version de ce check)"; continue
+      fi
       GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$pkg" GAUNTLET_FEATURES_ROOT="$FIX_OUT/conventions" GAUNTLET_KEEP_FORMAT_LINES=1 \
-        "$HOME/.claude/scripts/gauntlet.sh" "$c" "$(printf '%s' "$pkg" | tr '/' '_')" > "$FIX_OUT/conventions_$c.out" 2>&1 \
+        "$SCRIPTS/gauntlet.sh" "$c" "$(printf '%s' "$pkg" | tr '/' '_')" > "$FIX_OUT/conventions_$c.out" 2>&1 \
         && { info "$pkg : $c conforme"; continue; }
       grep -E '✗|\[FAIL\]' "$FIX_OUT/conventions_$c.out" | sed 's/^/  /'
       ko "$pkg : $c"; rc=1
@@ -324,7 +338,7 @@ fix_after() {
   fi
   local said=0
   while :; do
-    bash "$HOME/.claude/scripts/hook_wait.sh" "$FIX_OUT" "$(( $(left) > 5 ? $(left) : 5 ))" 2>/dev/null
+    bash "$SCRIPTS/hook_wait.sh" "$FIX_OUT" "$(( $(left) > 5 ? $(left) : 5 ))" 2>/dev/null
     st="$(state_get ".stages[\"$p\"].status")"
     [ "$st" != RED ] && [ ! -f "$FIX_OUT/hook_$p.running" ] && break
     if [ "$said" = 0 ]; then echo "agent au travail : $p rouge, renvoyé au travail par son hook — j'attends son prochain verdict" >&2; said=1; fi
@@ -348,14 +362,14 @@ case "$target" in
   list) profiles_list; exit 0 ;;
   after) fix_after "${2:-}" "${3:-}"; exit $? ;;
   watchdog) shift; exec python3 "$(dirname "${BASH_SOURCE[0]}")/fix/watchdog.py" "$@" ;;
-  report) exec python3 "$HOME/.claude/scripts/report/report.py" fix "$name" "${3:-}" ;;
+  report) exec python3 "$SCRIPTS/report/report.py" fix "$name" "${3:-}" ;;
 esac
 [ -n "$name" ] || die "usage: fix_gauntlet.sh <profil|check> <nom>"
 fix_context "$name" || die "pas dans un repo git"
 [ -d "$FIX_DIR" ] || die "fix inconnu : $FIX_DIR"
 mkdir -p "$FIX_OUT"
 # Un hook de fin d'agent (fix-gate.sh) joue peut-être déjà ce gate : on attend qu'il ait fini.
-bash "$HOME/.claude/scripts/hook_wait.sh" "$FIX_OUT" || exit 1
+bash "$SCRIPTS/hook_wait.sh" "$FIX_OUT" || exit 1
 
 checks="$(profile_checks "$target")"
 if [ -z "$checks" ]; then
