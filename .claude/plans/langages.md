@@ -45,4 +45,5 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    1.1 dans `~/.local/bin/android` (binaire signé Google), `~/.androidrc` = `--no-metrics`. Essayé sur un
    projet Wear OS / Compose : `preview list` et `preview render` via `android_cli.sh` (PNG + arbre JSON),
    `emulator start --headless` (serial lu dans sa sortie : adb n'est pas dans le PATH des sessions), `layout`.
-8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`. [toi : quel projet]
+8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`, sur un projet Wear OS / Compose.
+   → `fix/phone_session_tagged_watch`
