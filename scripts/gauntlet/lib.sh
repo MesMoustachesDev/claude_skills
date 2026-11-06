@@ -362,10 +362,11 @@ in_layer() {
   done
   [ "$1" = presentation ]
 }
-# layer_files <dossier>… — fichiers .dart de la couche courante sous ces dossiers, relatifs au package
+# layer_files <dossier>… — sources du langage (stack.ini → extensions) de la couche courante sous ces dossiers,
+# relatifs au package
 layer_files() {
-  local f
-  (cd "$PKG_DIR" && find "$@" -name '*.dart' 2>/dev/null) | sort | while IFS= read -r f; do
+  local f ere; ere="$(stack_ext_ere)"
+  (cd "$PKG_DIR" && find "$@" -type f 2>/dev/null) | grep -E "$ere" | sort | while IFS= read -r f; do
     in_layer "$LAYER" "$f" && printf '%s\n' "$f"
   done
 }
@@ -375,7 +376,8 @@ layer_files() {
 # red_check…) ne jugent alors que la moitié de l'agent, pas les fichiers que l'autre écrit en même temps.
 layer_scope() {
   local file="$1" all="$2" tmp l; tmp="$(mktemp)"
-  if [ "$all" = 1 ]; then layer_files lib test | drop_generated | sed "s#^#$PKG_REL/#" > "$tmp"
+  # shellcheck disable=SC2046
+  if [ "$all" = 1 ]; then layer_files $(stack_dirs) | drop_generated | sed "s#^#$PKG_REL/#" > "$tmp"
   else
     while IFS= read -r l; do
       [[ "$l" == "$PKG_REL/"* ]] || continue
@@ -595,6 +597,10 @@ merge_base() {
 # Exécution des checks
 # ---------------------------------------------------------------------------
 EXPENSIVE_CHECKS="coverage mutation qa"
+# Code de retour d'un check non applicable au package : l'outil du langage qu'il lance manque au projet.
+NA_RC=4
+# not_applicable <raison> — `not_applicable "ni Kover ni JaCoCo dans le build"; return` dans un check.
+not_applicable() { info "$*"; return "$NA_RC"; }
 is_expensive() { case " $EXPENSIVE_CHECKS " in *" $1 "*) return 0 ;; esac; return 1; }
 
 # run_checks <label> <check[:mode]>... — exécute, journalise, résume. Les checks coûteux sont
@@ -620,6 +626,12 @@ run_checks() {
         na="$na $name"; continue
       fi
       t0=$SECONDS; "check_$name" "$mode"; rc=$?; dt=$((SECONDS-t0))
+      # NA_RC : le langage a ce check, mais le projet n'a pas l'outil qu'il lance (pas de formateur, pas de
+      # couverture configurée) ; le check a dit pourquoi. Non applicable, comme ci-dessus.
+      if [ "$rc" -eq "$NA_RC" ]; then
+        printf '[N/A]  %s : non applicable à ce package (%s : outil absent du projet)\n' "$name" "${STACK:-langage non reconnu}"
+        na="$na $name"; continue
+      fi
       if [ "$rc" -eq 0 ]; then ok "$name (${dt}s)"; passed="$passed $name"
       else ko "$name (${dt}s)"; failed="$failed $name"; is_expensive "$name" || fast_failed=1; fi
       timings="$timings $name=$dt"

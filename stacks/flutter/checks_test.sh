@@ -2,9 +2,6 @@
 # checks_test.sh — tests d'un package Flutter : suite, rouge/vert, noms, couverture, mutation. Sourcé par
 # stacks/flutter/checks.sh, après scripts/gauntlet/checks_test.sh (packages de writes.extra, gel, tests ajoutés).
 
-TEST_REPORT="" # défini par run_tests_json
-TEST_NONE=0    # 1 : le package (ou sa couche) n'a aucun fichier de test, rien n'a tourné
-
 # feature_tests_here — le périmètre du package courant (couche comprise) contient un fichier de test.
 feature_tests_here() { scope_files "$PKG_REL/" | grep -qE '^test/.*_test\.dart$'; }
 
@@ -42,124 +39,11 @@ test_results() {
   # which would make the whole JSON report unreadable.
 }
 
-# test_pkg — la suite du package courant. 0 vert, 1 rouge ; 3 sous TESTS_OPTIONAL=1 si rien n'a tourné faute
-# de fichier de test (sans TESTS_OPTIONAL, c'est un échec).
-test_pkg() {
-  local rc total failed
-  run_tests_json; rc=$?
-  [ "$TEST_NONE" = 1 ] && [ "${TESTS_OPTIONAL:-0}" = 1 ] && return 3
-  total="$(test_results | wc -l | tr -d ' ')"
-  failed="$(test_results | jq -r 'select(.result!="success") | "  ✗ \(.file) — \(.name)"')"
-  [ "$total" = 0 ] && { ko "aucun test exécuté"; tail -20 "$GAUNTLET_OUT/test_stderr.log"; return 1; }
-  if [ -n "$failed" ]; then printf '%s\n' "$failed"; fi
-  info "$total test(s), $(printf '%s' "$failed" | grep -c '✗' || true) échec(s)"
-  [ "$rc" = 0 ] && [ -z "$failed" ]
-}
-
-# each_test_package <fonction> <message si rien n'a tourné> — <fonction> (0 ok, 1 échec, 3 rien à juger) sur le
-# package de la feature puis sur chaque package de extra_test_packages. Un package sans rien à juger (pas de
-# test dans la couche, pas de test de la feature) ne fait pas échouer ; il en faut un au moins qui juge.
-# Sans package supplémentaire : <fonction> seule, comportement d'un package unique inchangé.
-each_test_package() {
-  local fn="$1" none_msg="$2" extras pkg r rc=0 judged=0
-  extras="$(extra_test_packages)"
-  [ -n "$extras" ] || { "$fn"; return; }
-  info "package $PKG_REL"
-  TESTS_OPTIONAL=1 "$fn"; r=$?
-  case "$r" in 0) judged=1 ;; 3) ;; *) judged=1; rc=1 ;; esac
-  while IFS= read -r pkg; do
-    info "package $pkg (writes.extra, tests de la feature)"
-    TESTS_OPTIONAL=1 with_package "$pkg" extra_test_run "$fn"; r=$?
-    case "$r" in 0) judged=1 ;; 3) ;; *) judged=1; rc=1 ;; esac
-  done <<< "$extras"
-  [ "$judged" = 1 ] && return $rc
-  [ -z "$none_msg" ] && return 3     # l'appelant tranche (red_check : rejeu pass_base)
-  ko "$none_msg"; return 1
-}
-# extra_test_run <fonction> — <fonction> dans un package de writes.extra, seulement si le périmètre (couche
-# comprise) y contient un test de la feature : la moitié présentation ne relance pas toute la suite de pictures
-# parce que la moitié data y a écrit ses tests. Sinon rien à juger (3).
-extra_test_run() {
-  feature_tests_here || { info "aucun test de la feature dans $PKG_REL${LAYER:+ (couche $LAYER)} : suite non lancée"; return 3; }
-  "$@"
-}
-
-check_test() {
-  # Packages modifiés sans test de la feature : nommés, pas lancés (voir extra_changed_packages).
-  local pkg tested; tested="$(extra_test_packages)"
-  while IFS= read -r pkg; do
-    [ -n "$pkg" ] && ! grep -qxF "$pkg" <<<"$tested" && info "package $pkg (writes.extra) : modifié sans test de la feature, suite non lancée (analyze le compile)"
-  done < <(extra_changed_packages)
-  each_test_package test_pkg "aucun test exécuté (ni dans $PKG_REL, ni dans les packages de writes.extra modifiés)"
-}
-
-# red_check — après TEST-WRITER : la suite compile, et chaque fichier de test contient ≥ 1 échec.
-# Les tests qui passent déjà contre les stubs sont listés (information), pas bloquants.
-# Packages de writes.extra modifiés : chacun est jugé de même ; un package sans fichier de test de la feature
-# ne fait pas échouer, mais il en faut au moins un dans le périmètre, tous packages confondus.
-check_red_check() {
-  each_test_package red_pkg ""; local r=$?
-  [ "$r" = 3 ] || return "$r"
-  # Aucun package n'a de fichier de test dans le périmètre.
-  [ -n "${PASS_BASE:-}" ] && { info "aucun fichier de test modifié $(pass_label), ni dans $PKG_REL ni dans les packages de writes.extra : le rejeu n'ajoute pas de test ici"; return 0; }
-  ko "aucun fichier de test dans le périmètre ($PKG_REL et packages de writes.extra modifiés) — le test-writer n'a rien ajouté"; return 1
-}
-# red_pkg — red_check sur le package courant. 0 ok, 1 échec ; 3 sous TESTS_OPTIONAL=1 si aucun fichier de test
-# de la feature dans ce package.
-red_pkg() {
-  run_tests_json || true
-  # Périmètre de la passe : lors d'un rejeu (pass_base), les tests d'une passe déjà implémentée sont verts
-  # et doivent l'être (non-régressions gelées) ; seuls les tests écrits depuis doivent être rouges.
-  local total green_files passing SCOPE_FILE SCOPE_ALL; use_pass_scope
-  total="$(test_results | wc -l | tr -d ' ')"
-  if [ "$total" = 0 ]; then
-    [ "$TEST_NONE" = 1 ] && [ "${TESTS_OPTIONAL:-0}" = 1 ] && return 3
-    ko "aucun test exécuté — la suite ne compile probablement pas"; tail -30 "$GAUNTLET_OUT/test_stderr.log"; return 1
-  fi
-  # mode extend : seuls les fichiers de test nouveaux ou modifiés doivent être rouges
-  local scoped_files
-  scoped_files="$(test_results | jq -r '.file' | sort -u | filter_scope_files "$PKG_REL/")"
-  if [ -z "$scoped_files" ] && [ "${TESTS_OPTIONAL:-0}" = 1 ]; then
-    info "$total test(s), aucun fichier de test de la feature dans $PKG_REL"; return 3
-  fi
-  if [ -z "$scoped_files" ] && [ -n "${PASS_BASE:-}" ]; then
-    info "$total test(s), aucun fichier de test du package modifié $(pass_label) : le rejeu n'ajoute pas de test ici"; return 0
-  fi
-  if [ -z "$scoped_files" ]; then ko "aucun fichier de test dans le périmètre — le test-writer n'a rien ajouté"; return 1; fi
-  green_files="$(test_results | jq -r -s 'group_by(.file) | map(select(all(.[]; .result=="success")) | .[0].file) | .[]' | grep -xF -f <(printf '%s\n' "$scoped_files"))"
-  passing="$(test_results | jq -r 'select(.result=="success") | "\(.file):0 — \(.name)"' | filter_scope_lines "$PKG_REL/" | sed 's/^/  · /; s/:0 —/ —/')"
-  [ -n "$passing" ] && { info "tests du périmètre qui passent déjà contre les stubs :"; printf '%s\n' "$passing"; }
-  if [ -n "$green_files" ]; then
-    printf '%s\n' "$green_files" | sed 's/^/  ✗ tout vert : /'
-    ko "ces fichiers ne testent rien que les stubs ne satisfassent déjà"
-    return 1
-  fi
-  info "$total test(s), $(printf '%s\n' "$scoped_files" | wc -l | tr -d ' ') fichier(s) dans le périmètre, rouge dans chacun"
-}
-
-# test_names — écrit .claude/features/<f>/tests.md pour le skim du dev. Toujours vert.
-# Packages de writes.extra modifiés : leurs fichiers de test de la feature suivent, préfixés du package.
-check_test_names() {
-  [ -f "$TEST_REPORT" ] || run_tests_json || true
-  local out="$FEATURE_DIR/tests.md" all="$GAUNTLET_OUT/test_names.jsonl"
-  { test_results; each_extra_package extra_test_packages test_names_pkg; } | grep '^{' > "$all"
-  {
-    printf '# Tests — %s\n\n' "$FEATURE"
-    printf '_%s tests. « passe déjà » = vert contre les stubs, donc ne contraint pas l'"'"'implémentation._\n' "$(grep -c . "$all")"
-    jq -r -s 'group_by(.file)[] | "\n## \(.[0].file)\n" + (map("- " + .name + (if .result=="success" then "  _(passe déjà)_" else "" end)) | join("\n"))' "$all"
-  } > "$out"
-  info "écrit : ${out#$PROJECT_ROOT/}"
-}
-# test_names_pkg — résultats du package courant (writes.extra), limités aux fichiers de test de la feature,
-# chemins préfixés du package. Rapport réutilisé s'il vient de ce run (red_check), sinon la suite tourne.
-test_names_pkg() {
-  TEST_REPORT="$GAUNTLET_OUT/test_report.jsonl"
-  case " ${TESTS_RAN:-} " in *" $TEST_REPORT "*) ;; *) TESTS_OPTIONAL=1 run_tests_json || true ;; esac
-  local files; files="$(test_results | jq -r '.file' | sort -u | filter_scope_files "$PKG_REL/")"
-  [ -n "$files" ] || return 0
-  # shellcheck disable=SC2086
-  test_results | jq -c --arg p "$PKG_REL/" 'select(.file | IN($ARGS.positional[])) | .file = $p + .file' --args $files
-}
+# test, red_check, test_names : le déroulé est commun (scripts/gauntlet/checks_test.sh) ; ce fichier fournit
+# run_tests_json, test_results et feature_tests_here.
+check_test()       { run_suite_check; }
+check_red_check()  { run_red_check; }
+check_test_names() { run_test_names; }
 
 # coverage — couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (new_lines)
 # et seulement reformatées (drop_format_only).
