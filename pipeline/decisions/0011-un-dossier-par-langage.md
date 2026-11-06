@@ -34,7 +34,8 @@ des projets qui ne l'utilisent pas.
   2026-11-06) : `[N/A] <check> : non applicable à <langage>` dans le journal, `not_applicable` dans
   `last_<profil>.json`, jamais compté dans `passed`, et le profil peut passer. Sans ça, tout `/feature`
   d'un langage neuf serait rouge tant que ses checks ne sont pas écrits. Le revers, accepté : un check
-  oublié pour un langage ne bloque rien ; le rapport et l'evidence montrent la liste des `[N/A]`.
+  oublié pour un langage ne bloque rien. Aujourd'hui seuls le journal et le JSON du gate le montrent ;
+  le rapport HTML et l'evidence doivent reprendre la liste des `[N/A]` (plan `langages.md`, point 6).
 
 ## Conséquences
 
