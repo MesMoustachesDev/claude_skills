@@ -35,5 +35,6 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    choisir), `rules/stacks/android.md` (Compose, MockK, Turbine, coroutines, Hilt), gabarits, et Android CLI :
    `preview render --component-tree` pour les écrans sans appareil, `layout` pour la QA, `emulator`.
    Le rapport HTML et l'evidence listent les checks `[N/A]` d'un gate (ADR 0011 : signalés, pas bloquants).
+   → `pipeline/langages_android`
 7. **Installer Android CLI** (téléchargement depuis developer.android.com, `--no-metrics`). [toi]
 8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`. [toi : quel projet]
