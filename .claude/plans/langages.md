@@ -39,8 +39,10 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    Reste `[N/A]` pour Android : build_runner, metrics (detekt via analyze s'il est appliqué), reinvented,
    dedup_candidates, barrel_api, unused_code, unused_files, widget_functions, deps_unused, deps_features,
    pub_health, generated_fresh, test_plan, test_plan_match, test_dups ; format / coverage / mutation quand le
-   build n'applique ni ktlint/Spotless, ni Kover/JaCoCo, ni pitest. Non essayé : Android CLI (`android_cli.sh`,
-   `android.emulator = cli`, `layout.json` d'un flow rouge, `--no-metrics`), lint / detekt / ktlint / Kover /
-   pitest réels (pas en cache : simulés), un module `com.android.library` réel (AGP), la QA Maestro Android.
-7. **Installer Android CLI** (téléchargement depuis developer.android.com, `--no-metrics`). [toi]
+   build n'applique ni ktlint/Spotless, ni Kover/JaCoCo, ni pitest. Non essayé : `layout.json` écrit par le gate sur un flow
+   rouge (la commande `layout` elle-même marche), lint / detekt / ktlint / Kover / pitest réels (pas en cache : simulés), un module `com.android.library` réel (AGP), la QA Maestro Android.
+7. **Installer Android CLI** (téléchargement depuis developer.android.com, `--no-metrics`). [fait]
+   1.1 dans `~/.local/bin/android` (binaire signé Google), `~/.androidrc` = `--no-metrics`. Essayé sur un
+   projet Wear OS / Compose : `preview list` et `preview render` via `android_cli.sh` (PNG + arbre JSON),
+   `emulator start --headless` (serial lu dans sa sortie : adb n'est pas dans le PATH des sessions), `layout`.
 8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`. [toi : quel projet]

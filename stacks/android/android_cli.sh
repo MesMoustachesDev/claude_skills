@@ -16,8 +16,9 @@
 #
 # Lancé depuis n'importe où dans le projet : la racine Gradle et le chemin du module viennent de gradle_run.sh.
 # Android CLI absent : exit 3, « non applicable », rien n'est installé (le doctor le signale).
-# Écrit d'après la référence en ligne (2026-11-06), NON ESSAYÉ : Android CLI n'est pas installé sur la machine où
-# ce script a été écrit. Vérifier `android preview render --help` et `--no-metrics` au premier usage.
+# Essayé le 2026-11-06 avec Android CLI 1.1 sur un projet Wear OS / Compose : preview (38 s pour deux previews, PNG
+# et arbre JSON avec texte, contentDescription, rôle et ligne source), layout (installe un serveur d'instrumentation
+# sur l'appareil), emulator (--headless). `--no-metrics` est accepté, et ~/.androidrc le pose pour tous les appels.
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$(cd "$here/.." && pwd)}"
@@ -49,10 +50,15 @@ case "$cmd" in
     $android layout --pretty --full --output="$1" ${2:+--device="$2"} ;;
   emulator)
     [ $# -ge 1 ] || { echo "usage : android_cli.sh emulator <avd> [--cold]" >&2; exit 2; }
-    before="$(adb devices 2>/dev/null | awk '/^emulator-/{print $1}' | sort)"
+    # Le serial : Android CLI l'annonce (« Virtual device successfully started as 'emulator-5554' ») ; il ne
+    # choisit pas le port. adb n'est souvent pas dans le PATH des sessions : on lit sa ligne, pas `adb devices`.
+    log="$(mktemp)"
     # shellcheck disable=SC2086
-    $android emulator start --headless ${2:+--cold} "$1" >&2 || exit 1
-    # Le serial : l'émulateur apparu pendant le démarrage (Android CLI ne choisit pas le port).
-    comm -13 <(printf '%s\n' "$before") <(adb devices 2>/dev/null | awk '/^emulator-/{print $1}' | sort) | head -1 ;;
+    $android emulator start --headless ${2:+--cold} "$1" 2>&1 | tee "$log" >&2
+    rc=${PIPESTATUS[0]}
+    serial="$(sed -n "s/.*started as '\([^']*\)'.*/\1/p" "$log" | tail -1)"
+    rm -f "$log"
+    [ "$rc" = 0 ] && [ -n "$serial" ] || { echo "émulateur $1 : pas démarré (exit $rc)" >&2; exit 1; }
+    echo "$serial" ;;
   *) sed -n '2,24p' "${BASH_SOURCE[0]}"; exit 2 ;;
 esac
