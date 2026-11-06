@@ -7,7 +7,9 @@
 # Les commandes du langage (stack.ini → test_cmd, test_files_cmd, analyze_cmd…) tournent dans le dossier du
 # package, comme `flutter test`. Gradle, lui, se lance depuis la racine (settings.gradle.kts, ./gradlew) avec des
 # tâches qualifiées. Ce lanceur fait le lien :
-#   :<tâche>       → <module>:<tâche>     (`:testDebugUnitTest` → `:feature:login:testDebugUnitTest`)
+#   :<tâche>       → <module>:<tâche>     (`:testDebugUnitTest` → `:feature:login:testDebugUnitTest`) ;
+#                    une tâche déjà qualifiée par ce module reste telle quelle
+#   toujours       → --init-script test_logging.gradle (message d'assertion d'un test rouge sur la console)
 #   :@unitTest     → la tâche de tests unitaires du type de module (unit_test_task, jvm_unit_test_task)
 #   :@compile      → la compilation des tests, qui compile aussi le code (compile_task, jvm_compile_task)
 #   :@lint         → Android lint (lint_task, jvm_lint_task)
@@ -71,6 +73,7 @@ for a in "$@"; do
       t="$(task_for "${a#:@}")"
       [ -n "$t" ] || { echo "gradle_run.sh : alias inconnu $a (unitTest, compile, lint)" >&2; exit 2; }
       args+=("$path:$t") ;;
+    "$path":*) args+=("$a") ;;  # déjà qualifiée (`-x :mobile:processDebugGoogleServices`)
     :*) args+=("$path$a") ;;
     *.kt|*.java)
       f="$a"; [ -f "$f" ] || f="$start/$a"
@@ -84,6 +87,8 @@ for a in "$@"; do
     *) args+=("$a") ;;
   esac
 done
+# Le message d'assertion d'un test rouge sur la console (test_logging.gradle) : le gate red le lit.
+args+=(--init-script "$here/test_logging.gradle")
 
 if [ "${GRADLE_RUN_DRY:-0}" = 1 ]; then printf 'cd %s && %s' "$root" "$gradle"; printf ' %s' ${args[@]+"${args[@]}"}; printf '\n'; exit 0; fi
 cd "$root" || exit 2

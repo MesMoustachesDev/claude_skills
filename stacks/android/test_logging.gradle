@@ -1,0 +1,11 @@
+// Passé par gradle_run.sh (--init-script) : un test qui échoue imprime son message d'assertion sur la console,
+// pas seulement dans le rapport XML. Le gate red y lit `expected_failure` ; Gradle n'en montre par défaut que
+// la classe d'exception. Le build du projet n'a pas à le configurer.
+allprojects {
+    tasks.withType(Test).configureEach {
+        testLogging {
+            events "failed"
+            exceptionFormat "full"
+        }
+    }
+}

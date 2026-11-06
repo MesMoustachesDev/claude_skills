@@ -82,6 +82,12 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
     les hooks et le gauntlet le prennent pour racine.
   - Les modifications non commitées du checkout principal ne suivent pas : signale-le au dev si
     `git status --short` y est non vide et qu'elles touchent le périmètre du bug.
+  - **Fichiers non versionnés** (création comme reprise) : `bash ~/.claude/scripts/worktree_untracked.sh
+    <worktree>` copie depuis le checkout principal les fichiers gitignorés que le build lit et qui
+    manquent (`local.properties`, configs Firebase, `.env*`…), jamais un keystore ni un secret de
+    signature. Sans eux, un module Android ne builde pas et le gate red échoue sur l'environnement (cas
+    réel, 2026-11-06), et les hooks interdisent à Bastien de les écrire. Pas de question : dis les fichiers
+    copiés avec le bloc « ce que tu tranches sans lui ».
   - Les dépendances ne sont pas versionnées : Bastien les installe dans le package du bug
     (`npm ci` s'il y a un lockfile, sinon la commande d'installation du langage) — jamais `npm install`
     d'un paquet, jamais de bump.
