@@ -55,9 +55,10 @@ Checks :
   source_changed     depuis freeze_sha : au moins un fichier hors tests a changé
   target_green       target_cmd passe
   suite_green        suite_cmd passe
-  lint               lint_cmd passe (sauté si vide)
+  lint               lint_cmd passe ; vide → lint_cmd du langage du package (stack.ini) ; aucun → [N/A]
   conventions        design_system + l10n_strings du gauntlet feature sur les lignes modifiées de chaque package touché
-                     (sauté sans .claude/rules/feature_pipeline.md)
+                     ([N/A] sans .claude/rules/feature_pipeline.md)
+                     Un check qui n'a rien pu vérifier sort en [N/A] (not_applicable du JSON), jamais vert (ADR 0011).
   device_red         device_repro.cmd (le parcours du signalement, sur device) échoue avec device_repro.expected_failure
   device_green       device_repro.cmd passe
                      (les deux sautés seulement si device_repro.not_applicable donne une raison ; la commande
@@ -245,8 +246,13 @@ check_suite_green() {
 }
 
 check_lint() {
-  local cmd; cmd="$(repro_get .lint_cmd)"
-  [ -n "$cmd" ] || { info "pas de lint_cmd"; return 0; }
+  local cmd pkg; cmd="$(repro_get .lint_cmd)"
+  if [ -z "$cmd" ]; then
+    pkg="$(repro_get .package)"
+    cmd="$(bash "$SCRIPTS/stack.sh" get lint_cmd "$PROJECT_ROOT/${pkg:-.}" 2>/dev/null)"
+    [ -n "$cmd" ] || { not_applicable "ni lint_cmd dans repro.json, ni lint_cmd pour le langage du package"; return; }
+    info "lint du langage : $cmd"
+  fi
   run_in_pkg lint "$cmd" && return 0
   tail -30 "$FIX_OUT/lint.out" | sed 's/^/  /'
   ko "lint_cmd échoue"
@@ -259,7 +265,8 @@ check_lint() {
 # (stack.ini → extensions : .dart pour Flutter, .kt/.kts/.java pour Android). Un check sans version pour ce langage
 # est dit non applicable, pas vert en silence.
 check_conventions() {
-  [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] || { info "pas de feature_pipeline.md : sauté"; return 0; }
+  [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] \
+    || { not_applicable "pas de .claude/rules/feature_pipeline.md (/feature init)"; return; }
   local base f d pkgs="" pkg c rc=0 lang ext ok_ext others=""
   base="$(state_get .base_sha)"
   [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }
@@ -393,7 +400,10 @@ log="$FIX_OUT/last_${target}.log"; json="$FIX_OUT/last_${target}.json"
   printf 'fix_gauntlet %s — fix %s — %s\n' "$target" "$FIX_NAME" "$(date '+%Y-%m-%d %H:%M:%S')"
   for c in $checks; do
     section "$c"
-    if "check_$c"; then ok "$c"; passed="$passed $c"; else ko "$c"; failed="$failed $c"; fi
+    "check_$c"; rc=$?
+    if [ "$rc" = 0 ]; then ok "$c"; passed="$passed $c"
+    elif [ "$rc" = "$NA_RC" ]; then printf '[N/A]  %s\n' "$c"; FIX_NA="$FIX_NA $c"
+    else ko "$c"; failed="$failed $c"; fi
   done
   section "résumé $target"
   [ -n "$passed" ] && printf '  passés  :%s\n' "$passed"
