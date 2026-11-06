@@ -42,6 +42,26 @@ class ImporterRelationsTest(unittest.TestCase):
         self.assertIsNone(classer("Développeur", "Startup X", BOITES))
         self.assertIsNone(classer("Leader d'opinion", "Startup X", BOITES))
 
+    def test_classer_cofondateurs(self):
+        for poste in ("Co-fondateur", "CEO & Co-fondatrice", "Cofounder", "Co-Founder & CPO"):
+            self.assertEqual(classer(poste, "Startup X", BOITES), "décideur", poste)
+
+    def test_canoniser_url_sans_schema_ou_en_majuscules(self):
+        self.assertEqual(canoniser_url("www.linkedin.com/in/x-y"), "https://linkedin.com/in/x-y")
+        self.assertEqual(canoniser_url("linkedin.com/in/x-y/"), "https://linkedin.com/in/x-y")
+        self.assertEqual(canoniser_url("https://WWW.LINKEDIN.COM/in/X-Y"), "https://linkedin.com/in/x-y")
+        self.assertEqual(canoniser_url("https://evillinkedin.com/in/x-y"), "")
+
+    def test_lire_connections_champ_sur_deux_lignes_et_ligne_courte(self):
+        with tempfile.TemporaryDirectory() as d:
+            csv_path = Path(d) / "Connections.csv"
+            csv_path.write_text("First Name,Last Name,URL,Email Address,Company,Position,Connected On\n"
+                                'Ana,Lopez,https://linkedin.com/in/ana,,Startup X,"Head of Mobile\nFlutter",01 Jan 2025\n'
+                                "Bob,Court\n", encoding="utf-8")
+            relations = lire_connections(csv_path)
+        self.assertEqual(relations[0]["poste"], "Head of Mobile\nFlutter")
+        self.assertEqual(relations[1]["url"], "")
+
     def test_fiches_ecarte_les_doublons(self):
         relations = lire_connections(FIXTURE)
         resultat = fiches(relations, BOITES, {"https://linkedin.com/in/marc-bernard"}, set())

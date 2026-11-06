@@ -37,6 +37,10 @@ class LocalConfigTest(unittest.TestCase):
         self.assertEqual(est_ancienne_boite("BOITE A SAS", boites).nom, "Boîte A")
         self.assertIsNone(est_ancienne_boite("Startup X", boites))
 
+    def test_ne_lit_que_la_section_anciennes_boites(self):
+        self.path.write_text(GABARIT + "## Noms à ne jamais publier\n- Startup X\n", encoding="utf-8")
+        self.assertEqual([b.nom for b in lire_anciennes_boites(self.path)], ["Boîte A", "Boîte B"])
+
     def test_fichier_absent(self):
         with self.assertRaises(FileNotFoundError):
             lire_anciennes_boites(Path("/nulle/part"))

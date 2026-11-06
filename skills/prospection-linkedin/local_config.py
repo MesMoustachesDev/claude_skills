@@ -23,9 +23,12 @@ def normaliser(texte: str) -> str:
 
 def lire_anciennes_boites(path: Path = PROSPECTION) -> list[Boite]:
     """Lignes `- Nom | variantes : a, b | années : 2019-2021` ; variantes et années facultatives."""
-    boites = []
+    boites, dans_la_section = [], False
     for ligne in path.read_text(encoding="utf-8").splitlines():
-        if not ligne.startswith("- "):
+        if ligne.startswith("## "):
+            dans_la_section = normaliser(ligne[3:]) == "anciennes boites"
+            continue
+        if not dans_la_section or not ligne.startswith("- "):
             continue
         morceaux = [m.strip() for m in ligne[2:].split("|")]
         variantes, annees = (), ""

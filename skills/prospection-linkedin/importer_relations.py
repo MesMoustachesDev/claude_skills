@@ -7,6 +7,7 @@ Le script n'écrit que le fichier de sortie : c'est la session qui crée les fic
 """
 import argparse
 import csv
+import io
 import json
 import re
 import sys
@@ -17,8 +18,8 @@ from urllib.parse import urlparse
 from local_config import PROSPECTION, est_ancienne_boite, lire_anciennes_boites, normaliser
 
 DECIDEURS = ["cto", "cpo", "vp eng", "vp engineering", "head of", "lead", "fondateur", "fondatrice", "founder",
-             "co-founder", "cofondateur", "cofondatrice", "directeur technique", "directrice technique",
-             "engineering manager"]
+             "co-founder", "cofounder", "cofondateur", "cofondatrice", "co-fondateur", "co-fondatrice",
+             "directeur technique", "directrice technique", "engineering manager"]
 EXCLUS = ["recruteur", "recruteuse", "recruiter", "recruiting", "talent", "rh", "hr", "sales", "commercial",
           "commerciale", "freelance", "independant", "independante"]
 
@@ -29,8 +30,12 @@ def _contient(texte: str, mots: list[str]) -> bool:
 
 def canoniser_url(url: str) -> str:
     """https://linkedin.com/in/<slug en minuscules>, ou "" si ce n'est pas un profil."""
-    p = urlparse(url.strip())
-    if not p.netloc.endswith("linkedin.com"):
+    url = url.strip()
+    if url and not re.match(r"^https?://", url, re.IGNORECASE):
+        url = "https://" + url
+    p = urlparse(url)
+    hote = p.netloc.lower()
+    if hote != "linkedin.com" and not hote.endswith(".linkedin.com"):
         return ""
     m = re.match(r"^/in/([^/]+)", p.path)
     return f"https://linkedin.com/in/{m.group(1).lower()}" if m else ""
@@ -46,14 +51,18 @@ def classer(poste: str, entreprise: str, boites) -> str | None:
 
 
 def lire_connections(path: Path) -> list[dict]:
-    lignes = path.read_text(encoding="utf-8-sig").splitlines()
-    debut = next((i for i, l in enumerate(lignes) if l.startswith("First Name")), None)
-    if debut is None:
+    texte = path.read_text(encoding="utf-8-sig")
+    m = re.search(r"^First Name,", texte, re.MULTILINE)
+    if m is None:
         raise ValueError(f"{path} : pas de ligne d'en-tête « First Name »")
-    return [{"prenom": r["First Name"].strip(), "nom": r["Last Name"].strip(), "url": r["URL"].strip(),
-             "entreprise": (r["Company"] or "").strip(), "poste": (r["Position"] or "").strip(),
-             "connecte_le": (r["Connected On"] or "").strip()}
-            for r in csv.DictReader(lignes[debut:])]
+
+    def champ(r, cle):
+        return (r.get(cle) or "").strip()
+
+    return [{"prenom": champ(r, "First Name"), "nom": champ(r, "Last Name"), "url": champ(r, "URL"),
+             "entreprise": champ(r, "Company"), "poste": champ(r, "Position"),
+             "connecte_le": champ(r, "Connected On")}
+            for r in csv.DictReader(io.StringIO(texte[m.start():]))]
 
 
 def fiches(relations, boites, urls_existantes: set[str], noms_existants: set[str]) -> list[dict]:
