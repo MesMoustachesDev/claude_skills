@@ -148,6 +148,29 @@ export type PlanView = {
   phases: PlanPhase[]
 }
 
+export type PendingDoc = {
+  /** Libellé de l'onglet (`spec`, `critique`, `contrats`…). */
+  label: string
+  /** Chemin depuis la racine du repo. */
+  path: string
+  format: 'markdown' | 'code'
+  /** Langage du bloc de code, vide pour du markdown ou une extension inconnue. */
+  language: string
+  text: string
+  /** Taille d'origine quand le texte a été coupé, 0 sinon. */
+  cut: number
+}
+
+export type PendingView = {
+  /** Clé de l'étape courante (`spec`, `hg.tests`, `review`…), `done` en fin de pipeline. */
+  key: string
+  /** « 1 — Spec, critique, point d'étape « spec » ». */
+  title: string
+  /** cockpit.waiting : ce que l'orchestrateur attend de Thibault, vide sinon. */
+  waiting: string
+  docs: PendingDoc[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'pipeline-view': {
@@ -171,6 +194,10 @@ declare module 'claude-code' {
       strays: PlanBranch[]
       /** Branches dont le panneau déplie la liste de fichiers. */
       openBranches: string[]
+      /** L'encart « à lire » : les documents de l'étape courante (spec, contrats, revue…). */
+      pending: PendingView | null
+      /** Le chemin du document affiché dans l'encart, vide pour le premier. */
+      selectedDoc: string
     }
   }
 }

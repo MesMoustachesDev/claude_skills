@@ -3,6 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { activityOf, describeActivity, parseActivity, pipelineTarget } from '../hooks/activity'
 import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
+import { MAX_DOC, contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
 
 const ROOT = '/repo'
 const PIPELINE = JSON.stringify({
@@ -455,4 +456,70 @@ test('la reprise d’un /feature qu’une autre session fait tourner est arrêt�
   expect((other as { drop?: string }).drop).toBe(undefined)
   expect(pipelineTarget('fix', 'help')).toBe(null)
   expect(pipelineTarget('fix', 'crash_upload --from-mr 12')).toEqual({ kind: 'fix', name: 'crash_upload' })
+})
+
+// ---------------------------------------------------------------------------
+// Encart « à lire » : les documents de l'étape courante
+// ---------------------------------------------------------------------------
+
+const SPEC_DIR = `${ROOT}/.claude/features/two_factor_login`
+const WAITING = JSON.stringify({ ...JSON.parse(PIPELINE), cockpit: { waiting: 'Valide la spec' } })
+const NEXT = JSON.stringify({ key: 'spec', step: '1', title: 'Spec, critique, point d’étape « spec »' })
+
+const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>) => {
+  on('command.register', () => ({ value: { command: 'pipeline' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('process.run', (_, e) => {
+    const argv = e.argv.join(' ')
+    const out = argv.includes('pipeline.sh')
+      ? NEXT
+      : argv.includes('rev-parse')
+        ? ROOT
+        : argv.includes('branch')
+          ? 'feature/two_factor_login'
+          : ''
+
+    return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('fs.read', (_, e) => (e.path in files ? { value: files[e.path] } : { deny: 'ENOENT' }))
+}
+
+test('l’encart montre la spec et sa critique quand la spec attend Thibault', async ($, on) => {
+  readingEngine(on, {
+    [`${SPEC_DIR}/pipeline.json`]: WAITING,
+    [`${SPEC_DIR}/spec.md`]: '# Spec\n\nLe code arrive par SMS.',
+    [`${SPEC_DIR}/spec_review.md`]: '# Critique\n\nLe délai d’expiration manque.',
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /^À toi/ }))?.text).toBe('À toi : Valide la spec')
+  expect((await ui.find({ type: 'Button', key: `doc-.claude/features/two_factor_login/spec.md` }))?.props.label).toBe('spec')
+  expect(await ui.find({ type: 'Button', key: `doc-.claude/features/two_factor_login/spec_review.md` })).toBeDefined()
+  expect((await ui.find({ type: 'Markdown' }))?.text).toBe('# Spec\n\nLe code arrive par SMS.')
+  await ui.press({ type: 'Button', key: `doc-.claude/features/two_factor_login/spec_review.md` })
+  expect((await ui.find({ type: 'Markdown' }))?.text).toBe('# Critique\n\nLe délai d’expiration manque.')
+  await ui.unmount()
+})
+
+test('à lire : documents par étape, étape d’un fix, plan de correction', () => {
+  expect(sourcesFor('feature', 'hg.suggestions').map(([, label]) => label)).toEqual(['revue'])
+  expect(sourcesFor('feature', 'hg.contracts')[0]?.[0]).toBe('@contracts')
+  expect(sourcesFor('feature', 'inconnue')).toEqual([['spec.md', 'spec']])
+  const fix = (o: object) => JSON.stringify(o)
+  expect(fixNextStep(fix({ stages: {} }), false).key).toBe('red')
+  expect(fixNextStep(fix({ stages: { red: { status: 'PASSED' } } }), false).key).toBe('hg.repro')
+  const reviewed = { stages: { red: { status: 'PASSED' }, green: 'PASSED', review: { status: 'PASSED' } }, human_gates: { repro: { at: 'x' } } }
+  expect(fixNextStep(fix(reviewed), false).key).toBe('evidence')
+  expect(fixNextStep(fix(reviewed), true).key).toBe('hg.ui')
+  expect(fixNextStep('pas du json', false).key).toBe('')
+  const plan = fixPlanMarkdown(fix({ fix_plan: { layer: 'data', approach: 'remonter l’erreur', files: ['lib/a.dart'], rejected: 'try/catch dans la vue' } }))
+  expect(plan).toBe('**Couche** : data\n\n**Approche** : remonter l’erreur\n\n**Fichiers**\n\n- `lib/a.dart`\n\n**Alternative écartée** : try/catch dans la vue')
+  expect(waitingOf(WAITING)).toBe('Valide la spec')
+  expect(contractFiles(fix({ contracts: { files: ['a.dart', 3] } }))).toEqual(['a.dart'])
+  const long = toDoc('spec', 'x/spec.md', 'a'.repeat(MAX_DOC + 10))
+  expect([long.format, long.text.length, long.cut]).toEqual(['markdown', MAX_DOC, MAX_DOC + 10])
+  expect(toDoc('a.dart', 'lib/a.dart', 'x').language).toBe('dart')
 })

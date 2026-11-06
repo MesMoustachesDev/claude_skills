@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
+import type { ActiveAgent, PendingDoc, PendingView, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -33,6 +33,7 @@ import {
   summarize,
 } from './plan'
 import { type Scenario, type Step, parseScenarios } from './gherkin'
+import { contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
 import { AREA_LABEL, AREA_ORDER, attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from './attribution'
@@ -67,6 +68,8 @@ const thumbs = atom({ plugin: 'pipeline-view', key: 'thumbs' } as const, [])
 const plans = atom({ plugin: 'pipeline-view', key: 'plans' } as const, [])
 const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
 const openBranches = atom({ plugin: 'pipeline-view', key: 'openBranches' } as const, [])
+const pending = atom({ plugin: 'pipeline-view', key: 'pending' } as const, null)
+const selectedDoc = atom({ plugin: 'pipeline-view', key: 'selectedDoc' } as const, '')
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -345,6 +348,68 @@ const refreshThumbs = async ($: EngineInterface): Promise<void> => {
   }
 }
 
+// L'étape d'une feature ne change qu'avec pipeline.json : `pipeline.sh next --json` n'est relancé qu'alors.
+let stepCache = { text: '', step: { key: '', title: '' } }
+
+/** L'étape courante d'une feature, d'après `pipeline.sh next <nom> --json` (sans --after : lecture seule). */
+const featureStep = async ($: EngineInterface, name: string, text: string): Promise<{ key: string; title: string }> => {
+  if (text === stepCache.text) return stepCache.step
+  const run = await $.process
+    .run(['/bin/sh', '-c', 'exec bash "$HOME/.claude/scripts/pipeline.sh" next "$1" --json', 'sh', name], { cwd: root, timeoutMs: 15000 })
+    .catch(() => undefined)
+  let step = { key: '', title: '' }
+  try {
+    const n = JSON.parse(run?.stdout ?? '') as { key?: unknown; step?: unknown; title?: unknown }
+    step = { key: typeof n.key === 'string' ? n.key : '', title: `${String(n.step ?? '')} — ${String(n.title ?? '')}` }
+  } catch {
+    // pipeline.sh absent ou en erreur : l'encart montre la spec.
+  }
+  stepCache = { text, step }
+
+  return step
+}
+
+/** Les documents à lire pour l'étape courante, lus depuis le dossier du pipeline. */
+const loadPending = async (
+  $: EngineInterface,
+  kind: 'feature' | 'fix',
+  name: string,
+  dir: string,
+  text: string,
+  pkg: string,
+): Promise<PendingView | null> => {
+  if (!text) return null
+  const repro = kind === 'fix' ? await readText($, `${dir}/repro.json`) : ''
+  const step =
+    kind === 'feature'
+      ? await featureStep($, name, text)
+      : fixNextStep(text, /"kind"\s*:\s*"ui"/.test(repro))
+  const rel = (path: string) => shortPath(path, root)
+  const docs: PendingDoc[] = []
+  for (const [source, label] of sourcesFor(kind, step.key)) {
+    if (source === '@fix_plan') {
+      const md = fixPlanMarkdown(repro)
+      if (md) docs.push({ ...toDoc(label, 'plan.md', md), path: rel(`${dir}/repro.json`) })
+      continue
+    }
+    if (source === '@contracts') {
+      let files = contractFiles(text)
+      if (files.length === 0 && pkg) {
+        files = (await git($, ['grep', '--untracked', '-I', '-F', '-l', DECISION, '--', pkg], root)).split('\n').filter(Boolean)
+      }
+      for (const file of files) {
+        const body = await readText($, `${root}/${file}`)
+        if (body) docs.push(toDoc(file.slice(file.lastIndexOf('/') + 1), file, body))
+      }
+      continue
+    }
+    const body = await readText($, `${dir}/${source}`)
+    if (body.trim()) docs.push(toDoc(label, rel(`${dir}/${source}`), body))
+  }
+
+  return { key: step.key, title: step.title, waiting: waitingOf(text), docs }
+}
+
 const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   root = await git($, ['rev-parse', '--show-toplevel'])
   if (!root) return null
@@ -355,6 +420,8 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const config = await readText($, `${root}/.claude/rules/feature_pipeline.md`)
   const text = await readText($, file)
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
+  const view = snap ? await loadPending($, where.kind, where.name, dir, text, snap.pkg) : null
+  if (JSON.stringify(view) !== JSON.stringify(await read($, pending))) await update($, pending, () => view)
   const found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
   if (JSON.stringify(found) !== JSON.stringify(await read($, scenarios))) await update($, scenarios, () => found)
   const proofs = await loadEvidence($, dir, found)
@@ -728,7 +795,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
-    const { Box, Button, Code, Text } = ui
+    const { Box, Button, Code, Markdown, Text } = ui
     const snap = await read($, snapshot)
     const openPlans = await read($, plans)
     const loose = await read($, strays)
@@ -1007,6 +1074,53 @@ export const register: Register = on => {
     const isSource = await read($, showSource)
     const sourceOf = (path: string) => files.find(f => f.path === path)?.source ?? ''
     const step = (delta: number) => all[(index + delta + all.length) % all.length]?.id ?? ''
+    const reading = await read($, pending)
+    const wantedDoc = await read($, selectedDoc)
+    const doc = reading?.docs.find(d => d.path === wantedDoc) ?? reading?.docs[0]
+    const readingSection = reading && (
+      <Box flexDirection="column">
+        <Text> </Text>
+        {reading.waiting !== '' ? (
+          <Text bold color="warning">À toi : {reading.waiting}</Text>
+        ) : (
+          <Text bold>À lire{reading.title !== '' ? ` · étape ${reading.title}` : ''}</Text>
+        )}
+        {reading.waiting !== '' && reading.title !== '' && <Text dimColor>étape {reading.title}</Text>}
+        {reading.docs.length === 0 && <Text dimColor>Rien à lire pour cette étape pour l'instant.</Text>}
+        {doc && (
+          <Box flexDirection="column">
+            <Box flexDirection="row" flexWrap="wrap" gap={1} alignItems="center">
+              {reading.docs.map(d => (
+                <Button
+                  key={`doc-${d.path}`}
+                  label={d.label}
+                  variant={d.path === doc.path ? 'primary' : 'secondary'}
+                  onPress={() => update($, selectedDoc, () => d.path)}
+                />
+              ))}
+              <Button
+                key="doc-open"
+                plain
+                dimColor
+                label="ouvrir"
+                onPress={() => void $.process.run(['open', `${root}/${doc.path}`], { timeoutMs: 5000 }).catch(() => undefined)}
+              />
+            </Box>
+            <Text dimColor wrap="truncate-start">
+              {doc.path}
+              {doc.cut > 0 ? ` · coupé à ${doc.text.length} caractères sur ${doc.cut}` : ''}
+            </Text>
+            <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+              {doc.format === 'markdown' ? (
+                <Markdown key={`md-${doc.path}`} text={doc.text} />
+              ) : (
+                <Code source={doc.text} language={doc.language || undefined} path={doc.path} startLine={1} />
+              )}
+            </Box>
+          </Box>
+        )}
+      </Box>
+    )
 
     return (
       <Box flexDirection="column">
@@ -1033,6 +1147,7 @@ export const register: Register = on => {
             {stage.attempts > 0 ? `  ${stage.attempts}/${snap.maxAttempts}` : ''}
           </Text>
         ))}
+        {readingSection}
         <Text> </Text>
         {list.length === 0 && <Text dimColor>Aucun agent du pipeline dans cette session.</Text>}
         {list.map(a => {
