@@ -83,7 +83,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
   - Les modifications non commitées du checkout principal ne suivent pas : signale-le au dev si
     `git status --short` y est non vide et qu'elles touchent le périmètre du bug.
   - Les dépendances ne sont pas versionnées : Bastien les installe dans le package du bug
-    (`npm ci` s'il y a un lockfile, `flutter pub get` / `fvm flutter pub get`) — jamais `npm install`
+    (`npm ci` s'il y a un lockfile, sinon la commande d'installation du langage) — jamais `npm install`
     d'un paquet, jamais de bump.
   - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout et garde-la : le mot après
@@ -414,7 +414,7 @@ pour un blocage et relance.
     fait ce code, la cause en une phrase), puis ce qu'on lui demande ;
   - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code ;
   - jamais un identifiant seul (`S1`, « le plan B », « l'écart ») : il est toujours suivi de ce qu'il
-    désigne (« S1 — `foo.dart:42` : le mapper avale l'erreur réseau → la remonter en `NetworkError` »).
+    désigne (« S1 — `foo_mapper:42` : le mapper avale l'erreur réseau → la remonter en `NetworkError` »).
   Le message au-dessus peut porter le détail long ; la question ne s'y réfère pas (« voir ci-dessus »).
 - **Règles tirées des réponses du dev.** Avant toute question, lis `~/.claude/pipeline/answers.md` et
   `.claude/rules/pipeline_answers.md` du projet s'il existe : une règle qui tranche s'applique, tu le

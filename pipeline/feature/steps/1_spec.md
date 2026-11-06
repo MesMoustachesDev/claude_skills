@@ -74,7 +74,7 @@ relance Sophie avec le retour, puis 1b), plus, dans le même appel :
   la validation ;
 - une question par ligne de §9 encore `proposée` (une dépendance découverte) : la proposition
   « (Recommandé) » avec sa raison, l'alternative avec ce qu'elle change ; précédée dans ton message
-  de ce qui existe aujourd'hui (`pubspec.yaml:ligne`, l'usage dans le repo) ;
+  de ce qui existe aujourd'hui (`<manifeste>:ligne`, l'usage dans le repo) ;
 - la question de reclassement si un critère de S est dépassé.
 Validation → la colonne Statut des lignes tranchées passe à `validée` ou `modifiée`,
 `pipeline.sh gate <nom> spec`, `pipeline.sh pass <nom> spec`, et « brouillon » devient « validée le

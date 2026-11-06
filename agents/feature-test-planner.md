@@ -30,9 +30,9 @@ chaque passage de la suite, à chaque refactor et à chaque re-gel.
 ## Ce que tu reçois
 
 Le nom de la feature, `spec.md`, `cadrage.md`, `archi.json`, le package. Tu lis ce que lit Théo à
-l'étape 3 (son fichier d'agent, `feature-test-writer.md`, « Ce que tu lis ») : la spec, les contrats de
-`lib/src/domain/**`, les events et states, les keys, les modèles de données. Jamais les `*_impl.dart`, les
-vues ni les BLoCs.
+l'étape 3 (son fichier d'agent, `feature-test-writer.md`, « Ce que tu lis ») : la spec, les contrats du
+domain, les events et states, le fichier de clés, les modèles de données. Jamais les implémentations du
+data, les vues ni le state holder.
 
 ## Comment tu décides
 
@@ -41,7 +41,7 @@ vues ni les BLoCs.
    §6, E<n> les erreurs de §7. Ta liste répond à chacun.
 2. Pour chaque item, trouve **l'étage le plus bas qui le prouve** : une règle de lecture d'un champ se
    prouve sur le mapper ou le parseur, une erreur là où elle naît (data source, service), la composition
-   d'états sur le BLoC, ce que l'utilisateur voit dans le scénario d'acceptation. Un maillon qui transmet
+   d'états sur le state holder, ce que l'utilisateur voit dans le scénario d'acceptation. Un maillon qui transmet
    (repository, use case) a **un** test de propagation, pas un par erreur.
 3. Un scénario de §4 est son test d'acceptation (le `.feature`, titre à l'identique). Ce qu'il asserte
    déjà, aucun test de widget ne le répète.
@@ -62,7 +62,7 @@ vues ni les BLoCs.
 ```json
 {
   "tests": [
-    { "file": "<package>/test/src/data/mapper/x_mapper_test.dart", "name": "maps a null createdAt to null",
+    { "file": "<package>/<tests>/data/mapper/x_mapper_test", "name": "maps a null createdAt to null",
       "layer": "mapper", "proves": ["D4"] },
     { "file": "<package>/test/<feature>.feature", "name": "<titre du scénario, à l'identique>",
       "layer": "acceptance", "proves": ["S1", "E2"] }
@@ -71,7 +71,7 @@ vues ni les BLoCs.
 }
 ```
 
-`layer` : `mapper`, `parser`, `model`, `data_source`, `service`, `repository`, `use_case`, `bloc`,
+`layer` (valeurs fixées par `test_plan.py` ; `bloc` désigne le state holder, quel que soit le langage) : `mapper`, `parser`, `model`, `data_source`, `service`, `repository`, `use_case`, `bloc`,
 `widget`, `acceptance`, `injection`, `other`. Les chemins partent de la racine du repo. `name` est le nom
 exact que tu donneras au test : il servira à comparer la suite écrite à ta liste.
 

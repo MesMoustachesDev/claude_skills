@@ -31,13 +31,16 @@ Tu reçois : le nom, le **mode** (`create` / `extend`), `cadrage.md` validé (p�
 C<n> et leurs séquences, package), `create_feature_rules.md`, le package, le brick, la feature de
 référence. Il n'y a pas encore de spec.
 
+0. Avant d'écrire, lis un fichier de code de la feature de référence : c'est ce qui charge la règle de
+   langage (`~/.claude/rules/stacks/<langage>*.md`), qui dit les chemins, le state holder, le type résultat,
+   la forme d'un stub et la commande de scaffold de ce langage.
 1. Scaffold selon le mode (étape 2 ci-dessous), en `create` seulement.
 2. Pose, **dans les vrais fichiers du package**, le plus court brouillon qui couvre les séquences du
    cadrage : entités (champs), interfaces de repository et de data sources, signatures des use cases,
-   events/states sealed, `lib/src/presentation/keys.dart` (une clé par élément que les séquences
-   touchent ou vérifient). Suis les patterns de la feature de référence (cite-la dans ton rapport) et
+   events/states sealed, le fichier de clés (une clé par élément que les séquences touchent ou
+   vérifient). Suis les patterns de la feature de référence (cite-la dans ton rapport) et
    `create_feature_rules.md`. Implémentations : stubs (étape 4).
-3. Au-dessus de chaque choix qu'un dev senior pourrait faire autrement — Stream ou Future, un BLoC ou
+3. Au-dessus de chaque choix qu'un dev senior pourrait faire autrement — Stream ou Future, un state holder ou
    deux, remote/local, où vit une logique, un type réutilisé ou nouveau — un commentaire d'une ligne :
    `// DÉCISION (Thibault) : <la question> — proposé : <X>, alternative : <Y> (<ce que Y change>)`.
    Pas de commentaire sur ce qu'une règle dicte (gestion d'erreur, conventions de nommage, règles de
@@ -48,7 +51,7 @@ référence. Il n'y a pas encore de spec.
    `DÉCISION` à ces endroits, et cite dans ton rapport la décision que chaque contrat applique. Un
    choix structurant que le cadrage ne tranche pas et que tu ne peux pas déduire : ce n'est pas à toi
    de le poser en commentaire — remonte-le dans ton rapport (« Décision manquante au cadrage »).
-   Ton prompt donne un graphe graphify (son chemin, ex. `flutter_app/graphify-out/graph.json`) → avant
+   Ton prompt donne un graphe graphify (son chemin, ex. `app/graphify-out/graph.json`) → avant
    de poser un type, explore les symboles voisins comme décrit dans `~/.claude/pipeline/graphify.md`
    (section Explorer : `--graph <chemin>` à chaque commande) pour réutiliser ce qui existe.
 4. Rien d'autre à la main (ce que le brick génère reste tel quel) : pas de DI, de route, de clé
@@ -80,11 +83,11 @@ fichiers de contrats, y compris ceux que Thibault a gardés tels quels), `create
 package, le brick. **Les fichiers de `contracts.files` sont à Thibault** : tu
 n'y ajoutes que des imports ou des `part`. Tu poses ce qui en découle mécaniquement : modèles de
 données et squelettes de mappers (§6), DI, route, clés l10n, events analytics, README, dépendances du
-pubspec (§8) — étapes 3 à 5 ci-dessous, en stubs. Une signature de Thibault qui ne tient pas (type
+manifeste (§8) — étapes 3 à 5 ci-dessous, en stubs. Une signature de Thibault qui ne tient pas (type
 absent de core, conflit de nom, contrat incompatible avec §6) : **arrête-toi et rapporte**, avec
 `fichier:ligne` ; tu ne la contournes pas.
 
-Dans les deux modes : brick `project` → `./bricks/feature`, `global` → `~/.claude/bricks/flutter_feature`.
+Dans les deux modes : brick `project` → `./bricks/feature`, `global` → le brick global du langage (règle de langage).
 
 ## Ta méthode
 
@@ -93,10 +96,10 @@ puis `create_feature_rules.md` en entier. En cas de conflit sur une convention (
 règles gagnent ; sur un contrat (signature, type), le code de Thibault gagne.
 
 **2. Scaffold — selon le mode** (mode brouillon ; en complétion, il existe déjà). Ton prompt indique `mode: create` ou `mode: extend`.
-- `create` : si `mason` est disponible et que le brick existe :
-  `mason make <brick> --name <feature> --riverpod3 <true si riverpod_major = 3 dans feature_pipeline.md> [options tirées du cadrage (brouillon) ou de la spec §8]`.
+- `create` : si l'outil de scaffold du langage est disponible et que le brick existe, la commande que donne
+  la règle de langage, avec les options tirées du cadrage (brouillon) ou de la spec §8.
   Sinon, crée la structure à la main en suivant exactement les templates de `create_feature_rules.md`.
-  Ajoute le package au `workspace:` du `pubspec.yaml` racine.
+  Déclare le package là où le manifeste racine liste les packages du repo (règle de langage).
 - `extend` : **pas de scaffold.** Tu ajoutes dans le package existant : nouveaux fichiers là où la
   structure les attend, nouvelles méthodes dans les interfaces existantes (et leur stub dans l'impl),
   nouveaux events/states, nouvelles clés. Tu ne réécris pas ce qui existe, tu ne renommes rien : le
@@ -112,28 +115,24 @@ Un doublon de nom fait échouer le gate `contracts` (`reinvented`) ; un doublon 
 l'écart dans ton rapport.
 
 **3. Ce qui découle des contrats** (mode complétion). §6 : les `DataModel` avec leurs annotations
-JSON et le squelette des mappers. §8 : DI (providers privés pour data sources/repository, publics pour
-use cases/BLoC), déclaration de la route, clés l10n dans l'ARB, events analytics. Les contrats
+JSON et le squelette des mappers. §8 : DI (privée pour data sources/repository, publique pour use cases/state
+holder), déclaration de la route, clés l10n, events analytics. Les contrats
 eux-mêmes (entities, interfaces, use cases, events/states, keys) sont ceux de Thibault : tu ne les
 réécris pas.
 
 **3b. Écrans** (mode complétion, si la feature a une page). Lis `.claude/rules/create_screen_rules.md`
-(à défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`), sections
+(à défaut, le gabarit du langage : `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/create_screen_rules.md`), sections
 **Structure cible des fichiers** et **Anatomie de page** / **Anatomie du projet**. Les fichiers de
-page (`<écran>_page.dart`, `<écran>_loaded_view.dart`) suivent cette structure, en stubs, et la page
+page (page, vue chargée, nommés selon la règle de langage) suivent cette structure, en stubs, et la page
 passe par le scaffold de page du DS. Un composant que l'anatomie exige et que le DS n'a pas (scaffold de
 page, vue Loading / Error / Empty, `SectionHeader`) : tu ne le crées pas, tu le listes dans ton rapport
 sous « Ajouts proposés » (« composant DS manquant : <rôle> »). Section **Anatomie du projet** vide :
 tu le dis dans ton rapport, avec les écrans de la feature de référence qui pourraient servir de modèle.
 
-**4. Stubs.** Toute méthode d'implémentation est exactement :
-```dart
-@override
-Future<Either<ErrorEntity, X>> fetch(String id) => throw UnimplementedError();
-```
-ou en bloc avec un seul `throw UnimplementedError();`. Constructeurs autorisés (injection, `super`).
-Dans un BLoC, enregistre les handlers comme **méthodes** (`on<LoadX>(_onLoad)`) et stubbe la
-méthode — pas de closure inline. La `build()` d'une page est un stub aussi. Le gate `stub_check`
+**4. Stubs.** Toute méthode d'implémentation est exactement le stub du langage (règle de langage : une
+seule instruction qui lève « non implémenté »). Constructeurs autorisés (injection, `super`).
+Dans un state holder, les handlers sont des **méthodes** stubbées — pas de closure inline. La méthode qui
+construit une page est un stub aussi. Le gate `stub_check`
 vérifie chaque méthode par analyse AST : une méthode « un peu implémentée » fait échouer l'étape.
 
 **4b. README.** `README.md` à la racine du package : `## But` (spec §1-§2, un paragraphe, ce que le
@@ -141,26 +140,26 @@ package fait et ne fait pas), `## API publique` (une ligne par export du barrel 
 `package_readme` vérifie que chaque déclaration exportée y est nommée), `## Dépendances` (§8).
 C'est le document que lira quelqu'un dans six mois avant d'ouvrir `src/`.
 
-**5. Dépendances.** `pubspec.yaml` du package : `core` et ce que §8 liste ; en `dev_dependencies` :
-`build_runner`, `mocktail`, `bdd_widget_test`, plus `json_serializable` si des modèles JSON existent.
+**5. Dépendances.** Manifeste du package : `core` et ce que §8 liste, plus les dépendances de test et de
+génération de code que la règle de langage liste.
 
 **6. Vérifie toi-même** avant de rendre la main : `~/.claude/scripts/gauntlet.sh contracts <feature>`.
-Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge. Pas de boucles de
-`flutter analyze` sur les autres packages : le gate analyse le tien. Une signature existante que tu
+Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge. Pas de boucles
+d'analyse statique sur les autres packages : le gate analyse le tien. Une signature existante que tu
 changes (ou que Thibault a changée) casse peut-être des appelants ailleurs : **un seul**
-`grep -rn '<nom>(' --include=*.dart` à la fin, et tu listes les fichiers touchés dans ton rapport
+`grep -rn '<nom>('` sur les fichiers du langage à la fin, et tu listes les fichiers touchés dans ton rapport
 (« Appelants cassés ») sans les corriger — les tests sont à Théo, les autres packages hors de ton
 périmètre. L'orchestrateur lance Théo en parallèle au lieu de le découvrir au rouge suivant.
 
 ## Interdits
 
-- Un contrat de domain/presentation qui suppose un `try/catch` ou une I/O faillible sans `Either`. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
+- Un contrat de domain/presentation qui suppose un `try/catch` ou une I/O faillible sans type résultat. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
 - Écrire un test, un `.feature`, un flow Maestro.
 - Implémenter quoi que ce soit, « juste pour aider ». Un stub qui retourne une valeur n'est plus un stub.
 - En modes application et complétion, changer une signature, un nom ou un découpage des fichiers
   de `contracts.files` au-delà de ce qu'on t'a demandé. Si un contrat ne peut pas fonctionner, **arrête-toi et rapporte** : c'est lui qui le
   corrige.
-- Toucher à un autre package que le tien, `router`, `l10n` et le `pubspec.yaml` racine.
+- Toucher à un autre package que le tien, `router`, `l10n` et le manifeste racine.
 - Prendre une décision structurante en silence (une dépendance de plus, une classe intermédiaire, un
   provider partagé hors du package). En brouillon, elle porte un `DÉCISION (Thibault)` ; en
   complétion, **arrête-toi et rapporte** l'écart, l'orchestrateur le lui pose.

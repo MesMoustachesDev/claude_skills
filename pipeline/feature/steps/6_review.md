@@ -1,7 +1,7 @@
 ### 6. Revue — Romain (`feature-reviewer`)
 
 D'abord les scripts : `~/.claude/scripts/gauntlet.sh maintain <nom>` (dépendances inter-features
-justifiées, santé des packages pub.dev, design system, l10n, code mort, périmètre, secrets…). Son
+justifiées, santé des paquets tiers, design system, l10n, code mort, périmètre, secrets…). Son
 verdict n'arrête rien ici : le log est une **entrée** de Romain, qui transforme chaque échec en finding.
 
 Prompt : nom, `spec.md`, package, **deux bases** — la merge-base avec `base_branch` (le périmètre :

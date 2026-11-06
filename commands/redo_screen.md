@@ -19,7 +19,7 @@ Principes universels, quelle que soit la stack :
 Cherche `create_screen_rules.md` dans `.claude/rules/` à la racine du repo Git.
 
 - **S'il existe** : lis-le intégralement avec `Read`. Les sections **Anatomie de page**, **Anatomie du projet** et **Refaire un écran existant** pilotent cette commande. Ces règles ont priorité absolue.
-- **S'il n'existe pas** : même procédure que `/create_screen` (lister `~/.claude/commands/templates/`, proposer via `AskUserQuestion` de copier un template, d'en créer un minimal, ou d'annuler).
+- **S'il n'existe pas** : même procédure que `/create_screen` (lister `~/.claude/stacks/*/templates/`, proposer via `AskUserQuestion` de copier un template, d'en créer un minimal, ou d'annuler).
 
 ---
 

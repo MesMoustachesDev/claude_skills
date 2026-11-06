@@ -43,17 +43,17 @@ Lis `spec.md` §3, §4, §6, §7, puis **chaque fichier** de `test/` (pas seulem
 de la table de mapping §6 → un test de mapper, cas limites inclus.
 
 *Jonction des deux moitiés* — les tests ont été écrits par deux Théo en parallèle : data/domain
-(`test/src/{data,domain,injection}/`) et présentation (le reste). Un maillon que chacun a cru couvert par
+(tests des couches data, domain, injection) et présentation (le reste). Un maillon que chacun a cru couvert par
 l'autre est invisible dans chaque moitié prise seule. Pour **chaque erreur de §7**, une ligne de
-`coverage` par maillon : `§7 <X> : data source` (exception → `Left(X)`), `repository`, `use case`
-(propage `Left(X)`), `BLoC` (`Left(X)` → état), `vue` (l'état est visible). Un repository ou un use case qui
+`coverage` par maillon : `§7 <X> : data source` (exception → erreur X), `repository`, `use case`
+(propage X), `state holder` (X → état), `vue` (l'état est visible). Un repository ou un use case qui
 ne fait que transmettre est couvert par son unique test de propagation : cite-le pour chaque erreur, n'en
 exige pas un par erreur. Un maillon `missing` est un **bloquant**. L'orchestrateur te passe la ligne « Jonction §7 » de chaque Théo : vérifie-la sur le code,
 ne la recopie pas.
 
-*Niveau du mock* — l'acceptation tourne sur le vrai BLoC et des use cases mockés. Un test d'acceptation ou
-de widget qui mocke ou instancie un repository, une data source ou un client, ou un test d'acceptation qui
-mocke le BLoC, est un **bloquant** : il teste la mauvaise frontière et lie la présentation à la data.
+*Niveau du mock* — l'acceptation tourne sur le vrai state holder et des use cases mockés. Un test d'acceptation
+ou d'UI qui mocke ou instancie un repository, une data source ou un client, ou un test d'acceptation qui
+mocke le state holder, est un **bloquant** : il teste la mauvaise frontière et lie la présentation à la data.
 
 *Comportement, pas implémentation* — un test qui `verify()` un appel interne non listé comme
 side-effect dans la spec, qui dépend de l'ordre d'appels de mocks, ou qui teste une méthode privée,
@@ -69,7 +69,7 @@ ne prouve rien. Un test qui passe déjà (liste dans `tests.md`) doit être un c
 
 *Doublons* — `create_test.md`, principes 18 et 19 : un comportement se prouve une fois, au plus bas
 étage qui le peut. Un test qui prouve ce qu'un autre prouve déjà (le même état asserté par un test de
-widget et par un scénario, le même widget testé dans deux fichiers, une propagation de `Left` répétée par
+widget et par un scénario, le même widget testé dans deux fichiers, une propagation d'erreur répétée par
 erreur), ou qui asserte une taille, une couleur, un rayon ou un token sans règle de §5 derrière, est un
 **bloquant** dont le `fix` est « supprimer <test>, déjà prouvé par <fichier:ligne> ». Une suite trop
 grosse coûte à chaque refactor et à chaque re-gel : retirer un doublon est un gain, pas une perte. Pars de `.claude/features/<nom>/.gauntlet/test_dups.txt` :
@@ -101,7 +101,7 @@ tu juges :
 - **Assez** : pour chaque item, le test listé prouve-t-il vraiment l'item, à un étage qui peut le
   prouver ? Chaque cas limite de §6 et chaque erreur de §7 a-t-il son test là où il naît ? Chaque raison
   de `not_tested` tient-elle ? Un manque est un **bloquant** (« E2 : rien ne prouve le warning à la
-  réouverture ; test de BLoC dans … »).
+  réouverture ; test du state holder dans … »).
   Une règle à plusieurs conditions (« ou », « ≤ », « non fini ») a un test par condition et par borne :
   un seul test pour « largeur ou hauteur ≤ 0 » est un manque.
 - **Sobre** : *Doublons*, plus bas, appliqué à la liste. Les items signalés `?` par le gate (prouvés par
@@ -115,7 +115,7 @@ Même sortie (`tests_review.json`, `tests_review.md`) ; `coverage` = l'item → 
 
 ```json
 {
-  "blocking": [ { "file": "test/src/data/mapper/x_mapper_test.dart", "line": 0, "test": "-", "issue": "aucun test pour createdAt null (§6 cas limite)", "fix": "test 'maps null createdAt to null' …" } ],
+  "blocking": [ { "file": "<tests>/data/mapper/x_mapper_test", "line": 0, "test": "-", "issue": "aucun test pour createdAt null (§6 cas limite)", "fix": "test 'maps null createdAt to null' …" } ],
   "notes":    [ { "file": "…", "line": 31, "test": "emits Loaded", "issue": "having() sur items.length seulement ; vérifier aussi le premier item" } ],
   "coverage": { "shows recipes when loaded": "tested", "shows an error when the network fails": "missing", "§7 NotFoundError → Empty": "tested" }
 }

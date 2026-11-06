@@ -60,7 +60,7 @@ travail et fichiers non suivis compris. Packages listés dans `graphify.ignore_p
 
 Quand le projet a un graphe (copié dans le worktree par `prepare`), pars de la carte, pas d'une
 exploration à l'aveugle. Le graphe n'est pas forcément à la racine : son chemin est le `graph=` de la
-ligne d'état de `prepare` (ex. `flutter_app/graphify-out/graph.json`), transmis dans ton prompt.
+ligne d'état de `prepare` (ex. `app/graphify-out/graph.json`), transmis dans ton prompt.
 graphify cherche par défaut `./graphify-out/graph.json` : passe `--graph <g>` à chaque commande
 (`<g>` = `<worktree>/<graph=…>`), ou lance-la depuis le dossier qui contient `graphify-out/`.
 

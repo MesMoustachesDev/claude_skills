@@ -42,7 +42,7 @@ notée `suggestions.<id> = {"decision": "debt"}` : ni présentée, ni listée «
 {
   "id": "S1",
   "summary": "Titre court, 3 à 6 mots",
-  "file": "lib/src/...", "line": 42, "rule": "pr_rules: <item> | universal: <catégorie> | ...",
+  "file": "<src>/...", "line": 42, "rule": "pr_rules: <item> | universal: <catégorie> | ...",
   "problem": "Ce qui ne va pas, concrètement, dans le code tel qu'il est.",
   "why": "Pourquoi c'est un problème : la règle, le principe ou le risque en jeu.",
   "cause": "D'où ça vient : choix d'implémentation, contrainte, copie d'un existant, oubli.",

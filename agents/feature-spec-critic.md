@@ -33,8 +33,9 @@ devineront différemment. Ton travail est de trouver ces endroits **avant** que 
 Le nom de la feature, `spec.md`, `archi.json` (`sequences` : chaque C<n> du cadrage relié à un
 scénario de §4), `cadrage.md` validé, `contracts.sha` et `contracts.files` (les contrats sont dans
 le code, écrits par le dev : lis chaque fichier de la liste, y compris ceux qu'il a gardés tels quels), `.claude/rules/create_feature_rules.md`,
-le template `~/.claude/commands/templates/flutter/feature_spec_template.md` (ses commentaires sont les
-exigences par section).
+le gabarit de spec du langage, `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/feature_spec_template.md` (ses commentaires
+sont les exigences par section). Lis un fichier de contrat avant la spec : c'est ce qui charge la règle de
+langage, qui dit le type résultat, le fichier de clés et le state holder.
 
 **Mode ciblé** (à partir de la deuxième passe, ton prompt le dit) : tu reçois aussi
 `spec.diff` (le diff depuis la passe précédente) et le `spec_review.json` précédent. Tu ne relis
@@ -48,7 +49,7 @@ section que le diff ne touche pas : elle a déjà été critiquée. Une note dé
 Lis la spec en entier, puis vérifie section par section, en tranchant chaque point :
 
 `spec_lint` est déjà vert quand tu es lancée (gate de Sophie) : les clés citées existent dans
-`keys.dart`, chaque ligne de §7 cite un C<n> ou « hors scénario », les symboles cités existent,
+le fichier de clés, chaque ligne de §7 cite un C<n> ou « hors scénario », les symboles cités existent,
 `archi.json` pointe vers des titres de §4, la taille tient. Ne re-vérifie pas ces points ; vérifie ce
 qu'un script ne voit pas : que le C<n> cité par une erreur la prouve vraiment, qu'un symbole est
 appelé avec la bonne signature, qu'une règle n'en contredit pas une autre.
@@ -57,12 +58,12 @@ appelé avec la bonne signature, qu'une règle n'en contredit pas une autre.
 - Chaque item de §2 « Inclus » a au moins un scénario en §4. Chaque scénario de §4 ne parle que de §2.
 - Chaque état de §3 (Loading, Error, Empty, Loaded, par écran) a un scénario en §4.
 - Chaque erreur de §7 a un scénario Error en §4 et un state correspondant dans les contrats.
-- Les clés nommées dans §4 existent dans `keys.dart` ; les contrats sont cohérents entre eux (le use
-  case retourne ce que le repository retourne, le BLoC émet des states déclarés).
+- Les clés nommées dans §4 existent dans le fichier de clés ; les contrats sont cohérents entre eux (le
+  use case retourne ce que le repository retourne, le state holder émet des states déclarés).
 - §6 : un payload d'exemple par modèle de données, tous les champs, et la table de mapping couvre
   chaque champ de l'entity.
 - §8 : chaque dépendance inter-features nommée ; chaque route, clé l10n, event analytics de §3-§4 listé.
-- §8 : une machine d'états Mermaid par BLoC, dont les events et states sont ceux des contrats.
+- §8 : une machine d'états Mermaid par state holder, dont les events et states sont ceux des contrats.
 - **Cadrage ↔ §4** : chaque C<n> de `cadrage.md` a exactement une entrée dans `archi.json →
   sequences`, dont `scenario` est un titre exact de §4 ; ce scénario reprend chaque étape de la
   séquence du cadrage (action, réponse du serveur, résultat visible) — une étape sans step Given /
@@ -72,13 +73,13 @@ appelé avec la bonne signature, qu'une règle n'en contredit pas une autre.
   déclare bien ce qu'elle dit ; aucune signature recopiée qui diverge du code. Les types, keys et states que
   §4 et §7 utilisent existent dans ces fichiers.
 - **Les contrats permettent-ils la spec ?** Une erreur de §7 sans state pour l'afficher, une donnée
-  de §6 absente d'une entité, une I/O faillible sans `Either`, une clé de §4 absente de `keys.dart` :
+  de §6 absente d'une entité, une I/O faillible sans type résultat, une clé de §4 absente du fichier de clés :
   **bloquant avec `"owner": "thibault"`** et le `fichier:ligne` du contrat. Sophie ne peut pas le
   corriger (elle ne change pas les contrats) : c'est le dev qui tranche. Tout autre bloquant porte
   `"owner": "spec"`.
-- §9 ne contient que ce que les contrats ne montrent pas : le package et les dépendances (pub.dev,
+- §9 ne contient que ce que les contrats ne montrent pas : le package et les dépendances (registre du langage,
   inter-features), au format `ID | Sujet | Décision | Alternative | Raison | Statut`. Une ligne qui
-  porte sur Stream/Future, le découpage des BLoCs, les data sources ou l'emplacement d'une logique
+  porte sur Stream/Future, le découpage des state holders, les data sources ou l'emplacement d'une logique
   est un bloquant « à retirer de §9 : c'est dans le code de Thibault ». Une alternative-épouvantail
   sur une ligne `proposée` est un bloquant. §10 vide.
 - Est aussi un bloquant (« à retirer de §9 ») une ligne dont la réponse
@@ -99,11 +100,11 @@ implémentations raisonnables qui la satisfont toutes les deux ? (« affiche une
 où, avec retry ? « trié » — par quoi, dans quel sens ? « vide » — liste vide ou null ?) Chacune est
 un bloquant, parce que Théo choisira l'une et Ivan l'autre.
 
-*Faisabilité* (bloquants `owner: "thibault"` quand c'est un contrat qui pèche) — les contrats respectent `create_feature_rules.md` (imports, `Either`,
-Stream/Future, sealed, Equatable) ; en particulier, chaque use case, repository ou data source dont
+*Faisabilité* (bloquants `owner: "thibault"` quand c'est un contrat qui pèche) — les contrats respectent `create_feature_rules.md` (imports, type résultat,
+Stream/Future, sealed, égalité) ; en particulier, chaque use case, repository ou data source dont
 une méthode fait de l'I/O qui peut échouer (réseau, stockage, secure storage, Crashlytics, canal
-plateforme), directement ou via un autre use case, renvoie `Either<ErrorEntity, T>` : un
-`Future<void>` sur une telle méthode est un **bloquant**, pas une note. Même chose pour tout contrat qui place une I/O ou un `try/catch` hors de la couche data (un use case qui lit/écrit des fichiers, garde un appel natif, etc.) : la règle « try/catch seulement en data, Either partout ailleurs » est non négociable, une ligne §9 qui y déroge est elle-même un **bloquant**, jamais un écart acté ; rien n'exige un service qui n'existe pas dans `core` sans que §8
+plateforme), directement ou via un autre use case, renvoie le type résultat (erreur typée ou valeur) : une
+signature sans résultat sur une telle méthode est un **bloquant**, pas une note. Même chose pour tout contrat qui place une I/O ou un `try/catch` hors de la couche data (un use case qui lit/écrit des fichiers, garde un appel natif, etc.) : la règle « try/catch seulement en data, type résultat partout ailleurs » est non négociable, une ligne §9 qui y déroge est elle-même un **bloquant**, jamais un écart acté ; rien n'exige un service qui n'existe pas dans `core` sans que §8
 le dise ; les payloads de §6 sont plausibles pour le backend nommé.
 
 *Oublis classiques* — pagination, doublons, hors-ligne, concurrence (deux actions rapides), retour
@@ -116,7 +117,7 @@ arrière pendant un chargement, permissions, contenu vide côté serveur vs abse
 ```json
 {
   "blocking": [ { "section": "§4/§7", "issue": "NetworkError listée en §7 sans scénario Error en §4", "fix": "ajouter : Scenario: shows an error when the network fails …", "owner": "spec" },
-                { "section": "§7/contrat", "issue": "MealState n'a pas d'état d'erreur (lib/src/presentation/meal/bloc/meal_state.dart:8) : C4 ne peut pas s'afficher", "fix": "ajouter MealError(ErrorEntity error)", "owner": "thibault" } ],
+                { "section": "§7/contrat", "issue": "MealState n'a pas d'état d'erreur (presentation/meal/meal_state:8) : C4 ne peut pas s'afficher", "fix": "ajouter MealError(ErrorEntity error)", "owner": "thibault" } ],
   "notes":    [ { "section": "§3", "issue": "l'état Loading n'a pas de wireframe ; acceptable, le DS a un loader standard" } ]
 }
 ```

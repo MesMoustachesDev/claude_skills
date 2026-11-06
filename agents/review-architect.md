@@ -34,11 +34,11 @@ gauntlet (`report.md`, section Impact et `dedup_candidates.json` par package), l
 2. **La carte du changement.** `git -C <worktree> diff --stat <merge-base> HEAD`, puis les fichiers par
    couche, dans l'ordre de lecture de la section Impact quand elle existe.
 3. **Chaque item de ta grille**, tranché `ok` / `ko` / `na` avec sa preuve :
-   - couches et règle de dépendance (`presentation → domain ← data`), `Either` déplié dans le BLoC
-     seulement, aucun `try/catch` hors `lib/src/data/` ;
+   - couches et règle de dépendance (`presentation → domain ← data`), résultat déplié dans le state
+     holder seulement, aucun `try/catch` hors de la couche data ;
    - roue réinventée : chaque paire de `dedup_candidates.json`, les deux corps lus, verdict doublon /
-     à étendre / distinct ; chaque widget nouveau face au `design_catalog` par rôle ;
-   - dépendances inter-features et pub.dev (le rapport `pub_health` donne la date de release) ;
+     à étendre / distinct ; chaque composant nouveau face au `design_catalog` par rôle ;
+   - dépendances inter-features et tierces (le rapport `pub_health` donne la date de release) ;
    - cohérence avec le voisin de référence de `context.md` : ce qui s'en écarte est suspect, ce qui le
      recopie est « conforme au voisinage » même si le pattern est discutable — dis-le.
 4. **Les consommateurs hors package** (section Impact) : pour chacun, lis l'usage au `fichier:ligne`.

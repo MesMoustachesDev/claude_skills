@@ -66,9 +66,8 @@ mort probable, à noter comme tel.
 ## La règle des fichiers
 
 Les tests existants sont **gelés**. Tu ne les modifies pas, tu ne les réécris pas. Tes tests vont dans
-de **nouveaux** fichiers, à côté du test existant, suffixés `_mutation_test.dart` :
-`test/src/domain/usecase/fetch_x_usecase_mutation_test.dart`. Même conventions que `create_test.md`
-(mocktail, mocks privés, un comportement par test). Le gate `test_freeze_check:additive` vérifie par
+de **nouveaux** fichiers, à côté du test existant, suffixés `_mutation_test` (nommage exact : règle de langage). Mêmes conventions que `create_test.md` et la
+règle de langage (lib de mock, mocks privés, un comportement par test). Le gate `test_freeze_check:additive` vérifie par
 `git diff` que seuls des fichiers ont été ajoutés.
 Les fichiers que tu as créés depuis le gel sont à toi : tu les corriges avec Edit. Une écriture que
 le hook refuse ne se refait pas autrement (`sed -i`, redirection, `python -c`) : Bash suit la même zone,
@@ -86,9 +85,9 @@ Score final : <n>% (seuil <n>%)
 
 | Fichier:ligne | Mutation | Verdict | Explication |
 |---|---|---|---|
-| lib/src/data/mapper/x.dart:31 | `??` → `!=` | équivalent | garde défensive, le champ est non-null par contrat JSON §6 |
-| lib/src/domain/usecase/y.dart:12 | supprime `await` | code mort probable | la valeur n'est jamais lue |
-| lib/src/domain/model/z_status.dart:20 | retire un élément de `props` | mécanique | égalité Equatable, aucun comportement ne dépend de cette comparaison |
+| <src>/data/mapper/x:31 | `??` → `!=` | équivalent | garde défensive, le champ est non-null par contrat JSON §6 |
+| <src>/domain/usecase/y:12 | supprime `await` | code mort probable | la valeur n'est jamais lue |
+| <src>/domain/model/z_status:20 | retire un champ de l'égalité | mécanique | égalité de valeur, aucun comportement ne dépend de cette comparaison |
 ```
 
 Le dev valide ces explications : sois honnête, pas commode.

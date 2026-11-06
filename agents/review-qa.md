@@ -50,11 +50,11 @@ exacte une fois, et passe à B pour **tous** les scénarios — ce n'est pas une
 comportement (`grep -rl` sur la clé, le widget, le use case, le texte ; les `.feature` Gherkin et leurs
 steps ; les tests ajoutés par la MR). Un test ne compte que s'il **asserte le résultat promis**, pas
 seulement qu'il touche le code : lis-le. Puis rejoue-le, ciblé :
-`review.sh run-tests <slug> <package> test/…_test.dart …`. Vert → scénario prouvé par ce test. Rouge →
+`review.sh run-tests <slug> <package> <fichiers de test> …`. Vert → scénario prouvé par ce test. Rouge →
 lis l'échec : la MR a cassé le comportement (remarque) ou le test est faux (note-le).
 
 **C. Un test jetable** — aucun test ne le prouve : écris-en un, dans
-`<dossier de la revue>/probes/<nn>_<slug>_test.dart` (jamais dans le repo). Un widget test le plus
+`<dossier de la revue>/probes/<nn>_<slug>_test.<ext>` (jamais dans le repo). Un test d'UI le plus
 souvent (pump de l'écran ou du widget avec ses dépendances simulées comme le font les tests voisins du
 package — copie leur façon de faire), un test unitaire si le comportement est sous l'écran. Il asserte
 **ce que la MR promet**, pas ce que le code fait. Joue-le : `review.sh probe <slug> <package>` — il le
@@ -75,7 +75,7 @@ Au format de `~/.claude/pipeline/review/findings_format.md`, plus :
 "scenarios": [
   {"name": "quand je tape sur l'onglet Codes alors la liste des codes s'affiche comme avant",
    "verdict": "ok | ko | non vérifié", "method": "device | test existant | test jetable",
-   "proof": "test/codes/codes_tab_test.dart (rejoué, vert) | probes/02_codes_tab_test.dart (vert) | capture",
+   "proof": "test/codes/codes_tab_test (rejoué, vert) | probes/02_codes_tab_test (vert) | capture",
    "platform": "android", "observation": "—", "captures": []}
 ]
 ```

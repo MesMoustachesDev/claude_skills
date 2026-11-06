@@ -72,11 +72,11 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 *Architecture*
 - L'architecture décidée en §8 est celle du code : couches, DI, routes, events analytics.
 - Aucune logique métier dans un widget ; aucun modèle de données (`DataModel`) qui remonte en
-  présentation ; aucun `Either` déplié ailleurs que dans le BLoC.
+  présentation ; aucun résultat déplié ailleurs que dans le state holder.
 - Toute méthode de use case, repository ou data source qui fait de l'I/O faillible (réseau,
   stockage, secure storage, Crashlytics, canal plateforme), directement ou via un autre use case,
-  renvoie `Either<ErrorEntity, T>`. Un `Future<void>`, ou un `try/catch` ajouté chez l'appelant
-  pour compenser, est un **critique**. Tout `try/catch` hors de `lib/src/data/` (domain, presentation, injection) est un **critique**, même si une décision §9 l'autorise : la règle n'est pas négociable. En data, un catch qui laisse passer une `Error` levée par un plugin (`on Exception` face à `CompressError extends Error`) est un **critique**.
+  renvoie le type résultat. Une signature sans résultat, ou un `try/catch` ajouté chez l'appelant
+  pour compenser, est un **critique**. Tout `try/catch` hors de la couche data (domain, presentation, injection) est un **critique**, même si une décision §9 l'autorise : la règle n'est pas négociable. En data, un catch qui laisse passer une erreur qu'un plugin lève (ce que la règle de langage dit d'attraper) est un **critique**.
 - Chaque dépendance inter-features est **nécessaire** : pourrait-elle passer par `core` ? Crée-t-elle
   un couplage que la feature d'en face ne sait pas ? Un cycle se profile-t-il ?
 - Ce qui a été mis dans `core`, `router`, `l10n` par cette feature y a-t-il sa place, ou est-ce une
@@ -97,9 +97,9 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 - Les contraintes de version ne verrouillent pas une majeure en retard sans raison écrite.
 - **Pour chaque package que `pub_health` signale** (FAIL ou WARN, ajouté ou préexistant), tu produis
   une recommandation dans `review.json → dependencies` : l'alternative maintenue (vérifie-la sur
-  pub.dev — date de release, score, `isDiscontinued`), le volume de migration (`grep -rl` des imports
+  le registre du langage — date de release, score, abandon), le volume de migration (`grep -rl` des imports
   dans le workspace : combien de fichiers), le risque, et un verdict `replace | pin | watch`. Le script
-  sait dire « 58 mois sans release » ; toi tu sais dire « `dartz` → `fpdart`, 41 fichiers, API proche,
+  sait dire « 58 mois sans release » ; toi tu sais dire « paquet A → paquet B, 41 fichiers, API proche,
   à planifier hors de cette feature ». C'est pour l'evidence, pas un gate.
 
 *Design system et localisation*
@@ -108,7 +108,7 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
   `features/design/lib/`.
 - Les quatre états d'écran utilisent les composants d'état du DS s'il en a.
 - **Anatomie de page** (`.claude/rules/create_screen_rules.md`, sections **Anatomie de page** et
-  **Anatomie du projet** ; à défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`
+  **Anatomie du projet** ; à défaut, le gabarit du langage `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/create_screen_rules.md`
   et les écrans de la feature de référence). Pour chaque page de la feature, le tableau d'écart de
   `/redo_screen` : scaffold et AppBar, espacements (tokens, trois niveaux), hiérarchie typo, états,
   action principale, composants qui dupliquent le DS. Un `Scaffold` + `AppBar` assemblés à la main,
@@ -120,7 +120,7 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
 *Lisibilité à froid*
 - Nommage cohérent avec les features voisines (mêmes suffixes, mêmes verbes d'events).
 - Le barrel expose une API qui se comprend sans ouvrir `src/`.
-- Le package se lit de haut en bas : DI → use cases → BLoC → vue, sans surprise.
+- Le package se lit de haut en bas : DI → use cases → state holder → vue, sans surprise.
 - Gestion d'erreur homogène avec le reste de l'app (mêmes `ErrorEntity`, même affichage).
 - Test de six mois : un point que toi, sans contexte, tu n'as compris qu'en lisant deux fois → finding.
 
@@ -148,11 +148,11 @@ sait comment la feature marche, pas seulement qu'elle est prouvée. Écris-la da
 dès que ta passe rend `critical` vide (le gate ne l'exige qu'à ce moment-là) ; une passe avec des
 critiques peut la laisser vide :
 
-- **5 à 8 étapes** dans l'ordre du flux de données — vue → BLoC → use case → repository → data source
+- **5 à 8 étapes** dans l'ordre du flux de données — vue → state holder → use case → repository → data source
   (et mapper si la logique y est). Moins si la feature a moins de couches (2 minimum : une feature
   purement visuelle peut tenir en vue + composant). Pas une étape par fichier : une étape par endroit
   où il se passe quelque chose que Thibault doit comprendre.
-- Chacune : `layer` (`vue`, `bloc`, `usecase`, `repository`, `datasource`, `mapper`, `composant`…),
+- Chacune : `layer` (`vue`, `state`, `usecase`, `repository`, `datasource`, `mapper`, `composant`…),
   `file` (relatif au package, comme tes findings), `symbol` (`Classe.methode` ou `Classe` : le rapport
   recalcule la ligne si le code bouge après toi), `line`, `what` (2 phrases max : ce que fait ce code,
   dans les mots du domaine, et ce qui n'est pas évident — un ordre, une garde, un cas d'erreur), et
@@ -168,12 +168,12 @@ critiques peut la laisser vide :
 
 ```json
 {
-  "critical":      [ { "file": "lib/src/...", "line": 42, "rule": "spec §7 | archi | deps | ds | pr_rules: <item> | universal: <catégorie>", "summary": "...", "fix": "..." } ],
+  "critical":      [ { "file": "<src>/...", "line": 42, "rule": "spec §7 | archi | deps | ds | pr_rules: <item> | universal: <catégorie>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "texte du scénario ou du cas", "why": "aucun test ne couvre ..." } ],
-  "debt":          [ { "file": "lib/src/...", "line": 120, "issue": "code préexistant : …", "why_later": "hors des lignes de la feature, ni aggravé ni requis" } ],
-  "tour":          [ { "layer": "bloc", "file": "lib/src/presentation/meal/bloc/meal_bloc.dart", "symbol": "MealBloc._onDrop", "line": 41, "what": "Refuse le dépôt si le créneau est pris : émet MealRejected et remet le repas à sa place, sans appel serveur.", "implements": ["C3"] } ],
-  "dependencies":  [ { "package": "dartz", "issue": "pas de release depuis 58 mois", "added_by_feature": false, "alternative": "fpdart 1.x (release 2026-08, score 150/160)", "files_impacted": 41, "risk": "API Either quasi identique, Option renommée", "verdict": "watch", "note": "à planifier hors de cette feature" } ],
+  "debt":          [ { "file": "<src>/...", "line": 120, "issue": "code préexistant : …", "why_later": "hors des lignes de la feature, ni aggravé ni requis" } ],
+  "tour":          [ { "layer": "state", "file": "<src>/presentation/meal/meal_state_holder", "symbol": "MealStateHolder.onDrop", "line": 41, "what": "Refuse le dépôt si le créneau est pris : émet MealRejected et remet le repas à sa place, sans appel serveur.", "implements": ["C3"] } ],
+  "dependencies":  [ { "package": "result_lib", "issue": "pas de release depuis 58 mois", "added_by_feature": false, "alternative": "result_lib_next 1.x (release 2026-08, score 150/160)", "files_impacted": 41, "risk": "API quasi identique, Option renommée", "verdict": "watch", "note": "à planifier hors de cette feature" } ],
   "rules_checked": {
     "pr_rules":        { "<item>": "ok|ko|na" },
     "universal":       { "<catégorie>": "ok|ko" },

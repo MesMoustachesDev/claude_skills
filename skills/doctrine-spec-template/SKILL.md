@@ -1,1 +1,1 @@
-../../commands/templates/flutter/feature_spec_template.md
+../../stacks/flutter/templates/feature_spec_template.md

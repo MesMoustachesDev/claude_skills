@@ -3,7 +3,7 @@
 Après la visite validée, avant l'evidence. **Pauline ne se lance jamais d'office** : c'est Thibault
 qui décide, à chaque feature.
 
-**La question.** Si la feature n'a aucune page (`lib/src/presentation/` sans vue touchée depuis la
+**La question.** Si la feature n'a aucune page (aucune vue de la couche presentation touchée depuis la
 merge-base) : `pipeline.sh gate <nom> polish decision=no_screen`, rien d'autre. Sinon un seul
 `AskUserQuestion` (qui dit lui-même les défauts relevés, écran par écran), précédé des « Défauts visuels » de `qa.md` et
 d'une capture par écran (`SendUserFile`) : « On fait un polish visuel des écrans ? » — « Oui, audit

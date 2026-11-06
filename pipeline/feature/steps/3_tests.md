@@ -23,8 +23,8 @@ zone d'écriture (hook) et son gate de couche :
 
 | Moitié | `subagent_type` | Écrit | Gate (hook) |
 |---|---|---|---|
-| data/domain | `feature-test-writer-data` | `test/src/{data,domain,injection}/**` | `red_data` |
-| présentation | `feature-test-writer-presentation` | le reste de `test/`, `.feature`, steps, pubspec | `red_presentation` |
+| data/domain | `feature-test-writer-data` | tests des couches data, domain, injection | `red_data` |
+| présentation | `feature-test-writer-presentation` | le reste des tests, `.feature`, steps, manifeste | `red_presentation` |
 
 Prompt commun (15 lignes max) : nom, `spec.md`, `tests_plan.json` (« tu écris les tests de la liste dont
 le fichier est dans ta zone, ni plus ni moins »), package, `~/.claude/commands/create_test.md`, et « tu
@@ -79,7 +79,7 @@ Un bloquant qui est un contrat manquant suit « Contrat manquant » (3) avant la
 Vert → **Point d'étape « tests ».** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
 (`display: render`) : la section « Séquences » s'ouvre en premier. Pour chaque C<n>, côte à côte, la
 séquence validée au cadrage et la même redessinée par le script **depuis le test d'acceptation réel**
-(le `testWidgets` généré par `bdd_widget_test` et le corps de chaque step : pump, tap/saisie, réponse
+(le test généré par l'outil Gherkin du langage et le corps de chaque step : pump, tap/saisie, réponse
 du use case mocké, assertion, chacun avec `fichier:ligne`), et les écarts signalés (étape du
 cadrage absente du test, ou l'inverse). Puis les scénarios, la matrice §4 × `.feature`, l'inventaire.
 
@@ -92,7 +92,7 @@ les recopier. `AskUserQuestion` : « Valider les tests » / « Il manque des sc�
 restent, il complète).
 
 Validation → **gel** : `pipeline.sh freeze <nom>` (commit `test(<nom>): acceptance and unit tests
-(frozen)` de `<package>/test` et du pubspec du package, puis `tests_freeze_sha`, `human_gates.tests`,
+(frozen)` des tests du package et de son manifeste, puis `tests_freeze_sha`, `human_gates.tests`,
 `stages.red = PASSED`).
 À partir d'ici, `test/` ne change plus, sauf ajouts de Hugo.
 

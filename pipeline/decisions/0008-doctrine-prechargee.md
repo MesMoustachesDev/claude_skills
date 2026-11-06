@@ -1,6 +1,6 @@
 # 0008 — La doctrine d'un agent est préchargée comme skill, les règles projet viennent de .claude/rules
 
-Statut : acceptée (2026-11-05), remplace 0006
+Statut : acceptée (2026-11-05), remplace 0006 ; amendée le 2026-11-06 par 0011 (doctrine d'un langage)
 Où elle vit : le champ `skills:` des fichiers d'agent · `skills/doctrine-*` (liens vers les fichiers de
 `pipeline/` et des templates) · `.claude/rules/` des projets · `scripts/gauntlet/doctor.sh` et
 `steps/00_preconditions.md` (règle projet absente)
@@ -23,6 +23,10 @@ fichiers de `.claude/rules/` du projet, chargés d'office.
   le doctor la signale et le preflight demande à Thibault : la créer depuis le template, prendre le template
   tel quel (même copie), ou s'en passer (`rules.none`).
 - Une doctrine nouvelle pour un agent s'ajoute à son `skills:`, jamais en « lis X ».
+- Sauf la doctrine d'un langage (ADR 0011) : elle vit dans `~/.claude/rules/stacks/<langage>*.md`, chargée
+  au premier fichier du langage lu. Les skills d'un langage (`dart-flutter:*`) ne sont plus dans `skills:`
+  (un projet Kotlin les recevrait) : la règle du langage les nomme et l'agent les invoque avec `Skill`.
+  Le gabarit de spec (`doctrine-spec-template`) reste préchargé, lien vers `stacks/flutter/templates/`.
 
 ## Conséquences
 

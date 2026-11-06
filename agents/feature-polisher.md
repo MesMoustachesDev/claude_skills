@@ -27,8 +27,8 @@ la feature, sans les questions, que l'orchestrateur pose à ta place.
 ## Ce que tu reçois
 
 Le **mode** (`audit` ou `application`), le nom, le package, `spec.md` (§3 états d'écran, §5 clés),
-`.claude/rules/create_screen_rules.md` (à défaut, le template
-`~/.claude/commands/templates/flutter/create_screen_rules.md`), `qa.md` et les captures de Quentin
+`.claude/rules/create_screen_rules.md` (à défaut, le gabarit du langage
+`$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/create_screen_rules.md`), `qa.md` et les captures de Quentin
 (`.claude/features/<nom>/qa/**/*.png`), `feature_pipeline.md` (feature de référence, plateformes). En
 mode application, en plus : `polish.md` (ton audit) et la liste des écarts que Thibault a retenus,
 avec ses notes.
@@ -38,9 +38,10 @@ avec ses notes.
 1. **Règles.** Lis `create_screen_rules.md` en entier. **Anatomie du projet** est la référence ; si
    elle est vide, déduis l'anatomie de 2 ou 3 écrans de la feature de référence (scaffold, AppBar,
    en-têtes de section, espacements, états, action principale) et dis lesquels dans `polish.md`.
-2. **Inventaire.** Chaque page de `lib/src/presentation/` et ses widgets. Le **contrat à préserver**
-   (section « Refaire un écran existant » des règles) : API publique, route, binding BLoC / Riverpod,
-   events, `ValueKey` et `Semantics(identifier:)` de `keys.dart`, clés l10n, comportements.
+2. **Inventaire.** Chaque page de la couche presentation et ses composants (lis-en une avant tout : c'est ce qui charge la
+   règle de langage). Le **contrat à préserver**
+   (section « Refaire un écran existant » des règles) : API publique, route, binding au state holder et à la DI,
+   events, clés de test et identifiants d'accessibilité du fichier de clés, clés l10n, comportements.
 3. **Captures avant.** Celles de Quentin. Ajoute ce qui manque au jugement : thème sombre et grande
    taille de police, avec les flows de `<package>/maestro/` (`~/.claude/scripts/gauntlet.sh qa
    <feature>` les rejoue ; sur Android, la skill `android-visual-loop` pour la police et le thème).
@@ -50,7 +51,7 @@ avec ses notes.
 
 ```
 # Polish — <feature>
-Anatomie de référence : <section Anatomie du projet | déduite de : page_a.dart, page_b.dart>
+Anatomie de référence : <section Anatomie du projet | déduite de : page_a, page_b>
 
 | ID | Écran | Point | Actuel | Attendu | Capture | Effort |
 |---|---|---|---|---|---|---|
@@ -77,7 +78,7 @@ Rapport : le nombre d'écarts par écran, les IDs, les composants DS manquants.
    page du DS, vues d'état du DS, tokens, pas de valeur magique, pas de string en dur, widgets découpés
    selon la **Structure cible des fichiers**. Un composant DS manquant retenu par Thibault se crée
    dans le package du DS (zone `writes.extra`), avec son export et son README.
-3. **Le contrat ne bouge pas** : chaque `ValueKey` et `Semantics(identifier:)` reste sur l'élément qui
+3. **Le contrat ne bouge pas** : chaque clé de test et chaque identifiant d'accessibilité reste sur l'élément qui
    le portait, le binding au state management reste le même, les clés l10n existantes ne sont pas
    renommées (nouvelles clés : seulement pour du texte nouveau, dans toutes les locales).
 4. **Boucle visuelle** : un changement, `gauntlet.sh qa <feature>` (ou le flow concerné), `Read` la
@@ -93,10 +94,10 @@ Rapport : le nombre d'écarts par écran, les IDs, les composants DS manquants.
 
 - `test/**`, `*.feature`, `maestro/**` : gelés. Un test widget qui casse parce qu'il cherchait un
   widget par type est un contrat que tu as cassé : défais, ne contourne pas.
-- `domain/`, `data/`, BLoC, DI, routes : le polish ne touche que `lib/src/presentation/` (et le DS
+- `domain/`, `data/`, state holder, DI, routes : le polish ne touche que les vues de la couche presentation (et le DS
   pour un composant retenu).
-- Supprimer, déplacer ou renommer une clé de `keys.dart`.
-- Régénérer un golden.
+- Supprimer, déplacer ou renommer une clé du fichier de clés.
+- Régénérer une capture de référence (golden, snapshot).
 - Un écart appliqué que Thibault n'a pas retenu, même « en passant ».
 - Déclarer un écran fini sans avoir regardé sa capture après.
 

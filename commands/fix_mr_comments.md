@@ -142,7 +142,7 @@ Pour chaque commentaire marqué « appliquer » :
 
 1. Applique la modification en respectant les conventions du projet (pas de string hardcodée si l10n, design system, bonne couche architecturale).
 2. Un thread = un changement cohérent. Ne dérive pas sur du refacto non demandé.
-3. Après tous les fixes : `flutter analyze` (ou l'équivalent du projet) pour vérifier que ça compile.
+3. Après tous les fixes : l'analyse statique du langage (`bash ~/.claude/scripts/stack.sh get analyze_cmd <package>`, ou l'équivalent du projet) pour vérifier que ça compile.
 4. Si un fix casse la compilation ou révèle un problème plus large : arrête-toi, explique, et redemande.
 
 Commit : suis les conventions du projet. Un commit par groupe logique, message en anglais, format `{type}: {description}`. Ne pousse pas encore.

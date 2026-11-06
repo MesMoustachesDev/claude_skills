@@ -3,9 +3,10 @@
 Lue par `/reviewPR`, `feature-reviewer` et `fix-reviewer`. Une seule source : une règle ajoutée ici
 s'applique aux trois. Les règles projet (`.claude/rules/pr_rules.md`, `CLAUDE.md`) priment.
 
-**Hors Flutter** (backend Node, scripts…) : « Architecture » se lit contre le `CLAUDE.md` du projet et
-les fonctions voisines, pas contre `create_feature_rules.md` ; les items DS / l10n / barrel / BLoC sont
-`na`. Si le projet a des agents de revue spécialisés (`.claude/agents/*review*.md`), leurs invariants
+**Projet sans `create_feature_rules.md`** (backend Node, scripts…) : « Architecture » se lit contre le
+`CLAUDE.md` du projet et les fonctions voisines ; les items DS / l10n / barrel / state holder sont `na`.
+La règle de langage chargée (`~/.claude/rules/stacks/<langage>*.md`) dit ce que ces items veulent dire
+dans le langage du diff. Si le projet a des agents de revue spécialisés (`.claude/agents/*review*.md`), leurs invariants
 font partie de la grille.
 
 ## Règles universelles
@@ -48,10 +49,10 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
 
 - **Architecture** : les couches de `create_feature_rules.md` sont respectées ; aucune logique métier
   dans un widget ; aucun `DataModel` en présentation ; aucun repository en présentation, `ErrorRepository`
-  compris (le BLoC appelle un use case, qui reporte l'erreur ; le check `deps` le bloque sur les lignes
-  de la feature, la dette existante sort dans `debt_deps.txt`) ; les `Either` sont dépliés dans le BLoC, pas
-  ailleurs ; aucun `try/catch` hors de `lib/src/data/` (l'I/O est attrapée en data et rendue en
-  `Either<ErrorEntity, T>`, règle non négociable) ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
+  compris (le state holder appelle un use case, qui reporte l'erreur ; le check `deps` le bloque sur les lignes
+  de la feature, la dette existante sort dans `debt_deps.txt`) ; les résultats sont dépliés dans le state holder,
+  pas ailleurs ; aucun `try/catch` hors de la couche data (l'I/O est attrapée en data et rendue en
+  type résultat, règle non négociable) ; ce qui a été mis dans `core`/`router`/`l10n` y a sa place.
 - **Roue réinventée par la responsabilité** : ouvre `dedup_candidates.json`. Pour chaque paire
   (déclaration nouvelle ↔ candidate existante) : lis les deux corps et tranche — doublon (utiliser
   l'existant), à étendre (l'existant fait 80 %, on l'étend, on ne crée pas un jumeau), distinct. Pour
@@ -62,7 +63,7 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
 - **Dépendances** : chaque inter-features est nécessaire (pourrait passer par `core` ?) ; chaque
   package hébergé ajouté est justifié et maintenu (le rapport `pub_health` donne la date de release) ;
   pas de doublon avec ce que `core` exporte (second client HTTP, second logger). Pour chaque package
-  que `pub_health` signale, propose : alternative (vérifie-la sur pub.dev), fichiers impactés
+  que `pub_health` signale, propose : alternative (vérifie-la sur le registre du langage), fichiers impactés
   (`grep -rl`), risque, verdict `replace | pin | watch`.
 - **Design system et l10n** : au-delà des valeurs brutes (script), les états d'écran utilisent les
   composants d'état du DS ; les clés l10n sont nommées comme les voisines ; pas de concaténation de
@@ -81,12 +82,12 @@ Pour chaque package touché, tranche explicitement `ok` / `ko` :
   vérifient le contenu, pas le type ; pas de `verify()` d'un appel interne hors side-effect.
   Une interface du domaine doublée par un mock reconfiguré dans chaque fichier de test, alors qu'un fake
   (implémentation en mémoire, écrite une fois dans `test/`) suffirait → suggestion.
-  Un test qui attend un délai fixe pour voir un résultat (`pump(Duration(seconds: …))`, `Future.delayed`,
-  `sleep`, `waitForAnimationToEnd` sans condition dans Maestro) → `ko` : il attend un état
-  (`pumpAndSettle`, `expectLater` sur le stream, `extendedWaitUntil`), sinon il est lent ou instable.
+  Un test qui attend un délai fixe pour voir un résultat (délai codé en dur, N rafraîchissements de
+  durée fixe, `sleep`, `waitForAnimationToEnd` sans condition dans Maestro) → `ko` : il attend un état
+  (condition, flux émis, `extendedWaitUntil` ; les formes du langage sont dans sa règle), sinon il est lent ou instable.
 - **Règles portées par les objets** : une règle qui ne dépend que de l'état d'une entité (validité, total,
-  statut qui interdit une action) est une méthode de l'entité, pure et testée sans mock. Un BLoC ou un use
-  case qui lit les champs d'une entité pour décider à sa place → `ko`, avec la méthode qui la remplacerait.
+  statut qui interdit une action) est une méthode de l'entité, pure et testée sans mock. Un state holder ou un
+  use case qui lit les champs d'une entité pour décider à sa place → `ko`, avec la méthode qui la remplacerait.
   Le use case par action, même relais, reste la convention : le use case coordonne, l'entité décide.
   Question à te poser : faut-il connaître l'état interne de l'objet pour appliquer sa règle ? (article de Romain Rochegude, « Rethinking hexagonal architecture with Elegant Objects », 2026-11-03)
 - **Transverse en décorateur** : cache, logs, retry, report d'erreur ou analytics recopiés dans trois

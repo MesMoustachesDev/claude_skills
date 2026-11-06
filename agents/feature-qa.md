@@ -42,15 +42,15 @@ name: <texte exact du scénario Gherkin>
 - launchApp:
     clearState: true
 - tapOn:
-    id: "<clé de keys.dart, ex. recipe_list_error_retry>"
+    id: "<clé du fichier de clés, ex. recipe_list_error_retry>"
 - assertVisible:
     id: "recipe_list_loaded"
 - takeScreenshot: ${SCREENSHOT_DIR}/<nn>_<slug>
 ```
 
 - `APP_ID` et `SCREENSHOT_DIR` sont injectés par le gauntlet — ne les remplace jamais par une valeur.
-- Sélecteurs : **`id:` uniquement**, avec les clés de `keys.dart` (posées en `Semantics identifier`
-  par l'implémentation). Jamais de texte (localisé), jamais de coordonnées sauf impasse documentée.
+- Sélecteurs : **`id:` uniquement**, avec les clés du fichier de clés (posées en identifiant
+  d'accessibilité par l'implémentation). Jamais de texte (localisé), jamais de coordonnées sauf impasse documentée.
 - **Au moins une capture par flow**, à l'état final du scénario ; une de plus par état intermédiaire
   intéressant (Loading, dialogue).
 - Identifiants de test : **jamais en clair**. `inputText: ${QA_EMAIL}` et la variable vient de la

@@ -6,8 +6,8 @@ moitié n'attend l'autre.
 
 | Moitié | `subagent_type` | Écrit | Gate (hook) |
 |---|---|---|---|
-| data/domain | `feature-implementer-data` | `lib/src/{data,domain,injection}/**` | `green_data` |
-| présentation | `feature-implementer-presentation` | le reste de `lib/`, `writes.extra` (router, l10n) | `green_presentation` |
+| data/domain | `feature-implementer-data` | couches data, domain, injection du package | `green_data` |
+| présentation | `feature-implementer-presentation` | le reste du code du package, `writes.extra` (router, l10n) | `green_presentation` |
 
 Prompt commun : nom, `spec.md`, package, `tests.md`, et « tu implémentes en parallèle de l'autre moitié ;
 ton fichier d'agent dit ta zone ». La sortie rouge de sa couche : `.claude/features/<nom>/.gauntlet/last_red.log`

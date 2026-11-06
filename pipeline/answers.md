@@ -42,7 +42,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 ## Revue et suggestions
 
 - Une `DÉCISION` ou un choix par défaut que Thibault n'a pas modifié est gardé tel quel : ne redemande pas « tu gardes bien ces propositions ? ». (2026-10-17, « Décisions », 6 sur 6)
-- Une clé de test manquante dans `keys.dart` (ou un `Semantics.identifier` à poser) : Arthur l'ajoute aux contrats, sans question. (2026-10-17, « Clés », 3 sur 3 ; confirmée le 2026-10-30 sur error_redirect)
+- Une clé de test manquante dans le fichier de clés (ou son identifiant d'accessibilité à poser) : Arthur l'ajoute aux contrats, sans question. (2026-10-17, « Clés », 3 sur 3 ; confirmée le 2026-10-30 sur error_redirect)
 
 ## QA
 
@@ -52,10 +52,10 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 
 - Avant de proposer un mécanisme (stockage, détection, navigation, analytics…), cherche comment c'est déjà fait ailleurs dans le code et réutilise-le ; ne propose du neuf qu'en disant pourquoi l'existant ne convient pas. (2026-10-17, « On n'a pas un système cool pour ça déjà ? »)
 - Le cadrage, les comportements et les textes d'interface s'écrivent du point de vue de l'utilisateur, sans technique. (2026-10-17, « le user s'en carre de la technique »)
-- Une écriture locale qui peut échouer (Isar, stockage, préférences, plugin) rend `Either<ErrorEntity, void>` depuis la data source, comme toute I/O ; pas de `Future<void>` qui lève. (2026-10-17, « Either », tranché après 3 Either et 2 Future<void>)
-- Couches strictes : BLoC → use case → repository → data sources. Le repository combine les data sources ; pas de parsing JSON ni de persistance dans un use case ; ne supprime jamais un use case appelé par un BLoC. (2026-10-17, « respecte mon archi », 5 réponses)
+- Une écriture locale qui peut échouer (base locale, stockage, préférences, plugin) rend le type résultat (erreur typée ou rien) depuis la data source, comme toute I/O ; pas de fonction sans résultat qui lève. (2026-10-17, « Either », tranché après 3 Either et 2 Future<void>)
+- Couches strictes : state holder → use case → repository → data sources. Le repository combine les data sources ; pas de parsing JSON ni de persistance dans un use case ; ne supprime jamais un use case appelé par un state holder. (2026-10-17, « respecte mon archi », 5 réponses)
 - Jamais `.first` ni `take(1)` sur un Stream de watch : ajoute une méthode `Future` au repository ou à la data source. (2026-10-17, 2 réponses)
 - Un package tiers déjà exposé par `core` s'importe via `core`, pas en dépendance directe. (2026-10-17, « Core est là pour ça »)
 - Une nouvelle I/O transverse (détection ou ouverture d'app, plugin natif…) vit dans son propre package. (2026-10-17, « Dans sa propre feature ça », 4 réponses)
-- Une transaction Isar faillible se rend en `Either` via `AtomicOperationHelper.executeAtomicallyOrLeft` (core) ; ne crée pas de repository ou de data source juste pour porter la transaction. (2026-10-30, « DÉCISION 1 »)
-- Nomme chaque entité de domaine avec le suffixe `Entity` (classe `XxxEntity`, fichier `xxx_entity.dart`). (2026-10-29, « Contrats »)
+- Une transaction de base locale faillible se rend en type résultat via l'outil transactionnel de `core` (règle de langage) ; ne crée pas de repository ou de data source juste pour porter la transaction. (2026-10-30, « DÉCISION 1 »)
+- Nomme chaque entité de domaine avec le suffixe `Entity` (classe `XxxEntity`, fichier nommé d'après elle selon la convention du langage). (2026-10-29, « Contrats »)

@@ -92,7 +92,7 @@ Avant de lancer quoi que ce soit :
    - Ne PAS lister chaque commit individuellement. Regrouper les changements liés.
    - Regrouper les changements purement internes (refactors, cleanup, CI, tests, bumps de version) dans une seule ligne sous "Technical" (ex: "Internal improvements and stability fixes"). Ne pas détailler.
    - Ignorer les commits de type `chore: bump version` et `chore: release`.
-   - Pour les crashs / bugs techniques, décrire le symptôme visible par l'utilisateur, pas la cause technique (ex: "Fixed a crash when opening the plan view" au lieu de "Fixed null pointer in PlansBloc").
+   - Pour les crashs / bugs techniques, décrire le symptôme visible par l'utilisateur, pas la cause technique (ex: "Fixed a crash when opening the plan view" au lieu de "Fixed null pointer in PlansStateHolder").
    - Rester factuel et concis. Pas de filler, pas de marketing, pas de lyrisme.
 
 3. **Liens vers les issues** : Si les règles définissent une URL d'issues, convertir les références `#123` en liens markdown.

@@ -110,10 +110,12 @@ réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
 | Fichiers non versionnés du worktree | `~/.claude/scripts/worktree_untracked.sh <worktree>` (`worktree.copy_untracked`) |
 | Appareils QA | `pipeline.sh devices <nom>` (preflight, `qa_devices`) · `gauntlet.sh qa_device <nom>` |
 | Rapport pour le dev | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
-| Config projet | `.claude/rules/feature_pipeline.md` (template : `~/.claude/commands/templates/flutter/feature_pipeline.md`) |
-| Règles de code | `.claude/rules/create_feature_rules.md` (template : `~/.claude/commands/templates/flutter/create_feature_rules.md`) |
-| Template de spec | `~/.claude/commands/templates/flutter/feature_spec_template.md` |
-| Brick global | `~/.claude/bricks/flutter_feature` |
+| Langage du package | `bash ~/.claude/scripts/stack.sh detect <chemin>` ; doctrine : `~/.claude/rules/stacks/<langage>*.md`, chargée au premier fichier du langage lu |
+| Gabarits du langage | `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/` : `feature_pipeline.md`, `create_feature_rules.md`, `feature_spec_template.md`… |
+| Config projet | `.claude/rules/feature_pipeline.md` (gabarit : `feature_pipeline.md` du langage) |
+| Règles de code | `.claude/rules/create_feature_rules.md` (gabarit : `create_feature_rules.md` du langage) |
+| Template de spec | `feature_spec_template.md` du langage |
+| Brick global | celui du langage (règle de langage) |
 | État | `.claude/features/<nom>/pipeline.json` |
 | Ticket | `~/.claude/pipeline/issue.md` (existant ou créé après la spec validée) · tracker du projet (GitLab, Notion, rien) : `~/.claude/pipeline/tracker.md` |
 | Epic (gabarit L) | `~/.claude/commands/epic.md` |
@@ -159,7 +161,7 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
 
 ## Règles de conduite
 
-- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question au dev.
+- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question au dev.
 - **Filtre avant toute question imprévue.** Une question coûte l'attention du dev et souvent une
   boucle d'agents. Avant de la poser, dans l'ordre :
   1. **Une règle tranche** (règles de base, `create_feature_rules.md`, `pr_rules.md`, convention du
@@ -205,7 +207,7 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code, sans jargon que la question
     n'explique pas ;
   - jamais un identifiant seul (`S1`, `K3`, « le point 2 », « l'option B ») : il est toujours suivi de ce
-    qu'il désigne (« S1 — `foo.dart:42` : le mapper avale l'erreur réseau → la remonter en
+    qu'il désigne (« S1 — `foo_mapper:42` : le mapper avale l'erreur réseau → la remonter en
     `NetworkError` »).
   Le message au-dessus peut porter l'extrait long (3 à 8 lignes, lien cliquable) ; la question ne s'y
   réfère pas (« voir ci-dessus »). Relue seule, elle doit permettre de répondre sans cocher

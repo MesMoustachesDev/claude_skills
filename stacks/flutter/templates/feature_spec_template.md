@@ -228,7 +228,7 @@ N/A
 <!--
   Pas de vue d'architecture : la structure est dans les contrats du dev. Les séquences par scénario
   sont dans cadrage.md ; `archi.json` (à côté de cette spec, format :
-  ~/.claude/commands/templates/flutter/feature_archi_example.json) relie seulement chaque C<n> à son
+  ~/.claude/stacks/flutter/templates/feature_archi_example.json) relie seulement chaque C<n> à son
   scénario de §4. Seul diagramme gardé ici : la machine d'états de chaque BLoC.
 -->
 

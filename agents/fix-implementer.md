@@ -4,8 +4,6 @@ description: Fanny — Étape 2 du pipeline /fix. Corrige la cause racine d'un b
 model: sonnet
 skills:
   - superpowers:test-driven-development
-  - dart-flutter:dart-use-pattern-matching
-  - dart-flutter:flutter-fix-layout-issues
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:
@@ -40,9 +38,9 @@ des findings critiques à corriger.
 0. **Tes skills sont déjà chargés** (champ `skills` de ton en-tête, injectés au démarrage : ne
    les rappelle pas avec l'outil `Skill`). Applique-les :
    `superpowers:test-driven-development` (le code le plus simple qui fait passer le test de
-   reproduction), `superpowers:verification-before-completion` avant de rendre la main, et selon ce
-   que tu touches `dart-flutter:dart-use-pattern-matching` (domain, BLoC) ou
-   `dart-flutter:flutter-fix-layout-issues` (vue).
+   reproduction), `superpowers:verification-before-completion` avant de rendre la main, et les skills
+   du langage que la règle de langage liste pour la couche que tu touches (pas dans ton en-tête :
+   invoque-les avec l'outil `Skill`, après avoir lu le code en cause, qui charge la règle).
    Un skill qui contredit les règles du projet (`create_feature_rules.md`, `pr_rules.md`, conventions
    tranchées par Thibault, use case par action même relais) : **le projet gagne**.
 1. Lis `diagnosis.md` en entier, puis le code à `root_cause_location` et tout son flux. La cause racine
@@ -59,7 +57,7 @@ des findings critiques à corriger.
 3. Corrige **le minimum qui traite la cause**. Pas de refacto opportuniste, pas de reformatage de
    fichiers voisins, pas de changement de comportement hors du bug. Si la vraie correction est plus
    large que le bug (le même défaut ailleurs), corrige-le là aussi et liste-le dans ton rapport.
-   Leçons des runs précédents (learn 2026-10-27), qui valent aussi hors Flutter :
+   Leçons des runs précédents (learn 2026-10-27), qui valent dans tous les langages :
    - le commentaire, la KDoc, le README et la doc projet du code changé sont mis à jour dans le même diff ;
    - une règle, une borne ou un mapping n'existe qu'à un endroit : réutilise celui qui existe ;
    - ce que la correction rend inutile (variante, branche, dépendance, export) est retiré ;

@@ -36,7 +36,8 @@ Le nom du fix, la description du bug (texte, issue Sentry, capture, étapes), la
 
 **0. Le worktree.** Tu travailles dans un worktree neuf (`.claude/worktrees/fix-<nom>/`) : les
 dépendances n'y sont pas. Dès que tu sais quel package est en cause, installe-les à l'identique du
-lockfile — `npm ci` (s'il y a un `package-lock.json`), `flutter pub get` / `fvm flutter pub get` —
+lockfile — `npm ci` (s'il y a un `package-lock.json`), sinon la commande d'installation du langage (règle de
+langage, chargée dès que tu lis un fichier du package) —
 jamais `npm install <paquet>`, jamais de bump. Les `.env` locaux n'y sont pas non plus : un test
 n'en dépend pas.
 
@@ -75,7 +76,7 @@ Si un test existant est **faux**, tu le corriges — c'est dans ton périmètre 
 **3. Le test rouge.** Le niveau le plus bas qui reproduit le bug **réel** :
 - logique, data, backend → test unitaire, avec les vraies règles de mock du projet
   (`~/.claude/commands/create_test.md` : comportement, pas implémentation ; assertions sur le contenu).
-- Flutter, rendu ou interaction → widget test (`find.byKey`).
+- Rendu ou interaction → test d'UI du langage (élément trouvé par sa clé).
 - Visible seulement sur device (layout, plateforme, navigation native, permissions) → flow Maestro
   dans `<package>/maestro/fix_<nom>.yaml`, qui asserte le comportement **correct** (donc échoue
   aujourd'hui) et prend une capture dans `${FIX_SHOTS_DIR}` (`takeScreenshot: ${FIX_SHOTS_DIR}/<étape>`).
@@ -108,7 +109,7 @@ rapport (`Besoin du dev : …` si le rapport à utiliser n'est pas dans le signa
 
 Le test doit échouer **sur une assertion qui nomme le bug**, pas sur une compilation, un import ou un
 setup. Le message d'échec que tu attends va dans `expected_failure`. Si le runner manque (pas de
-script `test`), branche-le dans `package.json` / `pubspec.yaml` — c'est autorisé.
+script `test`), branche-le dans le manifeste du package (`package.json`, ou celui du langage) — c'est autorisé.
 
 Avant d'ajouter ton test, lance la suite du package une fois : son état est `baseline_suite`. Si elle
 est déjà rouge, liste les échecs — Fanny ne doit pas en hériter sans que le dev le sache.

@@ -8,8 +8,8 @@ si `prepare` a dit `ok`. En `extend` : « pas de scaffold ; ajoute dans l'exista
 
 Arthur scaffolde (en `create`) et pose **dans les vrais fichiers du package**, en stubs, le court
 brouillon de ce que Thibault doit posséder : entités, interfaces de repository et de data sources,
-signatures des use cases, events/states sealed, `keys.dart`. Chaque choix qu'un dev senior pourrait
-faire autrement (Stream ou Future, un BLoC ou deux, où vit une logique, remote/local) porte au-dessus
+signatures des use cases, events/states sealed, le fichier de clés. Chaque choix qu'un dev senior pourrait
+faire autrement (Stream ou Future, un state holder ou deux, où vit une logique, remote/local) porte au-dessus
 de la ligne un commentaire `// DÉCISION (Thibault) : <question> — proposé : <X>, alternative : <Y>`.
 **Les choix structurants viennent du cadrage** (« Décisions techniques », tranchées avec Thibault dans
 la discussion de départ) : Arthur les applique, sans `DÉCISION` à ces endroits. Son rapport signale une
@@ -28,9 +28,9 @@ d'Arthur avant l'étape 2 (brouillon, mode application en 0e) : `pipeline.sh aft
 « relancer Arthur avec une consigne » / « je pars de ce qu'il y a et je corrige moi-même en 0e ».
 
 `pipeline.sh commit-contracts <nom> draft` : commit `chore(<nom>): contracts draft (Arthur)` sur les
-seuls fichiers du package, du pubspec racine et de `writes.extra` touchés, puis `contracts.draft_sha`
+seuls fichiers du package, du manifeste racine et de `writes.extra` touchés, puis `contracts.draft_sha`
 et `contracts.files`, la liste des fichiers de contrats (diff depuis la merge-base sous
-`<package>/lib`, filtré sur `**/domain/**`, `**/keys.dart`, `**/*_event.dart`, `**/*_state.dart`). **`contracts.files` est la
+le code du package, filtré sur les `contract_globs` du langage : `stack.sh get contract_globs <package>`). **`contracts.files` est la
 définition des contrats de Thibault** pour tous les agents : un fichier qu'il n'a pas modifié est
 aussi le sien.
 

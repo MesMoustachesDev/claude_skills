@@ -7,7 +7,7 @@ rattaché à l'endroit du code qu'il concerne.
 `gauntlet.sh report <nom> tour`, `SendUserFile` du `report.html` (`display: render`), puis
 `SendUserFile` des captures (`.claude/features/<nom>/qa/**/*.png`, un appel par plateforme). La section
 « Visite guidée » montre les étapes de `review.json → tour` (écrites par Romain), dans l'ordre du flux
-de données (vue → BLoC → use case → repository → data source) : chacune avec `fichier:ligne`
+de données (vue → state holder → use case → repository → data source) : chacune avec `fichier:ligne`
 (recalculé depuis le symbole si le code a bougé depuis la revue), un extrait, ce que fait le code, le
 C<n> ou la décision qu'elle implémente, et rattachés : les mutants de ce fichier (`mutants.md`), ses
 suggestions de Romain avec leur décision, les captures de ses scénarios, les tests suspects. En tête,

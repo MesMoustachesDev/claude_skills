@@ -71,11 +71,11 @@ Sois honnête : deux `toUiModel` sur deux entités différentes sont `distinct`,
 {
   "verdicts": [
     {
-      "target":   { "name": "CookingProfileStringX.capitalizeFirst", "file": "lib/src/...dart", "line": 12 },
-      "existing": { "name": "StringX.capitalize", "file": "features/core/lib/src/string_ext.dart", "line": 8, "package": "core" },
+      "target":   { "name": "CookingProfileStringX.capitalizeFirst", "file": "<src>/...", "line": 12 },
+      "existing": { "name": "StringX.capitalize", "file": "features/core/<src>/string_ext", "line": 8, "package": "core" },
       "verdict":  "duplicate",
-      "reason":   "même transformation ; core/string_ext.dart est importé par 14 features",
-      "fix":      "supprimer CookingProfileStringX, importer package:core/string_ext.dart, appeler .capitalize()",
+      "reason":   "même transformation ; core/string_ext est importé par 14 features",
+      "fix":      "supprimer CookingProfileStringX, importer string_ext de core, appeler .capitalize()",
       "fix_by":   "architect"
     }
   ]

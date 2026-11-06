@@ -36,9 +36,9 @@ Lis-le intégralement avec `Read`. Il contient :
 ### Si le fichier n'existe pas :
 
 1. Informe l'utilisateur
-2. Liste les templates disponibles via `ls ~/.claude/commands/templates/`
+2. Liste les gabarits disponibles via `ls -d ~/.claude/stacks/*/templates/` (le langage du projet : `bash ~/.claude/scripts/stack.sh detect .`)
 3. Demande via `AskUserQuestion` :
-   - Choisir un template existant → copier `~/.claude/commands/templates/{choice}/create_screen_rules.md` dans `.claude/rules/`
+   - Choisir un template existant → copier `~/.claude/stacks/{choice}/templates/create_screen_rules.md` dans `.claude/rules/`
    - Créer un template from scratch → demande brièvement la stack (framework, DS, state management, l10n) et génère un `create_screen_rules.md` minimal dans `.claude/rules/`
    - Annuler
 

@@ -44,7 +44,7 @@ Ticket : <ref> <url>                ← si pipeline.json → issue existe (issue
 | # | Fichier:ligne | Ce que fait le code | Implémente |
 
 ## Acceptation
-| Scénario | Widget test | Android | iOS |   ← §4 × tests.md × qa.md ; en S, « — (gabarit S) » sur la plateforme non jouée
+| Scénario | Test d'acceptation | Android | iOS |   ← §4 × tests.md × qa.md ; en S, « — (gabarit S) » sur la plateforme non jouée
 
 ## Mesures
 Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%

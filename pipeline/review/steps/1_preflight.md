@@ -5,7 +5,7 @@ Une revue qui découvre à la fin que la QA n'avait pas d'appId, que le graphe n
 de la revue se vérifie ici, avant le gauntlet, et se tranche **en un seul arrêt**.
 
 1. `review.sh preflight <slug>` (Bash timeout 600000 : il lance le doctor du gauntlet). Il vérifie :
-   l'outillage (SDK épinglé installé, outils Dart du gauntlet — leur absence fait crasher `reinvented`
+   l'outillage (SDK épinglé installé, outils du gauntlet propres au langage — leur absence fait crasher `reinvented`
    et `dedup` —, linter, maestro), la config QA (plateformes, appIds réels et non de template, AVD et
    simulateur, compte de test référencé), le graphe graphify, et l'authentification de `glab`/`gh`.
    Il écrit `preflight.json` et liste les manques par domaine.
@@ -17,8 +17,8 @@ de la revue se vérifie ici, avant le gauntlet, et se tranche **en un seul arrê
      jetables (Recommandé si pas de device sous la main) » / « Pas de QA pour cette revue ».
    - **graphe** : « Construire le graphe maintenant (`/graphify` sur le projet, quelques minutes) » /
      « Sans graphe : Alice lit les consommateurs hors package à la main ».
-   - **outillage** : « Lance les corrections » (les commandes que le doctor donne : `fvm install …`,
-     `dart pub global activate …` — installations locales, rien d'externe) / « Continuer : les checks
+   - **outillage** : « Lance les corrections » (les commandes que le doctor donne — installations locales du SDK
+     et des outils, rien d'externe) / « Continuer : les checks
      concernés seront marqués non joués ».
    - **publication** : « Je m'authentifie (`glab auth login`, dans mon terminal) » / « Je publierai à
      la main : la revue s'arrêtera au texte validé ».

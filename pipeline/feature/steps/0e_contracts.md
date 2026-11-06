@@ -53,7 +53,7 @@ stubbées, imports, README) sans toucher à mes signatures » / « J'ai une ques
   `AskUserQuestion` de cet arrêt, avant qu'il édite.
 
 Vert → `pipeline.sh commit-contracts <nom> thibault` : commit `feat(<nom>): contracts (by Thibault)`
-des seuls fichiers du package, du pubspec et de `writes.extra` modifiés depuis `draft_sha`, avec
+des seuls fichiers du package, du manifeste et de `writes.extra` modifiés depuis `draft_sha`, avec
 `--allow-empty` (Thibault peut garder le brouillon tel quel : c'est un choix, et le commit le date),
 puis `contracts.sha`, `contracts.files` recalculé (un fichier de contrat ajouté par Thibault en fait
 partie) et `human_gates.contracts`. Les fichiers de

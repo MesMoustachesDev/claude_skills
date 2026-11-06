@@ -23,9 +23,9 @@ remarque** — du contexte. Il comprend :
    l'impact s'il existe :
 
    ```
-   data/       not_reachable_device_data_source.dart   +33/-2    query GraphQL `esls`
+   data/       not_reachable_device_data_source        +33/-2    query GraphQL `esls`
    presentation/
-               device_details_page.dart                +91/-115  ⚠ 1 ligne ESL, le reste = reformat
+               device_details_page                     +91/-115  ⚠ 1 ligne ESL, le reste = reformat
    ```
 
 4. **Le flux** — un diagramme Mermaid (bloc ` ```mermaid `) du chemin que parcourt la donnée ou

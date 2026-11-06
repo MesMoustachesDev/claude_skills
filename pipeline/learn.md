@@ -24,7 +24,7 @@ les patterns déjà connus (`known_patterns`).
 ## 2. Étiqueter
 
 Pour chaque signal, un `pattern` : un slug en snake_case qui nomme **la cause qui se répète**, pas le
-symptôme du run (`either_unfolded_outside_bloc`, `mock_hides_platform_null`, `spec_omits_empty_state`,
+symptôme du run (`result_unfolded_outside_state_holder`, `mock_hides_platform_null`, `spec_omits_empty_state`,
 pas `meal_plan_bug_42`).
 - Un pattern connu qui a la même cause → réutilise-le. C'est l'essentiel : un slug neuf par run ne
   fait jamais de récurrence.
@@ -45,9 +45,9 @@ dans ce que lit l'agent qui l'a produite, pas celui qui l'a rattrapée :
 
 | L'erreur vient de | Signaux typiques | La règle va dans |
 |---|---|---|
-| l'implémentation (Ivan, Nina, Fanny) | `review_critical`, `suggestion` appliquée, `reinvented`, `plan_deviation` | `.claude/rules/create_feature_rules.md` du projet ; si elle vaut pour tous les projets Flutter, le template `~/.claude/commands/templates/flutter/create_feature_rules.md` |
-| les tests (Théo, Bastien, Hugo) | `tests_blocking`, `missing_test`, `miss`, `arbitration`, re-gel `technique` | `~/.claude/commands/create_test.md` |
-| la spec (Sophie) | `spec_blocking`, re-gel `spec` | `~/.claude/commands/templates/flutter/feature_spec_template.md` (la section concernée) |
+| l'implémentation (Ivan, Nina, Fanny) | `review_critical`, `suggestion` appliquée, `reinvented`, `plan_deviation` | `.claude/rules/create_feature_rules.md` du projet ; si elle vaut pour tous les projets du langage, la règle de langage `~/.claude/rules/stacks/<langage>.md` (doctrine) ou le gabarit `~/.claude/stacks/<langage>/templates/create_feature_rules.md` (règles projet) |
+| les tests (Théo, Bastien, Hugo) | `tests_blocking`, `missing_test`, `miss`, `arbitration`, re-gel `technique` | `~/.claude/commands/create_test.md` ; si elle ne vaut que pour un langage, `~/.claude/rules/stacks/<langage>-tests.md` |
+| la spec (Sophie) | `spec_blocking`, re-gel `spec` | `~/.claude/stacks/<langage>/templates/feature_spec_template.md` (la section concernée) |
 | la revue elle-même : un défaut vu tard (re-gel, QA, visite) qu'aucune revue n'a signalé | `refreeze`, `accepted` répété | `~/.claude/pipeline/review_grid.md` |
 | un choix que Thibault tranche toujours pareil | `accepted` répété | `~/.claude/pipeline/answers.md` (son format) |
 

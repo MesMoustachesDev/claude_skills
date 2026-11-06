@@ -29,10 +29,10 @@ Lis-le intégralement avec l'outil `Read`. Il contient :
 ### Si le fichier n'existe pas :
 
 1. Informe l'utilisateur qu'aucun `create_feature_rules.md` n'a été trouvé
-2. Vérifie s'il existe des templates préfabriqués dans `~/.claude/commands/templates/`
-3. Liste les templates disponibles via `ls ~/.claude/commands/templates/`
+2. Vérifie s'il existe des gabarits préfabriqués : un dossier par langage, `~/.claude/stacks/<langage>/templates/`
+3. Liste-les via `ls -d ~/.claude/stacks/*/templates/` ; le langage du projet : `bash ~/.claude/scripts/stack.sh detect .`
 4. Demande à l'utilisateur via `AskUserQuestion` :
-   - Choisir un template existant (ex: `flutter`, `nextjs`, etc.) → copier `~/.claude/commands/templates/{choice}/create_feature_rules.md` dans `.claude/rules/`
+   - Choisir un template existant (ex : le langage détecté) → copier `~/.claude/stacks/{choice}/templates/create_feature_rules.md` dans `.claude/rules/`
    - Créer un template from scratch → demande à l'utilisateur de décrire brièvement son stack et ses conventions, puis génère un `create_feature_rules.md` minimal dans `.claude/rules/`
    - Annuler
 
@@ -63,7 +63,7 @@ Applique **exactement** les templates définis dans le fichier de règles, en :
 1. Respectant la structure de dossiers décrite
 2. Appliquant les conventions de nommage (transformation du nom de feature : snake_case → PascalCase, camelCase, etc. selon le template)
 3. Remplaçant les placeholders (`{feature_name}`, `{FeatureName}`, `{featureName}`, etc.) par les valeurs appropriées
-4. Ne générant **que** les fichiers pertinents selon les réponses aux questions (ex: ne pas générer de data layer si "pas de data source", ne pas générer de BLoC si "pas de BLoC", etc.)
+4. Ne générant **que** les fichiers pertinents selon les réponses aux questions (ex: ne pas générer de data layer si "pas de data source", ne pas générer de state holder si "pas de state holder", etc.)
 
 **Règles de génération :**
 - N'ajoute **aucun fichier** non défini dans les règles

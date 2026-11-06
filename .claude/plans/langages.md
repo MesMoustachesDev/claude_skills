@@ -10,13 +10,15 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
 
 ## Sortir Flutter de ce qui est commun
 
-2. **Doctrine Flutter → `rules/stacks/flutter*.md`** (paths `**/*.dart`, `**/pubspec.yaml`) : retirer la prose
+2. **Doctrine Flutter → `rules/stacks/flutter*.md`** (paths `**/*.dart`, `**/pubspec.yaml`, `**/*.arb`) : [fait] retirer la prose
    Flutter des agents (`feature-*`, `fix-*`, `review-*`), des commandes (`feature`, `fix`, `create_test`,
    `debug_issue`, `reviewPR`, `create_screen`…) et de `pipeline/` (`review_grid.md`, `answers.md`, steps).
    Les textes deviennent « la commande / les conventions du langage ».
    → `pipeline/langages_doctrine`
-3. **Gabarits → `stacks/flutter/templates/`** (plus exposés en skills), brick `flutter_feature` à côté ;
+3. **Gabarits → `stacks/flutter/templates/`** (plus exposés en skills), brick `flutter_feature` à côté ; [fait]
    `/feature init` copie les gabarits du langage détecté ; mettre à jour la douzaine de références.
+   Reste le lien `commands/templates/flutter` → `../../stacks/flutter/templates`, à retirer quand `pr_gauntlet.sh`
+   et `graphify.sh` (point 4) lisent le nouveau chemin.
    → `pipeline/langages_doctrine`
 4. **Scripts du /feature** : gauntlet (`checks_*.sh` → génériques + `stacks/flutter/checks.sh`), hooks
    `pipeline-restrict-writes.sh`, `pipeline.py` (`CONTRACT_GLOBS`, marqueur de package), `review.py`,

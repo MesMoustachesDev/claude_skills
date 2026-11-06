@@ -41,10 +41,10 @@ ligne : le chemin du fichier.
 
 **Lève les inconnues techniques maintenant, pas pendant la spec.** Tu tournes en arrière-plan d'une
 discussion : ce temps est gratuit, celui de la spec est sur le chemin critique. Pour chaque dépendance
-(pub.dev, plugin, plateforme) que la feature touchera, réponds aux questions dont la spec aura besoin en
+(paquet tiers, plugin, plateforme) que la feature touchera, réponds aux questions dont la spec aura besoin en
 §6 et §7 : ce qu'elle lève et quand (exception, `Error`, valeur nulle, flux qui se ferme), ses cas limites
 (entrée vide, invalide, énorme), son comportement asynchrone (cache, ordre, annulation). Lis ses sources
-dans `~/.pub-cache/hosted/pub.dev/<paquet>-<version>/` (la version du `pubspec.lock`), et, si la lecture ne
+(où les trouver, à la version résolue : règle de langage), et, si la lecture ne
 suffit pas, une sonde jetable dans ton scratchpad, jamais dans le repo. Écris-les dans une section
 `## Inconnues techniques levées` d'`exploration.md` : une ligne par fait, avec `fichier:ligne` dans les
 sources du paquet. Ce qui reste ouvert après ça : `## Inconnues ouvertes`, une ligne chacune.
@@ -59,7 +59,7 @@ lieu** : `discussion.md` en garde les décisions et le périmètre, `exploration
   ailleurs (autre plateforme, web, backend, feature voisine, design system). Relève les valeurs en dur
   (seuils, formats, limites, qualités) et les écarts entre implémentations. Si une autre plateforme le
   fait déjà, dis-le en premier : l'alignement est souvent la bonne réponse.
-  **Si ton prompt donne un graphe graphify** (son chemin, ex. `flutter_app/graphify-out/graph.json`),
+  **Si ton prompt donne un graphe graphify** (son chemin, ex. `app/graphify-out/graph.json`),
   pars de lui, comme décrit dans `~/.claude/pipeline/graphify.md` (section Explorer : `--graph <chemin>`
   à chaque commande) : carte d'abord, `query` en dernier recours.
   Lis le code pour vérifier ce que le graphe montre, pas pour le redécouvrir. Cite les nœuds avec leur
@@ -91,11 +91,11 @@ lieu** : `discussion.md` en garde les décisions et le périmètre, `exploration
   Ids imposés, le rapport les lit : `U` (utilisateur), `E` (écran), `A` (app) ; tout autre id
   (`S` serveur, `L` stockage local, `P` plateforme : galerie, caméra…) est un système extérieur.
   `U->>E` = une action, `E-->>U` = un résultat visible, `A->>S` / `S-->>A` = une requête et sa
-  réponse (erreur comprise). Comportement seulement : aucun nom de classe, de BLoC ou de use case.
+  réponse (erreur comprise). Comportement seulement : aucun nom de classe, de state holder ou de use case.
   Une étape par chose que le test d'acceptation devra faire ou vérifier : la séquence sera comparée,
   étape par étape, au test réel.
 - **Package et dépendances** : ce qui a été décidé (nouveau package, ou extension de `features/x`),
-  et toute dépendance pub.dev ou inter-feature retenue, avec la raison donnée dans la discussion.
+  et toute dépendance tierce ou inter-feature retenue, avec la raison donnée dans la discussion.
 - **Décisions techniques** : chaque choix structurant tranché dans la discussion (nouvelle I/O,
   Stream ou Future, découpage de l'état, où vit une logique, ce qu'on réutilise), une ligne chacun :
   le choix, la raison dans les mots du dev, l'alternative écartée. Arthur les applique telles quelles.
@@ -104,7 +104,7 @@ lieu** : `discussion.md` en garde les décisions et le périmètre, `exploration
   salve de questions : en général, rien.
 - **Règles non négociables** qui s'appliquent : rappelées, jamais posées comme question.
 - **Gabarit proposé** (S / M / L) et ses mesures, une ligne chacune : scénarios estimés, packages
-  touchés, package de feature ou dépendance pub.dev ajoutés, décisions majeures estimées (une ligne
+  touchés, package de feature ou dépendance tierce ajoutés, décisions majeures estimées (une ligne
   par décision : sujet, pourquoi elle change la structure). Critères : **S** ≤ ~8 scénarios, aucun
   nouveau package, ≤ 2 décisions majeures ; **L** > 5 décisions majeures ou plusieurs packages
   touchés ; **M** sinon. Dans le doute, le plus lourd. En **L**, ajoute un **découpage proposé** :
@@ -137,7 +137,7 @@ validés au cadrage, la description brute, la racine du projet, et le chemin de 
 - `CLAUDE.md` du projet.
 - La feature de référence désignée, et une ou deux features voisines de ce que tu vas spécifier :
   comment elles structurent domain/data/presentation, DI, routes, l10n, analytics.
-- `features/core/lib/*.dart` : ce qui existe déjà (Either, ErrorEntity, DataLoader, analytics, logger…).
+- le package `core` : ce qui existe déjà (type résultat, erreur typée, chargement, analytics, logger…).
   **Ne réinvente rien qui existe dans core.**
 - `features/design/` : les composants du design system disponibles.
 - `features/l10n/` : la convention des clés ARB.
@@ -163,10 +163,10 @@ erreur sans state pour l'afficher, une donnée absente d'une entité, un use cas
 ton rapport sous « Contrats à revoir par Thibault », avec `fichier:ligne`, le C<n> qu'il empêche et
 le changement minimal qui le permettrait. Le dev tranche.
 
-**§9 ne garde que ce que les contrats ne montrent pas** : le package et les dépendances (pub.dev,
+**§9 ne garde que ce que les contrats ne montrent pas** : le package et les dépendances (registre du langage,
 inter-features), au statut `validée` puisqu'ils ont été tranchés au cadrage. Une dépendance que tu
 découvres en écrivant la spec : une ligne `proposée`, avec une **alternative réelle** et la raison.
-Rien d'autre : Stream/Future, découpage des BLoCs, data sources, emplacement d'une logique sont dans
+Rien d'autre : Stream/Future, découpage des state holders, data sources, emplacement d'une logique sont dans
 le code de Thibault. Une question dont une règle dicte la réponse (gestion d'erreur,
 `create_feature_rules.md`, convention du repo) n'est jamais en §9.
 
@@ -175,20 +175,20 @@ le code voisin (import interdit, DI mal placée, README incomplet, copie à migr
 pas besoin de corriger pour fonctionner : tu ne la mets ni en §9 ni dans le périmètre, tu la listes
 dans ton rapport final sous « Dette existante (hors feature) », une ligne chacune avec le fichier.
 
-**3. Écris la spec** à partir de `~/.claude/commands/templates/flutter/feature_spec_template.md`.
+**3. Écris la spec** à partir du gabarit de spec du langage, `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/feature_spec_template.md`.
 Lis le template en entier : ses commentaires HTML sont tes consignes par section. Supprime-les une
 fois la section remplie.
 
 ## Exigences non négociables
 
-- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Ne la mets jamais en §9 comme décision ou alternative.
+- **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Ne la mets jamais en §9 comme décision ou alternative.
 - **§4 Gherkin** : chaque item de §2 « Inclus » a un scénario ; chaque état de §3 (Loading, Error,
   Empty, Loaded) a un scénario ; les steps désignent les widgets par leur clé de §5, jamais par leur
-  texte. Formulation en anglais, courte, compatible `bdd_widget_test`.
+  texte. Formulation en anglais, courte, compatible avec l'outil Gherkin du langage.
 - **§5 Contrats** : ils sont dans le code. Une ligne par contrat : le fichier et le **symbole**
-  (`Classe.methode` — un numéro de ligne ne survit pas aux éditions), ce qu'il déclare (« `MealRepository.watchWeek` : `Stream<Either<ErrorEntity, List<Meal>>>` »), et
+  (`Classe.methode` — un numéro de ligne ne survit pas aux éditions), ce qu'il déclare (« `MealRepository.watchWeek` : un flux de résultats de `List<Meal>` »), et
   le C<n> qu'il sert. Pas de signature recopiée : le code de Thibault fait foi, et Théo le lit.
-  Chaque clé de widget utilisée par §4 existe dans `keys.dart` (sinon : « Contrats à revoir »).
+  Chaque clé utilisée par §4 existe dans le fichier de clés (sinon : « Contrats à revoir »).
 - **§6 Données** : un payload d'exemple réel par modèle, tous les champs, plus les cas limites.
   Sans ça, personne ne peut tester un mapper.
 - **§7 Erreurs** : chaque erreur possible et ce que l'UI en fait. C'est la spec des scénarios Error.
@@ -196,7 +196,7 @@ fois la section remplie.
   (« jamais visible, remontée à Crashlytics seulement ») : une erreur sans scénario n'a pas de test
   d'acceptation, et Gaëlle cherchera son maillon dans chaque couche.
 - **§8 Archi** : dépendances du package, routes, clés l10n, events analytics, services core réutilisés,
-  et la machine d'états Mermaid de chaque BLoC. Pas d'autre diagramme dans la spec.
+  et la machine d'états Mermaid de chaque state holder. Pas d'autre diagramme dans la spec.
 - **§4 et le cadrage** : chaque C<n> du cadrage a **exactement un** scénario en §4 qui en reprend
   chaque étape (action, réponse du serveur, résultat visible) ; les scénarios d'états génériques
   (loading…) s'ajoutent sans C<n>.
@@ -212,7 +212,7 @@ fois la section remplie.
 
 Après la spec, écris `.claude/features/<nom>/archi.json` — rien d'autre qu'un tableau `sequences`
 qui relie chaque comportement du cadrage à son scénario de §4 (format :
-`~/.claude/commands/templates/flutter/feature_archi_example.json`) :
+`$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/feature_archi_example.json`) :
 
 ```json
 { "sequences": [
@@ -230,7 +230,7 @@ Pas de « etc. », pas de « à définir », pas de « selon les besoins ». Une
 ## Avant de rendre la main : `spec_lint`
 
 `~/.claude/scripts/gauntlet.sh spec_lint <nom>` (depuis la racine du worktree) vérifie ce qu'un script
-voit sans relecture : chaque clé citée existe dans `keys.dart`, chaque ligne de §7 cite son C<n>, chaque
+voit sans relecture : chaque clé citée existe dans le fichier de clés, chaque ligne de §7 cite son C<n>, chaque
 symbole de §5 et chaque `Classe.membre` d'une classe du workspace existent, chaque scénario
 d'`archi.json` est un titre de §4, la spec tient dans le plafond. Ton hook de fin le relance et te retient
 tant qu'il est rouge. Une clé ou un symbole absent parce que le **contrat** manque : ne l'invente pas,

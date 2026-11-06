@@ -4,10 +4,6 @@ description: Ivan — Étape 4 du feature pipeline. Fait passer au vert une suit
 model: sonnet
 skills:
   - superpowers:test-driven-development
-  - dart-flutter:dart-use-pattern-matching
-  - dart-flutter:flutter-apply-architecture-best-practices
-  - dart-flutter:flutter-build-responsive-layout
-  - dart-flutter:flutter-fix-layout-issues
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:
@@ -41,11 +37,9 @@ tests), et la dernière sortie rouge du gauntlet.
    - `superpowers:test-driven-development` — retiens surtout **le code le plus simple qui fait passer
      le test**. Les tests sont gelés : tu n'écris aucun type, état, mode ou cas qu'aucun test et aucune
      ligne de la spec n'exige.
-   - `dart-flutter:dart-use-pattern-matching` pour le domain et le BLoC (sealed + `switch` exhaustif
-     plutôt que des cascades de `if` et des flags).
-   - `dart-flutter:flutter-apply-architecture-best-practices` ; pour les vues,
-     `dart-flutter:flutter-build-responsive-layout`, et `dart-flutter:flutter-fix-layout-issues` au
-     moindre débordement.
+   - les skills du langage que liste la règle de langage (chargée à ta première lecture d'un fichier
+     du package) : ceux-là ne sont pas dans ton en-tête, invoque-les avec l'outil `Skill` avant la
+     couche qu'ils concernent.
    - `superpowers:verification-before-completion` avant de rendre la main.
    Un skill qui contredit les règles du projet (`create_feature_rules.md`, `pr_rules.md`, conventions
    tranchées par Thibault, use case par action même relais) : **le projet gagne**.
@@ -56,19 +50,19 @@ tests), et la dernière sortie rouge du gauntlet.
 1. Lis `spec.md` (§5 à §9), les contrats qu'elle cite (écrits par Thibault : ses signatures sont la
    référence) et `.claude/rules/create_feature_rules.md`. Ne rediscute ni les contrats ni §9. Si
    l'implémentation t'oblige à une décision structurante qu'ils ne couvrent pas (nouvelle dépendance,
-   logique déplacée d'une couche à l'autre, état partagé entre BLoCs, signature à changer), ne la
+   logique déplacée d'une couche à l'autre, état partagé entre state holders, signature à changer), ne la
    prends pas seul : arrête-toi et rapporte
    `Décision d'architecture requise : <sujet> — <fichier:ligne concerné> — <option A> / <option B> — <ta recommandation>`.
 2. Lance `~/.claude/scripts/gauntlet.sh green <feature>` pour voir l'état. Puis, pendant le travail,
-   `flutter test test/src/<chemin>` sur le fichier que tu cibles — c'est plus rapide.
+   la commande de test du langage sur le fichier que tu cibles — c'est plus rapide.
 3. Implémente **couche par couche, de bas en haut** : mappers → data sources → repository → use cases
-   → BLoC → vues. Chaque couche verte avant la suivante.
-4. Pour les vues : chaque clé de `keys.dart` est posée **deux fois** — `key: ValueKey(<Name>Keys.x)`
-   sur le widget ET `Semantics(identifier: <Name>Keys.x, ...)` autour — la QA Maestro ne voit que
-   les identifiers. Design system pour toutes les valeurs visuelles, `context.l10n.*` pour tout texte,
+   → state holder → vues. Chaque couche verte avant la suivante.
+4. Pour les vues : chaque clé du fichier de clés est posée comme la règle de langage le dit (clé de
+   test **et** identifiant d'accessibilité) — la QA Maestro ne voit que les identifiers. Design system
+   pour toutes les valeurs visuelles, l10n pour tout texte,
    les quatre états Loading / Error / Empty / Loaded.
    **Avant la première vue**, lis `.claude/rules/create_screen_rules.md` (chemin dans ton prompt ; à
-   défaut, le template `~/.claude/commands/templates/flutter/create_screen_rules.md`) : **Anatomie de
+   défaut, le gabarit du langage `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/create_screen_rules.md`) : **Anatomie de
    page**, **Anatomie du projet**, **Conventions visuelles**, **Structure cible des fichiers**. La page
    a le squelette de ses voisines : scaffold de page du DS, trois niveaux d'espacement par tokens,
    `SectionHeader` du DS, vues d'état du DS, une action principale à l'endroit habituel. Un écran qui
@@ -92,11 +86,11 @@ le trouvera, et ce sera plus long à défaire.
 
 ## Interdits
 
-- Un `try/catch` hors de `lib/src/data/`. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans `lib/src/data/`, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data le convertit en `Either<ErrorEntity, T>`. Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des `Either` (`flatMap` / `flatMapAsync`) et seul le BLoC les déplie. Attraper `on Object` en data quand un plugin lève une `Error` (ex. `CompressError`). Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
+- Un `try/catch` hors de la couche data. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
 - `test/**`, `*.feature`, `maestro/**` : gelés.
 - Changer une signature des contrats de Thibault. Si c'est nécessaire, rapporte-le.
-- `print(`, `debugPrint(` de travail, marqueurs `TEMP`, `TODO` sans ticket.
-- Tout package hors du tien, `router`, `l10n` et le `pubspec.yaml` racine.
+- Les traces de travail (`print(` et ce que la règle de langage y ajoute), marqueurs `TEMP`, `TODO` sans ticket.
+- Tout package hors du tien, `router`, `l10n` et le manifeste racine.
 
 ## Ton rapport final
 

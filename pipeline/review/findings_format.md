@@ -10,7 +10,7 @@ en tête. Une remarque incomplète est écartée et signalée : remplis tous les
   "role": "archi",
   "summary": "Une phrase : ce que tu as relu et ce qui en ressort.",
   "grid": {
-    "architecture": "ok — couches respectées, Either déplié dans le BLoC",
+    "architecture": "ok — couches respectées, résultat déplié dans le state holder",
     "roue_reinventee": "ko — F2",
     "dependances": "na"
   },
@@ -18,7 +18,7 @@ en tête. Une remarque incomplète est écartée et signalée : remplis tous les
     {
       "severity": "critical",
       "title": "Titre court, le problème et pas la solution",
-      "file": "features/esl/lib/src/data/esl_repository_impl.dart",
+      "file": "features/esl/<src>/data/esl_repository_impl",
       "line": 42,
       "problem": "Ce qui ne va pas, en une ou deux phrases, factuel.",
       "why": "Pourquoi c'est un problème ici : conséquence concrète, règle enfreinte (pr_rules, grille), ou écart au voisin de référence.",

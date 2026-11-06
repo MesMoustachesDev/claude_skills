@@ -20,22 +20,23 @@
   - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `absent` → ne parle pas de graphify
     et continue ; `stale` ou `échec` → note la ligne et continue sans carte. Sur `ok`, garde la valeur
-    de `graph=` (chemin du graphe relatif à la racine, ex. `flutter_app/graphify-out/graph.json`) et
+    de `graph=` (chemin du graphe relatif à la racine, ex. `app/graphify-out/graph.json`) et
     écris-la dans `pipeline.json → graphify_graph` (à la création, ou en remplacement à la reprise ;
     `null` hors `ok`) : tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage, et à tout
     agent relancé plus tard ; 9a le mettra à jour.
-  - **Fichiers non versionnés** (création comme reprise), avant le `pub get` :
+  - **Fichiers non versionnés** (création comme reprise), avant l'installation des dépendances :
     `bash ~/.claude/scripts/worktree_untracked.sh <worktree>`. Il copie depuis le checkout principal
     (le premier de `git worktree list`) les fichiers gitignorés que le build et les tests lisent et qui
-    manquent au worktree : `.env*`, `*.env`, `.ci.env`, `local.properties`, configs Firebase, `.fvmrc`…
+    manquent au worktree : `.env*`, `*.env`, `.ci.env`, `local.properties`, configs Firebase, fichiers de version du SDK…
     (`worktree.copy_untracked` de la config ; défaut dans l'en-tête du script). Il n'écrase jamais un
     fichier déjà là et ne copie jamais un keystore ni un secret de signature (`*.jks`, `key.properties`,
     `*.p8`, `*.p12`…), même s'ils sont demandés. Pas de question : dis-le avec le bloc « ce que tu
     tranches sans lui » (`feature.md`) — les fichiers copiés (lignes `copié`), la ligne `résumé`, les
     `refusé` s'il y en a, et que la liste se règle dans `worktree.copy_untracked`. Rien de copié : une
     ligne suffit, dans le même bloc que la base de branche.
-  - Dépendances non versionnées : `flutter pub get` (ou `fvm flutter pub get`) à la racine du
-    worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate `build_runner`.
+  - Dépendances non versionnées : la commande d'installation du langage du package (`stack.sh detect`
+    le dit ; lire son manifeste charge la règle de langage, qui donne la commande) à la racine du
+    worktree avant le doctor ; les fichiers générés non commités se régénèrent au gate de génération de code.
   - `.gitignore` : `.claude/worktrees/` s'il n'y est pas.
 - `gauntlet.sh doctor` rouge → exécute `/feature init` d'abord.
 - **Règles du projet absentes** : chaque ligne `RÈGLE ABSENTE : <fichier>` du doctor est une question à
@@ -43,14 +44,14 @@
   Pauline l'appliquent à chaque écran ; `pr_rules.md` : la référence de Romain et de `/reviewPR`). Un fichier
   de `.claude/rules/` est chargé en entier dans chaque agent par Claude Code : c'est la seule façon sûre de
   le leur donner. Les choix :
-  - « La créer depuis le template » → copie `~/.claude/commands/templates/flutter/<fichier>` dans
+  - « La créer depuis le template » → copie `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/<fichier>` dans
     `.claude/rules/<fichier>` du worktree, ouvre-le pour qu'il l'adapte (`open_in_editor`), commit avec la
     feature ;
   - « Prendre le template tel quel » → la même copie, sans l'ouvrir ;
   - « Le projet n'en a pas besoin » → ajoute le fichier à `rules.none` de `.claude/rules/feature_pipeline.md`.
 
 - **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
-  un `pubspec.yaml`). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si le
+  un marqueur de package de son langage : `stack.sh detect <chemin>` répond). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si le
   cadrage propose « extension de `features/x` » et que le dev le valide en 0b : tu bascules en
   `extend` avant le brouillon d'Arthur (les contrats s'écrivent dans le bon package).
 - **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, `pipeline.sh status <nom>` (affiche

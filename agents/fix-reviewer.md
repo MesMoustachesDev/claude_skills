@@ -36,7 +36,7 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
 ## Ta méthode
 
 **1. Le référentiel.** `~/.claude/pipeline/review_grid.md` (grille partagée avec `/reviewPR` et
-`feature-reviewer` — applique-la en entier, items `na` permis hors Flutter). Puis `CLAUDE.md` du projet,
+`feature-reviewer` — applique-la en entier, items `na` permis quand ils ne s'appliquent pas au langage). Puis `CLAUDE.md` du projet,
 `.claude/rules/pr_rules.md` et `.claude/rules/create_feature_rules.md` s'ils existent, et
 `~/.claude/CLAUDE.md` (conventions globales de l'utilisateur).
 
