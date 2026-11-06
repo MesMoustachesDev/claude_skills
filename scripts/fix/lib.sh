@@ -93,7 +93,11 @@ is_manifest_path() {
   return 1
 }
 # manifest_label — les manifestes permis, pour un message
-manifest_label() { printf 'package.json, pubspec.yaml%s' "$(for m in $FIX_STACK_MANIFESTS; do case "$m" in package.json|pubspec.yaml) ;; *) printf ', %s' "$m" ;; esac; done)"; }
+manifest_label() {
+  local m out="package.json, pubspec.yaml"
+  for m in $FIX_STACK_MANIFESTS; do case "$m" in package.json|pubspec.yaml) ;; *) out="$out, $m" ;; esac; done
+  printf '%s' "$out"
+}
 
 # changed_since <sha> — fichiers modifiés, ajoutés, supprimés ou non suivis depuis <sha>, relatifs à la racine.
 # Descend dans les sous-modules : un sous-module changé (flutter_app/dskit) donne ses fichiers, préfixés de

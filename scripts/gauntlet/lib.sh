@@ -10,6 +10,8 @@ section() { printf '\n%s== %s ==%s\n' "$C_B" "$*" "$C_0"; }
 ok()      { printf '%s[OK]%s   %s\n' "$C_OK" "$C_0" "$*"; }
 ko()      { printf '%s[FAIL]%s %s\n' "$C_KO" "$C_0" "$*"; }
 die()     { printf '%s[ABORT]%s %s\n' "$C_KO" "$C_0" "$*" >&2; exit 2; }
+# STAR — `*` en variable : bash 3.2 (macOS) garde l'antislash de ${x//\*\*/\*} (« a/\* »), pas de ${x//\*\*/$STAR}.
+STAR='*'
 
 # ---------------------------------------------------------------------------
 # Worktree de la feature, pour les hooks
@@ -561,7 +563,7 @@ filter_excluded() {
   while IFS= read -r f; do
     keep=1
     for g in "$@"; do
-      g="${g//\*\*/\*}"
+      g="${g//\*\*/$STAR}"
       # shellcheck disable=SC2254
       case "$f" in $g|*/$g) keep=0; break ;; esac
     done

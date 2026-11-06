@@ -80,7 +80,7 @@ FEATURE_DIR="${FEATURE_DIR:-$PROJECT_ROOT/$FEAT_REL}"
 extra="$(writes_extra | tr '\n' ' ')"   # zones supplémentaires : config projet (router, l10n…) + pipeline.json de la feature
 
 # match <chemin> <glob>... — case avec * traversant /
-match() { local p="$1"; shift; local g; for g in "$@"; do g="${g//\*\*/\*}"; case "$p" in $g) return 0;; esac; done; return 1; }
+match() { local p="$1"; shift; local g; for g in "$@"; do g="${g//\*\*/$STAR}"; case "$p" in $g) return 0;; esac; done; return 1; }
 
 # Dossiers du langage du package (stack.ini, la config du projet primant) : code (lib/ pour Flutter), tests
 # (test/), manifeste du package (pubspec.yaml), couche data, présentation. Relatifs au package.

@@ -28,12 +28,25 @@ check_todo_tickets() {
   return 1
 }
 
+# footprint_outside <motif>… — stdin : chemins ; rend ceux qu'aucun motif ne couvre (`*` traverse les `/`).
+# Une fonction à part : bash 3.2 (macOS) lit mal un `case` écrit dans un $(…).
+footprint_outside() {
+  local f g hit
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    hit=0
+    for g in "$@"; do g="${g//\*\*/$STAR}"; case "$f" in $g) hit=1; break ;; esac; done
+    [ "$hit" = 0 ] && printf '%s\n' "$f"
+  done
+}
+
 # footprint — la feature ne touche que son package, les zones autorisées et son dossier de travail.
-check_footprint() {
+# Corps en sous-shell : `set -f` (ci-dessous) n'en sort pas ; `local -` n'existe pas en bash 3.2.
+check_footprint() (
   local base allowed changed bad app
   # The allowed list holds patterns: without this, `for g in $allowed` expands them against the disk
   # and a nested file (lib/src/...) never matches its package's pattern.
-  local -; set -f
+  set -f
   base="$(merge_base)"
   app="$(cfg app_dir .)"; app="${app%/}"; [ "$app" = . ] && app="" || app="$app/"
   # Manifestes et fichiers d'outil du langage (stack.ini → manifests, tool_files), à la racine et dans l'app.
@@ -44,12 +57,12 @@ check_footprint() {
   allowed="$allowed $(writes_extra | sed -n 's#/\*\*$##p' | tr '\n' ' ')"
   # quotepath=false: otherwise git escapes non-ASCII paths ("polish/apr\303\250s/") and they never match.
   changed="$( { git -C "$PROJECT_ROOT" -c core.quotepath=false diff --name-only "$base"; git -C "$PROJECT_ROOT" -c core.quotepath=false ls-files --others --exclude-standard; } | sort -u)"
-  bad="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do
-      ok_=0; for g in $allowed; do g="${g//\*\*/\*}"; case "$f" in $g) ok_=1; break;; esac; done; [ "$ok_" = 0 ] && printf '%s\n' "$f"; done)"
+  # shellcheck disable=SC2086
+  bad="$(printf '%s\n' "$changed" | footprint_outside $allowed)"
   [ -z "$bad" ] && { info "$(printf '%s\n' "$changed" | grep -c . ) fichier(s) touché(s), tous dans le périmètre"; return 0; }
   printf '%s\n' "$bad" | sed 's/^/   ✗ /'; ko "fichiers hors périmètre de la feature (writes.extra pour élargir)"
   return 1
-}
+)
 
 # no_secrets [test] — pas d'identifiant, de clé ou d'email de test en clair.
 #   test : test/ seulement (profil red : un marqueur posé après le gel force un re-gel).
