@@ -20,3 +20,4 @@ se supprime pas.
 | [0008](0008-doctrine-prechargee.md) | La doctrine est préchargée comme skill, les règles projet viennent de .claude/rules | acceptée |
 | [0009](0009-liste-des-tests-avant-ecriture.md) | La liste des tests se décide avant d'en écrire un | acceptée |
 | [0010](0010-question-qui-se-suffit.md) | Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même | acceptée |
+| [0011](0011-un-dossier-par-langage.md) | Ce qui est propre à un langage vit dans son dossier et ne se charge que pour ce langage | acceptée |

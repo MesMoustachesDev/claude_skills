@@ -9,6 +9,11 @@
 !/bricks/
 !/pipeline/
 !/mods/
+!/stacks/
+!/rules/
+!/.claude/
+/.claude/*
+!/.claude/plans/
 !/CLAUDE.md
 
 # Managed by Claude Code / installers, not by us.
