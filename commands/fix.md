@@ -107,7 +107,9 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
   ```
 - **Cockpit** : crée la page du fix (`~/.claude/pipeline/fix/cockpit.md`, « Créer la page ») ; en
   reprise, réarme-la pour cette session (même section, point 4). Puis « Rafraîchir » avec `say <nom>
-  "Bastien reproduit le bug"` : la carte apparaît dans l'Accueil.
+  ""` : la carte apparaît dans l'Accueil. `say` ne porte jamais un statut (« Bastien reproduit le bug ») : le
+  watchdog lit tout texte de `say` comme une question qui attend le dev (`waiting_thibault`) et ne verrait
+  plus un fix bloqué (cas réel, premier /fix Kotlin).
 - **Watchdog** (création comme reprise, une fois par session) :
   1. `CronCreate` récurrent, `cron` = toutes les `watchdog.minutes` de `.claude/rules/feature_pipeline.md`
      (défaut 20 : `"*/20 * * * *"`, minute de départ décalée), `prompt` = `/fix <nom> watchdog`. Garde
