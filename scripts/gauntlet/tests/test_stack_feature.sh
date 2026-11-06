@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Repro — le gauntlet du /feature choisit les checks du langage du package (ADR 0011, plan langages point 4).
 #   Un package Android (build.gradle.kts) à côté d'un package Flutter, dans le même repo :
-#   - un check propre à Flutter (analyze) est dit « non applicable à android », compté à part, jamais « passé » ;
+#   - un check propre à Flutter (metrics : dart_code_linter) est dit « non applicable à android », compté à part,
+#     jamais « passé » ;
 #   - les checks communs (no_secrets, todo_tickets) lisent les sources du langage (.kt), pas seulement .dart ;
 #   - le hook pipeline-restrict-writes ouvre src/main et src/test du package Android, comme lib et test pour Flutter ;
 #   - stacklib.py (pipeline.py, review.py, report.py) lit les mêmes valeurs que stack.sh ; pipeline.py prend les
@@ -23,12 +24,12 @@ commit "$R" "develop" >/dev/null
 run_pkg() { local p="$1"; shift; OUT="$(cd "$R" && GAUNTLET_MODE=create GAUNTLET_PACKAGE="$p" bash "$GAUNTLET" "$@" 2>&1)"; RC=$?; }
 
 echo "un check propre à Flutter sur un package Android : non applicable, dit"
-run_pkg "$A" analyze login
-expect_rc 0 "analyze ne bloque pas un package Android"
-expect_out "[N/A]  analyze : non applicable à android" "le check est dit non applicable à android"
-expect_no_out "passés  : analyze" "il n'est pas compté passé"
-OUT="$(jq -c '[.stack, .not_applicable, .passed]' "$R/.claude/features/login/.gauntlet/last_analyze.json")"
-expect_out '["android",["analyze"],[]]' "last_analyze.json : stack android, analyze non applicable, rien de passé"
+run_pkg "$A" metrics login
+expect_rc 0 "metrics ne bloque pas un package Android"
+expect_out "[N/A]  metrics : non applicable à android" "le check est dit non applicable à android"
+expect_no_out "passés  : metrics" "il n'est pas compté passé"
+OUT="$(jq -c '[.stack, .not_applicable, .passed]' "$R/.claude/features/login/.gauntlet/last_metrics.json")"
+expect_out '["android",["metrics"],[]]' "last_metrics.json : stack android, metrics non applicable, rien de passé"
 run_pkg "$F" analyze feat
 expect_no_out "[N/A]" "contrôle : sur le package Flutter, analyze tourne"
 run_pkg "$A" check_qui_nexiste_pas login
@@ -70,7 +71,7 @@ hook_write feature-test-writer "$F/test/a_test.dart";                      expec
 
 echo "stacklib.py — les valeurs que lisent pipeline.py, review.py et report.py"
 pyget() { OUT="$(python3 -c "import sys; sys.path.insert(0, '$TESTS_DIR/../..'); import stacklib; print($1)" 2>&1)"; }
-pyget "stacklib.get_list('contract_globs', '$R/$A')";   expect_out "['*/domain/*']" "contrats Android"
+pyget "stacklib.get_list('contract_globs', '$R/$A')";   expect_out "['*/domain/*', '*UiState.kt'" "contrats Android"
 pyget "stacklib.get_list('contract_globs', '$R/$F')";   expect_out "'*/keys.dart'" "contrats Flutter"
 pyget "stacklib.get_list('test_dirs', '$R/$A')";        expect_out "['src/test', 'src/androidTest']" "dossiers de test Android"
 pyget "stacklib.is_package('$R/$A'), stacklib.is_package('$R/$F'), stacklib.is_package('$R/app')"

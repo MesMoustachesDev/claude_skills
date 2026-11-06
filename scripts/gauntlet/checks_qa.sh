@@ -53,7 +53,15 @@ qa_android_serial() { # → serial
       serial="$(cfg android.serial emulator-5554)"
       if ! android_online "$serial"; then
         [ -n "$avd" ] || { ko "android.avd non configuré et $serial hors ligne"; return 1; }
-        android_boot "$avd" "$serial" || return 1
+        # android.emulator = cli : Android CLI démarre l'AVD (sans fenêtre) et choisit le port ; son serial remplace
+        # android.serial pour ce run. Non essayé (Android CLI absent de la machine où c'est écrit).
+        if [ "$(cfg android.emulator)" = cli ] && [ -x "$CLAUDE_STACKS_DIR/android/android_cli.sh" ]; then
+          info "démarrage de l'AVD $avd par Android CLI"
+          serial="$(cd "$PROJECT_ROOT" && bash "$CLAUDE_STACKS_DIR/android/android_cli.sh" emulator "$avd" 2>"$GAUNTLET_OUT/emulator.log")"
+          android_online "${serial:-none}" || { ko "Android CLI n'a pas démarré $avd (voir .gauntlet/emulator.log)"; return 1; }
+        else
+          android_boot "$avd" "$serial" || return 1
+        fi
       fi ;;
   esac
 }
@@ -231,6 +239,11 @@ check_qa() {
     info "$nflows flow(s), échecs : ${failures:-?}, captures : $shots"
     if [ "$prc" != 0 ] || [ "${failures:-1}" != 0 ]; then
       grep -E 'FAILED|Failed|failed' "$out/maestro.log" | head -20 | sed 's/^/   /'
+      # Android CLI présent : la hiérarchie de l'écran où le flow s'est arrêté (testTags, textes, bornes), pour
+      # l'agent QA qui cherche pourquoi un élément est introuvable. Absent : rien.
+      [ "$platform" = android ] && [ -x "$CLAUDE_STACKS_DIR/android/android_cli.sh" ] \
+        && (cd "$PROJECT_ROOT" && bash "$CLAUDE_STACKS_DIR/android/android_cli.sh" layout "$out/layout.json" "$QA_DEVICE" >/dev/null 2>&1) \
+        && info "écran à l'arrêt : ${out#$PROJECT_ROOT/}/layout.json (android layout)"
       ko "qa $platform rouge (voir ${out#$PROJECT_ROOT/}/maestro.log)"; rc=1; failed_platforms="$failed_platforms $platform"
     elif [ "$shots" -lt "$nflows" ]; then
       ko "qa $platform : $shots capture(s) pour $nflows flow(s) — chaque flow doit prendre au moins une capture"; rc=1; failed_platforms="$failed_platforms $platform"
