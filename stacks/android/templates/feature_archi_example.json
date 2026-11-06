@@ -1,0 +1,28 @@
+{
+  "sequences": [
+    {
+      "id": "C1",
+      "scenario": "shows the week's meals when loaded",
+      "kind": "nominal",
+      "fr": "À l'ouverture du planning, les repas de la semaine s'affichent, groupés par jour."
+    },
+    {
+      "id": "C2",
+      "scenario": "moves a meal to a free slot",
+      "kind": "nominal",
+      "fr": "Glisser un repas sur un créneau libre l'y déplace et l'enregistre."
+    },
+    {
+      "id": "C3",
+      "scenario": "rejects a drop on a taken slot",
+      "kind": "limite",
+      "fr": "Un créneau déjà occupé refuse le dépôt : le repas revient à sa place."
+    },
+    {
+      "id": "C4",
+      "scenario": "shows an error with retry when the network fails",
+      "kind": "erreur",
+      "fr": "Sans réseau, un message d'erreur propose de réessayer ; réessayer recharge la semaine."
+    }
+  ]
+}
