@@ -65,6 +65,7 @@ Pose-toi ces questions :
 - Quels sont les cas d'erreur possibles ?
 - Que se passe-t-il avec des inputs extrêmes ? (vide, null, très grand, caractères spéciaux)
 - Y a-t-il des effets de bord ? (écriture DB, appel API, émission d'event)
+- Y a-t-il un chemin différé ou de réessai (worker, resynchro, nouvel essai après un échec partiel) ? Il a son test, qui passe par ce chemin et pas seulement par le chemin immédiat. (learn 2026-11-07, retry-path, 2 runs)
 
 Présente à l'utilisateur un résumé de ta compréhension et les scénarios de test que tu prévois AVANT de coder. Format :
 
