@@ -218,6 +218,7 @@ Future<void> emit(WidgetTester tester, List<Item> items) async {
   juste. Sors ce champ dans un `expect(résultat.champ, {…})` à part, qui compare le contenu. Le gate le refuse
   (`test_hygiene`).
 - Pas de `verify()` sauf side-effect critique listé dans la spec.
+- Logique qui peut échouer en partie (boucle, import, synchro) : teste le réessai après l'échec partiel, et vérifie qu'au second passage rien n'est perdu ni doublé. (learn 2026-11-07, retry-path, 2 runs)
 - Widget alimenté par un stream : `await tester.pump(Duration.zero)` après chaque émission ou erreur (section
   ci-dessus), dans les helpers d'émission.
 
