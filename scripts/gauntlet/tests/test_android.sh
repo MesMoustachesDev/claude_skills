@@ -130,6 +130,10 @@ printf 'package com.x.login.data\n\nimport com.x.login.domain.LoginRepository\n\
 run_c no_stubs login; expect_rc 0 "no_stubs : un commentaire // TODO n'est pas un stub"
 run_c stub_check login; expect_rc 1 "stub_check : une fonction implémentée avant les tests bloque"; expect_out "fun login" "la fonction est nommée"
 reset
+G="$TMP_ROOT/globs"; mkdir -p "$G/src/main/java/x/domain/sub"; touch "$G/src/main/java/x/domain/AUseCase.kt" "$G/src/main/java/x/domain/sub/BUseCase.kt"
+OUT="$(bash -c 'source "$1" >/dev/null 2>&1; expand_globs "$2" "src/main/**/domain/**/*UseCase.kt"' _ "$TESTS_DIR/../lib.sh" "$G")"
+expect_out "src/main/java/x/domain/AUseCase.kt" "expand_globs : domain/**/ vaut aussi zéro dossier (use case posé dans domain/)"
+expect_out "src/main/java/x/domain/sub/BUseCase.kt" "expand_globs : domain/**/ traverse les sous-dossiers"
 
 echo "error_handling, deps — couches"
 printf '\nfun f() { try { g() } catch (e: Exception) { } }\n' >> "$P/$K/ui/LoginScreen.kt"

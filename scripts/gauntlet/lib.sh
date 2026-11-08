@@ -542,7 +542,8 @@ writes_extra() { { cfg_list writes.extra; pipeline_get '.writes_extra[]?'; } | g
 # ---------------------------------------------------------------------------
 # Fichiers
 # ---------------------------------------------------------------------------
-# expand_globs <dir> <glob>... — un chemin relatif à <dir> par ligne. Supporte ** (find) et * simple.
+# expand_globs <dir> <glob>... — un chemin relatif à <dir> par ligne. Supporte ** (find) et * simple ; `**/` vaut
+# zéro dossier ou plus.
 expand_globs() {
   local dir="$1"; shift
   local g base rest
@@ -554,7 +555,8 @@ expand_globs() {
         base="${base%/}"; [ -n "$base" ] || base="."
         [ -d "$dir/$base" ] || continue
         if [[ "$rest" == */* ]]; then
-          (cd "$dir" && find "$base" -type f -path "*/$rest" 2>/dev/null)
+          # Un `**/` plus loin dans le glob vaut aussi zéro dossier : domain/**/*UseCase.kt prend domain/XUseCase.kt.
+          (cd "$dir" && find "$base" -type f \( -path "*/$rest" -o -path "*/${rest//\*\*\//}" \) 2>/dev/null)
         else
           (cd "$dir" && find "$base" -type f -name "*${rest#\*}" 2>/dev/null)
         fi
