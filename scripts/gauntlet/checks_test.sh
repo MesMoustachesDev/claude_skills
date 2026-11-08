@@ -189,9 +189,19 @@ test_pkg() {
   total="$(test_results | wc -l | tr -d ' ')"
   failed="$(test_results | jq -r 'select(.result!="success") | "  ✗ \(.file) — \(.name)"')"
   [ "$total" = 0 ] && { ko "aucun test exécuté"; tail -20 "$GAUNTLET_OUT/test_stderr.log"; return 1; }
+  # Fichiers déjà rouges sur la base (pipeline.json → known_failures [{file, reason}], vérifié à la base) : dette
+  # existante, signalée, pas bloquante. Un autre échec, ou un échec sans rapport, garde le gate rouge.
+  local known known_failed=""
+  known="$(pipeline_get '.known_failures[]?.file')"
+  if [ -n "$failed" ] && [ -n "$known" ]; then
+    known_failed="$(printf '%s\n' "$failed" | grep -F -f <(printf '  ✗ %s — \n' $known))"
+    failed="$(printf '%s\n' "$failed" | grep -vF -f <(printf '  ✗ %s — \n' $known))"
+    info "rouges sur la base (known_failures, dette existante) : $(printf '%s\n' "$known_failed" | grep -c '✗') échec(s)"
+    printf '%s\n' "$known_failed" | sed 's/✗/~/'
+  fi
   if [ -n "$failed" ]; then printf '%s\n' "$failed"; fi
   info "$total test(s), $(printf '%s' "$failed" | grep -c '✗' || true) échec(s)"
-  [ "$rc" = 0 ] && [ -z "$failed" ]
+  [ -z "$failed" ] && { [ "$rc" = 0 ] || [ -n "$known_failed" ]; }
 }
 
 # each_test_package <fonction> <message si rien n'a tourné> — <fonction> (0 ok, 1 échec, 3 rien à juger) sur le

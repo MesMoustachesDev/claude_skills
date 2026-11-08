@@ -108,6 +108,11 @@ mv "$PJ.bak" "$PJ"
 printf '// FAKE_FAIL\n' >> "$P/$T/ui/LoginScreenTest.kt"
 run_c red_check login; expect_rc 0 "red_check : rouge dans chaque fichier"
 run_c test login; expect_rc 1 "test : l'échec bloque"; expect_out "✗ $T/ui/LoginScreenTest.kt" "le fichier rouge est nommé"
+PJ="$R/.claude/features/login/pipeline.json"; mkdir -p "${PJ%/*}"; [ -f "$PJ" ] && cp "$PJ" "$PJ.bak2" || echo '{}' > "$PJ.bak2"
+jq --arg f "$T/ui/LoginScreenTest.kt" '.known_failures = [{file: $f, reason: "rouge sur la base"}]' "$PJ.bak2" > "$PJ"
+run_c test login; expect_rc 0 "test : un fichier rouge sur la base (known_failures) ne bloque pas"
+expect_out "~ $T/ui/LoginScreenTest.kt" "il reste signalé comme dette"
+mv "$PJ.bak2" "$PJ"
 run_c test_names login; expect_file_has "$R/.claude/features/login/tests.md" "## $T/ui/LoginScreenTest.kt" "tests.md liste le fichier de test"
 reset
 
