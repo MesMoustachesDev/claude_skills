@@ -90,7 +90,12 @@ check_spec_lint() {
   [ -f "$spec" ] || { info "pas encore de spec.md, rien à vérifier"; return 0; }
   [ -f "$archi" ] || archi=-
   case "$SIZE" in S) cap=15360 ;; L) cap=0 ;; *) cap=40960 ;; esac
-  python3 "$GAUNTLET_ROOT/spec_lint.py" "$spec" "$PKG_DIR" "$PROJECT_ROOT/$(cfg features_root features)" "$archi" "$cap"
+  # Les symboles se cherchent dans les sources du langage du package. Flutter : sous features_root ; ailleurs
+  # (Android : modules ui, app, core à côté des features), dans tout le repo.
+  local ext ws="$PROJECT_ROOT/$(cfg features_root features)"
+  ext="$(bash "$STACK_SH" get extensions "$PKG_DIR" 2>/dev/null | tr -d ' ')"
+  case "$ext" in ''|.dart) ;; *) ws="$PROJECT_ROOT" ;; esac
+  SPEC_LINT_EXT="${ext:-.dart}" python3 "$GAUNTLET_ROOT/spec_lint.py" "$spec" "$PKG_DIR" "$ws" "$archi" "$cap"
 }
 
 check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_review.json" '(.blocking|type=="array") and (.notes|type=="array")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/spec_review.json"), notes : $(jq '.notes|length' "$FEATURE_DIR/spec_review.json")"; }

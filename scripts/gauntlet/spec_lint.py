@@ -5,7 +5,8 @@ Usage : spec_lint.py <spec.md> <package> <racine du workspace> <archi.json ou ->
 
 Ce qu'une relecture humaine trouve aussi, mais qu'un script trouve sans coût ni oubli (cas réel :
 refactor_feature, 3 des 10 bloquants de la première critique) :
-  - clés : chaque clé citée ('<préfixe>_x' ou <Name>Keys.x) existe dans les keys.dart du package ;
+  - clés : chaque clé citée ('<préfixe>_x', <Name>Keys.x ou <Name>TestTags.x) existe dans le fichier de clés du
+    package (keys.dart en Flutter, *TestTags.kt en Android) ;
   - §7 : chaque ligne d'erreur cite le scénario qui la prouve (C<n>), ou dit « hors scénario : <raison> » ;
   - symboles : chaque symbole de §5 existe dans le workspace ; chaque `Classe.membre` cité, dont la classe
     est du workspace, existe dans le fichier de cette classe ;
@@ -19,23 +20,35 @@ import os
 import re
 import sys
 
+# Extensions des sources du langage du package (stack.ini → extensions, passées par le gauntlet) ; défaut Dart.
+EXTS = tuple(e.strip() for e in (os.environ.get("SPEC_LINT_EXT") or ".dart").split(",") if e.strip())
+KOTLIN = any(e in (".kt", ".kts", ".java") for e in EXTS)
 DECL = re.compile(r"^\s*(?:@\w+\s+)*(?:(?:abstract|sealed|final|base|interface|mixin)\s+)*"
                   r"(?:class|mixin|enum|typedef|extension(?:\s+type)?)\s+([A-Z]\w*)", re.M)
+KT_DECL = re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|protected|data|sealed|abstract|"
+                     r"open|enum|annotation|value|inline|inner|fun|expect|actual)\s+)*"
+                     r"(?:class|interface|object|typealias)\s+([A-Z]\w*)", re.M)
 # Types du SDK et des paquets d'erreur qu'une §5 cite sans qu'ils soient des contrats du workspace.
 SDK_TYPES = {"Either", "Left", "Right", "Unit", "Option", "Some", "None", "Stream", "Future", "FutureOr", "List",
              "Map", "Set", "Iterable", "String", "Object", "Exception", "Error", "Duration", "DateTime", "Uri",
              "Uint8List", "Widget", "BuildContext", "Bloc", "Cubit", "Emitter", "Equatable", "StreamController",
-             "StreamSubscription", "Completer", "Timer", "Function", "Record", "Null", "Never", "Type"}
+             "StreamSubscription", "Completer", "Timer", "Function", "Record", "Null", "Never", "Type",
+             # Kotlin, coroutines, Android
+             "Result", "Any", "Nothing", "Int", "Long", "Boolean", "Double", "Float", "Throwable", "Pair", "Triple",
+             "Flow", "StateFlow", "MutableStateFlow", "SharedFlow", "Job", "CoroutineScope", "Dispatchers", "Lazy",
+             "Context", "Intent", "Activity", "Settings", "Composable", "Modifier", "ViewModel", "SavedStateHandle"}
 # Generated files (feature_pipeline.md → generated.exclude), the regex the gauntlet exports.
 GENERATED = re.compile(os.environ.get("GAUNTLET_GENERATED_ERE") or r"\.(g|freezed)\.dart$")
-SKIP_DIRS = {".dart_tool", "build", ".git", "node_modules", "ios", "android", "macos", "linux", "windows", "web"}
+SKIP_DIRS = {".dart_tool", "build", ".git", "node_modules", "ios", "macos", "linux", "windows", "web"}
+if not KOTLIN:
+    SKIP_DIRS.add("android")  # le dossier natif d'une app Flutter ; dans un projet Android, c'est le code
 
 
-def dart_files(root):
+def src_files(root):
     for d, dirs, files in os.walk(root):
         dirs[:] = [x for x in dirs if x not in SKIP_DIRS and not x.startswith(".")]
         for f in files:
-            if f.endswith(".dart") and not GENERATED.search(os.path.join(d, f)):
+            if f.endswith(EXTS) and not GENERATED.search(os.path.join(d, f)):
                 yield os.path.join(d, f)
 
 
@@ -62,22 +75,28 @@ def main(spec_path, pkg, workspace, archi_path, cap):
             problems.append(msg)
 
     # --- clés ---------------------------------------------------------------------------------
-    keys_files = [p for p in dart_files(os.path.join(pkg, "lib")) if re.search(r"(^|_)keys\.dart$", os.path.basename(p))]
+    # Fichier de clés : keys.dart (Flutter, sous lib/) ou XxxTestTags.kt (Android, `object XxxTestTags`).
+    if KOTLIN:
+        keys_files = [p for p in src_files(pkg) if os.path.basename(p).endswith("TestTags.kt")]
+        cls_re, entry_re = r"object\s+(\w*TestTags)\b", r"const\s+val\s+(\w+)\s*(?::\s*String\s*)?=\s*\"([^\"]*)\""
+    else:
+        keys_files = [p for p in src_files(os.path.join(pkg, "lib")) if re.search(r"(^|_)keys\.dart$", os.path.basename(p))]
+        cls_re, entry_re = r"class\s+(\w*Keys)\b", r"static\s+const\s+(?:String\s+)?(\w+)\s*=\s*'([^']*)'"
     values, names, classes = set(), set(), set()
     for p in keys_files:
         src = read(p)
-        classes |= set(re.findall(r"class\s+(\w*Keys)\b", src))
-        for name, val in re.findall(r"static\s+const\s+(?:String\s+)?(\w+)\s*=\s*'([^']*)'", src):
+        classes |= set(re.findall(cls_re, src))
+        for name, val in re.findall(entry_re, src):
             names.add(name)
             values.add(val)
     if values:
         prefix = os.path.commonprefix(sorted(values))
         prefix = prefix[: prefix.rfind("_") + 1] if "_" in prefix else ""
         if len(prefix) >= 4:
-            for tok in sorted(set(re.findall(rf"'({re.escape(prefix)}[a-z0-9_]*)'", spec))):
+            for tok in sorted(set(re.findall(rf"['\"]({re.escape(prefix)}[a-z0-9_]*)['\"]", spec))):
                 if tok in values or any(v.endswith("_") and tok.startswith(v) and tok[len(v):].isdigit() for v in values):
                     continue
-                ko(tok, f"✗ clé '{tok}' citée par la spec, absente des keys.dart du package — contrat à compléter (Thibault) ou clé mal écrite")
+                ko(tok, f"✗ clé '{tok}' citée par la spec, absente du fichier de clés du package — contrat à compléter (Thibault) ou clé mal écrite")
     for cls in classes:
         for name in sorted(set(re.findall(rf"\b{cls}\.(\w+)", spec))):
             if name not in names and len(name) > 1:  # `Keys.x` : un nom générique de la prose, pas une clé
@@ -95,14 +114,16 @@ def main(spec_path, pkg, workspace, archi_path, cap):
     # --- symboles ---------------------------------------------------------------------------------
     index = {}
     for root in {pkg, workspace}:
-        for p in dart_files(root):
-            for name in DECL.findall(read(p)):
+        for p in src_files(root):
+            for name in (KT_DECL if p.endswith((".kt", ".kts", ".java")) else DECL).findall(read(p)):
                 index.setdefault(name, set()).add(p)
     for tok in sorted(set(t for t in re.findall(r"`([A-Z]\w*)(?:<[^`]*>)?`", section(spec, 5)))):
         if tok not in index and tok not in SDK_TYPES:
             ko(tok, f"✗ §5 cite `{tok}`, introuvable dans le package et le workspace — renommé, ou pas encore écrit ?")
     for code in re.findall(r"`([^`\n]+)`", spec):
         for cls, member in re.findall(r"(?<![\w…])([A-Z]\w*)\.([a-z_]\w*)", code):
+            if member in ("kt", "kts", "java", "dart") or cls in SDK_TYPES:
+                continue  # `Fichier.kt` est un nom de fichier ; `Result.success`, un type du SDK même homonyme
             files = index.get(cls)
             if not files or cls in classes:
                 continue  # pas une classe du workspace (Flutter, plugin…) ; les clés sont vérifiées plus haut
