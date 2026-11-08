@@ -267,6 +267,16 @@ red_pkg() {
   green_files="$(test_results | jq -r -s 'group_by(.file) | map(select(all(.[]; .result=="success")) | .[0].file) | .[]' | grep -xF -f <(printf '%s\n' "$scoped_files"))"
   passing="$(test_results | jq -r 'select(.result=="success") | "\(.file):0 — \(.name)"' | filter_scope_lines "$PKG_REL/" | sed 's/^/  · /; s/:0 —/ —/')"
   [ -n "$passing" ] && { info "tests du périmètre qui passent déjà contre les stubs :"; printf '%s\n' "$passing"; }
+  # Fichiers tout verts acceptés par Thibault (pipeline.json → red_accept_green, avec sa raison) : ce qu'ils
+  # prouvent existe avant les tests (ressources posées au scaffold). Signalés, plus bloquants.
+  local accepted f
+  accepted="$(pipeline_get '.red_accept_green[]?.file')"
+  if [ -n "$green_files" ] && [ -n "$accepted" ]; then
+    for f in $(printf '%s\n' "$green_files" | grep -xF -f <(printf '%s\n' "$accepted")); do
+      info "tout vert, accepté par Thibault : $f ($(pipeline_get ".red_accept_green[] | select(.file==\"$f\") | .reason"))"
+    done
+    green_files="$(printf '%s\n' "$green_files" | grep -vxF -f <(printf '%s\n' "$accepted"))"
+  fi
   if [ -n "$green_files" ]; then
     printf '%s\n' "$green_files" | sed 's/^/  ✗ tout vert : /'
     ko "ces fichiers ne testent rien que les stubs ne satisfassent déjà"
