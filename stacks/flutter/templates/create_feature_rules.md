@@ -98,6 +98,7 @@ features/{feature_name}/
 
 - **`try/catch` uniquement dans la couche data** (`lib/src/data/`), autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif), converti en `Either<ErrorEntity, T>`. Aucun `try/catch` dans domain, presentation ou injection : on y compose des `Either`. Attraper `on Object` quand un plugin lève une `Error`. Règle non négociable, vérifiée par le gauntlet (`error_handling`).
 - Utiliser `Either<ErrorEntity, T>` pour **toute opération qui peut échouer** : appels API, opérations I/O
+- Un repli sur une valeur par défaut dans un `catch` (ou un `handleError` de Stream) journalise l'erreur avant de rendre le repli : un repli silencieux cache la panne. (learn 2026-11-09, swallowed_error_without_log, 2 runs)
 - `Left` = erreur (`ErrorEntity`), `Right` = succès
 - Les **data sources remote** retournent `Future<Either<ErrorEntity, T>>` — ils catchent et wrappent les erreurs
 - Les **repositories** propagent les `Either` des data sources (pas de try/catch dans le repo)
