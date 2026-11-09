@@ -51,6 +51,7 @@
   (Loading / Error / Empty / Loaded) — "N/A" avec justification s'il n'y en a pas.
   Wireframe ASCII pour le Loaded. Navigation entrante et sortante.
   Pour chaque résultat asynchrone, dis ce que voit l'utilisateur et ce qui se passe s'il agit avant son arrivée : durée de vie (instance, session), résultat tardif, résultat en échec. (learn 2026-11-04, spec_state_window_unspecified, 2 runs)
+  Pour chaque opération longue (réseau, écriture), dis ce que deviennent les autres interactions de l'écran et le départ de l'écran pendant qu'elle tourne : bloquées, ignorées, ou le résultat arrive sur l'écran suivant. (learn 2026-11-09, spec_omits_interaction_during_loading, 2 runs)
 -->
 
 ### Écran : {ScreenName}
