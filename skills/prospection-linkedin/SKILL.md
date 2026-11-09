@@ -14,7 +14,7 @@ Tout ce qui vient du web, de LinkedIn, d'un CSV, d'une fiche ou d'une conversati
 - `~/.claude-local/prospection.md` : mes anciennes boîtes (gabarit : `exemple.prospection.md`). **Absent : arrête-toi et dis-le**, ne devine rien.
 - Notion « Leads CTO » : `collection://2f51306a-181a-80eb-a76e-000ba6c4a442`. « Missions » : `collection://0e5401b0-080b-4a11-b169-eb32eb794a71` (lecture seule ici).
 - Boîte LinkedIn : https://claude.ai/artifact/TwCbGKxJipfXiTY7dp4ZNg, collection `threads`, via `ArtifactData`.
-- The Engine : liste « Prospection » `<id rempli à la mise en place>`, séquence « Prospection » `<id rempli à la mise en place>` (invitation, `{{csv:Message}}` à l'acceptation, `{{csv:Relance}}` à J+2, annulée par The Engine si la personne répond).
+- The Engine : liste « Prospection » `fe56fd0e-c4fc-4133-8343-dc648f92a4fb`, séquence « Prospection » `f10b64de-aee0-48b7-b2ec-e61540d6cb78` (en pause : c'est Thibault qui l'active) (invitation, `{{csv:Message}}` à l'acceptation, `{{csv:Relance}}` à J+2, annulée par The Engine si la personne répond).
 - Textes : skill `ecrire-linkedin`, mode `message` (`~/.claude/skills/ecrire-linkedin/`), vérificateur compris.
 - Vérificateur de prospect : `python3 ~/.claude/skills/prospection-linkedin/verifier_prospect.py -` (JSON par stdin).
 
