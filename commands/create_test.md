@@ -146,4 +146,5 @@ Avant de présenter les tests à l'utilisateur :
 - [ ] Les noms de tests forment une documentation lisible du comportement de la feature
 - [ ] Les edge cases dangereux sont couverts
 - [ ] Pour chaque assertion, nommer l'implémentation fausse plausible qu'elle doit faire échouer ; si elle passerait aussi, vérifier en plus l'effet attendu (valeur exacte, appel avec ses arguments). (learn 2026-10-30, weak_assertion_accepts_wrong_impl, 2 runs)
+- [ ] Quand la cause ou la correction repose sur un paramètre ou un comportement d'un SDK tiers, cite la doc ou le source du SDK qui le garantit pour la configuration de production (version, variante, type de contenu) ; sinon, écris-le comme une hypothèse à vérifier, pas comme une cause. (learn 2026-11-09, refreeze-second-defect, 4 runs)
 - [ ] Les tests compilent et passent (ou signalent un vrai bug)
