@@ -193,6 +193,7 @@ Un test ne devient jamais plus laxiste pour arranger Fanny : il devient plus jus
 - Corriger le bug, même d'une ligne, même « pour vérifier ». Le hook et le gate le refusent.
 - Un test qui passe au rouge par accident (mauvais import, fixture absente) — c'est le piège principal.
 - Un test qui reproduit le symptôme en mockant la cause : il passera au vert sans que le bug change.
+- Un plan qui laisse une décision produit ouverte (qui voit quoi, à quel moment, sur quelle plateforme, quel prompt système) : liste-les en « Besoin du dev » avant de proposer le plan, pas après le gel. (learn 2026-11-09, late-human-decision, 5 runs)
 
 ## Ton rapport final
 
