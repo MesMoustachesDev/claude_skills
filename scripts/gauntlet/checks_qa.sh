@@ -4,7 +4,7 @@
 # Flows : <package>/maestro/*.yaml, un par scénario Gherkin. Plateformes : qa.platforms ; en gabarit S
 # (pipeline.json → size), une seule (qa.platform_s, sinon la première). Variables injectées :
 #   APP_ID          appId de la plateforme (android.app_id / ios.app_id)
-#   SCREENSHOT_DIR  dossier absolu des captures (.claude/features/<f>/qa/<platform>/)
+#   SCREENSHOT_DIR  « . » : le dossier du run de Maestro ; les captures sont recopiées dans .claude/features/<f>/qa/<platform>/
 # Un flow écrit ses captures avec : - takeScreenshot: ${SCREENSHOT_DIR}/<scenario>
 # Le run précédent (captures, report.xml, maestro.log) est déplacé dans qa/<platform>/_runs/<date>/, jamais
 # effacé. Un config.yaml dans <package>/maestro/ est passé à Maestro (--config : executionOrder…).
@@ -231,11 +231,14 @@ check_qa() {
     "qa_prepare_$platform" || { rc=1; failed_platforms="$failed_platforms $platform"; continue; }
     app_id="$(cfg "$platform.app_id")"
     marker="$GAUNTLET_OUT/qa_${platform}_started"; touch "$marker"
-    MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000}" maestro test --device "$QA_DEVICE" -e "APP_ID=$app_id" -e "SCREENSHOT_DIR=$out" ${maestro_cfg[@]+"${maestro_cfg[@]}"} \
+    # SCREENSHOT_DIR relatif : Maestro (2.12+) refuse un takeScreenshot hors du dossier horodaté qu'il crée sous
+    # --test-output-dir (« Invalid path ») ; les captures du run sont ensuite recopiées dans $out.
+    MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000}" maestro test --device "$QA_DEVICE" -e "APP_ID=$app_id" -e "SCREENSHOT_DIR=." ${maestro_cfg[@]+"${maestro_cfg[@]}"} \
       --format junit --output "$out/report.xml" --test-output-dir "$out" "$flows_dir" >"$out/maestro.log" 2>&1; prc=$?
     failures="$(grep -oE '(failures|errors)="[0-9]+"' "$out/report.xml" 2>/dev/null | grep -oE '[0-9]+' | paste -sd+ - | bc 2>/dev/null || echo "?")"
-    # This run's captures only: archived runs and older Maestro folders stay on disk.
-    shots="$(find "$out" -name '*.png' -newer "$marker" -not -path "$out/_runs/*" | wc -l | tr -d ' ')"
+    find "$out" -mindepth 2 -name '*.png' -newer "$marker" -not -path "$out/_runs/*" -exec cp {} "$out/" \; 2>/dev/null
+    # This run's captures only, recopied at the top of $out: archived runs and Maestro's folders stay on disk.
+    shots="$(find "$out" -maxdepth 1 -name '*.png' -newer "$marker" | wc -l | tr -d ' ')"
     info "$nflows flow(s), échecs : ${failures:-?}, captures : $shots"
     if [ "$prc" != 0 ] || [ "${failures:-1}" != 0 ]; then
       grep -E 'FAILED|Failed|failed' "$out/maestro.log" | head -20 | sed 's/^/   /'
