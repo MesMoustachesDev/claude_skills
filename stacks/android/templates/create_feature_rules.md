@@ -89,6 +89,7 @@ existant le plus proche :
 - Seule la couche `data/` attrape : `try { … } catch (e: CancellationException) { throw e } catch (e: IOException) { Result.failure(e) }`
 - Domaine et ViewModel composent : `result.map { … }`, `fold(onSuccess = …, onFailure = …)`
 - Une erreur métier précise : un `sealed interface {Name}Error` du domaine, porté par `Result.failure` ou un type scellé du projet
+- Un repli sur une valeur par défaut dans un `catch` (ou `.catch {}` d'un Flow) journalise l'erreur avant de rendre le repli : un repli silencieux cache la panne. (learn 2026-11-09, swallowed_error_without_log, 2 runs)
 
 ## Gabarits de fichiers
 
