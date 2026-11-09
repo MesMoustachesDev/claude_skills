@@ -202,6 +202,7 @@ N/A
 
 <!-- Chaque ErrorEntity possible, d'où elle vient, et ce que l'UI en fait. C'est la spec des scénarios Error.
      Colonne Scénario : le C<n> qui la prouve, ou « hors scénario : <raison> » (spec_lint le vérifie). -->
+<!-- Chaque erreur dit aussi comment la provoquer en test (exception levée, fake, double de plateforme) : une erreur qu'on ne sait pas provoquer n'est pas prouvée. Toute borne de la spec (longueur, taille, nombre) dit son unité réelle (largeur rendue, pas caractères) et le cas extrême qui la teste. (learn 2026-11-09, spec_error_without_scenario, spec_rule_missing_bound, 2 runs) -->
 
 | Erreur | Origine | Comportement UI | Retry possible | Scénario |
 |---|---|---|---|---|
