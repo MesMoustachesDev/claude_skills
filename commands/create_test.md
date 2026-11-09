@@ -37,6 +37,7 @@ Tu es un expert en tests. Tu écris des tests qui valident le **comportement att
 20. **Attendre un état, pas une durée** — Un test qui doit attendre un traitement asynchrone attend un état observable (signal de fin, flux émis, condition), jamais un délai ou N rafraîchissements de durée fixe, même recopié d'un test voisin. (learn 2026-11-06, test_waits_fixed_delay, 2 runs)
 21. **Pas d'unitaire qui refait un scénario** — Un comportement déjà prouvé par un scénario d'acceptation du package (vrai use case, mêmes mocks) ne reçoit pas de test unitaire en plus : l'unitaire couvre seulement ce que l'acceptation ne peut pas atteindre (branche plateforme, erreur invisible, valeur limite). Avant de rendre la liste, croise chaque unitaire avec les scénarios de §4. (learn 2026-11-09, test_duplicates_acceptance_scenario, 3 runs)
 22. **Un test n'exige pas un défaut** — Avant de geler un test, relis chaque assertion contre le plan validé et les critiques déjà corrigés : aucune n'exige un comportement qu'ils interdisent (doublon d'une interface déjà affichée, réponse perdue, état libéré trop tôt). (learn 2026-11-09, test-encodes-bug, 2 runs)
+23. **Pas d'ordre que la spec ne fixe pas** — Un test n'impose ni ordre d'appels ni détail que la spec ne fixe pas : il rougirait sur un refactor légitime. (learn 2026-11-09, test_asserts_unspecified_order, 2 runs)
 
 ---
 
