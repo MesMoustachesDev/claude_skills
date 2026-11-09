@@ -69,6 +69,7 @@ Pose-toi ces questions :
 - Que se passe-t-il avec des inputs extrêmes ? (vide, null, très grand, caractères spéciaux)
 - Y a-t-il des effets de bord ? (écriture DB, appel API, émission d'event)
 - Y a-t-il un chemin différé ou de réessai (worker, resynchro, nouvel essai après un échec partiel) ? Il a son test, qui passe par ce chemin et pas seulement par le chemin immédiat. (learn 2026-11-07, retry-path, 2 runs)
+- Ouvre-t-il un état de plateforme (récepteur, flux, abonnement, formulaire natif) ? Un test vérifie qu'il est refermé, y compris quand l'opération lève après l'ouverture. (learn 2026-11-09, test_leaks_open_platform_state, 2 runs)
 
 Présente à l'utilisateur un résumé de ta compréhension et les scénarios de test que tu prévois AVANT de coder. Format :
 
