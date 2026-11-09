@@ -45,5 +45,50 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    1.1 dans `~/.local/bin/android` (binaire signé Google), `~/.androidrc` = `--no-metrics`. Essayé sur un
    projet Wear OS / Compose : `preview list` et `preview render` via `android_cli.sh` (PNG + arbre JSON),
    `emulator start --headless` (serial lu dans sa sortie : adb n'est pas dans le PATH des sessions), `layout`.
-8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`, sur un projet Wear OS / Compose.
+8. **Essai sur un vrai projet Kotlin** : un `/fix`, puis un `/feature`, sur un projet Wear OS / Compose. [fait]
    → `fix/phone_session_tagged_watch`, `feature/gps_settings_shortcut`
+   Les deux sont allés au bout : commits locaux sur leurs branches, rien de poussé ni de MR. Le `/fix` a eu
+   son parcours sur émulateur téléphone ; le `/feature` (M) a fait trois boucles, car la QA Maestro sur Wear
+   a trouvé deux défauts réels que spec, critique et tests JVM avaient laissés passer.
+   Corrigé dans `~/.claude` :
+   - `/fix` copie les fichiers ignorés du checkout (`worktree_untracked.sh`) ;
+   - `gradle_run.sh` affiche le message d'assertion (init script) et ne requalifie pas une tâche
+     déjà qualifiée ;
+   - `fix_gauntlet` : `lint` prend la `lint_cmd` du langage, un check qui ne vérifie rien est `[N/A]` ;
+   - `expand_globs` : `**/` vaut zéro dossier ;
+   - `spec_lint` lit le Kotlin (symboles, `*TestTags.kt`) ;
+   - `red_check` : `red_accept_green`, pour un fichier tout vert accepté avec sa raison ;
+   - gate `test` : `known_failures`, les tests déjà rouges sur la base ;
+   - gate `qa` : captures Maestro 2.12 ;
+   - learn : 5 règles (`retry-path`, bornes et erreurs de spec, repli journalisé, état de plateforme refermé).
+   Reste, noté :
+   - **Zones et procédure**
+     - le `/feature init` écrit les règles dans le checkout principal sans les commiter ;
+     - `0e` confie à Théo des appelants hors tests que son hook refuse ;
+     - le hook d'écriture ne voit pas un script Python lancé depuis le scratchpad ;
+     - les zones de l'implementer et du QA sont incohérentes : README, flows Maestro.
+   - **Non applicables Android**
+     - `test_plan` / `test_plan_match` / `test_dups` liés au Dart ;
+     - `deps_unused` (une dépendance inutile vue seulement en revue) ;
+     - `dedup` ; le rapport « Séquences ».
+   - **Gates et tests hors du module**
+     - les tests hors du module de la feature (`app/src/test`) ne sont pas lancés par le gate `test` du package ;
+     - un gate N/A n'écrit pas d'étape, et `next` bloque ;
+     - un gate rejoué à la main n'écrit pas `stages.*`.
+   - **QA Wear**
+     - aucun émulateur par fix (`device_sim` est iOS seulement) ;
+     - consignes `device_repro` iOS ;
+     - app debug préinstallée sur l'AVD jetable (autre signature) ;
+     - écran en veille pendant le run ;
+     - deux Maestro sur un appareil (« Device server died ») ;
+     - pas de shell Maestro (pont adb maison) ;
+     - pas de check « testTag non exposé à Maestro ».
+   - **Pilotage**
+     - `next --after` ne sait pas attendre un agent avant son premier hook ;
+     - `cockpit-push` sans `if_version` sur les contrats ;
+     - `change_tree` compte les fichiers non suivis ;
+     - le rejeu ne repropose pas la spec et a peu de boucles.
+   - **Hors Android**
+     - le garde de worktree et le hook rtk refusent `git` et les commandes composées
+       (contournement : `/usr/bin/git`).
+   Journal complet : notes de session `langages_essai_android_journal.md`.
