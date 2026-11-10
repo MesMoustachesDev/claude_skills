@@ -29,7 +29,7 @@ premiers signaux en place), tout envoi automatique, toute modification du code d
 | `skills/prospection-linkedin/importer_relations.py` | L'export LinkedIn `Connections.csv` → fiches « À contacter / Réseau ». Lancé à la main, une fois, puis de temps en temps. Section 3. |
 | `skills/prospection-linkedin/verifier_prospect.py` | Contrôle strict d'un prospect proposé par le modèle avant toute écriture (section 6). |
 | Tâche planifiée locale `prospection-linkedin` | `scheduled-tasks/prospection-linkedin/SKILL.md`, lundi à vendredi 07:30 Europe/Paris, invoque le skill. |
-| Notion « Leads CTO » (`collection://2f51306a-181a-80eb-a76e-000ba6c4a442`) | Une option `Source` en plus : `Signal`. `Réseau` existe déjà. Aucune autre colonne ajoutée : le signal précis va dans `Notes` et `Besoin détecté`. |
+| Notion « Leads CTO » (`collection://2f51306a-181a-80eb-a76e-000ba6c4a442`) | Une option `Source` en plus : `Signal`. `Réseau` existe déjà. Une case `Je connais`, que seul Thibault coche (section 4.1). Aucune autre colonne ajoutée : le signal précis va dans `Notes` et `Besoin détecté`. |
 | Notion « Missions » (`collection://0e5401b0-080b-4a11-b169-eb32eb794a71`) | Lue seulement (section 4.4). |
 | The Engine : liste « Prospection » + séquence « Prospection » | Créées une fois, à la main dans la session de mise en place. Séquence sur `list_import`, **en pause** jusqu'à ce que Thibault l'active lui-même : invitation, step 1 `{{csv:Message}}` à l'acceptation, step 2 `{{csv:Relance}}` à J+2 (annulé par The Engine si la personne répond). Copie de « Missions FM ». |
 | Boîte LinkedIn (artifact privé, collection `threads`) | Reçoit les brouillons pour les relations du jour, comme `pipeline-linkedin` le fait pour les relances. |
@@ -71,7 +71,9 @@ en erreur, recherche vide) est dite en une ligne dans le rendu et n'empêche pas
 
 Faite en dernier, après le rendu des signaux, pour que la question ne bloque pas le reste.
 
-- Candidats : fiches `Statut = À contacter`, `Source = Réseau`, `Prochaine action` vide, par `createdTime`.
+- Candidats : fiches où Thibault a coché `Je connais` (case ajoutée le 2026-11-10 : par ordre d'import, la
+  routine proposait ses connexions les plus récentes, des inconnus), `Statut = À contacter`, `Prochaine
+  action` vide, par `createdTime`. Aucune cochée : une ligne, pas de question.
   La routine en propose 4 dans une question à choix multiple, « Qui on contacte aujourd'hui ? » ; Thibault en
   coche 2 au plus, ou nomme quelqu'un d'autre, ou personne.
 - Pour chaque personne retenue, une question : « on part de quoi ? ». Sa réponse est la seule source du

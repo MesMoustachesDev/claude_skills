@@ -29,8 +29,8 @@ Cette étape se fait **en dernier**, après le rendu des blocs Signaux et Missio
 
 Rien dans Leads CTO ne dit qui a travaillé avec moi : la colonne entreprise de l'export LinkedIn est l'entreprise actuelle de la personne. N'écris jamais « collègue », « on a bossé ensemble » ni aucun passé commun que je ne t'ai pas dit dans la session.
 
-1. Lis Leads CTO : fiches `Statut` « À contacter », `Source` « Réseau », `Prochaine action` vide, triées par `createdTime`. Prends les 4 premières.
-2. Pose la question avec AskUserQuestion, `multiSelect` : « Qui on contacte aujourd'hui ? (2 au plus) ». Une option par fiche : label = Name, description = Rôle et Entreprise. « Other » me sert à nommer quelqu'un d'autre ou à dire personne.
+1. Lis Leads CTO : fiches où **`Je connais` est coché**, `Statut` « À contacter », `Prochaine action` vide, triées par `createdTime`. Prends les 4 premières. Je coche moi-même cette case : une fiche non cochée n'est jamais proposée, quel que soit son titre. Aucune fiche cochée : écris une ligne « Aucune relation cochée « Je connais » dans Leads CTO » et arrête l'étape, sans question.
+2. Pose la question avec AskUserQuestion (s'il n'est pas disponible, pose la même question en texte, liste numérotée, et attends ma réponse), `multiSelect` : « Qui on contacte aujourd'hui ? (2 au plus) ». Une option par fiche : label = Name, description = Rôle et Entreprise. « Other » me sert à nommer quelqu'un d'autre ou à dire personne.
    - Un nom tapé dans Other : cherche sa fiche dans Leads CTO (Name, LIKE insensible à la casse, toutes sources). Pas de fiche : dis-le en une ligne, n'en crée pas.
    - Plus de 2 choisis : garde les 2 premiers et dis-le.
    - Personne, ou pas de réponse : n'écris rien.
