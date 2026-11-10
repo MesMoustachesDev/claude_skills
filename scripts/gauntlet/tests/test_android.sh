@@ -6,6 +6,7 @@
 #     stubs, couches, design system, chaînes, strings.xml, hygiène, README) ;
 #   - un outil absent du projet (ni ktlint ni Spotless, ni Kover ni JaCoCo, pas de pitest) : [N/A], jamais vert ;
 #   - un check que seul Flutter a (build_runner) : [N/A] ;
+#   - test_plan, test_plan_match : test_plan.py lit les chemins et les noms de test Kotlin (JUnit, Cucumber) ;
 #   - dedup_candidates : kotlin_dedup.py rapproche les ajouts du module des déclarations du repo ;
 #   - gradle_run.sh qualifie les tâches par le module et traduit un fichier de test en --tests.
 source "$(dirname "$0")/fixture.sh"
@@ -243,6 +244,65 @@ expect_out '"d":["AppEmptyState"]' "catalogue du design system (ds.imports)"
 expect_out '"doc":"Reads the users once."' "KDoc reprise"
 expect_out '"p":"feature/login","k":"feature/core"' "module Gradle de la cible et de la candidate"
 reset
+
+echo "test_plan, test_plan_match — tests Kotlin (src/test, src/androidTest, .feature Cucumber)"
+mkdir -p "$P/$T/domain"
+printf 'package com.x.login.domain\n\nimport org.junit.Test\n\nclass OldTest {\n    @Test\n    fun `an old behaviour`() = Unit\n}\n' > "$P/$T/domain/OldTest.kt"
+git -C "$R" stash -q -u; git -C "$R" checkout -q develop; git -C "$R" stash pop -q
+commit "$R" "old test" >/dev/null; git -C "$R" checkout -q feature/login; git -C "$R" merge -q --no-edit develop >/dev/null 2>&1
+FD="$R/.claude/features/login"; mkdir -p "$FD"
+cat > "$FD/spec.md" <<'MD'
+# Spec — login
+## 4. Scénarios d'acceptation (Gherkin)
+```gherkin
+Feature: login
+  Scenario: signs the user in
+```
+## 5. Contrats
+| Contrat | Fichier |
+|---|---|
+| `LoginUseCase.invoke` | domain/LoginUseCase.kt |
+## 7. Erreurs
+| Erreur | Origine | Comportement UI | Retry | Scénario |
+|---|---|---|---|---|
+| Réseau | repository | message | oui | S1 |
+MD
+KT="$M/$T/domain/LoginUseCaseTest.kt"; FE="$M/src/test/resources/login.feature"
+printf '{"tests":[
+ {"file":"%s","name":"signs the user in","layer":"acceptance","proves":["S1"]},
+ {"file":"%s","name":"returns the user on success","layer":"use_case","proves":["K1"]},
+ {"file":"%s","name":"failsOnNetworkError","layer":"use_case","proves":["E1"]},
+ {"file":"%s","name":"Shows the network message","layer":"use_case","proves":["E1"]}],"not_tested":[]}\n' "$FE" "$KT" "$KT" "$KT" > "$FD/tests_plan.json"
+run_x test_plan login; expect_rc 0 "liste Kotlin acceptée"; expect_no_out "[N/A]" "test_plan a une version Android"
+sed 's#src/test/kotlin#src/main/kotlin#' "$FD/tests_plan.json" > "$FD/bad.json"; cp "$FD/bad.json" "$FD/tests_plan.json"
+run_x test_plan login; expect_rc 1 "un fichier hors des dossiers de test est refusé"; expect_out "n'est pas un fichier de test du package" "le chemin est nommé"
+sed 's#src/main/kotlin#src/test/kotlin#' "$FD/bad.json" > "$FD/tests_plan.json"; rm "$FD/bad.json"
+cat > "$P/$T/domain/LoginUseCaseTest.kt" <<'EOK'
+package com.x.login.domain
+
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+
+class LoginUseCaseTest {
+    @Test
+    fun `returns the user on success`() = Unit
+
+    @Test fun failsOnNetworkError() = Unit
+
+    @Test
+    @DisplayName("Shows the network message")
+    fun networkMessage() = Unit
+
+    fun `not a test`() = Unit
+}
+EOK
+mkdir -p "$P/src/test/resources"; printf 'Feature: login\n  Scenario: signs the user in\n' > "$P/src/test/resources/login.feature"
+run_x test_plan_match login; expect_rc 0 "tests écrits = liste (backticks, identifiant, @DisplayName, scénario)"
+expect_out "4 test(s) écrits, 4 prévus" "le test d'avant la branche ne compte pas"
+printf '    @Test\n    fun `an extra one`() = Unit\n}\n' > "$TMP_ROOT/extra.kt"; sed -i.bak '$d' "$P/$T/domain/LoginUseCaseTest.kt"; rm -f "$P/$T/domain/LoginUseCaseTest.kt.bak"
+cat "$TMP_ROOT/extra.kt" >> "$P/$T/domain/LoginUseCaseTest.kt"
+run_x test_plan_match login; expect_rc 1 "un test hors liste rougit"; expect_out "écrit, pas prévu : $KT — an extra one" "le test est nommé"
+reset; rm -rf "$FD/spec.md" "$FD/tests_plan.json"
 
 echo "checks que seul Flutter a, profil complet"
 run_c build_runner login; expect_rc 0 "build_runner ne bloque pas"; expect_out "[N/A]  build_runner : non applicable à android" "build_runner non applicable à android"

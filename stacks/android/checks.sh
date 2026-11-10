@@ -16,7 +16,7 @@
 # applicable : `[N/A]` dans le journal (ADR 0011). Un check d'ici dont l'outil manque au projet (pas de formateur,
 # pas de couverture, pas de pitest) rend NA_RC : `[N/A]` aussi, avec la raison, jamais un vert.
 ANDROID_CHECKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for _f in checks_static.sh checks_test.sh checks_maintain.sh; do
+for _f in checks_static.sh checks_test.sh checks_test_plan.sh checks_maintain.sh; do
   # shellcheck source=/dev/null
   source "$ANDROID_CHECKS_DIR/$_f"
 done

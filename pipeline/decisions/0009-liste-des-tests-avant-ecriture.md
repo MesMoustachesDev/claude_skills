@@ -1,10 +1,10 @@
 # 0009 — La liste des tests se décide avant d'en écrire un
 
-Statut : acceptée (2026-11-05), amende 0001
+Statut : acceptée (2026-11-05), amende 0001 ; amendée le 2026-11-10 (tests Kotlin)
 Où elle vit : `pipeline/feature/steps/3_tests.md` (3a) · `agents/feature-test-planner.md` ·
 `agents/feature-test-reviewer.md` (mode liste) · `agents/feature-test-writer*.md` ·
 `scripts/gauntlet/test_plan.py` · `stacks/flutter/checks_test_plan.sh` (`test_plan`, `test_plan_match`
-dans le gate `red`) · `hooks/pipeline-restrict-writes.sh` · `hooks/pipeline-gate.sh` ·
+dans le gate `red`), repris par `stacks/android/checks_test_plan.sh` · `hooks/pipeline-restrict-writes.sh` · `hooks/pipeline-gate.sh` ·
 `scripts/pipeline/pipeline.py` (`ORDER`)
 
 ## Contexte

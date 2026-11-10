@@ -17,6 +17,12 @@ prouvés par beaucoup de tests sont listés pour Gaëlle, sans bloquer : c'est e
 fichier et son nom ; un scénario par son titre dans le `.feature`. En mode extend, seuls les tests ajoutés
 depuis <base> comptent.
 
+Fichiers de test reconnus, par langage : Dart, `<package>/test/**/*_test.dart` et `<package>/test/**/*.feature` ;
+Kotlin (module Gradle), `<module>/src/test/**/*Test(s).kt`, `<module>/src/androidTest/**/*.kt` et les `.feature` sous
+`src/test` ou `src/androidTest` (Cucumber, d'ordinaire `src/test/resources`). Un nom de test Kotlin est celui de la
+méthode JUnit (`@Test`, `@ParameterizedTest`…) : le texte entre backticks, l'identifiant sinon, `@DisplayName`
+s'il y en a un.
+
 <package> peut être une liste séparée par des virgules : le package de la feature, puis les packages de
 writes.extra où elle a le droit d'écrire des tests (un appel dans features/user, son acceptation à côté).
 
@@ -93,6 +99,22 @@ def packages(arg: str) -> list[str]:
     return [p for p in arg.split(',') if p]
 
 
+def is_test_file(f: str, package: str) -> bool:
+    """Un fichier de test du package (Dart) ou du module (Kotlin), d'après le chemin seul."""
+    for p in packages(package):
+        p = p.rstrip('/') + '/'
+        if not f.startswith(p):
+            continue
+        rest = f[len(p):]
+        if rest.startswith('test/') and (f.endswith('_test.dart') or f.endswith('.feature')):
+            return True
+        if rest.startswith('src/test/') and (re.search(r'Tests?\.kt$', f) or f.endswith('.feature')):
+            return True
+        if rest.startswith('src/androidTest/') and (f.endswith('.kt') or f.endswith('.feature')):
+            return True
+    return False
+
+
 def decode(raw: str, ids: set[str], package: str) -> tuple[list[dict], list[dict]]:
     data = json.loads(raw)
     if not isinstance(data, dict) or set(data) - {'tests', 'not_tested'} or not isinstance(data.get('tests'), list):
@@ -107,8 +129,7 @@ def decode(raw: str, ids: set[str], package: str) -> tuple[list[dict], list[dict
             raise ValueError(f'{where} : champs attendus {sorted(TEST_FIELDS)}')
         f = t['file']
         if not isinstance(f, str) or f.startswith('/') or '..' in Path(f).parts \
-                or not any(f.startswith(p.rstrip('/') + '/test/') for p in packages(package)) \
-                or not (f.endswith('_test.dart') or f.endswith('.feature')):
+                or not is_test_file(f, package):
             raise ValueError(f"{where} : {f!r} n'est pas un fichier de test du package {package}")
         if not isinstance(t['name'], str) or not t['name'].strip() or len(t['name']) > 300 or '\n' in t['name']:
             raise ValueError(f'{where} : nom invalide')
@@ -171,6 +192,39 @@ def check(spec_path: str, plan_path: str, package: str) -> int:
     return 1 if bad else 0
 
 
+KT_TEST_ANN = re.compile(r'@(?:org\.junit\.(?:jupiter\.api\.)?)?(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b')
+KT_DISPLAY = re.compile(r'@DisplayName\(\s*"((?:[^"\\]|\\.)*)"\s*\)')
+KT_FUN = re.compile(r'\bfun\s+(?:`([^`]+)`|([A-Za-z_][A-Za-z0-9_]*))\s*\(')
+
+
+def kotlin_test_names(path: Path):
+    """(ligne, nom normalisé) des méthodes JUnit : @Test puis le `fun` qui suit (backticks compris)."""
+    lines = path.read_text(errors='replace').splitlines()
+    i = 0
+    while i < len(lines):
+        if not KT_TEST_ANN.search(re.sub(r'//.*', '', lines[i])):
+            i += 1
+            continue
+        display = None
+        for j in range(i, min(i + 8, len(lines))):
+            d = KT_DISPLAY.search(lines[j])
+            display = display or (d.group(1) if d else None)
+            f = KT_FUN.search(lines[j])
+            if f:
+                yield j + 1, norm(display or f.group(1) or f.group(2))
+                i = j
+                break
+        i += 1
+
+
+def test_files(tdir: Path, kotlin: bool):
+    if not tdir.is_dir():
+        return []
+    if not kotlin:
+        return sorted(tdir.rglob('*_test.dart'))
+    return sorted(p for p in tdir.rglob('*.kt') if tdir.name == 'androidTest' or re.search(r'Tests?\.kt$', p.name))
+
+
 def written(root: Path, package: str, base: str) -> set[tuple[str, str]]:
     """(fichier, nom normalisé) des tests et scénarios du package, moins ceux qui existaient à <base>."""
     def at_base(rel: str) -> str:
@@ -190,22 +244,26 @@ def written(root: Path, package: str, base: str) -> set[tuple[str, str]]:
 
 def _written_in(root: Path, package: str, at_base, scenarios) -> set[tuple[str, str]]:
     out = set()
-    tdir = root / package / 'test'
-    for path in sorted(tdir.rglob('*_test.dart')) if tdir.is_dir() else []:
-        if path.with_name(path.name[:-len('_test.dart')] + '.feature').exists():
-            continue  # généré par bdd_widget_test depuis le .feature, dont les scénarios comptent déjà
-        rel = str(path.relative_to(root))
-        old = at_base(rel)
-        before = set()
-        if old:
-            with tempfile.TemporaryDirectory() as d:
-                tmp = Path(d) / path.name
-                tmp.write_text(old)
-                before = {n for _, n in test_names(tmp)}
-        out |= {(rel, n) for _, n in test_names(path) if n not in before}
-    for path in sorted(tdir.rglob('*.feature')) if tdir.is_dir() else []:
-        rel = str(path.relative_to(root))
-        out |= {(rel, n) for n in scenarios(path.read_text()) - scenarios(at_base(rel))}
+    # Dart : <package>/test ; Kotlin : <module>/src/test et src/androidTest
+    dirs = [(root / package / 'test', False), (root / package / 'src' / 'test', True),
+            (root / package / 'src' / 'androidTest', True)]
+    for tdir, kotlin in dirs:
+        names_of = kotlin_test_names if kotlin else test_names
+        for path in test_files(tdir, kotlin):
+            if not kotlin and path.with_name(path.name[:-len('_test.dart')] + '.feature').exists():
+                continue  # généré par bdd_widget_test depuis le .feature, dont les scénarios comptent déjà
+            rel = str(path.relative_to(root))
+            old = at_base(rel)
+            before = set()
+            if old:
+                with tempfile.TemporaryDirectory() as d:
+                    tmp = Path(d) / path.name
+                    tmp.write_text(old)
+                    before = {n for _, n in names_of(tmp)}
+            out |= {(rel, n) for _, n in names_of(path) if n not in before}
+        for path in sorted(tdir.rglob('*.feature')) if tdir.is_dir() else []:
+            rel = str(path.relative_to(root))
+            out |= {(rel, n) for n in scenarios(path.read_text()) - scenarios(at_base(rel))}
     return out
 
 

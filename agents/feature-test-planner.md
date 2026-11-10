@@ -71,6 +71,11 @@ data, les vues ni le state holder.
 }
 ```
 
+`file` : un fichier de test du package, d'après les conventions du langage — Dart, `<package>/test/**/*_test.dart`
+et `<package>/test/*.feature` ; Kotlin, `<module>/src/test/**/*Test.kt`, `<module>/src/androidTest/**` et le
+`.feature` Cucumber (`<module>/src/test/resources/`). `name` : le nom du test tel qu'il sera écrit — en Kotlin, celui
+de la méthode JUnit (le texte entre backticks), ou son `@DisplayName`.
+
 `layer` (valeurs fixées par `test_plan.py` ; `bloc` désigne le state holder, quel que soit le langage) : `mapper`, `parser`, `model`, `data_source`, `service`, `repository`, `use_case`, `bloc`,
 `widget`, `acceptance`, `injection`, `other`. Les chemins partent de la racine du repo. `name` est le nom
 exact que tu donneras au test : il servira à comparer la suite écrite à ta liste.

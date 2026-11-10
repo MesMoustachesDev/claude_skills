@@ -172,8 +172,9 @@ une réponse propre à Android s'ajoute ici avec sa date) :
   les gates `format`, `coverage`, `mutation` sont **non applicables** (signalés, pas bloquants, ADR 0011).
 - Checks sans version Android (non applicables) : `build_runner`, `metrics` (detekt les porte s'il est
   appliqué, via `analyze`), `reinvented`, `barrel_api`, `unused_code`, `unused_files`,
-  `widget_functions`, `deps_unused`, `deps_features`, `pub_health`, `generated_fresh`, `test_plan`,
-  `test_plan_match`, `test_dups`.
+  `widget_functions`, `deps_unused`, `deps_features`, `pub_health`, `generated_fresh`, `test_dups`.
+- `test_plan`, `test_plan_match` : `test_plan.py` lit `src/test/**/*Test.kt`, `src/androidTest/**` et les `.feature`
+  Cucumber ; un nom de test est celui de la méthode JUnit (backticks compris, `@DisplayName` s'il y en a un).
 - `dedup_candidates` (étape 0d) : `stacks/android/kotlin_dedup.py`, lexer Kotlin en Python sans dépendance.
 - Fichiers à copier dans un worktree neuf : `local.properties` (chemin du SDK), `google-services.json`, les
   `.env*` ; jamais un keystore.

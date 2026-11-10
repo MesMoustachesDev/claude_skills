@@ -38,7 +38,7 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    → `pipeline/langages_android`
    Reste `[N/A]` pour Android : build_runner, metrics (detekt via analyze s'il est appliqué), reinvented,
    barrel_api, unused_code, unused_files, widget_functions, deps_unused, deps_features,
-   pub_health, generated_fresh, test_plan, test_plan_match, test_dups ; format / coverage / mutation quand le
+   pub_health, generated_fresh, test_dups ; format / coverage / mutation quand le
    build n'applique ni ktlint/Spotless, ni Kover/JaCoCo, ni pitest. Non essayé : `layout.json` écrit par le gate sur un flow
    rouge (la commande `layout` elle-même marche), lint / detekt / ktlint / Kover / pitest réels (pas en cache : simulés), un module `com.android.library` réel (AGP), la QA Maestro Android.
 7. **Installer Android CLI** (téléchargement depuis developer.android.com, `--no-metrics`). [fait]
@@ -68,9 +68,9 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
      - le hook d'écriture ne voit pas un script Python lancé depuis le scratchpad ;
      - les zones de l'implementer et du QA sont incohérentes : README, flows Maestro.
    - **Non applicables Android**
-     - `test_plan` / `test_plan_match` / `test_dups` liés au Dart ;
+     - `test_dups` lié au Dart (`test_plan`, `test_plan_match` et `dedup` ont leur version Android) ;
      - `deps_unused` (une dépendance inutile vue seulement en revue) ;
-     - `dedup` ; le rapport « Séquences ».
+     - le rapport « Séquences ».
    - **Gates et tests hors du module**
      - les tests hors du module de la feature (`app/src/test`) ne sont pas lancés par le gate `test` du package ;
      - un gate N/A n'écrit pas d'étape, et `next` bloque ;
