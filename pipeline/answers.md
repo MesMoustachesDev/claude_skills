@@ -32,6 +32,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 - Trou du gauntlet — lignes non couvertes qui ne sont que du code existant déplacé, reformaté, ou de la DI ; `stub_check` rouge sur du code inchangé et déjà validé : accepte, note-le en dette, ne demande pas. Reste une question : une ligne de code neuf non couverte après le passage de Hugo. (2026-10-17, « Couverture », « stub_check », 12 cas)
 - Trou du gauntlet — en extend, quand les contrats n'ajoutent que des champs ou paramètres (aucune méthode), accepte `stub_check` sans demander ; l'acceptation reste tracée dans l'evidence. (2026-10-19, « stub_check »)
 - Trou du gauntlet — accepte `red_check` sur les tests d'un code déjà réaligné par le commit de contrats, sans demander ; l'acceptation reste tracée dans l'evidence. Seulement les fichiers de test dont le code testé est dans ce commit ; un autre fichier tout vert reste une question. (2026-10-19, « red_check » ; restreinte le 2026-11-10)
+- Trou du gauntlet — accepte `red_check` sur un test de requête Room (DAO) écrit contre une `@Query` posée complète à la complétion (une requête ne peut pas être un stub), sans demander ; l'acceptation reste tracée dans l'evidence. (2026-11-10, « Règle »)
 - Ne demande pas de valider les mutants quand tous les survivants sont expliqués dans `mutants.md` : ils sont présentés dans la visite guidée. (2026-10-17, « Mutants », 6 sur 6)
 
 ## Tests
