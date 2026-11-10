@@ -67,7 +67,8 @@ autre use case, rend `Either<ErrorEntity, T>` : un `Future<void>` sur une telle 
 - Complétion : les `DataModel` avec leurs annotations JSON (`json_serializable`) et le squelette des
   mappers (§6) ; DI Riverpod ; route ; clés l10n dans l'ARB. Fichiers de page : `<écran>_page.dart`,
   `<écran>_loaded_view.dart`.
-- Dépendances du `pubspec.yaml` du package : `core` et ce que §8 liste ; en `dev_dependencies` :
+- Dépendances du `pubspec.yaml` du package : `core` et ce que §8 liste, dont chaque lib tierce que le
+  package importe lui-même (pas de ré-export via `core`) ; en `dev_dependencies` :
   `build_runner`, `mocktail`, `bdd_widget_test`, plus `json_serializable` si des modèles JSON existent.
 - Appelants d'une signature changée : un seul `grep -rn '<nom>(' --include=*.dart` à la fin. Pas de boucles de
   `flutter analyze` sur les autres packages : le gate analyse le tien.
@@ -128,8 +129,9 @@ Celles de `pipeline/answers.md` valent en Flutter avec ces mots :
 - Couches strictes : BLoC → use case → repository → data sources ; ne supprime jamais un use case appelé
   par un BLoC. (2026-10-17, « respecte mon archi »)
 - Une transaction Isar faillible se rend en `Either` via `AtomicOperationHelper.executeAtomicallyOrLeft`
-  (core) ; ne crée pas de repository ou de data source juste pour porter la transaction. (2026-10-30,
-  « DÉCISION 1 »)
+  (core), appelé dans la data source locale (ou le repository qui combine plusieurs data sources), jamais
+  dans un use case ; pas de repository ou de data source neufs juste pour porter la transaction.
+  (2026-10-30, « DÉCISION 1 » ; corrigée le 2026-11-10)
 - Entité de domaine : classe `XxxEntity`, fichier `xxx_entity.dart`. (2026-10-29, « Contrats »)
 - Clé de test manquante : Arthur l'ajoute à `keys.dart`, avec son `Semantics.identifier`. (2026-10-17, « Clés »)
 

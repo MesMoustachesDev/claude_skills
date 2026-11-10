@@ -262,8 +262,37 @@ check_stub_check() {
   run_dart_tool stub_check.dart --root "$PKG_DIR" --scope "$GAUNTLET_OUT/scope_pkg.txt" --base-dir "$base_dir" $(printf '%s ' $files)
 }
 
+# metrics_ratchet <violations> <fichier de dette> — mesure, à la merge-base, les fichiers des fonctions hors
+# seuil. Une fonction qui l'était déjà, sur la même métrique, sans que la valeur augmente, part dans le fichier
+# de dette (signalée, non bloquante). Une qui a grossi reste bloquante, avec sa valeur de base. Une fonction
+# absente de la base (nouvelle, renommée) reste bloquante. Les violations qui restent sortent sur stdout.
+metrics_ratchet() {
+  local viol="$1" debt="$2" root=".dart_tool/gauntlet_metrics_base" json="$GAUNTLET_OUT/metrics_base.json" base f values
+  base="$(merge_base)"; rm -rf "${PKG_DIR:?}/$root" "$json"
+  for f in $(printf '%s\n' "$viol" | awk '{ split($2, p, ":"); print p[1] }' | sort -u); do
+    mkdir -p "$PKG_DIR/$root/$(dirname "$f")"
+    show_at "$base" "$PKG_REL/$f" > "$PKG_DIR/$root/$f" || rm -f "$PKG_DIR/$root/$f"
+  done
+  if [ -n "$(find "$PKG_DIR/$root" -name '*.dart' 2>/dev/null)" ]; then
+    (cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics analyze "$root" \
+        --no-congratulate --reporter=json --json-path="$json" >/dev/null 2>&1)
+  fi
+  rm -rf "${PKG_DIR:?}/$root"
+  [ -s "$json" ] || { printf '%s\n' "$viol"; return; }
+  values="$(jq -r --arg r "$root/" '.records[] | (.path | ltrimstr($r)) as $p | (.functions // {}) | to_entries[]
+              | .key as $f | .value.metrics[] | "\($p) \($f) \(.metricsId)=\(.value)"' "$json")"
+  printf '%s\n' "$viol" | BASE="$values" DEBT="$debt" awk '
+    BEGIN { n=split(ENVIRON["BASE"], a, "\n")
+            for (i=1;i<=n;i++) { split(a[i], w, " "); split(w[3], m, "="); b[w[1] " " w[2] " " m[1]]=m[2] } }
+    { split($2, p, ":"); split($4, m, "="); k=p[1] " " $3 " " m[1]
+      if ((k in b) && m[2]+0 <= b[k]+0) { line=$0; sub(/✗/, "(dette existante, n'"'"'a pas empiré)", line); print line > ENVIRON["DEBT"]; next }
+      if (k in b) { print $0 " — a empiré, base " b[k]; next }
+      print }'
+}
+
 # metrics — dart_code_linter, seuils depuis la config, rapport JSON filtré au périmètre : une fonction
-# compte si l'une de ses lignes est nouvelle (extend) ou toujours (create).
+# compte si l'une de ses lignes est nouvelle (extend) ou toujours (create). En extend, une fonction déjà hors
+# seuil sur la base dont la mesure n'a pas augmenté est de la dette signalée (metrics_ratchet).
 check_metrics() {
   local json="$GAUNTLET_OUT/metrics.json" viol
   (cd "$PKG_DIR" && $DART pub global run dart_code_linter:metrics analyze lib \
@@ -283,8 +312,14 @@ check_metrics() {
             { split($1, a, ":"); f=prefix a[1]; s=a[2]+0; e=a[3]+0; keep=(all==1)||(f in files)
               if (!keep) for (i=s;i<=e;i++) if ((f":"i) in lines) { keep=1; break }
               if (keep) { sub(/:[0-9]+$/, "", $1); print "   ✗ " $0 } }')"
-  # Dette acceptée (fonction déjà hors seuil sur la base) : pipeline.json → metrics_accepted, liste de
-  # "<chemin dans le package> <Fonction>" posée avec sa dette par l'orchestrateur ; affichée, non bloquante.
+  # Dette existante qui n'a pas empiré : le script compare à la base, personne ne tranche à sa place.
+  local debt="$GAUNTLET_OUT/metrics_debt.txt"; : > "$debt"
+  if [ -n "$viol" ] && [ "$SCOPE_ALL" != 1 ]; then
+    viol="$(metrics_ratchet "$viol" "$debt")"
+    [ -s "$debt" ] && cat "$debt"
+  fi
+  # Dette acceptée par Thibault (`accept`) : pipeline.json → metrics_accepted, liste de
+  # "<chemin dans le package> <Fonction>" ; affichée, non bloquante.
   local accepted
   accepted="$(pipeline_get '.metrics_accepted[]?')"
   if [ -n "$accepted" ] && [ -n "$viol" ]; then
