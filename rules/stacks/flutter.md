@@ -98,6 +98,7 @@ autre use case, rend `Either<ErrorEntity, T>` : un `Future<void>` sur une telle 
   Un skill qui contredit les règles du projet : le projet gagne.
 - Fanny ne modifie aucun fichier hors `fix_plan.files` sans l'avoir signalé comme écart et obtenu l'accord, même pour supprimer du code devenu mort. (learn 2026-11-09, out-of-plan-file, 2 runs)
 - Formate seulement les fichiers que tu as modifiés (`dart format <fichier>`), jamais un dossier entier (`dart format lib`). (learn 2026-11-10, agent_formats_whole_directory, 2 runs)
+- Passe à un composant du design system (wrapperSize, iconSize) le token Spaces qui existe, comme les features voisines, jamais une taille brute. (learn 2026-11-10, raw_size_bypasses_ds_token, 2 runs)
 
 ## Spec (Sophie, Camille)
 
