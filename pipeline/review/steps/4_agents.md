@@ -7,7 +7,9 @@ Lance **dans un seul message, trois appels `Agent`** (ils tournent en même temp
 **Maëlle est sautée** (pas d'appel, `review.sh agent <slug> qa skipped "<raison>"`) seulement si
 Thibault a passé `--no-qa` ou s'il n'y a pas de worktree. Un device indisponible ou une MR sans rien de
 visible ne la sautent pas : elle prouve alors par les tests existants, ou par des tests jetables
-(`agents/review-qa.md`). Dis-lui dans son prompt ce que `context.md` promet de visible.
+(`agents/review-qa.md`). Dis-lui dans son prompt ce que `context.md` promet de visible, et que sur iOS
+elle n'installe l'app que sur le simulateur de la revue (`review.sh sim <slug>`, créé à part et supprimé
+au cleanup), jamais sur `ios.simulator`, le simulateur partagé.
 
 Chaque prompt tient en 10 lignes, avec des chemins et des faits, jamais ton historique :
 - le slug, le dossier de la revue, le worktree, la source, la cible, le merge-base

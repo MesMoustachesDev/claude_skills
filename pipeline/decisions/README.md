@@ -21,3 +21,4 @@ se supprime pas.
 | [0009](0009-liste-des-tests-avant-ecriture.md) | La liste des tests se décide avant d'en écrire un | acceptée |
 | [0010](0010-question-qui-se-suffit.md) | Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même | acceptée |
 | [0011](0011-un-dossier-par-langage.md) | Ce qui est propre à un langage vit dans son dossier et ne se charge que pour ce langage | acceptée |
+| [0012](0012-revue-sans-effet-sur-l-environnement-partage.md) | Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé | acceptée |

@@ -24,4 +24,11 @@ pipeline "$R" x '{"mode":"create","package":"app/features/feat","qa_devices":{"i
 run_g "$R" qa_device x
 expect_rc 1 "fresh sans ios.simulator_base : rouge"
 expect_out "pas de ios.simulator_base à cloner" "pas de repli sur le simulateur partagé"
+
+# /reviewPR impose le simulateur de la revue : un UDID inconnu est rouge, jamais remplacé par le partagé.
+pipeline "$R" x '{"mode":"create","package":"app/features/feat"}'
+GAUNTLET_SIM_UDID=00000000-0000-0000-0000-000000000000 run_g "$R" qa_device x
+expect_rc 1 "simulateur imposé inconnu : rouge"
+expect_out "simulateur imposé 00000000-0000-0000-0000-000000000000 introuvable" "l'UDID imposé est nommé"
+expect_no_out "simulateur partagé" "pas de repli sur le simulateur partagé"
 finish

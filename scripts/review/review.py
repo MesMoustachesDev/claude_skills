@@ -23,6 +23,8 @@ GAUNTLET_OUT_ROOT = os.path.join(HOME, ".cache", "gauntlet", "pr")
 STEPS_DIR = os.path.join(HOME, ".claude", "pipeline", "review", "steps")
 PR_GAUNTLET = os.path.join(HOME, ".claude", "scripts", "pr_gauntlet.sh")
 GAUNTLET = os.path.join(HOME, ".claude", "scripts", "gauntlet.sh")
+SIM_SH = os.path.join(HOME, ".claude", "scripts", "sim.sh")
+WORKTREE_UNTRACKED = os.path.join(HOME, ".claude", "scripts", "worktree_untracked.sh")
 ROLES = ("archi", "code", "qa")
 AGENT_DONE = {"done", "skipped", "failed"}
 SEVERITY_ORDER = {"critical": 0, "suggestion": 1, "question": 2}
@@ -63,8 +65,24 @@ def doc_id(s):
     return re.sub(r"[^A-Za-z0-9_\-.~:@+]", "-", s.replace("/", "~"))[:200]
 
 
+CFG_REL = os.path.join(".claude", "rules", "feature_pipeline.md")
+
+
+def main_checkout(cwd=None):
+    """Le checkout principal du repo : le premier de `git worktree list`."""
+    out = git("worktree", "list", "--porcelain", cwd=cwd, check=False)
+    return next((l[9:] for l in out.splitlines() if l.startswith("worktree ")), None)
+
+
 def project_root():
-    return git("rev-parse", "--show-toplevel")
+    """La racine du repo, jamais le dossier courant : review.sh se lance aussi depuis l'app, dans un
+    sous-dossier. Depuis un worktree sans la config (souvent non suivie), le checkout principal, qui l'a."""
+    top = git("rev-parse", "--show-toplevel")
+    if not os.path.isfile(os.path.join(top, CFG_REL)):
+        main = main_checkout(top)
+        if main and os.path.isfile(os.path.join(main, CFG_REL)):
+            return main
+    return top
 
 
 def project_name(root):
@@ -166,7 +184,7 @@ def cmd_init(args):
     project = project_name(root)
     s = {
         "slug": slug, "key": doc_id(f"{project}--{slug}"), "project": project, "project_root": root,
-        **info, "created": now(), "dir": d,
+        "launched_from": os.getcwd(), **info, "created": now(), "dir": d,
         "gauntlet_out": os.path.join(GAUNTLET_OUT_ROOT, re.sub(r"[^A-Za-z0-9_]", "_", (info["source"] or slug).replace("origin/", "", 1))),
         "worktree": None, "stages": {}, "agents": {r: {"status": "pending"} for r in ROLES},
         "triage": {}, "posted": [], "cockpit": {},
@@ -175,6 +193,7 @@ def cmd_init(args):
         json.dump(s, f, ensure_ascii=False, indent=2)
     print(f"revue {slug} : {info.get('source')} → {info.get('base') or '(base de la config)'}"
           + (f" · « {info['title']} » par {info['author']}" if info.get("title") else ""))
+    print(f"racine du repo : {root}")
     print(json.dumps({"slug": slug, "dir": d, "key": s["key"]}, ensure_ascii=False))
 
 
@@ -312,6 +331,14 @@ def cmd_gauntlet(r, args):
     report = os.path.join(s["gauntlet_out"], "report.md")
     print(f"gauntlet : {'vert' if p.returncode == 0 else 'rouge (exit ' + str(p.returncode) + ')'} · rapport {report}")
     print(f"worktree : {s.get('worktree') or 'non conservé (échec avant sa création ?) — voir ' + r.file('gauntlet.log')}")
+    cfg = read_text(os.path.join(s["project_root"], CFG_REL))
+    if s.get("worktree") and cfg is not None:
+        missing = [f for f in untracked_needed(s["project_root"], cfg, copy_patterns(s["project_root"], cfg))
+                   if not os.path.exists(os.path.join(s["worktree"], f))]
+        s["untracked_missing"] = missing
+        r.save()
+        for f in missing:
+            print(f"[WARN] {f} manque dans le worktree : l'app de QA tournera sans (review.sh preflight l'avait-il signalé ?)")
 
 
 def cmd_qa(r, args):
@@ -322,25 +349,76 @@ def cmd_qa(r, args):
     flows = r.file("maestro")
     if not os.path.isdir(flows) or not any(f.endswith(".yaml") for f in os.listdir(flows)):
         die(f"aucun flow dans {flows}")
-    cfg = os.path.join(wt, ".claude", "rules", "feature_pipeline.md")
-    app_dir = "."
-    try:
-        for line in open(cfg, encoding="utf-8"):
-            m = re.match(r"\s*app_dir\s*=\s*(\S+)", line)
-            if m:
-                app_dir = m.group(1)
-    except OSError:
+    cfg = os.path.join(wt, CFG_REL)
+    cfg_text = read_text(cfg)
+    if cfg_text is None:
         die("config du projet absente dans le worktree : QA impossible")
+    app_dir = cfg_value(cfg_text, "app_dir") or "."
     env = dict(os.environ, GAUNTLET_MODE="extend", GAUNTLET_PACKAGE=app_dir.rstrip("/") or ".",
                GAUNTLET_FEATURES_ROOT=os.path.join(s["gauntlet_out"], "features"), GAUNTLET_CFG=cfg,
                GAUNTLET_QA_FLOWS=flows)
+    platforms = [x.strip() for x in cfg_value(cfg_text, "qa.platforms").split(",") if x.strip()]
     if "--all-platforms" not in args:
         env["GAUNTLET_SIZE"] = "S"  # une plateforme : qa.platform_s, sinon la première de qa.platforms
+        platforms = [cfg_value(cfg_text, "qa.platform_s") or (platforms or [""])[0]]
+    if "ios" in platforms:
+        env["GAUNTLET_SIM_UDID"] = review_sim(r, cfg_text)
     p = subprocess.run([GAUNTLET, "qa", "review"], cwd=wt, env=env, capture_output=True, text=True)
     shots = os.path.join(s["gauntlet_out"], "features", "review", "qa")
     print((p.stdout + p.stderr)[-3000:])
     print(f"captures : {shots}")
     sys.exit(p.returncode)
+
+
+def sim_udid(name):
+    out = run(["xcrun", "simctl", "list", "devices", "available", "-j"], check=False).stdout or "{}"
+    return next((d["udid"] for ds in json.loads(out).get("devices", {}).values() for d in ds
+                 if name and name in (d.get("name"), d.get("udid"))), None)
+
+
+def review_sim(r, cfg_text):
+    """Le simulateur iOS de cette revue, « <modèle> · review-<slug> » : jamais ios.simulator, le simulateur
+    partagé où vivent l'app staging et ses données (une install de la MR les écrase). Clone de
+    ios.simulator_base s'il est configuré, sinon un simulateur neuf du même modèle et du même runtime que
+    ios.simulator (sim.sh --like). Supprimé par cleanup."""
+    base, shared = cfg_value(cfg_text, "ios.simulator_base"), cfg_value(cfg_text, "ios.simulator")
+    if not base and not shared:
+        die("ni ios.simulator_base ni ios.simulator dans la config : pas de simulateur pour la revue")
+    sim_args = ["--base", base] if base else ["--like", shared]
+    name = f"review-{r.slug}"
+    p = subprocess.run([SIM_SH, *sim_args, "ensure", name], cwd=r.s["project_root"], capture_output=True, text=True)
+    udid = (p.stdout.strip().splitlines() or [""])[-1]
+    if p.returncode != 0 or not udid:
+        die(f"pas de simulateur pour cette revue (sim.sh {' '.join(sim_args)} ensure {name}) :\n{p.stderr.strip()}")
+    if udid == sim_udid(shared):
+        die(f"sim.sh a rendu le simulateur partagé « {shared} » : QA arrêtée, rien n'est installé")
+    r.s["qa_sim"] = {"name": name, "sim_args": sim_args, "udid": udid, "at": now()}
+    r.save()
+    return udid
+
+
+def cmd_sim(r, args):
+    """L'UDID du simulateur de la revue (créé s'il le faut) : le seul où Maëlle installe ou lance l'app."""
+    cfg_text = read_text(os.path.join(r.s.get("worktree") or r.s["project_root"], CFG_REL))
+    if cfg_text is None:
+        die("config du projet absente : pas de simulateur de revue")
+    udid = review_sim(r, cfg_text)
+    print(udid)
+    print(f"simulateur de la revue : {r.s['qa_sim']['sim_args'][1]} · {r.s['qa_sim']['name']} — "
+          "n'installe et ne lance l'app que là ; supprimé par review.sh cleanup", file=sys.stderr)
+
+
+def remove_review_sim(s):
+    sim = s.get("qa_sim")
+    if not sim:
+        return None
+    p = subprocess.run([SIM_SH, *sim["sim_args"], "remove", sim["name"]], cwd=s["project_root"], capture_output=True, text=True)
+    if p.returncode != 0:
+        print(f"simulateur de la revue non supprimé : {p.stderr.strip()}")
+        return None
+    s.setdefault("sims_removed", []).append({**sim, "removed": now()})
+    s["qa_sim"] = None
+    return sim["name"]
 
 
 def package_dir(r, package):
@@ -443,6 +521,9 @@ def cmd_cleanup(r, args):
     s = r.s
     wt = remove_worktree(s)
     print(f"worktree supprimé : {wt}" if wt else "aucun worktree à supprimer")
+    sim = remove_review_sim(s)
+    if sim:
+        print(f"simulateur de la revue supprimé : {sim}")
     s.setdefault("stages", {})["synthesis"] = {"status": "PASSED", "at": now()}
     r.save()
     print(f"conservés : {r.dir} (état, remarques, flows) et {s['gauntlet_out']} (rapport, captures)")
@@ -968,16 +1049,83 @@ def find_graph(root):
     return None
 
 
+def glob_match(path, pat):
+    """Un glob de worktree.copy_untracked (syntaxe git, « **/ » = n'importe quel dossier) contre un chemin."""
+    if pat.startswith("**/"):
+        return fnmatch.fnmatch(path, pat[3:]) or fnmatch.fnmatch(path, "*/" + pat[3:])
+    return fnmatch.fnmatch(path, pat)
+
+
+def copy_patterns(root, cfg_text):
+    """Ce que le worktree de revue reçoit du checkout principal : worktree.copy_untracked, puis pr.copy_untracked."""
+    pats = run(["bash", WORKTREE_UNTRACKED, "--patterns", root], check=False).stdout.split()
+    return pats + [p.strip() for p in cfg_value(cfg_text, "pr.copy_untracked").split(",") if p.strip()]
+
+
+def untracked_needed(root, cfg_text, pats):
+    """Fichiers ignorés par git dont l'app de QA a besoin, en chemins relatifs à la racine (jamais leur contenu) :
+    untracked.required de la config, plus chaque fichier qu'un .gitignore du repo nomme exactement (chemin
+    ancré, sans joker), qui correspond à la liste copiée et porte le nom d'un flavor des commandes de build
+    QA (`<app>/assets/.env.staging` pour --flavor staging). Un tel fichier est souvent chargé en optionnel :
+    s'il manque, rien ne casse au build, l'app tourne sans config."""
+    need = {p.strip().lstrip("/") for p in cfg_value(cfg_text, "untracked.required").split(",") if p.strip()}
+    builds = " ".join(cfg_value(cfg_text, f"{pf}.build") for pf in ("ios", "android"))
+    flavors = set(re.findall(r"--flavor[= ]([A-Za-z0-9_-]+)", builds))
+    for gi in git("ls-files", "--", ":(glob)**/.gitignore", cwd=root, check=False).splitlines() if flavors else []:
+        for line in (read_text(os.path.join(root, gi)) or "").splitlines():
+            e = line.strip()
+            if not e or e[0] in "#!" or e.endswith("/") or "/" not in e or re.search(r"[*?\[\\]", e):
+                continue
+            rel = os.path.normpath(os.path.join(os.path.dirname(gi), e.lstrip("/")))
+            if any(f in os.path.basename(rel) for f in flavors) and any(glob_match(rel, p) for p in pats):
+                need.add(rel)
+    tracked = set(git("ls-files", "--", *need, cwd=root, check=False).splitlines()) if need else set()
+    return sorted(need - tracked)
+
+
+def stray_rules(root):
+    """Règles projet posées sous un sous-dossier (.claude/rules/ de l'app) au lieu de la racine du repo :
+    le pipeline ne les y lit pas."""
+    found = []
+    for dirpath, dirs, files in os.walk(root):
+        depth = os.path.relpath(dirpath, root).count(os.sep)
+        dirs[:] = [] if depth >= 3 else [d for d in dirs if d not in (".git", "build", "node_modules", "Pods", ".dart_tool", "worktrees")]
+        if dirpath.endswith(os.path.join(".claude", "rules")) and dirpath != os.path.join(root, ".claude", "rules"):
+            found += [os.path.relpath(os.path.join(dirpath, f), root) for f in files if f in ("feature_pipeline.md", "pr_rules.md")]
+    return sorted(found)
+
+
 def cmd_preflight(r, args):
     s, root = r.s, r.s["project_root"]
     items = []
     add = lambda id_, area, status, detail, fix=None: items.append(
         {"id": id_, "area": area, "status": status, "detail": detail, "fix": fix})
-    cfg_path = os.path.join(root, ".claude", "rules", "feature_pipeline.md")
+    print(f"racine du repo : {root}" + (f" (lancé depuis {s['launched_from']})" if s.get("launched_from") not in (None, root) else ""))
+    cfg_path = os.path.join(root, CFG_REL)
     cfg = read_text(cfg_path)
-    if cfg is None:
+    stray = stray_rules(root)
+    for f in stray:
+        if not os.path.isfile(os.path.join(root, ".claude", "rules", os.path.basename(f))):
+            add(f"rules:{f}", "projet", "block", f"{f} est sous un sous-dossier : le pipeline ne lit que "
+                f"{os.path.join(root, '.claude', 'rules')}/, cette règle serait ignorée",
+                f"mv {os.path.join(root, f)} {os.path.join(root, '.claude', 'rules')}/ puis review.sh preflight")
+    if cfg is None and not stray:
         add("config", "projet", "warn", "pas de .claude/rules/feature_pipeline.md : le gauntlet prend le template générique "
             "(pas de QA device, seuils par défaut)", "/feature init dans le projet")
+    if cfg is not None and not os.path.isfile(os.path.join(root, ".claude", "rules", "pr_rules.md")) and not stray:
+        add("rules:pr_rules", "projet", "warn", "pas de .claude/rules/pr_rules.md : les relecteurs n'appliquent que la grille partagée")
+    # Fichiers ignorés par git dont le build a besoin : le worktree ne les a que si le checkout principal les a
+    # et que la liste copiée les couvre (pr_gauntlet.sh → worktree_untracked.sh). Noms seulement, jamais de valeur.
+    if cfg is not None:
+        pats = copy_patterns(root, cfg)
+        for rel in untracked_needed(root, cfg, pats):
+            if not os.path.exists(os.path.join(root, rel)):
+                add(f"untracked:{rel}", "worktree", "block", f"{rel} manque au checkout principal : ignoré par git, l'app de "
+                    "QA en a besoin et ne le signale pas (chargé en optionnel, elle tournerait sans config)",
+                    "le récupérer depuis le coffre de secrets de l'équipe dans le checkout principal, puis review.sh preflight")
+            elif not any(glob_match(rel, p) for p in pats):
+                add(f"untracked:{rel}", "worktree", "block", f"{rel} ne sera pas copié dans le worktree de revue "
+                    "(hors de worktree.copy_untracked et de pr.copy_untracked)", "ajouter son chemin à pr.copy_untracked")
     # Outillage : le doctor du gauntlet (SDK épinglé, outils Dart du gauntlet, linter, maestro, plateformes QA)
     if cfg is not None:
         p = subprocess.run([GAUNTLET, "doctor"], cwd=root, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=600)
@@ -1083,7 +1231,7 @@ def cmd_cockpit_page(r, args):
 
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
-    "gauntlet": cmd_gauntlet, "qa": cmd_qa, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
+    "gauntlet": cmd_gauntlet, "qa": cmd_qa, "sim": cmd_sim, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
     "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge,
     "check-comments": cmd_check_comments, "set-cockpit": cmd_set_cockpit, "page-deleted": cmd_page_deleted, "cockpit-page": cmd_cockpit_page, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }

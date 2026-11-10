@@ -20,6 +20,11 @@ Le gauntlet rouge n'arrête pas la revue : ses `[FAIL]` deviendront les remarque
 Le script n'a pas pu tourner (projet sans `feature_pipeline.md`, outils absents, SDK manquant) : dis-le
 à Thibault en une ligne et continue avec le diff seul, en le disant aussi au briefing.
 
+Le worktree reçoit du checkout principal les fichiers ignorés par git de `worktree.copy_untracked`
+(`.env` du flavor, configs Firebase ; jamais un secret de signature). Une ligne `[WARN] … manque dans le
+worktree` après le gauntlet : l'app de QA tournera sans ce fichier. Si le préflight ne l'avait pas
+tranché, c'est un point imprévu : dis-le à Thibault tout de suite.
+
 Pas de worktree enregistré (`review.sh next` ne l'affiche pas) : relis `gauntlet.log` dans le dossier
 de la revue ; sans worktree, Maëlle est sautée et Alice et Corentin lisent avec `git show
 <remote>/<source>:<fichier>`.

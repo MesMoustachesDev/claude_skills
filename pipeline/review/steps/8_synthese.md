@@ -31,7 +31,7 @@ _Une ligne : mergeable / mergeable après corrections (lesquelles) / à reprendr
 ---
 
 Puis **`review.sh cleanup <slug>`** : il supprime le worktree de la revue (jamais rien hors du dossier
-temporaire) et passe l'étape. Les rapports, remarques, flows et captures restent. `review.sh say
+temporaire) et le simulateur iOS de la revue s'il y en a un, et passe l'étape. Les rapports, remarques, flows et captures restent. `review.sh say
 <slug> ""`.
 
 Termine par 3 lignes : verdict, nombre de commentaires publiés, chemin de `synthesis.md`.

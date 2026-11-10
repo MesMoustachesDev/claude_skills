@@ -130,7 +130,10 @@ readme.sections = ^## (But|Purpose), ^## (API publique|Public API)
 # ---------------------------------------------------------------------------
 pr.max_lines = 600
 commits.pattern = ^(feat|fix|chore|refactor|test|docs|perf|ci|build|style)(\([a-z0-9_/-]+\))?!?: .+
+# En plus de worktree.copy_untracked (copié aussi dans le worktree de revue), relatifs à la racine.
 pr.copy_untracked = local.properties
+# Fichiers ignorés que le préflight de /reviewPR doit trouver au checkout principal (au-delà de ceux qu'il devine).
+untracked.required =
 
 # ---------------------------------------------------------------------------
 # QA — Maestro sur Android (flows dans <module>/maestro/, captures dans .claude/features/<name>/qa/android/)

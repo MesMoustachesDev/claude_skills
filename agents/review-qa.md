@@ -46,6 +46,15 @@ test en variables, jamais en clair. Joue avec `~/.claude/scripts/review.sh qa <s
 du `.png`). Le device échoue pour une raison d'environnement (config, build, device) : note la raison
 exacte une fois, et passe à B pour **tous** les scénarios — ce n'est pas une remarque sur la MR.
 
+**Un seul simulateur iOS : celui de la revue.** `review.sh qa` le crée et l'utilise seul ; pour toute
+autre action sur iOS (build, `simctl install`, lancement, MCP Maestro), prends son UDID avec
+`review.sh sim <slug>` et passe-le explicitement (`-d <udid>`, `simctl install <udid>`). **Jamais**
+`ios.simulator` de la config ni un simulateur déjà allumé : c'est le simulateur partagé, l'app staging et
+ses données y vivent, et une install de la MR les écrase. Il est supprimé par `review.sh cleanup`.
+L'app démarre sur une page blanche ou sans config : regarde `untracked_missing` dans `review.json` (un
+fichier ignoré par git, comme le `.env` du flavor, absent du worktree) — raison d'environnement, pas
+remarque sur la MR.
+
 **B. Un test existant qui le prouve déjà** — cherche dans le worktree le test qui exerce ce
 comportement (`grep -rl` sur la clé, le widget, le use case, le texte ; les `.feature` Gherkin et leurs
 steps ; les tests ajoutés par la MR). Un test ne compte que s'il **asserte le résultat promis**, pas

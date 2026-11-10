@@ -7,7 +7,10 @@ de la revue se vérifie ici, avant le gauntlet, et se tranche **en un seul arrê
 1. `review.sh preflight <slug>` (Bash timeout 600000 : il lance le doctor du gauntlet). Il vérifie :
    l'outillage (SDK épinglé installé, outils du gauntlet propres au langage — leur absence fait crasher `reinvented`
    et `dedup` —, linter, maestro), la config QA (plateformes, appIds réels et non de template, AVD et
-   simulateur, compte de test référencé), le graphe graphify, et l'authentification de `glab`/`gh`.
+   simulateur, compte de test référencé), le graphe graphify, l'authentification de `glab`/`gh`, les
+   règles projet posées dans un sous-dossier au lieu de la racine du repo (domaine **projet**), et les
+   fichiers ignorés par git dont l'app de QA a besoin (`.env` du flavor : domaine **worktree**). Il
+   résout la racine avec git, d'où qu'il soit lancé, et l'affiche en première ligne.
    Il écrit `preflight.json` et liste les manques par domaine.
 2. **Rien ne manque** → `review.sh pass <slug> preflight`, étape suivante, sans question.
 3. **Sinon, un seul `AskUserQuestion`**, une question par domaine concerné (4 au plus), chacune
@@ -23,6 +26,10 @@ de la revue se vérifie ici, avant le gauntlet, et se tranche **en un seul arrê
    - **publication** : « Je m'authentifie (`glab auth login`, dans mon terminal) » / « Je publierai à
      la main : la revue s'arrêtera au texte validé ».
    - **projet** (pas de config) : « Continuer avec le template générique » / « Je lance `/feature init` d'abord ».
+     Règle dans un sous-dossier : « Je la déplace à la racine (la commande `mv` du préflight) » / « Continuer sans elle ».
+   - **worktree** (fichier ignoré absent du checkout principal, ou hors de la liste copiée) : « Je le
+     récupère maintenant (coffre de secrets), je te dis quand c'est fait » / « Continuer : la QA device
+     sera faite sans ce fichier, donc non probante ». Ne lis ni n'affiche jamais son contenu.
 4. **Applique ses réponses** avant d'aller plus loin :
    - valeurs QA données → écris-les dans `.claude/rules/feature_pipeline.md` du projet (bloc `ini` et
      « Notes pour les agents »), montre le diff à Thibault en une ligne par clé ; c'est sa config, il

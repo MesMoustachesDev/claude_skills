@@ -10,6 +10,7 @@
 # effacé. Un config.yaml dans <package>/maestro/ est passé à Maestro (--config : executionOrder…).
 # iOS : avec ios.simulator_base, chaque run a son simulateur, « <modèle> · feature-<feature> » (sim.sh ensure,
 # nom surchargé par GAUNTLET_SIM_NAME), à supprimer avec le worktree. Sans, ios.simulator, partagé.
+# GAUNTLET_SIM_UDID impose le simulateur (/reviewPR : celui de la revue, review.sh qa) et passe avant tout.
 
 wait_until() { # wait_until <secondes> <cmd...>
   local t="$1"; shift
@@ -92,6 +93,14 @@ qa_prepare_android() { # → QA_DEVICE
 # Preflight (pipeline.json → qa_devices.ios) : reuse → le simulateur nommé ; fresh | prepared → le clone.
 qa_ios_udid() {
   local sim name mode dev
+  if [ -n "${GAUNTLET_SIM_UDID:-}" ]; then
+    udid="$GAUNTLET_SIM_UDID"
+    xcrun simctl list devices available -j | jq -e --arg u "$udid" '[.devices[][] | select(.udid==$u)] | length > 0' >/dev/null \
+      || { ko "simulateur imposé $udid introuvable (GAUNTLET_SIM_UDID)"; return 1; }
+    info "simulateur imposé : $udid"
+    xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || true
+    return 0
+  fi
   mode="$(pipeline_get .qa_devices.ios.mode)"; dev="$(pipeline_get .qa_devices.ios.device)"
   if [ "$mode" = reuse ]; then
     udid="$(xcrun simctl list devices available -j | jq -r --arg k "$dev" '[.devices[][] | select(.name==$k or .udid==$k)][0].udid // empty')"

@@ -12,6 +12,11 @@
 # .claude/rules/feature_pipeline.md (racine du repo courant). Il est déjà connecté au compte de test et
 # porte les données de QA (rapports téléchargés) : chaque clone part de cet état. Il doit être éteint pour
 # être cloné ; un clone existant, lui, se reboote sans le modèle.
+#
+# --like <nom|udid> à la place de --base : pas de modèle préparé, « <nom> · <run> » est créé neuf
+# (simctl create, même type d'appareil et même runtime que <nom>), sans compte ni données. Le simulateur
+# <nom> lui-même n'est jamais touché, allumé ou non : /reviewPR s'en sert quand ios.simulator_base est vide,
+# pour ne jamais installer une app de revue sur le simulateur partagé (ios.simulator).
 # Seul l'UDID va sur stdout ; les messages vont sur stderr.
 set -u
 set -o pipefail
@@ -63,12 +68,25 @@ lock() {
   trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 }
 
+# create_like <modèle> <nom du nouveau> — simulateur neuf, même type d'appareil et même runtime que <modèle>
+create_like() {
+  local spec dt rt
+  spec="$(xcrun simctl list devices available -j | jq -r --arg k "$1" \
+    '[.devices | to_entries[] | .key as $rt | .value[] | select(.name==$k or .udid==$k) | "\(.deviceTypeIdentifier) \($rt)"][0] // empty')"
+  [ -n "$spec" ] || die "simulateur « $1 » introuvable : rien à imiter (ios.simulator de la config)"
+  read -r dt rt <<<"$spec"
+  msg "création de « $2 » ($dt, $rt)"
+  xcrun simctl create "$2" "$dt" "$rt" 2>&1
+}
+
 cmd_ensure() {
   local name="$1" base="$2" clone udid state
   clone="$base · $name"
   lock
   udid="$(device_field "$clone" udid)"
-  if [ -z "$udid" ]; then
+  if [ -z "$udid" ] && [ "$like" = 1 ]; then
+    udid="$(create_like "$base" "$clone")" || die "simctl create a échoué : $udid"
+  elif [ -z "$udid" ]; then
     [ -n "$(device_field "$base" udid)" ] || { how_to_create "$base"; exit 2; }
     state="$(device_field "$base" state)"
     [ "$state" = Shutdown ] || die "le modèle « $base » est $state : il ne se clone qu'éteint. Si personne ne s'en sert : xcrun simctl shutdown \"$base\""
@@ -90,11 +108,12 @@ cmd_remove() {
   msg "« $clone » ($udid) supprimé"
 }
 
-base=""
+base=""; like=0
 [ "${1:-}" = --base ] && { base="${2:-}"; shift 2; }
+[ "${1:-}" = --like ] && { base="${2:-}"; like=1; shift 2; }
 action="${1:-}"; name="${2:-}"
 case "$action" in
-  ""|-h|--help) sed -n '2,16p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
 esac
 [ -n "$base" ] || base="$(base_name)"
 [ "$action" = base ] && { [ -n "$base" ] || exit 1; printf '%s\n' "$base"; exit 0; }

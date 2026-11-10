@@ -126,8 +126,14 @@ if [ -f "$wt/.gitmodules" ]; then
     fi
   done
 fi
-# Fichiers non suivis dont les checks ont besoin (.env lu par un générateur…) : liste explicite dans la
-# config, vide par défaut. Jamais un keystore : rien dans le profil pr ne signe un binaire.
+# Fichiers ignorés par git dont le build a besoin (.env du flavor, configs Firebase…) : ceux de
+# worktree.copy_untracked, comme un worktree de feature (worktree_untracked.sh : jamais un secret de
+# signature, jamais un écrasement, seuls les noms sont journalisés). Sans eux, une app qui charge sa
+# config en optionnel tourne sans, et la QA voit une page blanche. review.sh preflight signale ceux qui
+# manquent aussi au checkout principal.
+bash "$SCRIPTS/worktree_untracked.sh" "$wt" >"$out/untracked.log" 2>&1 || true
+grep -E '^(copié|refusé)' "$out/untracked.log" | sed 's/^/untracked : /' >&2
+# pr.copy_untracked : en plus, des fichiers que la liste ci-dessus ne couvre pas.
 for f in $(cfg pr.copy_untracked | tr ',' ' '); do
   if [ -e "$PROJECT/$f" ] && [ ! -e "$wt/$f" ]; then mkdir -p "$wt/$(dirname "$f")"; cp -R "$PROJECT/$f" "$wt/$f"; fi
 done

@@ -143,10 +143,14 @@ readme.sections = ^## (But|Purpose), ^## (API publique|Public API)
 pr.max_lines = 600
 # Format des messages de commit (regex grep -E) ; les commits wip/fixup/squash sont toujours signalés.
 commits.pattern = ^(feat|fix|chore|refactor|test|docs|perf|ci|build|style)(\([a-z0-9_/-]+\))?!?: .+
-# Fichiers non suivis (gitignore) copiés du checkout principal dans le worktree de revue, parce qu'un
-# check en a besoin (un générateur qui lit .env…). Chemins relatifs à la racine. Pas de keystore :
-# rien dans le profil pr ne signe un binaire, et le worktree est supprimé après.
+# Le worktree de revue reçoit du checkout principal les fichiers ignorés de worktree.copy_untracked
+# (worktree_untracked.sh : jamais un secret de signature). pr.copy_untracked : en plus, des chemins que
+# cette liste ne couvre pas, relatifs à la racine.
 pr.copy_untracked =
+# Fichiers ignorés dont l'app de QA a besoin et que le préflight de /reviewPR doit trouver au checkout principal
+# (chemins relatifs à la racine). Il trouve déjà seul ceux qu'un .gitignore nomme et qui portent le flavor des
+# builds QA (<app>/assets/.env.staging pour --flavor staging) ; ajoute ici ceux qu'il ne peut pas deviner.
+untracked.required =
 
 # ---------------------------------------------------------------------------
 # QA — Maestro (flows dans <package>/maestro/, captures dans .claude/features/<name>/qa/<platform>/)
@@ -163,7 +167,8 @@ android.build = fvm flutter build apk --debug
 android.apk = build/app/outputs/flutter-apk/app-debug.apk
 ios.simulator = iPhone 16 Pro
 # Simulateur modèle (éteint, compte de test connecté, données de QA en place) : chaque run /fix et /feature
-# en clone le sien (~/.claude/scripts/sim.sh). Vide : tous les runs partagent ios.simulator.
+# en clone le sien (~/.claude/scripts/sim.sh). Vide : /feature et /fix partagent ios.simulator ; /reviewPR,
+# jamais : il crée un simulateur neuf du même modèle, « <ios.simulator> · review-<slug> », supprimé au cleanup.
 ios.simulator_base =
 ios.app_id = com.example.app
 ios.build = fvm flutter build ios --debug --simulator
