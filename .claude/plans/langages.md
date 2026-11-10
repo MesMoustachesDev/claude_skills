@@ -37,7 +37,7 @@ Décision : `pipeline/decisions/0011-un-dossier-par-langage.md`. Mode d'emploi :
    Le rapport HTML et l'evidence listent les checks `[N/A]` d'un gate (ADR 0011 : signalés, pas bloquants).
    → `pipeline/langages_android`
    Reste `[N/A]` pour Android : build_runner, metrics (detekt via analyze s'il est appliqué), reinvented,
-   dedup_candidates, barrel_api, unused_code, unused_files, widget_functions, deps_unused, deps_features,
+   barrel_api, unused_code, unused_files, widget_functions, deps_unused, deps_features,
    pub_health, generated_fresh, test_plan, test_plan_match, test_dups ; format / coverage / mutation quand le
    build n'applique ni ktlint/Spotless, ni Kover/JaCoCo, ni pitest. Non essayé : `layout.json` écrit par le gate sur un flow
    rouge (la commande `layout` elle-même marche), lint / detekt / ktlint / Kover / pitest réels (pas en cache : simulés), un module `com.android.library` réel (AGP), la QA Maestro Android.

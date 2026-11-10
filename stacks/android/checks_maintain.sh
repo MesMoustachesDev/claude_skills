@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # checks_maintain.sh — maintenabilité d'un module Android / Kotlin : design system, chaînes, strings.xml, hygiène
-# des tests, API dépréciées, README. Sourcé par stacks/android/checks.sh.
+# des tests, API dépréciées, README, candidats de la roue réinventée. Sourcé par stacks/android/checks.sh.
 #
 # Pas de version Android (non applicables, ADR 0011) : deps_unused, deps_features, pub_health (dépendances Gradle :
-# pas d'outil fiable sans réseau), reinvented, dedup_candidates (outils AST Dart), barrel_api (Kotlin n'a pas de
+# pas d'outil fiable sans réseau), reinvented (outil AST Dart), barrel_api (Kotlin n'a pas de
 # barrel ; `internal` fait ce travail, le compilateur le garde), unused_code, unused_files (detekt les porte s'il
 # est appliqué : voir analyze), widget_functions (un composable EST une fonction), generated_fresh (KSP et kapt
 # génèrent dans build/, jamais commité).
@@ -139,3 +139,15 @@ check_package_readme() {
 }
 # has_plugin_in_module <regex> — le build du module lui-même cite <regex>
 has_plugin_in_module() { cat "$PKG_DIR/build.gradle.kts" "$PKG_DIR/build.gradle" 2>/dev/null | grep -v '^[[:space:]]*//' | grep -qE "$1"; }
+
+# dedup_candidates — entrée de l'agent feature-dedup : pour chaque déclaration réutilisable du module (périmètre du
+# diff en mode extend), les déclarations Kotlin du reste du repo qui lui ressemblent (tokens de nom pondérés IDF,
+# rôle, receveur ou supertype, signature, types partagés) ; kotlin_dedup.py, sans dépendance. Toujours vert : c'est
+# un producteur, le verdict vient de l'agent.
+check_dedup_candidates() {
+  local scope="$GAUNTLET_OUT/scope_root.txt"
+  scope_for_tool "" "$scope"
+  python3 "$ANDROID_CHECKS_DIR/kotlin_dedup.py" --root "$PROJECT_ROOT" --package "$PKG_DIR" --scope "$scope" \
+    --ignore-names "$(cfg_list dup.ignore_names | paste -sd, -)" --ds-prefix "$(cfg_list ds.imports | paste -sd, -)" \
+    --out "$FEATURE_DIR/dedup_candidates.json"
+}

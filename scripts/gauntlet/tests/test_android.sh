@@ -6,6 +6,7 @@
 #     stubs, couches, design system, chaînes, strings.xml, hygiène, README) ;
 #   - un outil absent du projet (ni ktlint ni Spotless, ni Kover ni JaCoCo, pas de pitest) : [N/A], jamais vert ;
 #   - un check que seul Flutter a (build_runner) : [N/A] ;
+#   - dedup_candidates : kotlin_dedup.py rapproche les ajouts du module des déclarations du repo ;
 #   - gradle_run.sh qualifie les tâches par le module et traduit un fichier de test en --tests.
 source "$(dirname "$0")/fixture.sh"
 FAKE_GRADLE="$TESTS_DIR/fake_gradle.sh"
@@ -192,6 +193,55 @@ printf '\nfun slow() { Thread.sleep(100) }\n' >> "$P/$T/ui/LoginScreenTest.kt"
 run_c test_hygiene login; expect_rc 1 "Thread.sleep dans un test"; expect_out "Thread.sleep" "la ligne est nommée"
 reset; rm "$P/README.md"
 run_c package_readme login; expect_rc 1 "README absent d'un module bibliothèque"
+reset
+
+echo "dedup_candidates — déclarations Kotlin du repo qui ressemblent aux ajouts du module (kotlin_dedup.py)"
+C="feature/core/src/main/kotlin/com/x/core"
+mkdir -p "$R/feature/core/build" "$R/$C/domain" "$R/$C/data" "$R/feature/design/src/main/kotlin/com/x/design" "$R/feature/core/src/test/kotlin"
+printf 'plugins { kotlin("jvm") }\n' > "$R/feature/core/build.gradle.kts"
+printf 'plugins { kotlin("jvm") }\n' > "$R/feature/design/build.gradle.kts"
+cat > "$R/$C/domain/GetAllUsersUseCase.kt" <<'EOK'
+package com.x.core.domain
+
+import javax.inject.Inject
+
+/** Observes every user, "{ not a brace }" in a string. */
+class GetAllUsersUseCase @Inject constructor(
+    private val userRepository: UserRepository,
+) {
+    operator fun invoke(): Flow<List<User>> = userRepository.observeAll()
+}
+EOK
+printf 'package com.x.core.data\n\nfun User.toUserDao(): UserDao = TODO()\n\nfun User.toUserSummary(): UserSummary = TODO()\n' > "$R/$C/data/UserMapper.kt"
+printf 'package com.x.core.domain\n\nclass GetAllUsersUseCaseCopy\n' > "$R/$C/domain/GetAllUsersUseCase_Factory.kt"
+printf 'package com.x.core\n\nclass ListUsersUseCaseTest\n' > "$R/feature/core/src/test/kotlin/ListUsersUseCaseTest.kt"
+printf 'package com.x.design\n\n@Composable\nfun AppEmptyState(text: String) {}\n' > "$R/feature/design/src/main/kotlin/com/x/design/AppEmptyState.kt"
+commit "$R" core >/dev/null
+cat > "$P/$K/domain/ListUsersUseCase.kt" <<'EOK'
+package com.x.login.domain
+
+import javax.inject.Inject
+
+/** Reads the users once. */
+class ListUsersUseCase @Inject constructor(
+    private val userRepository: UserRepository,
+) {
+    suspend operator fun invoke(): List<User> = TODO()
+}
+EOK
+printf 'package com.x.login.ui\n\n@Composable\nfun LoginEmptyState(text: String) {}\n\n@Preview\n@Composable\nprivate fun LoginEmptyStatePreview() {}\n\nprivate fun hidden() = 1\n' > "$P/$K/ui/LoginEmptyState.kt"
+run_x dedup_candidates login; expect_rc 0 "producteur : toujours vert"; expect_no_out "[N/A]" "dedup_candidates a une version Android"
+DC="$R/.claude/features/login/dedup_candidates.json"
+OUT="$(jq -c '[.entries[] | {t: .target.name, c: [.candidates[].name]}]' "$DC")"
+expect_out '{"t":"ListUsersUseCase","c":["GetAllUsersUseCase"' "use case ajouté rapproché du use case existant d'un autre module"
+expect_no_out 'GetAllUsersUseCaseCopy' "fichier généré (generated.exclude) exclu"
+expect_no_out 'ListUsersUseCaseTest' "tests exclus"
+expect_no_out '"t":"LoginRepository"' "extend : une déclaration hors du diff n'est pas cible"
+OUT="$(jq -c '{w: [.widgets[].name], d: [.design_catalog[].name], doc: .entries[0].target.doc, p: .package, k: .entries[0].candidates[0].package}' "$DC")"
+expect_out '"w":["LoginEmptyState"]' "composable public de l'ui listé, preview et privé exclus"
+expect_out '"d":["AppEmptyState"]' "catalogue du design system (ds.imports)"
+expect_out '"doc":"Reads the users once."' "KDoc reprise"
+expect_out '"p":"feature/login","k":"feature/core"' "module Gradle de la cible et de la candidate"
 reset
 
 echo "checks que seul Flutter a, profil complet"

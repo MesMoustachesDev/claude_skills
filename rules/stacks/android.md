@@ -171,9 +171,10 @@ une réponse propre à Android s'ajoute ici avec sa date) :
   formateur (ktlint ou Spotless), la couverture (Kover ou JaCoCo), pitest : ce que le build applique, sinon
   les gates `format`, `coverage`, `mutation` sont **non applicables** (signalés, pas bloquants, ADR 0011).
 - Checks sans version Android (non applicables) : `build_runner`, `metrics` (detekt les porte s'il est
-  appliqué, via `analyze`), `reinvented`, `dedup_candidates`, `barrel_api`, `unused_code`, `unused_files`,
+  appliqué, via `analyze`), `reinvented`, `barrel_api`, `unused_code`, `unused_files`,
   `widget_functions`, `deps_unused`, `deps_features`, `pub_health`, `generated_fresh`, `test_plan`,
   `test_plan_match`, `test_dups`.
+- `dedup_candidates` (étape 0d) : `stacks/android/kotlin_dedup.py`, lexer Kotlin en Python sans dépendance.
 - Fichiers à copier dans un worktree neuf : `local.properties` (chemin du SDK), `google-services.json`, les
   `.env*` ; jamais un keystore.
 - Doctor : JDK, wrapper `./gradlew` à la racine, Android CLI (avertissement), adb.

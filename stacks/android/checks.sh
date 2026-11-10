@@ -9,7 +9,7 @@
 #   checks_test.sh      test, red_check, test_names (rapports JUnit XML), coverage (Kover ou JaCoCo),
 #                       mutation, mutation_scope (pitest s'il est appliqué)
 #   checks_maintain.sh  design_system, l10n_strings, l10n_arb (strings.xml), test_hygiene, deprecated_api,
-#                       package_readme
+#                       package_readme, dedup_candidates (kotlin_dedup.py)
 #   stack_doctor        ce que le doctor vérifie pour Android (JDK, wrapper, Android CLI, adb)
 #
 # Un check que Flutter a et pas Android (build_runner, metrics, reinvented, barrel_api, unused_code…) est non
