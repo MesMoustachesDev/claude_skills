@@ -173,8 +173,10 @@ une réponse propre à Android s'ajoute ici avec sa date) :
 - Checks sans version Android (non applicables) : `build_runner`, `metrics` (detekt les porte s'il est
   appliqué, via `analyze`), `reinvented`, `barrel_api`, `unused_code`, `unused_files`,
   `widget_functions`, `deps_unused`, `deps_features`, `pub_health`, `generated_fresh`, `test_dups`.
-- `test_plan`, `test_plan_match` : `test_plan.py` lit `src/test/**/*Test.kt`, `src/androidTest/**` et les `.feature`
-  Cucumber ; un nom de test est celui de la méthode JUnit (backticks compris, `@DisplayName` s'il y en a un).
+- `test_plan`, `test_plan_match` : `test_plan.py` lit `src/test/**/*Test.kt`, `src/androidTest/**` et les `.feature` ;
+  un nom de test est celui de la méthode JUnit (backticks compris, `@DisplayName` s'il y en a un). Un scénario du
+  `.feature` est écrit quand une méthode porte son titre (casse ignorée), qui ne compte pas en plus
+  (`android-tests.md`, Acceptation).
 - `dedup_candidates` (étape 0d) : `stacks/android/kotlin_dedup.py`, lexer Kotlin en Python sans dépendance.
 - Fichiers à copier dans un worktree neuf : `local.properties` (chemin du SDK), `google-services.json`, les
   `.env*` ; jamais un keystore.

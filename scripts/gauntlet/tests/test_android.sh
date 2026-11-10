@@ -297,8 +297,11 @@ class LoginUseCaseTest {
 }
 EOK
 mkdir -p "$P/src/test/resources"; printf 'Feature: login\n  Scenario: signs the user in\n' > "$P/src/test/resources/login.feature"
-run_x test_plan_match login; expect_rc 0 "tests écrits = liste (backticks, identifiant, @DisplayName, scénario)"
-expect_out "4 test(s) écrits, 4 prévus" "le test d'avant la branche ne compte pas"
+run_x test_plan_match login; expect_rc 1 "scénario sans méthode JUnit du même nom : pas écrit"
+expect_out "prévu, pas écrit : $FE — signs the user in" "le scénario est nommé"
+printf 'package com.x.login\n\nimport org.junit.Test\n\nclass LoginAcceptanceTest {\n    @Test\n    fun `Signs the user in`() = Unit\n}\n' > "$P/$T/LoginAcceptanceTest.kt"
+run_x test_plan_match login; expect_rc 0 "tests écrits = liste (backticks, identifiant, @DisplayName, scénario exécuté par sa méthode)"
+expect_out "4 test(s) écrits, 4 prévus" "la méthode du scénario ne compte pas en plus, le test d'avant la branche non plus"
 printf '    @Test\n    fun `an extra one`() = Unit\n}\n' > "$TMP_ROOT/extra.kt"; sed -i.bak '$d' "$P/$T/domain/LoginUseCaseTest.kt"; rm -f "$P/$T/domain/LoginUseCaseTest.kt.bak"
 cat "$TMP_ROOT/extra.kt" >> "$P/$T/domain/LoginUseCaseTest.kt"
 run_x test_plan_match login; expect_rc 1 "un test hors liste rougit"; expect_out "écrit, pas prévu : $KT — an extra one" "le test est nommé"

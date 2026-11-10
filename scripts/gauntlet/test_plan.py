@@ -19,9 +19,10 @@ depuis <base> comptent.
 
 Fichiers de test reconnus, par langage : Dart, `<package>/test/**/*_test.dart` et `<package>/test/**/*.feature` ;
 Kotlin (module Gradle), `<module>/src/test/**/*Test(s).kt`, `<module>/src/androidTest/**/*.kt` et les `.feature` sous
-`src/test` ou `src/androidTest` (Cucumber, d'ordinaire `src/test/resources`). Un nom de test Kotlin est celui de la
+`src/test` ou `src/androidTest` (d'ordinaire `src/test/resources`). Un nom de test Kotlin est celui de la
 méthode JUnit (`@Test`, `@ParameterizedTest`…) : le texte entre backticks, l'identifiant sinon, `@DisplayName`
-s'il y en a un.
+s'il y en a un. Kotlin n'a pas de runner Gherkin : un scénario du `.feature` est écrit quand une méthode de test du
+module porte son titre (casse ignorée) ; cette méthode est le scénario, `match` ne la compte pas en plus.
 
 <package> peut être une liste séparée par des virgules : le package de la feature, puis les packages de
 writes.extra où elle a le droit d'écrire des tests (un appel dans features/user, son acceptation à côté).
@@ -247,6 +248,7 @@ def _written_in(root: Path, package: str, at_base, scenarios) -> set[tuple[str, 
     # Dart : <package>/test ; Kotlin : <module>/src/test et src/androidTest
     dirs = [(root / package / 'test', False), (root / package / 'src' / 'test', True),
             (root / package / 'src' / 'androidTest', True)]
+    kt_new, kt_all, scen_new, scen_all = set(), set(), set(), set()
     for tdir, kotlin in dirs:
         names_of = kotlin_test_names if kotlin else test_names
         for path in test_files(tdir, kotlin):
@@ -260,10 +262,27 @@ def _written_in(root: Path, package: str, at_base, scenarios) -> set[tuple[str, 
                     tmp = Path(d) / path.name
                     tmp.write_text(old)
                     before = {n for _, n in names_of(tmp)}
-            out |= {(rel, n) for _, n in names_of(path) if n not in before}
+            now = {n for _, n in names_of(path)}
+            new = {(rel, n) for n in now - before}
+            if kotlin:
+                kt_all |= now
+                kt_new |= new
+            else:
+                out |= new
         for path in sorted(tdir.rglob('*.feature')) if tdir.is_dir() else []:
             rel = str(path.relative_to(root))
-            out |= {(rel, n) for n in scenarios(path.read_text()) - scenarios(at_base(rel))}
+            current = scenarios(path.read_text())
+            new = {(rel, n) for n in current - scenarios(at_base(rel))}
+            if kotlin:
+                scen_all |= current
+                scen_new |= new
+            else:
+                out |= new
+    # Kotlin n'a pas de runner Gherkin : le .feature est la référence, et chaque scénario est exécuté par une
+    # méthode JUnit du même nom (casse ignorée). Cette méthode EST le scénario : elle ne compte pas en plus, et un
+    # scénario sans elle n'est pas écrit.
+    out |= {(f, n) for f, n in kt_new if n not in scen_all}
+    out |= {(f, n) for f, n in scen_new if n in kt_all}
     return out
 
 

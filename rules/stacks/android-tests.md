@@ -151,6 +151,9 @@ Pas d'outil Gherkin imposé en Kotlin (Cucumber-Android demande un appareil, et 
   `src/test/kotlin/<p>/ui/<Feature>AcceptanceTest.kt`, **nommé exactement comme le scénario**
   (`` fun `Shows the profile after login`() ``), ses étapes en commentaires `// Given …`, `// When …`, `// Then …`
   au-dessus du code qui les joue.
+- Dans `tests_plan.json`, le scénario est listé **sur le `.feature`** (`layer: acceptance`), jamais sur la méthode :
+  `test_plan_match` rattache la méthode JUnit qui porte son titre (casse ignorée) au scénario, elle ne compte pas en
+  plus. Un scénario sans méthode du même nom reste « prévu, pas écrit ».
 - L'acceptation tourne sur le **vrai ViewModel**, branché sur des use cases mockés, rendu par le vrai écran
   (`XxxRoute` avec le ViewModel construit dans le test) sous Robolectric. Une action de l'utilisateur :
   `performClick`, `performTextInput` ; une réponse d'un système extérieur : `coEvery { useCase(…) } returns …`

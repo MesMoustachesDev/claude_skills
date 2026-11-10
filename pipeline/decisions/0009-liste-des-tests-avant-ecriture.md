@@ -1,6 +1,6 @@
 # 0009 — La liste des tests se décide avant d'en écrire un
 
-Statut : acceptée (2026-11-05), amende 0001 ; amendée le 2026-11-10 (tests Kotlin)
+Statut : acceptée (2026-11-05), amende 0001 ; amendée le 2026-11-10 (tests Kotlin, scénario écrit par sa méthode JUnit)
 Où elle vit : `pipeline/feature/steps/3_tests.md` (3a) · `agents/feature-test-planner.md` ·
 `agents/feature-test-reviewer.md` (mode liste) · `agents/feature-test-writer*.md` ·
 `scripts/gauntlet/test_plan.py` · `stacks/flutter/checks_test_plan.sh` (`test_plan`, `test_plan_match`
@@ -28,7 +28,9 @@ demande une passe de mutation par lot.
 - **Sobre**, tenu par le script : chaque test prouve au moins un item ; un item prouvé par beaucoup de
   tests est signalé. Tenu par Gaëlle : les doublons sortent de la liste avant d'être écrits.
 - Théo écrit exactement la liste : `test_plan_match`, dans le gate `red`, refuse un test écrit hors liste
-  ou prévu et pas écrit. Un test à ajouter passe d'abord par la liste.
+  ou prévu et pas écrit. Un test à ajouter passe d'abord par la liste. Un scénario se compare par son titre
+  dans le `.feature` ; en Kotlin, sans runner Gherkin, il est écrit par la méthode JUnit qui porte ce titre
+  (casse ignorée), qui ne compte pas en plus (amendement du 2026-11-10).
 - Le filet d'après reste : la couverture (5) et la mutation (Hugo, 7) disent ce que la liste aurait raté.
 
 ## Conséquences

@@ -162,7 +162,7 @@ rules.none =
 | coverage | Kover ou JaCoCo (rapport XML) | non applicable |
 | mutation | pitest (`info.solidsoft.pitest`, `pl.droidsonroids.pitest`), outputFormats XML | non applicable |
 | dedup_candidates (étape 0d, Denis) | `kotlin_dedup.py` : déclarations du module (le diff en extend) rapprochées de celles du repo par le nom, le rôle, le receveur, le supertype et la signature ; `dup.ignore_names`, `ds.imports` (catalogue des composables du design system) | — (Python 3, sans dépendance) |
-| test_plan, test_plan_match (étape 3a, gate red) | `test_plan.py` : tests `src/test/**/*Test.kt`, `src/androidTest/**`, scénarios des `.feature` (Cucumber, `src/test/resources`) ; nom de test = méthode JUnit | — |
+| test_plan, test_plan_match (étape 3a, gate red) | `test_plan.py` : tests `src/test/**/*Test.kt`, `src/androidTest/**`, scénarios du `.feature` (`src/test/resources`), chacun écrit par la méthode JUnit qui porte son titre ; nom de test = méthode JUnit | — |
 | build_runner, metrics, reinvented, barrel_api, unused_code, widget_functions, pub_health, test_dups… | — | non applicables à Android |
 
 Un check non applicable est signalé (`[N/A]` dans le journal, le rapport HTML et l'evidence), jamais compté vert.
