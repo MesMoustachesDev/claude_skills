@@ -50,6 +50,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 ## QA
 
 - Chaque worktree crée son propre simulateur (clone du simulateur modèle, supprimé avec le worktree) ; ne lance jamais une étape device sur le simulateur partagé. (2026-11-03, « c'est pas "faisable". C'est la règle », fix photo_delete_without_confirm)
+- Quand aucune fonction de l'app ne permet de préparer les données d'un scénario, la QA les prépare elle-même par la base locale de l'app debug (run-as, SQL) au lieu de déclarer le scénario « non préparable ». (2026-11-11, « Règle », « t'as accès à la bdd room »)
 
 ## Code et conventions
 
