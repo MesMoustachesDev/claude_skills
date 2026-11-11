@@ -202,6 +202,23 @@ qa_device_ready() {
   return 1
 }
 
+# qa_without_flows — feature sans écran : pas d'appareil ni de build ici, l'agent QA a joué chaque scénario
+# lui-même (adb shell cmd app_function…). Par plateforme, qa_verdicts.py exige un verdict par scénario de §4
+# dans qa.md, ✓ partout, et pour chaque ✓ un fichier de sortie brute cité, présent dans qa/<plateforme>/.
+qa_without_flows() {
+  local platform rc=0
+  info "feature sans écran : QA sans flow Maestro, verdicts lus dans ${FEATURE_DIR#$PROJECT_ROOT/}/qa.md"
+  for platform in $(qa_platforms); do
+    if python3 "$GAUNTLET_ROOT/qa_verdicts.py" --spec "$FEATURE_DIR/spec.md" --qa "$FEATURE_DIR/qa.md" \
+         --raw "$FEATURE_DIR/qa/$platform" --platform "$platform"; then
+      ok "qa $platform (verdicts de qa.md)"
+    else
+      ko "qa $platform rouge : verdicts de qa.md"; rc=1
+    fi
+  done
+  return $rc
+}
+
 # GAUNTLET_QA_REUSE=1 (set by the feature-qa end hook): if a QA run already finished on the same state
 # (qa_fingerprint), its verdict is reused and the flows are not replayed. A manual `gauntlet.sh qa` always runs.
 check_qa() {
@@ -226,6 +243,11 @@ check_qa() {
       rel="${f#$PROJECT_ROOT/}"
       git -C "$PROJECT_ROOT" cat-file -e "$base:$rel" 2>/dev/null || nflows=$((nflows + 1))
     done
+  fi
+  # Feature sans écran (la stack le dit : qa_screen_files ne rend aucun fichier) et sans flow : la QA s'est
+  # faite hors Maestro (adb, ligne de commande), le gate juge le tableau de verdicts de qa.md.
+  if [ "$nflows" = 0 ] && [ -z "${GAUNTLET_QA_FLOWS:-}" ] && declare -F qa_screen_files >/dev/null && [ -z "$(qa_screen_files)" ]; then
+    qa_without_flows; return
   fi
   [ "$nflows" -gt 0 ] || { ko "aucun flow dans ${flows_dir#$PROJECT_ROOT/}/"; return 1; }
   # Passed explicitly: without it, `maestro test <dir>` was seen ignoring config.yaml (executionOrder).

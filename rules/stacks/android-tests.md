@@ -172,3 +172,23 @@ Pas d'outil Gherkin imposé en Kotlin (Cucumber-Android demande un appareil, et 
 - Un flow rouge : le gate écrit `qa/android/layout.json` (hiérarchie de l'écran à l'arrêt, `android layout`)
   quand Android CLI est là ; lis-le avant de conclure qu'un élément manque.
 - Les tests de `src/androidTest` (instrumentés) ne remplacent pas un flow : ils ne passent pas par l'APK installé.
+
+## QA sans écran, par adb (Quentin)
+
+Une feature sans écran (aucun `@Composable` dans son périmètre : AppFunctions, service, receiver…) n'a pas de
+flow Maestro. Chaque scénario de §4 se joue sur l'APK installé, en ligne de commande, et le gate `qa` lit
+`qa.md` au lieu de lancer Maestro. Dès qu'un fichier du périmètre déclare un `@Composable`, les flows sont exigés.
+- Émulateur à **2 cœurs au moins** (instance jetable `-read-only -no-snapshot -cores 4`) : sur un AVD à 1 cœur,
+  `adb shell cmd app_function execute-app-function` se bloque dans system_server et finit en « Timed out ».
+- AppFunctions : `adb shell cmd app_function list-app-functions` pour l'index, puis
+  `execute-app-function --package <appId> --function <functionId complet> --parameters '<json>'`. Le functionId
+  est l'identifiant complet de l'index (classe qualifiée et `#` méthode), jamais le nom court de la fonction.
+- Données : d'abord par les fonctions de l'app elles-mêmes. Quand aucune fonction ne permet de préparer l'état
+  (plan archivé, séance faite, données corrompues), par la base de l'app debug : `run-as <appId>` pour copier la
+  base sur l'hôte, `sqlite3` dessus (app arrêtée, `-wal` et `-shm` retirés), puis la repousser. Le SQL joué va
+  dans `qa/android/setup_db.sql`.
+- Chaque appel écrit sa sortie brute dans `qa/android/<nn>_<slug>.txt`. `qa.md` garde le tableau
+  `| # | Scénario | Android | Observation |` : une ligne par scénario de §4, titre exact, verdict ✓ (« ✓ avec
+  réserve » compris), ✗ ou « non vérifié », et pour chaque ✓ le fichier de sortie brute entre backticks dans
+  l'Observation. Le gate est rouge s'il manque un scénario, sur un ✗ ou un « non vérifié », ou si un ✓ ne cite
+  aucun fichier présent dans `qa/android/`.

@@ -97,3 +97,13 @@ stack_doctor() {
   fi
   warn_if "adb (QA Maestro sur émulateur)" adb --version
 }
+
+# qa_screen_files — fichiers Kotlin du périmètre (hors tests) qui déclarent un @Composable. Aucun : la feature
+# n'a pas d'écran, le gate qa accepte une QA sans flow Maestro (verdicts de qa.md, checks_qa.sh).
+qa_screen_files() {
+  local f
+  { if [ "$SCOPE_ALL" = 1 ]; then git -C "$PROJECT_ROOT" ls-files --cached --others --exclude-standard -- "$PKG_REL"
+    else sed 's/:[0-9]*$//' "$SCOPE_FILE" | sort -u; fi; } \
+    | grep '\.kt$' | grep -Ev '/src/(test|androidTest)/' \
+    | while IFS= read -r f; do grep -q '@Composable' "$PROJECT_ROOT/$f" 2>/dev/null && printf '%s\n' "$f"; done
+}

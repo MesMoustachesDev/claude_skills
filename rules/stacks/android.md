@@ -130,6 +130,8 @@ avec leur **arbre de composants** JSON (bornes, testTags, sémantique, modifiers
 l'écrit dans `qa/android/layout.json` quand un flow est rouge). `android.emulator = cli` dans la config fait
 démarrer l'AVD de QA par `android emulator start --headless`. Sans Android CLI (exit 3, « non applicable ») :
 captures par Maestro sur l'émulateur, comme avant. La clé `android` de `stack.ini` porte `--no-metrics`.
+Feature sans écran (aucun `@Composable` dans le périmètre) : pas de flow, QA par adb et verdicts de `qa.md`
+lus par le gate `qa` (`android-tests.md`, « QA sans écran, par adb »).
 
 ## Spec (Sophie, Camille)
 

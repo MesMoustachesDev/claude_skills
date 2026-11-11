@@ -7,6 +7,7 @@
 #   - un outil absent du projet (ni ktlint ni Spotless, ni Kover ni JaCoCo, pas de pitest) : [N/A], jamais vert ;
 #   - un check que seul Flutter a (build_runner) : [N/A] ;
 #   - test_plan, test_plan_match : test_plan.py lit les chemins et les noms de test Kotlin (JUnit, Cucumber) ;
+#   - qa : une feature sans @Composable dans son périmètre passe par les verdicts de qa.md, pas par Maestro ;
 #   - dedup_candidates : kotlin_dedup.py rapproche les ajouts du module des déclarations du repo ;
 #   - gradle_run.sh qualifie les tâches par le module et traduit un fichier de test en --tests.
 source "$(dirname "$0")/fixture.sh"
@@ -306,6 +307,25 @@ printf '    @Test\n    fun `an extra one`() = Unit\n}\n' > "$TMP_ROOT/extra.kt";
 cat "$TMP_ROOT/extra.kt" >> "$P/$T/domain/LoginUseCaseTest.kt"
 run_x test_plan_match login; expect_rc 1 "un test hors liste rougit"; expect_out "écrit, pas prévu : $KT — an extra one" "le test est nommé"
 reset; rm -rf "$FD/spec.md" "$FD/tests_plan.json"
+
+echo "qa — feature sans écran : verdicts de qa.md au lieu des flows Maestro"
+CFG="$R/.claude/rules/feature_pipeline.md"; sed -i.bak 's/^qa.platforms =$/qa.platforms = android/' "$CFG"
+FD="$R/.claude/features/login"; mkdir -p "$FD/qa/android"
+printf '# Spec\n## 4. Scénarios\n```gherkin\n  Scenario: Lists the workouts\n  Scenario: Reports not found\n```\n## 5. Contrats\n' > "$FD/spec.md"
+printf 'liste\n' > "$FD/qa/android/01_list.txt"; printf 'introuvable\n' > "$FD/qa/android/02_not_found.txt"
+printf 'package com.x.login.domain\n\nfun listWorkouts() = Unit\n' > "$P/$K/domain/ListWorkouts.kt"
+qa_md() { printf '# QA\n\n| # | Scénario | Android | Observation |\n|---|---|---|---|\n| 01 | lists the workouts | %s | `01_list.txt` : 3 séances |\n| 02 | reports not found | %s | %s |\n' "$1" "$2" "$3" > "$FD/qa.md"; }
+qa_md "✓" "✓ avec réserve" '`02_not_found.txt` : code 1500'
+run_x qa login; expect_rc 0 "sans écran ni flow : chaque scénario ✓ avec sa sortie brute"
+expect_out "2/2 scénario(s) ✓ avec sortie brute (android)" "les verdicts sont comptés"; expect_no_out "aucun flow" "Maestro n'est pas exigé"
+qa_md "✓" "✗" '`02_not_found.txt`'; run_x qa login; expect_rc 1 "un ✗ rougit"; expect_out "« Reports not found » : ✗" "le scénario est nommé"
+qa_md "✓" "non vérifié" '—'; run_x qa login; expect_rc 1 "un « non vérifié » rougit"
+qa_md "✓" "✓" '`absent.txt` : rien'; run_x qa login; expect_rc 1 "un ✓ sans sortie brute existante rougit"; expect_out "✓ sans sortie brute citée" "dit ce qui manque"
+printf '# QA\n\n| # | Scénario | Android | Observation |\n|---|---|---|---|\n| 01 | lists the workouts | ✓ | `01_list.txt` |\n' > "$FD/qa.md"
+run_x qa login; expect_rc 1 "un scénario sans verdict rougit"; expect_out "« Reports not found » : pas de verdict android" "le scénario manquant est nommé"
+printf 'package com.x.login.ui\n\nimport androidx.compose.runtime.Composable\n\n@Composable\nfun WorkoutsScreen() = Unit\n' > "$P/$K/ui/WorkoutsScreen.kt"
+qa_md "✓" "✓" '`02_not_found.txt`'; run_x qa login; expect_rc 1 "un écran dans le périmètre : Maestro reste exigé"; expect_out "aucun flow dans feature/login/maestro/" "le flow manquant est dit"
+mv "$CFG.bak" "$CFG"; reset; rm -rf "$FD/spec.md" "$FD/qa.md" "$FD/qa"
 
 echo "checks que seul Flutter a, profil complet"
 run_c build_runner login; expect_rc 0 "build_runner ne bloque pas"; expect_out "[N/A]  build_runner : non applicable à android" "build_runner non applicable à android"

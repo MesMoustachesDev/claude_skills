@@ -163,6 +163,7 @@ rules.none =
 | mutation | pitest (`info.solidsoft.pitest`, `pl.droidsonroids.pitest`), outputFormats XML | non applicable |
 | dedup_candidates (étape 0d, Denis) | `kotlin_dedup.py` : déclarations du module (le diff en extend) rapprochées de celles du repo par le nom, le rôle, le receveur, le supertype et la signature ; `dup.ignore_names`, `ds.imports` (catalogue des composables du design system) | — (Python 3, sans dépendance) |
 | test_plan, test_plan_match (étape 3a, gate red) | `test_plan.py` : tests `src/test/**/*Test.kt`, `src/androidTest/**`, scénarios du `.feature` (`src/test/resources`), chacun écrit par la méthode JUnit qui porte son titre ; nom de test = méthode JUnit | — |
+| qa (étape 8, Quentin) | Maestro, un flow par scénario dans `<module>/maestro/` ; feature sans écran (aucun `@Composable` dans le périmètre) et sans flow : `qa_verdicts.py` lit le tableau de `qa.md`, un ✓ par scénario de §4 avec sa sortie brute dans `qa/android/` | — |
 | build_runner, metrics, reinvented, barrel_api, unused_code, widget_functions, pub_health, test_dups… | — | non applicables à Android |
 
 Un check non applicable est signalé (`[N/A]` dans le journal, le rapport HTML et l'evidence), jamais compté vert.
