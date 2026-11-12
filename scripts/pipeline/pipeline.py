@@ -999,6 +999,10 @@ def commit(c, files, message, allow_empty=False):
         by_repo[(c.root, "")] = []
     shas = []
     for (top, _), fs in by_repo.items():
+        # Un fichier absent du disque et de l'index a déjà sa suppression indexée (git rm) : `git add` refuserait
+        # le chemin (« pathspec did not match »), et le commit l'emporte sans lui.
+        indexed = set(git("ls-files", "--cached", "--", *fs, cwd=top).splitlines()) if fs else set()
+        fs = [f for f in fs if f in indexed or os.path.lexists(os.path.join(top, f))]
         if fs:
             git("add", "--", *fs, cwd=top)
         args = ["commit", "-m", message] + (["--allow-empty"] if allow_empty else [])
