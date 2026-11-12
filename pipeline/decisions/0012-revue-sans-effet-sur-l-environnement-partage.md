@@ -1,8 +1,8 @@
 # 0012 — Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé
 
-Statut : acceptée (2026-11-10)
-Où elle vit : `scripts/review/review.py` (`project_root`, `cmd_preflight`, `review_sim`, `cmd_qa`, `cmd_sim`,
-`cmd_cleanup`, contrôle après `cmd_gauntlet`) · `scripts/sim.sh` (`--like`) · `scripts/gauntlet/checks_qa.sh`
+Statut : acceptée (2026-11-10), amendée (2026-11-12 : config du simulateur lue dans le checkout principal, cleanup par suffixe)
+Où elle vit : `scripts/review/review.py` (`project_root`, `cmd_preflight`, `sim_config`, `review_sim`, `cmd_qa`, `cmd_sim`,
+`cmd_cleanup`, `remove_review_sims`, contrôle après `cmd_gauntlet`) · `scripts/sim.sh` (`--like`, `base_name`) · `scripts/gauntlet/checks_qa.sh`
 (`GAUNTLET_SIM_UDID`) · `scripts/pr_gauntlet.sh` et `scripts/worktree_untracked.sh` (`--patterns`) ·
 `agents/review-qa.md` · `pipeline/review/steps/1_preflight.md`, `2_gauntlet.md`, `4_agents.md`,
 `8_synthese.md` · clé `untracked.required` des gabarits `stacks/*/templates/feature_pipeline.md`
@@ -19,6 +19,11 @@ La revue d'une MR d'un projet a perdu du temps et une install sur trois points q
 3. Le worktree de revue n'avait pas le `.env` du flavor staging, ignoré par git et chargé en optionnel : l'app
    démarrait sur une page blanche, sans erreur de build, jusqu'à ce que le fichier soit récupéré à la main.
 
+Amendement (2026-11-12) : sur une MR dont la branche est partie avant l'ajout de `ios.simulator_base`,
+`review.sh sim` puis `qa` ont créé un simulateur vierge (`--like`) au lieu de cloner le modèle : la clé était
+lue dans la config du worktree de la MR. La QA s'est rabattue sur des tests jetables (« aucun rapport
+téléchargé ») et le clone du modèle, refait à la main, n'était pas connu de `cleanup`.
+
 ## Décision
 
 - **La racine, c'est git.** `review.sh` résout la racine avec `git rev-parse --show-toplevel` (et, dans un
@@ -28,8 +33,11 @@ La revue d'une MR d'un projet a perdu du temps et une install sur trois points q
 - **La QA de revue a son simulateur, toujours.** `review.sh qa` et `review.sh sim` utilisent
   « `<modèle>` · review-`<slug>` » : clone de `ios.simulator_base` s'il existe, sinon un simulateur neuf du
   même type d'appareil et du même runtime que `ios.simulator` (`sim.sh --like`), sans compte ni données.
-  Le gauntlet le reçoit en `GAUNTLET_SIM_UDID`, qui passe avant tout autre choix. Le simulateur partagé
-  n'est jamais rendu ; si `sim.sh` le rendait, la QA s'arrête. `review.sh cleanup` supprime le simulateur.
+  `ios.simulator_base` et `ios.simulator` se lisent dans le checkout principal (la config à jour), le worktree
+  de la MR seulement en dernier recours ; `sim.sh` résout son modèle de la même façon. Le gauntlet le reçoit
+  en `GAUNTLET_SIM_UDID`, qui passe avant tout autre choix. Le simulateur partagé n'est jamais rendu ; si
+  `sim.sh` le rendait, la QA s'arrête. `review.sh cleanup` supprime tous les « `<préfixe>` · review-`<slug>` »
+  (clone du modèle ou simulateur neuf), pas seulement le dernier noté dans l'état.
   Maëlle n'installe ni ne lance l'app ailleurs.
 - **Les fichiers ignorés dont l'app a besoin se vérifient au préflight.** Requis = `untracked.required` de
   la config, plus chaque fichier qu'un `.gitignore` nomme exactement (chemin ancré, sans joker), qui

@@ -9,7 +9,7 @@
 #   sim.sh base           nom du modèle résolu, exit 1 si aucun n'est configuré
 #
 # Le modèle : --base <nom|udid>, sinon $SIM_BASE, sinon `ios.simulator_base` du bloc ini de
-# .claude/rules/feature_pipeline.md (racine du repo courant). Il est déjà connecté au compte de test et
+# .claude/rules/feature_pipeline.md (checkout principal du repo courant, sinon racine du worktree). Il est déjà connecté au compte de test et
 # porte les données de QA (rapports téléchargés) : chaque clone part de cet état. Il doit être éteint pour
 # être cloné ; un clone existant, lui, se reboote sans le modèle.
 #
@@ -24,14 +24,24 @@ set -o pipefail
 msg() { printf 'sim.sh: %s\n' "$*" >&2; }
 die() { msg "$*"; exit 2; }
 
-base_name() {
-  [ -n "${SIM_BASE:-}" ] && { printf '%s' "$SIM_BASE"; return; }
-  local root cfg
-  root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
-  cfg="$root/.claude/rules/feature_pipeline.md"
+cfg_base() {
+  local cfg="$1/.claude/rules/feature_pipeline.md"
   [ -f "$cfg" ] || return 0
   awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfg" | grep -E '^[[:space:]]*ios\.simulator_base[[:space:]]*=' \
     | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+# Le checkout principal d'abord : un worktree dont la branche est partie avant l'ajout de la clé ne l'a pas.
+base_name() {
+  [ -n "${SIM_BASE:-}" ] && { printf '%s' "$SIM_BASE"; return; }
+  local top main v
+  top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+  main="$(git -C "$top" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+  for root in "$main" "$top"; do
+    [ -n "$root" ] || continue
+    v="$(cfg_base "$root")"
+    [ -n "$v" ] && { printf '%s' "$v"; return; }
+  done
 }
 
 # device_field <nom|udid> <champ> — udid | state | name, du premier simulateur disponible qui correspond

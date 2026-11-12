@@ -362,7 +362,7 @@ def cmd_qa(r, args):
         env["GAUNTLET_SIZE"] = "S"  # une plateforme : qa.platform_s, sinon la première de qa.platforms
         platforms = [cfg_value(cfg_text, "qa.platform_s") or (platforms or [""])[0]]
     if "ios" in platforms:
-        env["GAUNTLET_SIM_UDID"] = review_sim(r, cfg_text)
+        env["GAUNTLET_SIM_UDID"] = review_sim(r)
     p = subprocess.run([GAUNTLET, "qa", "review"], cwd=wt, env=env, capture_output=True, text=True)
     shots = os.path.join(s["gauntlet_out"], "features", "review", "qa")
     print((p.stdout + p.stderr)[-3000:])
@@ -376,12 +376,30 @@ def sim_udid(name):
                  if name and name in (d.get("name"), d.get("udid"))), None)
 
 
-def review_sim(r, cfg_text):
+def sim_config(s):
+    """ios.simulator_base et ios.simulator, lus d'abord dans le checkout principal : la branche de la MR
+    peut être partie avant l'ajout d'une clé, et sa config (celle du worktree) ne l'a pas. Le worktree ne
+    sert qu'en dernier recours."""
+    roots = [main_checkout(s["project_root"]), s["project_root"], s.get("worktree")]
+    texts = [t for t in (read_text(os.path.join(p, CFG_REL)) for p in roots if p) if t]
+    pick = lambda key: next((v for v in (cfg_value(t, key) for t in texts) if v), "")
+    return pick("ios.simulator_base"), pick("ios.simulator")
+
+
+def review_sims(slug):
+    """Les simulateurs de cette revue, quel que soit leur préfixe (modèle cloné ou --like) : {nom: préfixe}."""
+    suffix = f" · review-{slug}"
+    out = run(["xcrun", "simctl", "list", "devices", "available", "-j"], check=False).stdout or "{}"
+    return {d["name"]: d["name"][:-len(suffix)] for ds in json.loads(out).get("devices", {}).values() for d in ds
+            if d.get("name", "").endswith(suffix)}
+
+
+def review_sim(r):
     """Le simulateur iOS de cette revue, « <modèle> · review-<slug> » : jamais ios.simulator, le simulateur
     partagé où vivent l'app staging et ses données (une install de la MR les écrase). Clone de
     ios.simulator_base s'il est configuré, sinon un simulateur neuf du même modèle et du même runtime que
     ios.simulator (sim.sh --like). Supprimé par cleanup."""
-    base, shared = cfg_value(cfg_text, "ios.simulator_base"), cfg_value(cfg_text, "ios.simulator")
+    base, shared = sim_config(r.s)
     if not base and not shared:
         die("ni ios.simulator_base ni ios.simulator dans la config : pas de simulateur pour la revue")
     sim_args = ["--base", base] if base else ["--like", shared]
@@ -399,26 +417,26 @@ def review_sim(r, cfg_text):
 
 def cmd_sim(r, args):
     """L'UDID du simulateur de la revue (créé s'il le faut) : le seul où Maëlle installe ou lance l'app."""
-    cfg_text = read_text(os.path.join(r.s.get("worktree") or r.s["project_root"], CFG_REL))
-    if cfg_text is None:
-        die("config du projet absente : pas de simulateur de revue")
-    udid = review_sim(r, cfg_text)
+    udid = review_sim(r)
     print(udid)
     print(f"simulateur de la revue : {r.s['qa_sim']['sim_args'][1]} · {r.s['qa_sim']['name']} — "
           "n'installe et ne lance l'app que là ; supprimé par review.sh cleanup", file=sys.stderr)
 
 
-def remove_review_sim(s):
-    sim = s.get("qa_sim")
-    if not sim:
-        return None
-    p = subprocess.run([SIM_SH, *sim["sim_args"], "remove", sim["name"]], cwd=s["project_root"], capture_output=True, text=True)
-    if p.returncode != 0:
-        print(f"simulateur de la revue non supprimé : {p.stderr.strip()}")
-        return None
-    s.setdefault("sims_removed", []).append({**sim, "removed": now()})
-    s["qa_sim"] = None
-    return sim["name"]
+def remove_review_sims(s):
+    """Supprime tous les « <préfixe> · review-<slug> », pas seulement celui de qa_sim : un clone recréé
+    sous un autre préfixe (modèle puis --like, ou l'inverse) ne doit pas survivre à la revue."""
+    removed, name = [], f"review-{s['slug']}"
+    for full, prefix in review_sims(s["slug"]).items():
+        p = subprocess.run([SIM_SH, "--base", prefix, "remove", name], cwd=s["project_root"], capture_output=True, text=True)
+        if p.returncode != 0:
+            print(f"simulateur « {full} » non supprimé : {p.stderr.strip()}")
+            continue
+        s.setdefault("sims_removed", []).append({"name": name, "prefix": prefix, "removed": now()})
+        removed.append(full)
+    if removed or not review_sims(s["slug"]):
+        s["qa_sim"] = None
+    return removed
 
 
 def package_dir(r, package):
@@ -521,8 +539,7 @@ def cmd_cleanup(r, args):
     s = r.s
     wt = remove_worktree(s)
     print(f"worktree supprimé : {wt}" if wt else "aucun worktree à supprimer")
-    sim = remove_review_sim(s)
-    if sim:
+    for sim in remove_review_sims(s):
         print(f"simulateur de la revue supprimé : {sim}")
     s.setdefault("stages", {})["synthesis"] = {"status": "PASSED", "at": now()}
     r.save()
