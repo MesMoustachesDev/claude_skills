@@ -84,7 +84,7 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    porte aussi `mode`, `deliverable` (ce que l'utilisateur voit si elle est mergée seule), `status:
    "prévu"`, `ticket: null`, `branch: null`, `mr: null`, et la suite — tickets dans le tracker, tableau
    de bord, statuts — est celle de `/epic` (`~/.claude/commands/epic.md`, « nouvel epic », points 4
-   et 5) : enchaîne-la sans repasser par la discussion, elle a eu lieu. Pas de spec, pas de worktree
+   à 7, plan `.claude/plans/<nom>.md` compris) : enchaîne-la sans repasser par la discussion, elle a eu lieu. Pas de spec, pas de worktree
    de plus. L'epic lance chaque sous-feature dans sa propre session, dans l'ordre de dépendance
    (`/feature <sous> --parent <nom> [--in <package>] "<description>"`, `epic.md`, « Lancer une
    sous-session ») ; au cadrage d'une sous-feature,

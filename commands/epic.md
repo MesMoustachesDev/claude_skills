@@ -112,11 +112,14 @@ vu et validé le contenu exact.
    créé et met le reste dans `pending_writes`.
    Ticket d'epic déjà existant (partie A) : seuls les enfants sont créés, et le parent reçoit la
    checklist (`link`) — mise à jour de sa description montrée dans le même lot.
-5. **Lancement** : chaque morceau sans dépendance (ou dont les dépendances sont mergées) part tout de
+5. **Plan, avant tout lancement** : `ExitWorktree` `action: "keep"` (une session isolée dans le worktree
+   ne peut pas écrire dans le checkout principal), puis écris le plan de l'epic (« Le plan de l'epic »).
+   C'est la pièce que Thibault regarde : le panneau Pipeline ne montre l'epic que par lui.
+6. **Lancement** : chaque morceau sans dépendance (ou dont les dépendances sont mergées) part tout de
    suite dans sa session (« Lancer une sous-session »). Pas de spec ni de contrats ici : chaque
    session fera les siens.
-6. **Fin** : le tableau de bord (plus bas), puis `ExitWorktree` `action: "keep"`. L'epic reste la
-   session parente : il reçoit les notes de fin de tour et lance la suite.
+7. **Fin** : le tableau de bord (plus bas). L'epic reste la session parente : il reçoit les notes de fin
+   de tour et lance la suite.
 
 ## `/epic <nom>` — reprise, tableau de bord
 
@@ -154,6 +157,21 @@ Un `pipeline.json` en `M` ou `S` → ce n'est pas un epic : dis-le.
 Mets à jour la carte du cockpit de l'epic (« Rafraîchir », `cockpit.md`) : elle montre déjà
 l'avancement des sous-features.
 
+## Le plan de l'epic
+
+`.claude/plans/<nom>.md`, **dans le checkout principal** (jamais la copie d'un worktree), suivant les
+règles « Plans de travail » du CLAUDE.md global : le panneau Pipeline le lit et montre l'état de chaque
+point. Un epic sans ce fichier n'existe pas pour Thibault.
+- En tête : titre, `**Goal:**` (le critère de succès du cadrage), `**Suivi:**` (`/epic <nom>`, le
+  worktree de l'epic).
+- Un point par morceau du découpage, dans son ordre : ``### Task <n>: <ce qu'il livre> — `<sous>` ``,
+  puis le livrable, la validation et les `depends_on` en deux ou trois lignes.
+- Morceau lancé → ``→ `<branche>` `` sous son titre, dans le même tour que le lancement. Mergé ou réglé
+  sans code → `[fait]` sur le titre (`sync`). Abandonné → `[abandonné]` et la raison. Une question qui
+  attend Thibault → `[toi]` jusqu'à sa réponse.
+- `add`, `drop`, redécoupage : le plan change dans le même tour que `split`.
+- Reprise (`/epic <nom>`) sans plan → écris-le d'abord, avant le tableau de bord.
+
 ## Lancer une sous-session
 
 Une session par morceau, lancée par l'epic (`start_session`, `initiation: "user_asked"` : lancer est
@@ -180,6 +198,8 @@ le travail que Thibault a confié à l'epic), `context: "fresh"`, `use_worktree:
    `prévu` ; branche ou `pipeline.json` → `en cours` ; MR ouverte sur la branche → `MR ouverte` ;
    mergée → `mergé` (commandes : `tracker.md`, « MR et statut réel »). Écris `split[i].status`,
    `branch`, `mr` par `pipeline.sh set`.
+   Reporte-les dans le plan de l'epic, même tour (`→ <branche>`, `[fait]`, `[abandonné]` : « Le plan de
+   l'epic »).
 2. **Tracker** (≠ `none`) : `find` de chaque ticket. Pour chaque écart :
    - dû à l'avancement (le ticket est en retard) → écriture proposée (`set_status`, `MR`, `Branche`,
      case cochée chez le parent) ;
