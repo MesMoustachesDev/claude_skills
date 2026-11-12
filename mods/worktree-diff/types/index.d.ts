@@ -21,6 +21,15 @@ export type SelectedDiff = {
   source: string
 }
 
+export type EditedFile = {
+  worktree: string
+  path: string
+  // The file as read when editing began: a save refuses if the disk no longer matches it.
+  original: string
+  draft: string
+  notice: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'worktree-diff': {
@@ -30,6 +39,7 @@ declare module 'claude-code' {
       collapsed: string[]
       diff: SelectedDiff | null
       areTestsShown: boolean
+      edited: EditedFile | null
     }
   }
 }

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, Register } from 'claude-code'
 
-import type { ChangedFile, PipelineWorktree, SelectedDiff } from '../types'
+import type { ChangedFile, EditedFile, PipelineWorktree, SelectedDiff } from '../types'
 
 const PANE = 'worktree-diff'
 // Pipeline records and generated files: the tree shows the code a run wrote.
@@ -13,6 +13,9 @@ const selectedWorktree = atom({ plugin: 'worktree-diff', key: 'selectedWorktree'
 const collapsed = atom({ plugin: 'worktree-diff', key: 'collapsed' } as const, [])
 const diff = atom({ plugin: 'worktree-diff', key: 'diff' } as const, null)
 const areTestsShown = atom({ plugin: 'worktree-diff', key: 'areTestsShown' } as const, false)
+const edited = atom({ plugin: 'worktree-diff', key: 'edited' } as const, null)
+
+const EDITOR_ROWS = 24
 
 const TEST_FOLDERS = ['test', 'tests', 'integration_test', 'test_driver', '__tests__', 'maestro']
 
@@ -160,6 +163,35 @@ async function showDiff($: Engine, worktree: PipelineWorktree, file: ChangedFile
   await update($, diff, () => selected)
 }
 
+async function startEditing($: Engine, worktree: PipelineWorktree, path: string) {
+  const text = await $.fs.read(`${worktree.dir}/${path}`)
+  const file: EditedFile = { worktree: worktree.name, path, original: text, draft: text, notice: '' }
+  await update($, edited, () => file)
+}
+
+// Writes the draft unless the file changed on disk since editing began (an agent
+// working in the worktree): then the newer text is loaded and nothing is written.
+async function save($: Engine, worktree: PipelineWorktree, file: EditedFile, text: string) {
+  const path = `${worktree.dir}/${file.path}`
+  const onDisk = await $.fs.read(path)
+  if (onDisk !== file.original) {
+    const reloaded: EditedFile = {
+      ...file,
+      original: onDisk,
+      draft: onDisk,
+      notice: 'Le fichier a changé sur le disque entre-temps : rien n’est écrit, voici sa version actuelle.',
+    }
+    await update($, edited, () => reloaded)
+    return
+  }
+  await $.fs.write(path, text)
+  await update($, edited, () => null)
+  await refresh($)
+  const fresh = (await read($, worktrees)).find(one => one.name === worktree.name)
+  const changed = fresh?.files.find(one => one.path === file.path)
+  if (fresh && changed) await showDiff($, fresh, changed)
+}
+
 type DirNode = { name: string; path: string; dirs: DirNode[]; files: ChangedFile[]; count: number }
 
 type Row =
@@ -272,7 +304,10 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Code, Text } = $.ui.resolve(e)
+    const elements = $.ui.resolve(e)
+    const { Box, Button, Code, Text } = elements
+    // The mobile app draws no field: there the pane stays read-only.
+    const Input = e.surface !== 'mobile' && 'Input' in elements ? elements.Input : undefined
     const all = await read($, worktrees)
     const sessionBranch = await read($, currentBranch)
     const selectedName = await read($, selectedWorktree)
@@ -281,6 +316,9 @@ export const register: Register = on => {
     const worktree = all.find(one => one.name === selectedName)
     const isDiffShown = shownDiff !== null && shownDiff.worktree === worktree?.name
     const testsShown = await read($, areTestsShown)
+    const editedFile = await read($, edited)
+    const isEditing =
+      Input !== undefined && editedFile !== null && editedFile.worktree === worktree?.name && editedFile.path === shownDiff?.path
     const testCount = worktree?.files.filter(file => isTest(file.path)).length ?? 0
     const visibleFiles = (worktree?.files ?? []).filter(file => testsShown || !isTest(file.path))
 
@@ -376,9 +414,42 @@ export const register: Register = on => {
           <Box flexDirection="column" flexGrow={1} flexShrink={1}>
             <Box flexDirection="row" gap={1}>
               <Text bold wrap="truncate-start">{shownDiff.path}</Text>
-              <Button key="close-diff" label="Fermer" plain onPress={() => update($, diff, () => null)} />
+              {Input && worktree && !isEditing && worktree.files.find(one => one.path === shownDiff.path)?.status !== 'D' && (
+                <Button key="edit" label="Éditer" plain onPress={() => startEditing($, worktree, shownDiff.path)} />
+              )}
+              {!isEditing && (
+                <Button key="close-diff" label="Fermer" plain onPress={() => update($, diff, () => null)} />
+              )}
             </Box>
-            <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
+            {isEditing && worktree && editedFile ? (
+              <Box flexDirection="column" gap={1}>
+                {isTest(editedFile.path) && (
+                  <Text color="warning">Fichier de test : après le gel (3b), le modifier le sort du gel.</Text>
+                )}
+                {editedFile.notice && <Text color="warning">{editedFile.notice}</Text>}
+                <Input
+                  key={`editor-${editedFile.worktree}-${editedFile.path}`}
+                  rows={EDITOR_ROWS}
+                  autoFocus
+                  value={editedFile.draft}
+                  submitLabel="enregistrer"
+                  onInput={value => update($, edited, file => (file ? { ...file, draft: value } : file))}
+                  onSubmit={value => save($, worktree, editedFile, value)}
+                />
+                <Box flexDirection="row" gap={1}>
+                  <Button
+                    key="save"
+                    label="Enregistrer"
+                    variant="primary"
+                    onPress={() => save($, worktree, editedFile, editedFile.draft)}
+                  />
+                  <Button key="cancel" label="Annuler" plain onPress={() => update($, edited, () => null)} />
+                  {editedFile.draft !== editedFile.original && <Text dimColor>modifié, non enregistré</Text>}
+                </Box>
+              </Box>
+            ) : (
+              <Code source={shownDiff.source} format="diff" path={shownDiff.path} />
+            )}
           </Box>
         )}
         </Box>
