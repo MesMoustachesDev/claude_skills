@@ -37,13 +37,14 @@ const PANE = {
   },
 } as const
 
-const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, opens: string[] = []) => {
+const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, opens: string[] = [], pipeline = () => PIPELINE, hasTimer = true) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', (_, e) => {
     opens.push(e.id)
     return { value: { isPlaced: true } }
   })
-  on('clock.every', () => ({ value: undefined }))
+  // Une période refusée arrête la minuterie : l'état n'est plus relu que par les événements.
+  on('clock.every', () => (hasTimer ? { value: undefined } : { deny: 'pas de minuterie dans ce test' }))
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
 
@@ -64,7 +65,7 @@ const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, o
   })
   on('fs.read', (_, e) =>
     e.path === `${ROOT}/.claude/features/two_factor_login/pipeline.json`
-      ? { value: PIPELINE }
+      ? { value: pipeline() }
       : { deny: 'ENOENT' },
   )
 }
@@ -166,6 +167,58 @@ test('le panneau suit Ivan : durée, appels, refus et fichiers modifiés', async
     'Ivan (implémentation) au travail 3m07, 1 refus',
   )
   await band.unmount()
+})
+
+test('une question à Thibault relit l’état, le tour encore ouvert', async ($, on) => {
+  let pipeline = PIPELINE
+  let reads = 0
+  engine(
+    on,
+    'feature/two_factor_login',
+    [],
+    () => {
+      reads++
+      return pipeline
+    },
+    false,
+  )
+  on('tool.call', () => ({ result: {} }))
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  // Implémentation passée au vert pendant le tour : ni fin de tour ni minuterie ne l'ont relue.
+  const raw = JSON.parse(PIPELINE) as { stages: Record<string, { status: string; at: string }> }
+  raw.stages.green = { status: 'PASSED', at: '2026-10-13T13:00:00Z' }
+  pipeline = JSON.stringify(raw)
+  const before = reads
+  await $.tool.call({ tool: 'AskUserQuestion', questions: [] })
+  expect(reads).toBeGreaterThan(before)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /impl/ }))?.text).toContain('✓ impl (vert)')
+  await ui.unmount()
+})
+
+test('la fin d’un agent relit l’état', async ($, on) => {
+  let reads = 0
+  engine(
+    on,
+    'feature/two_factor_login',
+    [],
+    () => {
+      reads++
+      return PIPELINE
+    },
+    false,
+  )
+  on('clock.now', () => ({ value: 1_000_000 }))
+  on('agent.spawn', () => ({ model: 'opus', agentId: 'ivan-1' }))
+  on('turn.complete', () => ({ text: '' }))
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  await $.agent.spawn({ prompt: 'impl', subagentType: 'feature-implementer' })
+
+  const before = reads
+  await $.turn.complete({ answer: 'fini', durationMs: 1000, isAborted: false, turnId: 't1', agentId: 'ivan-1', reason: 'answer' })
+  expect(reads).toBeGreaterThan(before)
 })
 
 const GHERKIN = `Feature: Login

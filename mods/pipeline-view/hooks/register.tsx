@@ -734,16 +734,20 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (!e.agentId && mine) {
-      mine = { ...mine, title: (await titleOf($, mine.session)) || mine.title }
-      await publish($, 'idle', '', true)
+    // Fin du tour principal ou d'un agent : l'état est relu même si la comptabilité ci-dessous échoue.
+    try {
+      if (!e.agentId && mine) {
+        mine = { ...mine, title: (await titleOf($, mine.session)) || mine.title }
+        await publish($, 'idle', '', true)
+      }
+      if (e.agentId) {
+        const at = await $.clock.now()
+        await update($, agents, list => agentEnded(list, e.agentId ?? '', at))
+        await update($, now, () => at)
+      }
+    } finally {
+      await refresh($)
     }
-    if (e.agentId) {
-      const at = await $.clock.now()
-      await update($, agents, list => agentEnded(list, e.agentId ?? '', at))
-      await update($, now, () => at)
-    }
-    await refresh($)
 
     return done
   })
@@ -785,6 +789,10 @@ export const register: Register = on => {
     if (e.agentId) return next(e)
     await update($, isAsking, () => true)
     await publish($, 'waiting', 'question')
+    // Le tour reste ouvert tant que Thibault n'a pas répondu : il doit lire l'état d'avant la question, pas
+    // celui de la dernière fin de tour (un fichier de contrat supprimé entre-temps restait affiché).
+    await refresh($)
+    await refreshPlans($)
     try {
       return await next(e)
     } finally {
