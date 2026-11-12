@@ -23,3 +23,4 @@ se supprime pas.
 | [0011](0011-un-dossier-par-langage.md) | Ce qui est propre à un langage vit dans son dossier et ne se charge que pour ce langage | acceptée |
 | [0012](0012-revue-sans-effet-sur-l-environnement-partage.md) | Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé | acceptée |
 | [0013](0013-epic-lance-les-sous-sessions.md) | /epic orchestre les /feature et les /fix et lance lui-même leurs sessions | acceptée |
+| [0014](0014-un-epic-a-son-plan.md) | Un epic a son plan dans `.claude/plans/`, écrit avant tout lancement | acceptée |
