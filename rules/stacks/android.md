@@ -98,6 +98,7 @@ un **bloquant** (critique de spec) et un **critique** (revue). Gate : `error_han
   (`libs.xxx`) ; en test : `junit`, `mockk`, `turbine`, `kotlinx-coroutines-test`, Robolectric et
   `ui-test-junit4` pour Compose.
 - Appelants d'une signature changée : un seul `grep -rn '<nom>(' --include=*.kt` à la fin ; le gate compile le
+- Un `README.md` créé pour un module existant décrit tout le module (but, API publique, dépendances lues dans son `build.gradle.kts`), pas seulement ce que la feature y ajoute. (learn 2026-11-12, module_readme_scoped_to_feature, 2 runs)
   module.
 
 ## Implémentation et vues (Ivan, Nina, Fanny, Pauline)
