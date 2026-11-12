@@ -34,7 +34,7 @@ Au retour de chaque moitié (et d'Ivan complet) :
   Thibault. Si l'autre moitié tourne encore et que la décision peut toucher un fichier qu'elle lit (une
   signature, un `ErrorEntity`, un état), laisse-la finir sans la relancer, puis tranche. Montre l'extrait
   concerné (`fichier:ligne`) et ce qui existe ailleurs dans le repo, ouvre le fichier pour lui, et une
-  question : « je modifie mon contrat » (« Réédition plus tard » de 0e) / l'option d'Ivan / l'autre. Puis
+  question : « je modifie mon contrat » (« Réédition plus tard » de 1e) / l'option d'Ivan / l'autre. Puis
   `SendMessage` à la moitié concernée avec la décision ; si le contrat a changé, l'autre moitié repasse
   son gate (`gauntlet.sh green_<couche> <nom>`) avant `join`.
 - Le rapport liste des « tests suspects » alors que le gate est vert → ajoute-les à

@@ -57,7 +57,8 @@
 - **Reprise** : si `.claude/features/<nom>/pipeline.json` existe, `pipeline.sh status <nom>` (affiche
   gabarit, étapes passées, sautées et points d'étape validés) puis `pipeline.sh next <nom>` : c'est lui
   qui donne l'étape où reprendre, dans l'ordre du tableau. Un brouillon commité sans
-  `human_gates.contracts` reprend à 0e : rouvre les fichiers pour Thibault. `size: L` avec `split`
+  `human_gates.contracts` reprend à 1e (rouvre les fichiers pour Thibault), ou à 1 si ses scénarios ne
+  sont pas encore validés (brouillon commité dans l'ordre d'avant l'ADR 0015). `size: L` avec `split`
   rempli : `next` le dit, affiche l'état de chaque sous-feature (son `pipeline.json` dans son worktree)
   et ne lance rien.
   Sinon : `pipeline.sh init <nom> --mode create|extend --package <chemin> --base <base>` (la base

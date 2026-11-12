@@ -34,8 +34,8 @@ Seulement sur un nouveau run : en reprise, `issue` est déjà renseigné et tu n
 
 ## B. Création, juste après la validation du dev
 
-`issue.status == "to_create"` seulement. Moment : `/feature` après la validation de la spec (fin du
-point d'étape « spec »), `/fix` après le gel du test (fin du point d'étape de reproduction), `/epic`
+`issue.status == "to_create"` seulement. Moment : `/feature` une fois la spec rattachée aux contrats
+de Thibault (étape 1g, après 1f), `/fix` après le gel du test (fin du point d'étape de reproduction), `/epic`
 après la validation du découpage.
 
 1. Écris le brouillon dans le dossier du run, `issue.md` (pour `/epic` : `tickets.md`, un bloc par

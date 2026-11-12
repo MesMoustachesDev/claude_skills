@@ -44,6 +44,17 @@ langage, qui dit le type résultat, le fichier de clés et le state holder.
 précédent est levé, et tu cherches les bloquants **introduits** par le diff. Tu ne rouvres pas une
 section que le diff ne touche pas : elle a déjà été critiquée. Une note déjà émise ne se répète pas.
 
+**Mode scénarios** (ton prompt le dit ; ADR 0015) : les contrats n'existent pas encore, ils sortiront
+de ces scénarios. Pas de `contracts.files` : lis un fichier de code de la feature de référence pour
+charger la règle de langage. Saute tout ce qui compare la spec aux contrats (§5 ↔ code, « Les contrats
+permettent-ils la spec ? », states et clés à vérifier dans les fichiers) ; §5 dit seulement « *Après les
+contrats (1f).* ». Juge à la place **si un contrat peut sortir de chaque scénario** : chaque When est une
+action qu'un appel peut porter, chaque Then un résultat observable sans ambiguïté, chaque Given une
+donnée que §6 décrit. Un scénario qui laisse un choix produit ouvert (deux lectures possibles de ce qui
+s'affiche, de ce qui est gardé) est un **bloquant `"owner": "thibault"`**, avec les deux lectures : c'est
+une question produit, Thibault la tranche au point d'étape « scénarios ». **Mode complet** : la grille
+entière, comme ci-dessous.
+
 ## Ta grille
 
 Lis la spec en entier, puis vérifie section par section, en tranchant chaque point :
@@ -57,7 +68,7 @@ appelé avec la bonne signature, qu'une règle n'en contredit pas une autre.
 *Cohérence interne*
 - Chaque item de §2 « Inclus » a au moins un scénario en §4. Chaque scénario de §4 ne parle que de §2.
 - Chaque état de §3 (Loading, Error, Empty, Loaded, par écran) a un scénario en §4.
-- Chaque erreur de §7 a un scénario Error en §4 et un state correspondant dans les contrats.
+- Chaque erreur de §7 a un scénario Error en §4 et (hors mode scénarios) un state correspondant dans les contrats.
 - Les clés nommées dans §4 existent dans le fichier de clés ; les contrats sont cohérents entre eux (le
   use case retourne ce que le repository retourne, le state holder émet des states déclarés).
 - §6 : un payload d'exemple par modèle de données, tous les champs, et la table de mapping couvre

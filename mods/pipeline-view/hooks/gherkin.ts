@@ -157,3 +157,18 @@ export const parseScenarios = (file: ScenarioFile): Scenario[] => {
 
   return found
 }
+
+/** Le Gherkin de la §4 d'une spec (blocs ```gherkin``` mis bout à bout), vide s'il n'y en a pas encore. */
+export const specGherkin = (spec: string): string => {
+  const section = /^## 4\.[^\n]*\n([\s\S]*?)(?=^## \d+\.|(?![\s\S]))/m.exec(spec)?.[1] ?? ''
+  const blocks = [...section.matchAll(/```gherkin\n([\s\S]*?)```/g)].map(m => m[1] ?? '')
+
+  return blocks.join('\n').trim() ? blocks.join('\n') : ''
+}
+
+/** Les comportements C<n> du cadrage (`### C<n> — <titre>`) en scénarios sans étapes, à montrer avant la spec. */
+export const cadrageGherkin = (cadrage: string): string => {
+  const titles = [...cadrage.matchAll(/^###\s+(C\d+)\s*[—–-]\s*(.+)$/gm)].map(m => `${m[1]} — ${(m[2] ?? '').trim()}`)
+
+  return titles.length > 0 ? ['Feature: Cadrage', ...titles.map(t => `  Scenario: ${t}`)].join('\n') + '\n' : ''
+}

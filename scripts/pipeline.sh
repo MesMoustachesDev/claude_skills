@@ -22,7 +22,7 @@
 #   pipeline.sh extra <nom> [glob…]               zones d'écriture hors package pour cette feature (pipeline.json →
 #                                                writes_extra) ; glob entre guillemets ; sans glob, liste projet + feature
 #   pipeline.sh set <nom> <clé.pointée> <json>   écriture libre (ex. suggestions.S1 '{"decision":"applied"}')
-#   pipeline.sh after-architect <nom>            après chaque retour d'Arthur avant l'étape 2 (0c, 0e)
+#   pipeline.sh after-architect <nom>            après chaque retour d'Arthur avant l'étape 2 (1c, 1e)
 #   pipeline.sh contracts-files <nom>            recalcule contracts.files (arbre de travail)
 #   pipeline.sh commit-contracts <nom> draft|thibault|reedit ["<quoi>"] [fichiers…]
 #   pipeline.sh freeze <nom>                     gel des tests (3b)

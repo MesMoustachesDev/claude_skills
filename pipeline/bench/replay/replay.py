@@ -46,7 +46,7 @@ CASES = LOCAL / 'cases.json'
 CLAUDE = HERE.parent.parent.parent
 GAUNTLET = CLAUDE / 'scripts' / 'gauntlet.sh'
 AGENT = {'red': 'feature-test-writer', 'green': 'feature-implementer', 'review': 'feature-reviewer'}
-ORDER = ['cadrage', 'contracts_draft', 'dedup', 'spec_lint', 'spec_review', 'contracts', 'spec', 'red_data',
+ORDER = ['cadrage', 'spec_lint', 'spec_review', 'spec', 'contracts_draft', 'dedup', 'spec_contracts', 'contracts', 'red_data',
          'red_presentation', 'red', 'tests_review', 'green_data', 'green_presentation', 'green', 'clean',
          'dedup_clean', 'review', 'suggestions', 'harden', 'qa', 'polish', 'evidence']
 # Ce que l'étape et les suivantes produisent : absent au départ de la passe.

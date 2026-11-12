@@ -37,7 +37,7 @@ from datetime import datetime
 MARKED = "https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"
 MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
 LAYERS = ["presentation", "domain", "data", "injection"]
-FEATURE_STAGES = ("cadrage", "contracts", "spec", "tests", "tour", "evidence", "mutants", "qa")
+FEATURE_STAGES = ("cadrage", "spec", "contracts", "tests", "tour", "evidence", "mutants", "qa")
 FIX_STAGES = ("repro", "review", "ui", "evidence")
 
 
@@ -1011,7 +1011,8 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     sc_html, sc_badge = scenarios_section(secs.get("4"), picks, {norm(x) for x in feat_scen} if feat_scen else None)
     if secs.get("4"):
         page.add("scenarios", "Scénarios : ce qui sera testé", sc_html, sc_badge)
-        if focus == "tests":
+        # Au point d'étape « contrats », chaque contrat se lit en regard du scénario qui l'a fait naître (ADR 0015).
+        if focus in ("tests", "contracts"):
             page.also_open.append("scenarios")
 
     # §9 : ce que les contrats ne montrent pas (package, dépendances)

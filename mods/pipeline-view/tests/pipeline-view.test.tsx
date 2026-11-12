@@ -3,6 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { activityOf, describeActivity, parseActivity, pipelineTarget } from '../hooks/activity'
 import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
+import { cadrageGherkin, specGherkin } from '../hooks/gherkin'
 import { MAX_DOC, contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
 
 const ROOT = '/repo'
@@ -37,7 +38,7 @@ const PANE = {
   },
 } as const
 
-const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, opens: string[] = [], pipeline = () => PIPELINE, hasTimer = true) => {
+const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, opens: string[] = [], pipeline = () => PIPELINE, hasTimer = true, files: Record<string, string> = {}) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', (_, e) => {
     opens.push(e.id)
@@ -66,7 +67,9 @@ const engine = (on: Parameters<Parameters<typeof test>[1]>[1], branch: string, o
   on('fs.read', (_, e) =>
     e.path === `${ROOT}/.claude/features/two_factor_login/pipeline.json`
       ? { value: pipeline() }
-      : { deny: 'ENOENT' },
+      : e.path in files
+        ? { value: files[e.path] ?? '' }
+        : { deny: 'ENOENT' },
   )
 }
 
@@ -338,6 +341,53 @@ test('le panneau Pipeline attend le premier .feature', async ($, on) => {
   await ui.unmount()
 })
 
+const SPEC_MD = `# Spec — two_factor_login
+
+## 4. Scénarios
+
+\`\`\`gherkin
+Feature: Login
+
+  Scenario: keeps the checked sessions
+    Given a plan with {2} checked sessions
+    When the model returns a new plan
+    Then I see {2} checked sessions
+\`\`\`
+
+## 5. Contrats
+
+*Après les contrats (1f).*
+`
+const CADRAGE_MD = `# Cadrage\n\n### C1 — quand le plan change, alors les séances cochées restent\n\n### C2 — quand le modèle échoue, alors l'ancien plan reste\n`
+
+test('avant le premier .feature : la §4 de la spec, sinon les C<n> du cadrage', async ($, on) => {
+  expect(specGherkin(SPEC_MD)).toContain('Scenario: keeps the checked sessions')
+  expect(specGherkin('## 4. Scénarios\n\n## 5. Contrats\n')).toBe('')
+  expect(cadrageGherkin(CADRAGE_MD)).toBe(
+    "Feature: Cadrage\n  Scenario: C1 — quand le plan change, alors les séances cochées restent\n  Scenario: C2 — quand le modèle échoue, alors l'ancien plan reste\n",
+  )
+  expect(cadrageGherkin('# Cadrage sans C<n>')).toBe('')
+
+  const dir = `${ROOT}/.claude/features/two_factor_login`
+  engine(on, 'feature/two_factor_login', [], () => PIPELINE, true, { [`${dir}/spec.md`]: SPEC_MD, [`${dir}/cadrage.md`]: CADRAGE_MD })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /keeps the checked sessions/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Pas encore de \.feature/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('avant la spec : les C<n> du cadrage', async ($, on) => {
+  const dir = `${ROOT}/.claude/features/two_factor_login`
+  engine(on, 'feature/two_factor_login', [], () => PIPELINE, true, { [`${dir}/cadrage.md`]: CADRAGE_MD })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /C1 — quand le plan change/ })).toBeDefined()
+  await ui.unmount()
+})
+
 const PLAN_MD = `# Plan — paywall
 
 ## Les chantiers
@@ -592,7 +642,7 @@ test('l’encart montre le diff des contrats, puis le fichier entier avec ses ch
   on('process.run', (_, e) => {
     const argv = e.argv.join(' ')
     const out = argv.includes('pipeline.sh')
-      ? JSON.stringify({ key: 'hg.contracts', step: '0e', title: 'Contrats' })
+      ? JSON.stringify({ key: 'hg.contracts', step: '1e', title: 'Contrats' })
       : argv.includes('merge-base')
         ? 'abc123'
         : argv.includes('-U3 ')

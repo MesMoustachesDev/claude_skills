@@ -9,10 +9,11 @@ type Source = [source: string, label: string]
 
 const FEATURE_DOCS: Record<string, Source[]> = {
   cadrage: [['cadrage.md', 'cadrage'], ['discussion.md', 'discussion'], ['exploration.md', 'exploration']],
-  contracts_draft: [['@contracts', 'contrats']],
+  contracts_draft: [['@contracts', 'contrats'], ['spec.md', 'scénarios']],
   dedup: [['dedup.md', 'doublons'], ['@contracts', 'contrats']],
   'hg.contracts': [['@contracts', 'contrats'], ['dedup.md', 'doublons']],
   spec: [['spec.md', 'spec'], ['spec_review.md', 'critique'], ['spec.diff', 'diff spec']],
+  spec_contracts: [['spec.md', 'spec'], ['@contracts', 'contrats'], ['spec.diff', 'diff spec']],
   contracts: [['spec.md', 'spec']],
   test_plan: [['tests_plan.json', 'liste des tests'], ['spec.md', 'spec']],
   test_plan_review: [['tests_review.md', 'revue de la liste'], ['tests_plan.json', 'liste des tests']],

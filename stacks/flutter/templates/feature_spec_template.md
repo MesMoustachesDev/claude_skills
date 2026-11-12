@@ -93,7 +93,8 @@
   - Pour chaque valeur attendue qui dépend d'un Given (préférences, état stocké, Background), écrire
     d'où elle vient d'après §6/§8 et le code existant (fichier:ligne), et vérifier qu'aucun scénario
     existant avec le même Given n'attend autre chose. (learn 2026-10-30, spec_scenarios_contradict_rules, 2 runs)
-  - Avant d'écrire un step qui lit une clé, vérifier qu'elle est déclarée dans un keys.dart des
+  - Mode scénarios (avant les contrats, ADR 0015) : la clé d'un step se propose, Arthur la posera. Ensuite
+    (1f, mode complet), avant d'écrire un step qui lit une clé, vérifier qu'elle est déclarée dans un keys.dart des
     contrats (y compris ceux des autres packages touchés) ; sinon la remonter comme contrat manquant,
     jamais l'inventer. (learn 2026-11-02, spec_reads_key_absent_from_contract, 2 runs)
   - Un comportement de bibliothèque cité par la spec (durée par défaut, erreur levée, crans, debug /
@@ -130,8 +131,11 @@ Feature: {Feature name}
 
 ## 5. Contrats
 
+*Après les contrats (1f).* — ligne à retirer en 1f.
+
 <!--
-  Écrits par le dev dans le code (commit « contracts (by Thibault) » — {sha}). Cette section ne
+  Vide jusqu'à l'étape 1f (ADR 0015 : les scénarios sont écrits et validés avant les contrats, qui en
+  sortent). Écrits par le dev dans le code (commit « contracts (by Thibault) » — {sha}). Cette section ne
   recopie aucune signature : une ligne par contrat, fichier:ligne, ce qu'il déclare, le C<n> qu'il
   sert. Le test-writer lit les fichiers, l'implementer les respecte. Un contrat qui empêche un
   comportement du cadrage n'est pas contourné ici : il va dans « Contrats à revoir par Thibault »
@@ -255,7 +259,7 @@ stateDiagram-v2
   - Package (nouveau / extension de …) et dépendances (pub.dev, inter-features) : tranchés au
     cadrage, statut `validée`.
   - Une dépendance découverte en écrivant la spec : statut `proposée`, avec une alternative RÉELLE ;
-    le dev la tranche au point d'étape « spec ».
+    le dev la tranche au point d'étape « scénarios ».
   - Jamais Stream/Future, découpage des BLoCs, data sources, emplacement d'une logique : c'est dans
     le code du dev. Jamais une question qu'une règle tranche, jamais la dette du code existant.
   - ID stable (A1, A2…), jamais renuméroté.

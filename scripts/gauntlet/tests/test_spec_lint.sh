@@ -2,6 +2,7 @@
 # Repro — spec_lint, gate de Sophie avant la critique de Camille.
 # Cas réel : refactor_feature, première critique — la clé 'editor_stroke_preview' absente de
 # keys.dart, et « écriture des préférences en échec » sans scénario : deux bloquants qu'un script trouve.
+# Phase scénarios (ADR 0015) : avant les contrats de Thibault, ni clés ni symboles, le reste pareil.
 source "$(dirname "$0")/fixture.sh"
 need_fvm
 
@@ -23,7 +24,8 @@ abstract interface class FeatRepository {
 EOF
 commit "$R" "develop" >/dev/null
 git -C "$R" checkout -q -b feature/x
-pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"M\"}"
+GATES='"human_gates":{"contracts":{"at":"2026-11-12T10:00:00Z"}}'
+pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"M\",$GATES}"
 F="$R/.claude/features/x"
 
 spec() {  # spec <ligne §7> <clé citée> <symbole §5> <membre>
@@ -77,8 +79,24 @@ echo "<!-- spec_lint: ignore feat_stroke_preview -->" >> "$F/spec.md"
 run_g "$R" spec_lint x
 expect_rc 0 "jeton marqué spec_lint: ignore (contrat à revoir) : vert"
 
+echo "phase scénarios : avant les contrats de Thibault"
+pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"M\"}"
+spec "| écriture en échec | data source | rien | non | hors scénario : jamais visible |" feat_stroke_preview FeatRepositry fetch
+run_g "$R" spec_lint x
+expect_rc 0 "clé, symbole et membre pas encore écrits : vert"
+expect_out "phase scénarios" "la phase est dite"
+spec "| écriture en échec | data source | rien | non | |" feat_page FeatRepository load
+run_g "$R" spec_lint x
+expect_out "« écriture en échec » ne cite aucun scénario" "§7 reste vérifiée"
+printf '{"sequences":[{"id":"C1","scenario":"saves the picture"}]}\n' > "$F/archi.json"
+run_g "$R" spec_lint x
+expect_out "C1 pointe vers « saves the picture »" "archi.json ↔ §4 reste vérifié"
+printf '{"sequences":[{"id":"C1","scenario":"saves the drawing"}]}\n' > "$F/archi.json"
+pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"M\",$GATES}"
+spec "" feat_page FeatRepository load
+
 echo "plafond du gabarit et cadrage"
-pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"S\"}"
+pipeline "$R" x "{\"mode\":\"create\",\"package\":\"$P\",\"size\":\"S\",$GATES}"
 head -c 16000 /dev/zero | tr '\0' 'a' >> "$F/spec.md"
 run_g "$R" spec_lint x
 expect_out "plafond du gabarit 15360" "spec au-delà de 15 Kio en S"

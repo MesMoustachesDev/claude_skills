@@ -181,7 +181,7 @@ une réponse propre à Android s'ajoute ici avec sa date) :
   un nom de test est celui de la méthode JUnit (backticks compris, `@DisplayName` s'il y en a un). Un scénario du
   `.feature` est écrit quand une méthode porte son titre (casse ignorée), qui ne compte pas en plus
   (`android-tests.md`, Acceptation).
-- `dedup_candidates` (étape 0d) : `stacks/android/kotlin_dedup.py`, lexer Kotlin en Python sans dépendance.
+- `dedup_candidates` (étape 1d) : `stacks/android/kotlin_dedup.py`, lexer Kotlin en Python sans dépendance.
 - Fichiers à copier dans un worktree neuf : `local.properties` (chemin du SDK), `google-services.json`, les
   `.env*` ; jamais un keystore.
 - Doctor : JDK, wrapper `./gradlew` à la racine, Android CLI (avertissement), adb.

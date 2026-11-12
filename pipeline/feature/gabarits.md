@@ -16,7 +16,7 @@ de trop ne coûte que du temps.
 **Ce que le gabarit ne touche jamais** : les gates d'intégrité — compilation (`analyze`,
 `build_runner`), suite verte (`test`, `green`), gel (`test_freeze_check`, re-gels), dépendances
 (`deps`, `deps_features`), `error_handling` — et les profils du gauntlet (`profiles.sh` ne lit pas
-le gabarit). Les six points d'étape (cadrage, contrats de Thibault, spec, tests et gel, suggestions,
+le gabarit). Les six points d'étape (cadrage, scénarios, contrats de Thibault, tests et gel, suggestions,
 visite guidée) restent en S. Le gabarit allège le jugement (critique, dedup, mutation, QA), jamais la
 preuve ni la propriété du code.
 
@@ -27,12 +27,12 @@ reprise, `status`, le rapport HTML et l'evidence la montrent avec sa raison. Une
 n'est jamais rejouée à la reprise, sauf reclassement.
 
 **Reclassement.** S → M dès qu'un critère de S est dépassé : plus de 2 commentaires
-`DÉCISION (Thibault)` dans le brouillon d'Arthur (mesuré en 0e), plus de 8 scénarios en §4, un
-package ou une dépendance ajoutés en §8 (mesurés au point d'étape « spec »). Dis-le au dev avec
+`DÉCISION (Thibault)` dans le brouillon d'Arthur (mesuré en 1e), plus de 8 scénarios en §4, un
+package ou une dépendance ajoutés en §8 (mesurés au point d'étape « scénarios »). Dis-le au dev avec
 la mesure et ce que M change (étapes rejouées, plafonds de boucle), et `AskUserQuestion` « Passer en M (Recommandé) » / « Rester en S : <raison> », dans le
 même appel que la question de l'arrêt en cours. En M, une étape déjà `SKIPPED` en S est rejouée avant d'aller plus loin. M → L : plus
-de 5 `DÉCISION (Thibault)` dans le brouillon (mesuré en 0e, avant qu'il édite), ou un imprévu après
+de 5 `DÉCISION (Thibault)` dans le brouillon (mesuré en 1e, avant qu'il édite), ou un imprévu après
 la spec : le dev décide (découper ou continuer en M) ; ce que deviennent les contrats déjà commités
-est décrit en 0e. Chaque reclassement va dans
+est décrit en 1e. Chaque reclassement va dans
 `pipeline.json → size_changes` (`{at, from, to, reason}`) et dans l'evidence.
 

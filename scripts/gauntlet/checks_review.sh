@@ -49,7 +49,7 @@ check_dedup_report() {
 check_dedup_verdict() {
   check_dedup_report || return 1
   local f="$FEATURE_DIR/dedup.json" n deferred open
-  # Before the implementation (0d), only stubs exist: a finding whose fix means
+  # Before the implementation (1d), only stubs exist: a finding whose fix means
   # writing real code (fix_by: cleaner) is carried to the cleaner, and blocks again at 5b.
   open='(.verdict=="duplicate" or .verdict=="extend") and .accepted != true'
   if [ "$(pipeline_get .stages.green.status)" != PASSED ]; then
@@ -84,7 +84,8 @@ _verdict_ok() { # _verdict_ok <file> <label> <message>
 
 # spec_lint — avant Camille, gate du hook de Sophie : ce qu'un script vérifie sans relecture (clés, une
 # scène par erreur de §7, symboles cités, archi.json ↔ §4, plafond du gabarit). Voir spec_lint.py.
-# Sans spec.md (cadrage, exploration), rien à vérifier.
+# Sans spec.md (cadrage, exploration), rien à vérifier. Avant les contrats de Thibault (ADR 0015 : scénarios
+# d'abord), phase « scenarios » : symboles, membres et clés n'existent pas encore.
 check_spec_lint() {
   local spec="$FEATURE_DIR/spec.md" archi="$FEATURE_DIR/archi.json" cap
   [ -f "$spec" ] || { info "pas encore de spec.md, rien à vérifier"; return 0; }
@@ -95,7 +96,9 @@ check_spec_lint() {
   local ext ws="$PROJECT_ROOT/$(cfg features_root features)"
   ext="$(bash "$STACK_SH" get extensions "$PKG_DIR" 2>/dev/null | tr -d ' ')"
   case "$ext" in ''|.dart) ;; *) ws="$PROJECT_ROOT" ;; esac
-  SPEC_LINT_EXT="${ext:-.dart}" python3 "$GAUNTLET_ROOT/spec_lint.py" "$spec" "$PKG_DIR" "$ws" "$archi" "$cap"
+  local phase=full
+  jq -e '.human_gates.contracts' "$FEATURE_DIR/pipeline.json" >/dev/null 2>&1 || phase=scenarios
+  SPEC_LINT_PHASE="$phase" SPEC_LINT_EXT="${ext:-.dart}" python3 "$GAUNTLET_ROOT/spec_lint.py" "$spec" "$PKG_DIR" "$ws" "$archi" "$cap"
 }
 
 check_spec_review_report()  { _report_ok "$FEATURE_DIR/spec_review.json" "spec_review.json" '(.blocking|type=="array") and (.notes|type=="array")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/spec_review.json"), notes : $(jq '.notes|length' "$FEATURE_DIR/spec_review.json")"; }
@@ -103,7 +106,7 @@ check_spec_review_verdict() {
   check_spec_review_report || return 1
   local f="$FEATURE_DIR/spec_review.json" n
   # owner "thibault" : le correctif est un contrat écrit par le dev. Il bloque comme les autres, mais
-  # ne relance pas le specifier : le dev le tranche au point d'étape « spec » (accepted + raison).
+  # ne relance pas le specifier : le dev le tranche au point d'étape « scénarios » (ou en 1f pour un contrat) (accepted + raison).
   local t
   n="$(jq '[.blocking[] | select(.accepted != true and .owner != "thibault")] | length' "$f")"
   t="$(jq '[.blocking[] | select(.accepted != true and .owner == "thibault")] | length' "$f")"
@@ -111,7 +114,7 @@ check_spec_review_verdict() {
   jq -r '.blocking[] | select(.accepted != true and .owner != "thibault") | "   ✗ [\(.section // "-")] \(.issue)"' "$f"
   jq -r '.blocking[] | select(.accepted != true and .owner == "thibault") | "   ✗ pour Thibault [\(.section // "-")] \(.issue)"' "$f"
   [ "$n" != 0 ] && ko "$n point(s) bloquant(s) — retour au specifier"
-  [ "$t" != 0 ] && ko "$t contrat(s) à trancher par Thibault au point d'étape « spec »"
+  [ "$t" != 0 ] && ko "$t contrat(s) à trancher par Thibault au point d'étape « scénarios » (ou en 1f pour un contrat)"
   return 1
 }
 

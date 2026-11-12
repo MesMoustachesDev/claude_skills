@@ -17,7 +17,7 @@ pipeline "$R" demo "{\"feature\":\"demo\",\"mode\":\"create\",\"size\":\"M\",
   \"stages\":{\"cadrage\":{\"status\":\"PASSED\"},\"contracts_draft\":{\"status\":\"PASSED\"},\"dedup\":{\"status\":\"PASSED\"},
              \"spec\":{\"status\":\"PASSED\"},\"contracts\":{\"status\":\"PASSED\",\"at\":\"2026-11-04T18:34:06Z\"},
              \"red\":{\"status\":\"PASSED\",\"at\":\"$AT11H\"}},
-  \"human_gates\":{\"contracts\":{\"at\":\"x\"},\"spec\":{\"at\":\"2026-11-04T18:21:47Z\"}},
+  \"human_gates\":{\"contracts\":{\"at\":\"2026-11-04T17:00:00Z\"},\"spec\":{\"at\":\"2026-11-04T18:21:47Z\"}},
   \"cockpit\":{\"waiting\":null,\"at\":\"$AT11H\"}}"
 mkdir -p "$F/.gauntlet"; echo '{"ok":true}' > "$F/.gauntlet/last_red.json"
 old 660 "$F/pipeline.json" "$F/.gauntlet/last_red.json"

@@ -13,6 +13,8 @@ refactor_feature, 3 des 10 bloquants de la première critique) :
   - archi.json : chaque scénario relié à un C<n> est un titre de §4 ;
   - taille : la spec tient dans le plafond du gabarit.
 `<!-- spec_lint: ignore <jeton> -->` dans la spec exempte un jeton (faux positif assumé).
+SPEC_LINT_PHASE=scenarios (avant les contrats de Thibault, ADR 0015) : ni clés, ni symboles, ni `Classe.membre`
+— ils n'existent pas encore ; les clés citées par §4 sont ce qu'Arthur posera dans le fichier de clés.
 Sortie : une ligne « ✗ … » par problème ; exit 1 s'il y en a.
 """
 import json
@@ -22,6 +24,7 @@ import sys
 
 # Extensions des sources du langage du package (stack.ini → extensions, passées par le gauntlet) ; défaut Dart.
 EXTS = tuple(e.strip() for e in (os.environ.get("SPEC_LINT_EXT") or ".dart").split(",") if e.strip())
+SCENARIOS_ONLY = os.environ.get("SPEC_LINT_PHASE") == "scenarios"
 KOTLIN = any(e in (".kt", ".kts", ".java") for e in EXTS)
 DECL = re.compile(r"^\s*(?:@\w+\s+)*(?:(?:abstract|sealed|final|base|interface|mixin)\s+)*"
                   r"(?:class|mixin|enum|typedef|extension(?:\s+type)?)\s+([A-Z]\w*)", re.M)
@@ -89,7 +92,7 @@ def main(spec_path, pkg, workspace, archi_path, cap):
         for name, val in re.findall(entry_re, src):
             names.add(name)
             values.add(val)
-    if values:
+    if values and not SCENARIOS_ONLY:
         prefix = os.path.commonprefix(sorted(values))
         prefix = prefix[: prefix.rfind("_") + 1] if "_" in prefix else ""
         if len(prefix) >= 4:
@@ -97,7 +100,7 @@ def main(spec_path, pkg, workspace, archi_path, cap):
                 if tok in values or any(v.endswith("_") and tok.startswith(v) and tok[len(v):].isdigit() for v in values):
                     continue
                 ko(tok, f"✗ clé '{tok}' citée par la spec, absente du fichier de clés du package — contrat à compléter (Thibault) ou clé mal écrite")
-    for cls in classes:
+    for cls in ([] if SCENARIOS_ONLY else classes):
         for name in sorted(set(re.findall(rf"\b{cls}\.(\w+)", spec))):
             if name not in names and len(name) > 1:  # `Keys.x` : un nom générique de la prose, pas une clé
                 ko(f"{cls}.{name}", f"✗ {cls}.{name} cité par la spec, absent de {cls} — contrat à compléter (Thibault) ou nom mal écrit")
@@ -117,10 +120,10 @@ def main(spec_path, pkg, workspace, archi_path, cap):
         for p in src_files(root):
             for name in (KT_DECL if p.endswith((".kt", ".kts", ".java")) else DECL).findall(read(p)):
                 index.setdefault(name, set()).add(p)
-    for tok in sorted(set(t for t in re.findall(r"`([A-Z]\w*)(?:<[^`]*>)?`", section(spec, 5)))):
+    for tok in sorted(set(t for t in re.findall(r"`([A-Z]\w*)(?:<[^`]*>)?`", "" if SCENARIOS_ONLY else section(spec, 5)))):
         if tok not in index and tok not in SDK_TYPES:
             ko(tok, f"✗ §5 cite `{tok}`, introuvable dans le package et le workspace — renommé, ou pas encore écrit ?")
-    for code in re.findall(r"`([^`\n]+)`", spec):
+    for code in [] if SCENARIOS_ONLY else re.findall(r"`([^`\n]+)`", spec):
         for cls, member in re.findall(r"(?<![\w…])([A-Z]\w*)\.([a-z_]\w*)", code):
             if member in ("kt", "kts", "java", "dart") or cls in SDK_TYPES:
                 continue  # `Fichier.kt` est un nom de fichier ; `Result.success`, un type du SDK même homonyme
@@ -149,7 +152,7 @@ def main(spec_path, pkg, workspace, archi_path, cap):
 
     for p in problems:
         print(p)
-    print(f"spec_lint : {len(problems)} problème(s) — {len(keys_files)} fichier(s) de clés, {len(index)} symboles indexés, {size} octets")
+    print(f"spec_lint{' (phase scénarios)' if SCENARIOS_ONLY else ''} : {len(problems)} problème(s) — {len(keys_files)} fichier(s) de clés, {len(index)} symboles indexés, {size} octets")
     return 1 if problems else 0
 
 

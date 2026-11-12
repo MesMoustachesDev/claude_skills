@@ -50,13 +50,13 @@ complet (`red` : toute la suite, l'analyse du package entier, `tests.md`) et éc
   accepte une moitié `SKIPPED`.
 
 Les **relances suivantes** — boucle de Gaëlle (3b), « Il manque des scénarios » de Thibault, Théo réaligné
-en 0e — passent d'abord par la liste (Théo-liste la complète, `test_plan` vert), puis vont à **Théo complet**
+en 1e — passent d'abord par la liste (Théo-liste la complète, `test_plan` vert), puis vont à **Théo complet**
 (`feature-test-writer`) : un retour cite des fichiers des deux couches, et
 la suite est déjà écrite. Après lui, `gauntlet.sh red <nom>` comme avant.
 
 **Contrat manquant** (Théo ou Gaëlle signalent un type, une clé ou un state absent des contrats) :
 ce n'est ni à Théo ni à Arthur de l'inventer. Tu le montres à Thibault avec l'extrait du fichier de
-contrat et le scénario qui en a besoin ; il l'ajoute (« Réédition plus tard » de 0e, puis Arthur en
+contrat et le scénario qui en a besoin ; il l'ajoute (« Réédition plus tard » de 1e, puis Arthur en
 mode application si une impl stubbée doit suivre), puis Théo reprend là où il s'était arrêté.
 
 **Gabarit S :** identique, deux moitiés comprises — les tests sont l'actif durable, ils ne s'allègent pas,

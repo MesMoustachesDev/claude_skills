@@ -44,14 +44,14 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 
 1. **`~/.claude/scripts/pipeline.sh next <nom>`** (depuis le worktree ; sans worktree ni
    `pipeline.json`, il renvoie l'étape 0). Il décide, à partir de `pipeline.json`, l'étape à jouer
-   (ordre de reprise, étapes `PASSED` ou `SKIPPED` sautées, `stages.contracts` antérieur à la spec
-   ignoré, feature découpée en L), le fichier d'étape à lire, l'agent, le gabarit, et les entrées à
+   (ordre de reprise, étapes `PASSED` ou `SKIPPED` sautées, `stages.contracts` antérieur aux contrats
+   de Thibault ignoré, feature découpée en L), le fichier d'étape à lire, l'agent, le gabarit, et les entrées à
    passer (chemins existants, `contracts.sha`, `contracts.files`, `tests_freeze_sha`, graphe). Ne
    recalcule rien de tout ça toi-même.
 2. **Lis le fichier d'étape qu'il indique**, en entier, puis exécute l'étape. Un renvoi vers une autre
-   étape (« Réédition plus tard » de 0e, « Contrat manquant » de 3, « Rejeu » de 0) : lis la section
+   étape (« Réédition plus tard » de 1e, « Contrat manquant » de 3, « Rejeu » de 0) : lis la section
    citée dans son fichier, `steps/<étape>_*.md`. Gabarits et reclassement :
-   `~/.claude/pipeline/feature/gabarits.md`, à lire en 0b, en 0e et à chaque reclassement.
+   `~/.claude/pipeline/feature/gabarits.md`, à lire en 0b, en 1e et à chaque reclassement.
 3. **Toute écriture de `pipeline.json` passe par `pipeline.sh`.** Tu n'édites jamais le fichier à la
    main : `pass`, `skip`, `join` (étapes 3 et 4 : gate complet après les deux moitiés), `gate`, `size`, `loop`, `debt`, `accept`, `set` (écriture libre, pour ce qu'aucune
    commande ne couvre : `suggestions.S1`, `issue`, `suspect_tests`…), `after-architect`,
@@ -126,18 +126,19 @@ réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape après | En S | En L |
 |---|---|---|---|---|---|---|---|
 | 0b | cadrage | toi avec Thibault (discussion), Sophie (exploration en arrière-plan, puis mise en forme) | `feature-specifier` | — | **oui, une discussion du tac au tac** sur le fonctionnel et la base technique, avant tout agent ; puis le cadrage rendu (une séquence par scénario, décisions techniques), jusqu'à « c'est ça » | identique | découpage en sous-features validé, puis la suite de `/epic` (tickets, tableau de bord) |
-| 0c | brouillon de contrats | Arthur (mode brouillon) | `feature-architect` | `contracts` | non | identique | — |
-| 0d | dedup du brouillon | Denis | `feature-dedup` | `dedup_verdict` | non (ses verdicts vont à 0e) | identique | — |
-| 0e | contrats de Thibault | Thibault, dans son IDE | — | `contracts` | **oui** : il édite les fichiers ouverts pour lui, puis commit « contracts (by Thibault) » | identique | — |
-| 1 | spec | Sophie | `feature-specifier` | — | non | plafond 15 Ko | — |
-| 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : la spec, et dans le même appel les lignes de §9 encore `proposée` (boucle vers 1 avant) | une seule passe (`loops.spec` max 0) | — |
+| 1 | scénarios (ADR 0015 : avant les contrats) | Sophie | `feature-specifier` | `spec_lint` phase scénarios | non | plafond 15 Ko | — |
+| 1b | critique | Camille | `feature-spec-critic` | `spec_review_verdict` | **oui** : les scénarios, et dans le même appel les lignes de §9 encore `proposée` (boucle vers 1 avant) | une seule passe (`loops.spec` max 0) | — |
+| 1c | brouillon de contrats, tiré des scénarios | Arthur (mode brouillon) | `feature-architect` | `contracts` | non | identique | — |
+| 1d | dedup du brouillon | Denis | `feature-dedup` | `dedup_verdict` | non (ses verdicts vont à 1e) | identique | — |
+| 1e | contrats de Thibault | Thibault, dans son IDE | — | `contracts` | **oui** : il édite les fichiers ouverts pour lui, puis commit « contracts (by Thibault) » | identique | — |
+| 1f | §5 de la spec | Sophie (mode contrats) | `feature-specifier` | `spec_lint` complet | non (un contrat qui ne permet pas un scénario remonte à Thibault) | identique | — |
 | 2 | complétion du scaffold | Arthur (mode complétion) | `feature-architect` | `contracts` | non | identique | — |
 | 3a | liste des tests | Théo-liste, puis Gaëlle (mode liste) | `feature-test-planner`, puis `feature-test-reviewer` | `test_plan`, puis `tests_review_verdict` | non | identique | — |
 | 3 | tests | Théo, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Théo complet | `feature-test-writer-data` + `feature-test-writer-presentation` ; relances `feature-test-writer` | `red_data` + `red_presentation`, puis `red` au join (dont `test_plan_match` : la suite est la liste) | non | identique | — |
 | 3b | revue des tests | Gaëlle | `feature-test-reviewer` | `tests_review_verdict` | **oui** : séquences cadrage ↔ tests réels, `tests.md`, puis gel (boucle vers 3 avant) | identique | — |
 | 4 | impl | Ivan, en deux moitiés parallèles (data/domain, présentation), puis `pipeline.sh join` ; relances : Ivan complet | `feature-implementer-data` + `feature-implementer-presentation` ; relances `feature-implementer` | `green_data` + `green_presentation`, puis `green` au join | non | identique | — |
 | 5 | clean | Nina | `feature-cleaner` | `clean` | non | identique | — |
-| 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) | `SKIPPED`, sauf entrées `cleaner` reportées de 0d | — |
+| 5b | dedup | Denis | `feature-dedup` | `dedup_verdict` | non (boucle vers 5 si doublons) | `SKIPPED`, sauf entrées `cleaner` reportées de 1d | — |
 | 6 | review | Romain | `feature-reviewer` | `review_verdict` | **oui** : suggestions à retenir (boucle vers 4 si critiques) ; Romain écrit aussi la visite guidée | identique ; `missing_tests` → Hugo | — |
 | 7 | harden | Hugo | `feature-hardener` | `harden` | non (mutants montrés dans la visite) | seulement si logique modifiée ou `missing_tests` | — |
 | 8 | qa | Quentin | `feature-qa` | `qa` | non (captures montrées dans la visite) | une seule plateforme | — |
@@ -196,7 +197,7 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   décider ». Choisie → tu expliques (l'extrait, ce qu'il fait, ce que chaque choix change), tu réponds
   à ses questions, puis tu reposes la même confirmation. Discuter n'est jamais une validation.
 - **Ajouts proposés, à chaque étape.** Ce qu'un agent ajoute sans que le dev l'ait décidé (Arthur en
-  0c et en complétion : data sources, mappers, providers ; Sophie dans la spec ; Ivan ou Nina : une
+  1c et en complétion : data sources, mappers, providers ; Sophie dans la spec ; Ivan ou Nina : une
   classe, un helper, un découpage) est montré au prochain arrêt dans un tableau `Détail | Proposition |
   Pourquoi c'est utile`, séparé de ses décisions. Les agents le listent dans leur rapport sous ce titre.
 - **Une question se suffit à elle-même.** Thibault répond souvent depuis Remote Control, où il ne voit
@@ -242,7 +243,7 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
-  exception : l'issue GitLab de 1c, dont le dev valide le contenu exact avant l'envoi.
+  exception : l'issue GitLab de 1g, dont le dev valide le contenu exact avant l'envoi.
 - **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
   Son hook de fin joue encore le gate (plus d'une minute pour `contracts` ou `red`) : c'est le script qui
   attend, pas toi. `pipeline.sh next <nom> --after <profil>` (ou `join <nom> red|green --after <moitié>`),

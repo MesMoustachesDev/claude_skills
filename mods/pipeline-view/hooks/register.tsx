@@ -32,7 +32,7 @@ import {
   parseWorktrees,
   summarize,
 } from './plan'
-import { type Scenario, type Step, parseScenarios } from './gherkin'
+import { type Scenario, type Step, cadrageGherkin, parseScenarios, specGherkin } from './gherkin'
 import { contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
@@ -278,6 +278,20 @@ const loadScenarios = async ($: EngineInterface, pkg: string, base: string): Pro
   return found
 }
 
+/** Avant le premier .feature (ADR 0015 : les scénarios précèdent les contrats et le code) : la §4 de la spec,
+ * sinon les C<n> du cadrage, lus dans le dossier du pipeline. */
+const loadPlannedScenarios = async ($: EngineInterface, dir: string): Promise<ScenarioFile[]> => {
+  for (const [file, status, toGherkin] of [
+    ['spec.md', 'spec §4, pas encore dans le code', specGherkin],
+    ['cadrage.md', 'cadrage, avant les scénarios', cadrageGherkin],
+  ] as const) {
+    const source = toGherkin(await readText($, `${dir}/${file}`))
+    if (source) return [{ path: shortPath(`${dir}/${file}`, root), status, source, count: source.match(SCENARIO)?.length ?? 0 }]
+  }
+
+  return []
+}
+
 // Le rapport de tests fait plusieurs centaines de Ko : relu seulement quand il change.
 let testCache = { path: '', mtime: -1, results: new Map<string, 'passed' | 'failed' | 'skipped'>() }
 
@@ -459,7 +473,8 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
   const view = snap ? await loadPending($, where.kind, where.name, dir, text, snap.pkg) : null
   if (JSON.stringify(view) !== JSON.stringify(await read($, pending))) await update($, pending, () => view)
-  const found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
+  let found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
+  if (snap && where.kind === 'feature' && found.length === 0) found = await loadPlannedScenarios($, dir)
   if (JSON.stringify(found) !== JSON.stringify(await read($, scenarios))) await update($, scenarios, () => found)
   const proofs = await loadEvidence($, dir, found)
   if (JSON.stringify(proofs) !== JSON.stringify(await read($, evidence))) await update($, evidence, () => proofs)

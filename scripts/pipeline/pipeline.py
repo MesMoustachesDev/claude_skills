@@ -24,10 +24,12 @@ STEPS_DIR = os.path.expanduser("~/.claude/pipeline/feature/steps")
 # Une clé « hg.x » est un point d'étape (human_gates.x), les autres sont des stages.
 ORDER = [
     ("cadrage", "0b", "Cadrage fonctionnel", "0b_cadrage.md", "Sophie (feature-specifier, mode cadrage), puis toi avec Thibault"),
-    ("contracts_draft", "0c", "Brouillon de contrats", "0c_contracts_draft.md", "Arthur (feature-architect, mode brouillon)"),
-    ("dedup", "0d", "Roue réinventée sur le brouillon", "0d_dedup.md", "Denis (feature-dedup)"),
-    ("hg.contracts", "0e", "Point d'étape « contrats » : Thibault les écrit", "0e_contracts.md", "Thibault (+ Arthur en mode application)"),
-    ("spec", "1", "Spec, critique, point d'étape « spec »", "1_spec.md", "Sophie (feature-specifier) puis Camille (feature-spec-critic)"),
+    # Les scénarios avant les contrats, et les contrats tirés des scénarios (ADR 0015).
+    ("spec", "1", "Scénarios, critique, point d'étape « scénarios »", "1_spec.md", "Sophie (feature-specifier) puis Camille (feature-spec-critic)"),
+    ("contracts_draft", "1c", "Brouillon de contrats tiré des scénarios", "1c_contracts_draft.md", "Arthur (feature-architect, mode brouillon)"),
+    ("dedup", "1d", "Roue réinventée sur le brouillon", "1d_dedup.md", "Denis (feature-dedup)"),
+    ("hg.contracts", "1e", "Point d'étape « contrats » : Thibault les écrit", "1e_contracts.md", "Thibault (+ Arthur en mode application)"),
+    ("spec_contracts", "1f", "§5 de la spec : les contrats de Thibault", "1f_spec_contracts.md", "Sophie (feature-specifier, mode contrats)"),
     ("contracts", "2", "Complétion du scaffold", "2_scaffold.md", "Arthur (feature-architect, mode complétion)"),
     ("test_plan", "3a", "Liste des tests", "3_tests.md", "Théo-liste (feature-test-planner)"),
     ("test_plan_review", "3a", "Relecture de la liste", "3_tests.md", "Gaëlle (feature-test-reviewer, mode liste)"),
@@ -51,7 +53,7 @@ LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "test_plan": 2, "tests": 2, "revie
 LOOP_VERDICT = {"spec": "spec_review.json", "test_plan": "tests_review.json", "tests": "tests_review.json", "review": "review.json", "dedup_clean": "dedup.json"}
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
 GATE_LABELS = {
-    "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Spec validée",
+    "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Scénarios validés",
     "tests": "Tests validés et gelés", "suggestions": "Suggestions de revue tranchées", "tour": "Visite guidée validée",
     "polish": "Polish visuel tranché",
 }
@@ -154,16 +156,29 @@ def state_of(p, key):
         if key == "hg.polish" and state_of(p, "evidence") == "PASSED":
             return "SKIPPED"   # feature livrée avant l'étape 8c
         return None
+    if key == "spec_contracts" and spec_after_contracts(p):
+        return "SKIPPED"   # spec validée après les contrats (ordre d'avant l'ADR 0015) : sa §5 est déjà écrite
     st = (p.get("stages") or {}).get(key)
     if not st:
         return None
     status = st.get("status") if isinstance(st, dict) else st
     if key == "contracts":
-        # stages.contracts antérieur à la validation de la spec = reste de 0c/0e (voir 0. Préconditions).
-        spec_at = ((p.get("human_gates") or {}).get("spec") or {}).get("at")
-        if not spec_at or (isinstance(st, dict) and (st.get("at") or "") < spec_at):
+        # stages.contracts antérieur aux deux points d'étape (scénarios, contrats) = reste du hook d'Arthur en
+        # 1c/1e, ou 0c/0e de l'ancien ordre (voir 0. Préconditions).
+        gates = p.get("human_gates") or {}
+        spec_at = (gates.get("spec") or {}).get("at")
+        con_at = (gates.get("contracts") or {}).get("at") or ""
+        if not spec_at or (isinstance(st, dict) and (st.get("at") or "") < max(spec_at, con_at)):
             return None
     return status
+
+
+def spec_after_contracts(p):
+    """La spec a été validée après les contrats de Thibault : ordre d'avant l'ADR 0015, §5 écrite avec elle."""
+    gates = p.get("human_gates") or {}
+    spec_at = (gates.get("spec") or {}).get("at")
+    con_at = (gates.get("contracts") or {}).get("at")
+    return bool(spec_at and con_at and spec_at > con_at)
 
 
 def find_pipeline(c, name):
@@ -876,7 +891,7 @@ def cmd_watchdog(c, args):
 
 
 def cmd_after_architect(c, args):
-    """0c/0e : le hook d'Arthur écrit stages.contracts, qui appartient à l'étape 2."""
+    """1c/1e : le hook d'Arthur écrit stages.contracts, qui appartient à l'étape 2."""
     if state_of(c.p, "hg.spec") == "PASSED":
         print("spec validée : stages.contracts appartient bien à l'étape 2, rien à déplacer")
         return

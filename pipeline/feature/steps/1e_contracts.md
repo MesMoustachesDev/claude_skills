@@ -1,8 +1,9 @@
-### 0e. Point d'étape « contrats » : Thibault les écrit
+### 1e. Point d'étape « contrats » : Thibault les écrit
 
 `gauntlet.sh report <nom> contracts` puis `SendUserFile` du `report.html` (`display: render`) : les
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
-déclarations qui existent déjà ailleurs (Denis), les séquences du cadrage pour rappel.
+déclarations qui existent déjà ailleurs (Denis), les scénarios validés de §4 pour rappel : chaque
+contrat se lit en regard du scénario qui l'a fait naître.
 
 **Une relecture, pas une découverte.** Les choix structurants ont été tranchés dans la discussion de
 départ (0b) et Arthur les a appliqués : ne repose pas de question ouverte ici. Les `DÉCISION (Thibault)`
@@ -39,7 +40,7 @@ stubbées, imports, README) sans toucher à mes signatures » / « J'ai une ques
   « je l'édite »), par paquets de 4. Les « garder » / « alternative » et le mécanique demandé sont
   appliqués par Arthur en **mode application** (« applique ces choix, efface ces commentaires,
   réaligne impls stubbées, imports et README ; aucun scaffold, aucune autre signature ») ; à son
-  retour, `pipeline.sh after-architect <nom>` comme en 0c. Puis `gauntlet.sh contracts <nom>`. Rouge → montre
+  retour, `pipeline.sh after-architect <nom>` comme en 1c. Puis `gauntlet.sh contracts <nom>`. Rouge → montre
   les erreurs (`fichier:ligne`) et propose « je corrige » / « Arthur corrige le mécanique ».
   « Appelants cassés » dans le rapport d'Arthur (tests ou fichiers hors package qui appellent une
   signature changée) → Théo les réaligne tout de suite, en background, sans attendre le rouge
@@ -60,7 +61,7 @@ partie) et `human_gates.contracts`. Les fichiers de
 `contracts.files` sont désormais la référence : aucun agent ne change une de leurs signatures sans
 lui (Arthur, Théo, Ivan et Nina rapportent un contrat qui ne tient pas, ils ne le contournent pas).
 
-**Réédition plus tard** (contrat à revoir au point d'étape « spec », décision demandée par Ivan…) :
+**Réédition plus tard** (contrat à revoir en 1f, décision demandée par Ivan…) :
 Thibault édite, puis tu joues `gauntlet.sh contracts <nom>` (avant l'étape 2) ou `gauntlet.sh green
 <nom>` (après : il y a du code autour) ; rouge → montre-le-lui avant tout commit. Vert →
 `pipeline.sh commit-contracts <nom> reedit "<quoi>" <fichiers qu'il a édités>` : commit
@@ -72,6 +73,6 @@ re-gel, cause `contrat`.
 **Gabarit S :** identique — c'est le moment où la feature devient la sienne. **En L :** n'a pas lieu.
 **Découpage décidé ici (M → L)** : le brouillon et les contrats déjà commités restent sur
 `feature/<nom>`. Le découpage se valide comme en 0b (5) ; la première sous-feature part de cette
-branche (`base: feature/<nom>` dans son `pipeline.json`), et son 0c part des fichiers existants au
+branche (`base: feature/<nom>` dans son `pipeline.json`), et son 1c part des fichiers existants au
 lieu de repartir de zéro ; les suivantes suivent l'ordre de dépendance.
 

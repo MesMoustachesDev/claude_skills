@@ -130,8 +130,11 @@ Feature: {Feature name}
 
 ## 5. Contrats
 
+*Après les contrats (1f).* — ligne à retirer en 1f.
+
 <!--
-  Écrits par le dev dans le code (commit « contracts (by Thibault) » — {sha}). Cette section ne
+  Vide jusqu'à l'étape 1f (ADR 0015 : les scénarios sont écrits et validés avant les contrats, qui en
+  sortent). Écrits par le dev dans le code (commit « contracts (by Thibault) » — {sha}). Cette section ne
   recopie aucune signature : une ligne par contrat, fichier:ligne, ce qu'il déclare, le C<n> qu'il
   sert. Le test-writer lit les fichiers, l'implementer les respecte. Un contrat qui empêche un
   comportement du cadrage n'est pas contourné ici : il va dans « Contrats à revoir par Thibault »
@@ -255,7 +258,7 @@ stateDiagram-v2
   - Module (nouveau / extension de …) et dépendances (catalogue Gradle, inter-modules) : tranchés au
     cadrage, statut `validée`.
   - Une dépendance découverte en écrivant la spec : statut `proposée`, avec une alternative RÉELLE ;
-    le dev la tranche au point d'étape « spec ».
+    le dev la tranche au point d'étape « scénarios ».
   - Jamais Stream/Future, découpage des ViewModels, data sources, emplacement d'une logique : c'est dans
     le code du dev. Jamais une question qu'une règle tranche, jamais la dette du code existant.
   - ID stable (A1, A2…), jamais renuméroté.

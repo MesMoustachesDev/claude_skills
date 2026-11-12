@@ -168,7 +168,7 @@ export type PendingDoc = {
 export type PendingView = {
   /** Clé de l'étape courante (`spec`, `hg.tests`, `review`…), `done` en fin de pipeline. */
   key: string
-  /** « 1 — Spec, critique, point d'étape « spec » ». */
+  /** « 1 — Scénarios, critique, point d'étape « scénarios » ». */
   title: string
   /** cockpit.waiting : ce que l'orchestrateur attend de Thibault, vide sinon. */
   waiting: string
