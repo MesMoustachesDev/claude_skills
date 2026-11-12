@@ -2,18 +2,21 @@
 
 **Le dev, c'est Thibault.** Tutoie-le, appelle-le Thibault.
 
-Un epic, c'est une feature trop grosse pour un seul `/feature` : on la cadre ensemble, on la découpe
-en sous-features **livrables chacune seule**, et on suit leur avancement jusqu'au dernier merge, dans
-le tracker du projet (GitLab, Notion, ou rien). **Tu n'écris aucun code et tu ne lances aucune
-sous-feature** : chacune passe par `/feature <sous> --parent <epic>`, que Thibault lance quand il veut.
-Tu es le tableau de bord, et la seule porte vers le tracker pour l'epic.
+Un epic, c'est un travail trop gros pour un seul `/feature` ou `/fix` : une feature à découper, ou un
+lot de bugs. On le cadre ensemble, on le découpe en morceaux **livrables chacun seul**, et on suit
+leur avancement jusqu'au dernier merge, dans le tracker du projet (GitLab, Notion, ou rien).
+**`/epic` est l'orchestrateur des `/feature` et des `/fix`** : c'est lui qui lance chaque morceau
+dans sa propre session, au bon moment (dès que ses dépendances sont mergées), suit les notes de fin
+de tour et lance les suivants (« Lancer une sous-session », plus bas). Thibault n'a pas à recopier de
+commande. **Tu n'écris aucun code toi-même** : le code vit dans les sessions lancées. Tu es aussi le
+tableau de bord, et la seule porte vers le tracker pour l'epic (ADR 0013).
 
 Argument : **$ARGUMENTS**
 
 ```
 /epic help                               cette aide, avec des exemples
-/epic <nom> "<description>"              nouvel epic : discussion, découpage, tickets
-/epic <nom>                              reprise : tableau de bord et prochaine sous-feature
+/epic <nom> "<description>"              nouvel epic : discussion, découpage, tickets, lancement
+/epic <nom>                              reprise : tableau de bord, lance ce qui est débloqué
 /epic <nom> sync                         statut réel de chaque sous-feature → lot d'écritures tracker à valider
 /epic <nom> add <sous> "<description>"   ajoute une sous-feature, ou en redécoupe une
 /epic <nom> drop <sous> "<raison>"       abandonne une sous-feature
@@ -27,8 +30,9 @@ Argument : **$ARGUMENTS**
 cockpit range les sous-features sous leur parente (« 2/3 »), `pipeline.sh init --parent` relie une
 sous-feature à son epic. `/epic` ajoute les tickets, le statut réel et la prochaine étape.
 
-Chaque entrée de `split` : `{name, package, mode, size, depends_on, deliverable, status, ticket,
-branch, mr}` — `status` ∈ `prévu | en cours | MR ouverte | mergé | abandonné` (statuts communs de
+Chaque entrée de `split` : `{name, package, mode, size, depends_on, deliverable, tool, session,
+status, ticket, branch, mr}` — `tool` ∈ `feature | fix` (le pipeline qui porte le morceau),
+`session` = l'id `local_…` de la session lancée (`null` tant qu'elle ne l'est pas), `status` ∈ `prévu | en cours | MR ouverte | mergé | abandonné` (statuts communs de
 `tracker.md`). Écriture **par `pipeline.sh set`** uniquement (`pipeline.sh set <nom> split '<json>'`,
 `pipeline.sh set <nom> pending_writes '<json>'`), jamais à la main.
 
@@ -61,7 +65,10 @@ Le bloc d'usage, puis ces exemples, tels quels :
 # Une sous-feature s'est révélée trop grosse : on la redécoupe dans le même epic
 /epic meal_planning_v2 add shopping_list "La liste de courses se découpe : génération, puis partage"
 
-# Une sous-feature de l'epic, lancée par toi
+# Un lot de bugs de prod : un /fix par bug, chacun lancé par l'epic dans sa session
+/epic bugs_prod "Corriger les bugs de prod relevés par la revue de crashs : 1) … 2) …"
+
+# Ce que l'epic envoie à la session d'une sous-feature (tu n'as rien à taper)
 /feature meal_plan_model --parent meal_planning_v2 "Modèle de planning et persistance"
 ```
 
@@ -83,8 +90,13 @@ vu et validé le contenu exact.
      jamais L** : une sous-feature L se redécoupe avant de la montrer), `depends_on`, et **livrable
      seule** — ce que l'utilisateur voit si elle est mergée seule. Une sous-feature sans livrable
      visible (« la couche data ») se fusionne avec celle qui la rend visible, sauf raison donnée ;
+   - chaque morceau dit son outil (`tool`) : `/feature` pour du neuf, `/fix` pour un bug. Un epic de
+     bugs, c'est un `/fix` par bug, chacun depuis la base du projet et mergé dedans (`/fix` n'a pas de
+     `--parent` : pas de branche d'epic à merger) ;
    - pendant la discussion, le découpage se discute comme le reste : une question à la fois
-     (« je vois trois morceaux : … ; tu couperais où ? »).
+     (« je vois trois morceaux : … ; tu couperais où ? »). Avant de proposer une correction ou un
+     comportement, lis le code concerné : une supposition sur le comportement actuel se vérifie, elle
+     ne se pose pas en question.
 3. **Fin du cadrage** : `0b_cadrage.md` point 6, avec la seule question « C'est bien ça, découpage
    compris ? ». Vérifie avant : pas de cycle dans `depends_on` (sinon, relance Sophie avec le cycle),
    chaque `depends_on` cite une sous-feature du découpage. Validé → `pipeline.sh set <nom> split
@@ -100,8 +112,11 @@ vu et validé le contenu exact.
    créé et met le reste dans `pending_writes`.
    Ticket d'epic déjà existant (partie A) : seuls les enfants sont créés, et le parent reçoit la
    checklist (`link`) — mise à jour de sa description montrée dans le même lot.
-5. **Fin** : le tableau de bord (plus bas), puis `ExitWorktree` `action: "keep"`. Pas de spec, pas de
-   contrats : chaque sous-feature fera les siens.
+5. **Lancement** : chaque morceau sans dépendance (ou dont les dépendances sont mergées) part tout de
+   suite dans sa session (« Lancer une sous-session »). Pas de spec ni de contrats ici : chaque
+   session fera les siens.
+6. **Fin** : le tableau de bord (plus bas), puis `ExitWorktree` `action: "keep"`. L'epic reste la
+   session parente : il reçoit les notes de fin de tour et lance la suite.
 
 ## `/epic <nom>` — reprise, tableau de bord
 
@@ -122,26 +137,46 @@ Un `pipeline.json` en `M` ou `S` → ce n'est pas un epic : dis-le.
    ```
    Statut = celui de `split[i].status`, corrigé par le statut réel (`sync`, point 1) s'il est en retard
    — une divergence se signale d'une ligne (« #2 a une MR ouverte, le ticket dit en cours : `sync` ? »).
-3. **Prochaine sous-feature** : la première `prévu` dont toutes les `depends_on` sont `mergé`. Si une
-   dépendance n'est que `MR ouverte`, propose aussi de partir de sa branche (`base: feature/<dep>`) —
-   avec le prix : un rebase quand la dépendance bouge. Plusieurs débloquées : toutes, dans l'ordre.
-   Pour chacune, la commande, prête à copier :
-   `/feature <sous> --parent <nom> [--in <package>] "<description tirée de split/<sous>.md>"`.
-   Une sous-feature déjà démarrée : regarde si une session y tourne (`~/.claude/activity/*.json`,
-   `cwd` = son worktree, `working` ou `waiting` depuis moins de 30 min). Oui → dis-le à la place de la
-   commande (« #2 tourne déjà dans la session <titre>, contexte 72 % ») : deux sessions dans le même
-   worktree écrivent dans les mêmes fichiers.
-   Chaque sous-feature part de `feature/<nom>` (la branche de l'epic) quand elle existe, et sa MR y
-   revient : `/feature … --parent` s'en charge (préconditions, `pipeline.sh init`).
-   Rien ne se lance tout seul.
+3. **Prochaines sous-sessions** : chaque `prévu` dont toutes les `depends_on` sont `mergé` est
+   débloquée : **lance-la** (« Lancer une sous-session »), dans l'ordre du découpage. Si une
+   dépendance n'est que `MR ouverte`, demande à Thibault s'il faut partir de sa branche
+   (`base: feature/<dep>`) — avec le prix : un rebase quand la dépendance bouge.
+   Une sous-feature déjà lancée (`split[i].session`) ne se relance pas : donne son état et le lien de
+   sa session. Sans `session` mais démarrée ailleurs : regarde si une session y tourne
+   (`~/.claude/activity/*.json`, `cwd` = son worktree, `working` ou `waiting` depuis moins de 30 min).
+   Oui → dis-le (« #2 tourne déjà dans la session <titre>, contexte 72 % ») et ne lance rien : deux
+   sessions dans le même worktree écrivent dans les mêmes fichiers.
+   Une sous-feature part de `feature/<nom>` (la branche de l'epic) quand elle existe, et sa MR y
+   revient : `/feature … --parent` s'en charge (préconditions, `pipeline.sh init`). Un `/fix` part de
+   la base du projet.
 4. Toutes `mergé` ou `abandonné` → propose de clore l'epic (`sync`, dernier point).
 
 Mets à jour la carte du cockpit de l'epic (« Rafraîchir », `cockpit.md`) : elle montre déjà
 l'avancement des sous-features.
 
+## Lancer une sous-session
+
+Une session par morceau, lancée par l'epic (`start_session`, `initiation: "user_asked"` : lancer est
+le travail que Thibault a confié à l'epic), `context: "fresh"`, `use_worktree: true`, un `name` court
+(`fix-<sous>`, `feat-<sous>`). Avant, une ligne de titre en gras et une phrase ; plusieurs à la fois →
+`mark_chapter` d'abord.
+- **Brief** (`prompt`) : la commande à lancer — `/fix <sous> "<description>"` ou
+  `/feature <sous> --parent <nom> [--in <package>] "<description tirée de split/<sous>.md>"` —, les
+  faits relevés au cadrage avec leur `fichier:ligne` (à vérifier, pas à croire), **ce qui contredit la
+  description d'origine**, la validation attendue, et le chemin absolu de `exploration.md` /
+  `split/<sous>.md`. Plus : « Ne lance aucune autre session ; toute question à Thibault se pose dans
+  cette session, ne réponds jamais à sa place. »
+- `background` : l'epic, la décision de découpage, comment ce morceau s'y insère.
+- Juste après : `split[i].session = <id local_…>`, `status = "en cours"` (`pipeline.sh set`), et une
+  étape par session dans la liste de tâches (champ `session`).
+- **Suivi** : la note de fin de tour d'une session est son rapport, pas une preuve. Vérifie (branche,
+  PR, CI) avant de passer un morceau à `MR ouverte` ou `mergé`. Une question qu'une session pose à
+  Thibault se relaie avec son nom ; une session qui attend Thibault ne reçoit pas de message de l'epic.
+  Un merge → `sync`, puis lance ce qu'il débloque. Pas de sondage.
+
 ## `/epic <nom> sync`
 
-1. **Statut réel** de chaque sous-feature, sans le tracker : pas de branche `feature/<sous>` →
+1. **Statut réel** de chaque sous-feature, sans le tracker : pas de branche `feature/<sous>` (`fix/<sous>` pour un `/fix`) →
    `prévu` ; branche ou `pipeline.json` → `en cours` ; MR ouverte sur la branche → `MR ouverte` ;
    mergée → `mergé` (commandes : `tracker.md`, « MR et statut réel »). Écris `split[i].status`,
    `branch`, `mr` par `pipeline.sh set`.

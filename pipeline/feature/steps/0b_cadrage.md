@@ -85,8 +85,9 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    "prévu"`, `ticket: null`, `branch: null`, `mr: null`, et la suite — tickets dans le tracker, tableau
    de bord, statuts — est celle de `/epic` (`~/.claude/commands/epic.md`, « nouvel epic », points 4
    et 5) : enchaîne-la sans repasser par la discussion, elle a eu lieu. Pas de spec, pas de worktree
-   de plus. Le tableau de bord donne la commande de chaque sous-feature, dans l'ordre de dépendance
-   (`/feature <sous> --parent <nom> [--in <package>] "<description>"`) ; au cadrage d'une sous-feature,
+   de plus. L'epic lance chaque sous-feature dans sa propre session, dans l'ordre de dépendance
+   (`/feature <sous> --parent <nom> [--in <package>] "<description>"`, `epic.md`, « Lancer une
+   sous-session ») ; au cadrage d'une sous-feature,
    Sophie reçoit en entrée le chemin absolu de son extrait (que `pipeline.sh init … --parent` imprime) et
    ne repart pas de zéro. Le cockpit range chaque sous-feature sous sa parente (« 2/3 ») et montre, sur
    la parente, l'avancement de toutes. Une sous-feature qui dépend
