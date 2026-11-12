@@ -21,20 +21,30 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 - Je ne suis pas PO : « ce à quoi on pense » plutôt que « ce qui a été décidé ».
 - 2 ou 3 tics de `voix.md`, une touche Kaamelott au maximum.
 - Emojis : zéro, ou un seul qui ajoute le ton. Jamais 🚀 💡 🎯 🔥 ✅ 👉 💪 🙌.
-- Longueur : 800 à 1 800 caractères en général, 3 000 au maximum (limite The Engine).
+- Longueur : 700 à 1 300 caractères, 1 800 au maximum. Ce n'est pas un tuto : un seul détail technique suffit, pas le mode d'emploi complet.
 
-## La checklist de viralité de The Engine (à cocher, toutes)
+## Le ton
 
+Constaté sur la MegaSearch de novembre 2026 : les posts tech FR qui marchent sont courts et prennent position.
+- **Le hook prend position** : un pari (« Je prends le pari inverse »), un désaccord, ou une phrase de hype citée puis démontée en une ligne (« Non. Tu as ouvert 7 sessions Claude Code avec un dashboard. »). Plutôt ça que « voilà ce qui m'est arrivé ». L'anecdote vient ensuite, comme preuve.
+- **Une vraie question de désaccord est permise** en toute fin, après la punchline (à la place du PS, ou après lui). Elle porte sur un point précis du post et invite à me contredire : « Je me trompe sur quel point ? », « Vous auriez gardé l'auto-enchaînement, vous ? ». La question au bateau (« Et vous, vous en pensez quoi ? ») reste interdite.
+- **Le texte seul est une option à part entière.** Une image seulement si elle montre quelque chose (une capture, un chiffre), pas pour décorer.
+
+## La checklist de viralité de The Engine
+
+Obligatoires :
 1. Double hook : les deux premières lignes accrochent, chacune seule.
 2. Open loop : une question ou une tension posée tôt, résolue plus tard.
 3. Phrases longues et courtes alternées.
-4. Un bloc en escalier : des lignes courtes qui s'enchaînent.
-5. Une ligne finie par « : » avant une liste en « - ».
-6. Des parenthèses (un aparté, une vanne).
-7. De petites touches d'humour.
-8. Des mots de liaison en début de ligne (« Sauf que », « Bah oui », « Et », « Du coup »).
-9. Dire à qui il s'adresse (« Si tu es dev mobile… »).
-10. **Une punchline en dernière ligne avant le PS.** Essentielle. Une question finale ne compte pas.
+4. Des parenthèses (un aparté, une vanne).
+5. De petites touches d'humour.
+6. **Une punchline avant la fin** (avant le PS ou la question de désaccord). Essentielle. Une question ne compte pas comme punchline.
+
+Facultatives, seulement si le post s'y prête (pas toutes à la fois, sinon tous les posts ont le même moule) :
+7. Un bloc en escalier : des lignes courtes qui s'enchaînent.
+8. Une ligne finie par « : » avant une liste en « - ».
+9. Des mots de liaison en début de ligne (« Sauf que », « Bah oui », « Et », « Du coup »).
+10. Dire à qui il s'adresse (« Si tu es dev mobile… »).
 11. Un PS.
 
 ## Pour le ton

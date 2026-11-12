@@ -30,7 +30,7 @@ Matière : un sujet, une idée Notion (« Idées post linked », `collection://8
 3. Vérifie (étape 5). Puis relis-le toi-même contre la checklist de viralité de `posts.md`, case par case.
 4. Montre-moi le texte complet, puis une ligne par point de la checklist qui n'est pas évident, et les ATTENTION restantes du vérificateur avec ta décision.
 5. Après mon go seulement :
-   - image : propose `/image-post` (il pose sa propre question de style)
+   - image : demande d'abord si le post part en texte seul ou avec une image (voir « Le ton » dans `posts.md`) ; avec une image seulement, propose `/image-post` (il pose sa propre question de style)
    - The Engine : `add_post` avec `status: draft`, le texte **exactement** comme je l'ai validé. Jamais `scheduled`, jamais `publish_now` sans que je le demande.
    - Notion : si le post vient d'une idée de la table, passe la fiche en « Brouillon », remplis « Fichier brouillon » et « Lien The Engine ».
 

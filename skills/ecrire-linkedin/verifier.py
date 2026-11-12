@@ -98,16 +98,16 @@ if mode == "post":
     n = len(texte)
     if n > 3000:
         erreurs.append(f"{n} caractères (max 3000 pour The Engine)")
+    elif n > 1800:
+        attentions.append(f"{n} caractères : plus de 1 800, à raccourcir (cible 700 à 1 300)")
     elif n < 400:
         attentions.append(f"{n} caractères, court pour un post")
     lignes = [l.strip() for l in texte.splitlines() if l.strip()]
     ps = next((i for i, l in enumerate(lignes) if re.match(r"^p\.?s\b", l.lower())), None)
-    if ps is None:
-        erreurs.append("pas de PS")
-    elif ps > 0 and lignes[ps - 1].endswith("?"):
-        erreurs.append("la dernière ligne avant le PS est une question, il faut une punchline")
-    if not any(l.endswith(":") for l in lignes) or not any(l.startswith("- ") for l in lignes):
-        attentions.append("pas de ligne finie par « : » suivie d'une liste en « - »")
+    # La punchline précède le PS, ou la question de désaccord finale s'il n'y a pas de PS.
+    fin = ps if ps is not None else len(lignes) - (1 if lignes and lignes[-1].endswith("?") else 0)
+    if fin > 0 and lignes[fin - 1].endswith("?"):
+        erreurs.append("la ligne avant la fin (PS ou question finale) est une question, il faut une punchline")
     if "(" not in texte:
         attentions.append("pas de parenthèses")
 
