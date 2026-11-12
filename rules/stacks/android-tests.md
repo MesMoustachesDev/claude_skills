@@ -84,6 +84,7 @@ class ProfileViewModelTest {
 - Repository : ses data sources mockées ou fakes ; l'erreur d'I/O (exception levée par la data source) devient
   le résultat d'erreur attendu ; une `CancellationException` est relancée, pas convertie (test dédié).
 - Mapper : une table d'entrées → sorties, un cas par champ optionnel ou absent.
+- Un fake (repository, service système) reproduit le comportement de l'implémentation réelle, lu dans son code ou son bytecode — filtres, refus, erreurs —, pas seulement la KDoc ni le chemin nominal. (learn 2026-11-12, fake_follows_kdoc_not_impl, 2 runs)
 
 ## Pour les écrans Compose
 
