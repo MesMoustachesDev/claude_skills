@@ -144,6 +144,7 @@ lus par le gate `qa` (`android-tests.md`, « QA sans écran, par adb »).
 - Chaque testTag utilisé par §4 existe dans `XxxTestTags` ; §8 a une machine d'états Mermaid par ViewModel, dont
   les états et événements sont ceux de `XxxUiState` / `XxxUiEvent` ; aucune I/O faillible sans résultat.
 - Les scénarios de §4 s'écrivent en anglais, courts : chacun devient un test Compose du même nom.
+- Un comportement de plateforme non observé sur appareil s'écrit comme hypothèse (« non vérifié sur appareil, <date> ») dans la spec, la doc et les commentaires, et le test qui l'encode le dit. (learn 2026-11-12, platform_state_known_only_on_device, 2 runs)
 
 ## Revue (Romain, Victor, Alice, Corentin)
 
