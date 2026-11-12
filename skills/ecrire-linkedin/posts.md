@@ -30,22 +30,33 @@ Constaté sur la MegaSearch de novembre 2026 : les posts tech FR qui marchent so
 - **Une vraie question de désaccord est permise** en toute fin, après la punchline (à la place du PS, ou après lui). Elle porte sur un point précis du post et invite à me contredire : « Je me trompe sur quel point ? », « Vous auriez gardé l'auto-enchaînement, vous ? ». La question au bateau (« Et vous, vous en pensez quoi ? ») reste interdite.
 - **Le texte seul est une option à part entière.** Une image seulement si elle montre quelque chose (une capture, un chiffre), pas pour décorer.
 
-## La checklist de viralité de The Engine
+## La checklist de viralité de The Engine (21 critères, dont 5 essentiels *)
 
-Obligatoires :
-1. Double hook : les deux premières lignes accrochent, chacune seule.
-2. Open loop : une question ou une tension posée tôt, résolue plus tard.
-3. Phrases longues et courtes alternées.
-4. Des parenthèses (un aparté, une vanne).
-5. De petites touches d'humour.
-6. **Une punchline avant la fin** (avant le PS ou la question de désaccord). Essentielle. Une question ne compte pas comme punchline.
+C'est la checklist affichée dans l'éditeur de The Engine (onglet « Checklist viralité »). Après `add_post`, ouvre le brouillon dans le navigateur intégré et lis le score : un essentiel (*) ou un obligatoire raté se corrige avant de me dire que c'est fini. Le reste est facultatif, seulement si le post s'y prête : pas tout à la fois, sinon tous les posts ont le même moule. Le score total n'est pas un objectif.
 
-Facultatives, seulement si le post s'y prête (pas toutes à la fois, sinon tous les posts ont le même moule) :
-7. Un bloc en escalier : des lignes courtes qui s'enchaînent.
-8. Une ligne finie par « : » avant une liste en « - ».
-9. Des mots de liaison en début de ligne (« Sauf que », « Bah oui », « Et », « Du coup »).
-10. Dire à qui il s'adresse (« Si tu es dev mobile… »).
-11. Un PS.
+Obligatoires (les 5 essentiels * de The Engine, plus les miens) :
+1. * Un hook qui attire l'attention.
+2. Double hook : les deux premières lignes accrochent, chacune seule.
+3. Open loop : une question ou une tension posée tôt, résolue plus tard.
+4. Phrases longues et courtes alternées.
+5. Des parenthèses (un aparté, une vanne).
+6. De petites touches d'humour.
+7. * **Tes mots à toi** : mes vraies phrases et mes tics de `voix.md`, pas seulement un ton. Quand la matière vient d'une discussion, cite ce que j'ai réellement écrit (mot pour mot, avec « => » pour enchaîner ma réaction). Raté le 30/10 sur le post « Maîtrise avancée de Claude Code », qui n'avait aucune vraie phrase de moi.
+8. * Parler à la première personne.
+9. * Éviter les tournures IA.
+10. * **Une punchline avant la fin** (avant le PS ou la question de désaccord). Une question ne compte pas comme punchline.
+
+Facultatives :
+11. Un hook à contre-courant (prendre l'avis dominant à rebours).
+12. Un bloc en escalier : des lignes courtes qui s'enchaînent.
+13. Une ligne finie par « : » avant une liste en « - ».
+14. Des mots de liaison en début de ligne (« Sauf que », « Bah oui », « Et », « Du coup »).
+15. Faire ressortir des mots (un mot en MAJUSCULES, une citation entre « »).
+16. Un élément de branding (dev mobile Flutter / Android, Cookbooker, freelance).
+17. Ne pas être trop lisse (un avis tranché, une aspérité).
+18. Dire à qui il s'adresse (« Si tu es dev mobile… »).
+19. Un PS.
+20. Un visuel complémentaire (voir `/image-post`), seulement s'il montre quelque chose.
 
 ## Pour le ton
 
