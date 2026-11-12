@@ -116,6 +116,7 @@ un **bloquant** (critique de spec) et un **critique** (revue). Gate : `error_han
 - Traces de travail interdites à la livraison : `println(`, `printStackTrace()` (gate `no_temp_markers`) ;
   `Log.d` passe par le logger du projet.
 - Compose : état hissé (`XxxScreen` sans état propre hors `remember` d'UI), `LazyColumn` avec `key =`, pas de
+- Un bloc ajouté à une fonction existante qui la ferait dépasser le seuil de longueur (`threshold.function_lines`) ou d'imbrication (`threshold.nesting`) s'extrait en fonction nommée, pas en ligne. (learn 2026-11-12, inline_block_exceeds_function_length, 2 runs)
   calcul lourd dans la composition (`remember`, `derivedStateOf`), lambdas stables.
 
 ## Voir un écran sans appareil (Android CLI)
