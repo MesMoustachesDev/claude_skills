@@ -60,3 +60,4 @@ les `.md` de ce projet (`.claude/rules/`, `.claude/features/`), pas ici : dans `
 dit « une feature de refactor », « le design system du projet ». Les valeurs dont un skill a besoin
 (noms à ne jamais publier, hôte GitLab, cas du banc de rejeu) vivent dans `~/.claude-local/`, hors du
 repo. Un hook `pre-push` refuse un push qui contient un nom de `~/.claude-local/clients.txt`.
+**Un changement de mod (`mods/<nom>`) monte sa version** dans `.claude-plugin/plugin.json`, puis `claude plugin marketplace update thibault-mods` et `claude plugin update <nom>@thibault-mods` : l'app tourne sur la copie en cache de chaque version, pas sur `mods/`.
