@@ -128,6 +128,7 @@ avec leur **arbre de composants** JSON (bornes, testTags, sémantique, modifiers
   posé et visible ;
 - **polish** (Pauline) : captures avant / après de chaque état de l'`UiState` ;
 - **QA rapide** (Quentin) : avant de démarrer l'émulateur, s'assurer que l'écran rend et porte ses tags.
+- Démarre l'émulateur de QA Android avec `-cores 4 -no-snapshot` et le GPU hôte (`-gpu host`), jamais en rendu logiciel sur un seul cœur (learn 2026-11-13, qa_emulator_too_slow, 2 runs).
 `android_cli.sh layout <fichier> [serial]` donne la hiérarchie de l'écran affiché sur l'appareil (le gate `qa`
 l'écrit dans `qa/android/layout.json` quand un flow est rouge). `android.emulator = cli` dans la config fait
 démarrer l'AVD de QA par `android emulator start --headless`. Sans Android CLI (exit 3, « non applicable ») :
