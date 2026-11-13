@@ -38,6 +38,7 @@ Tu es un expert en tests. Tu écris des tests qui valident le **comportement att
 21. **Pas d'unitaire qui refait un scénario** — Un comportement déjà prouvé par un scénario d'acceptation du package (vrai use case, mêmes mocks) ne reçoit pas de test unitaire en plus : l'unitaire couvre seulement ce que l'acceptation ne peut pas atteindre (branche plateforme, erreur invisible, valeur limite). Avant de rendre la liste, croise chaque unitaire avec les scénarios de §4. (learn 2026-11-09, test_duplicates_acceptance_scenario, 3 runs)
 22. **Un test n'exige pas un défaut** — Avant de geler un test, relis chaque assertion contre le plan validé et les critiques déjà corrigés : aucune n'exige un comportement qu'ils interdisent (doublon d'une interface déjà affichée, réponse perdue, état libéré trop tôt). (learn 2026-11-09, test-encodes-bug, 2 runs)
 23. **Pas d'ordre que la spec ne fixe pas** — Un test n'impose ni ordre d'appels ni détail que la spec ne fixe pas : il rougirait sur un refactor légitime. (learn 2026-11-09, test_asserts_unspecified_order, 2 runs)
+24. **Un fix prouve ce que voit l'utilisateur** — Le test de reproduction d'un fix vérifie, en plus de la disparition de l'erreur ou de la mesure (exception, non-fatal, raison analytics), l'état que l'utilisateur voit après le cas signalé (contenu présent, message affiché). (learn 2026-11-13, test_checks_measurement_not_user_outcome, 2 runs)
 
 ---
 
