@@ -78,16 +78,28 @@
   en reprise, réarme-la pour cette session (même section, point 4).
 - **Watchdog** (création comme reprise, une fois par session). Le pipeline ne reste jamais des heures
   sans avancer : sur `import_cancel_sync`, `red` a été joint à 21 h 54, et 3b n'a été lancée qu'à 9 h.
-  1. `CronCreate` récurrent, `cron` = toutes les `watchdog.minutes` de la config (défaut 20 :
-     `"*/20 * * * *"`, minute de départ décalée), `prompt` = `/feature <nom> watchdog`. Garde l'id
-     dans `pipeline.sh set <nom> watchdog_cron '"<id>"'`. Il ne se déclenche que session inactive :
-     il ne coupe jamais un tour. Il expire au bout de 7 jours : en reprise, recrée-le (`CronList`
-     d'abord, pas de doublon).
+  1. `CronCreate` récurrent, `cron` = toutes les 1,5 × `watchdog.minutes` de la config, arrondi à un
+     diviseur de 60 (défaut 20 → 30 : `"*/30 * * * *"`, minute de départ décalée). Plus tôt, le
+     verdict serait presque toujours `idle`. `prompt` = le texte court ci-dessous, **jamais**
+     `/feature <nom> watchdog` : une commande slash recopie tout `feature.md` (27 Ko) dans la
+     conversation à chaque réveil, et une session qui reçoit ces réveils n'est plus compactée
+     (ADR 0005, amendement 4) :
+     ```
+     Watchdog <nom> : bash ~/.claude/scripts/pipeline.sh watchdog <nom>. working ou idle → fin du
+     tour, sans message. stalled → reprends la boucle (pipeline.sh next <nom>) dans ce tour ; relis
+     ~/.claude/commands/feature.md si tu ne l'as plus en tête. waiting_thibault avec alert: true →
+     PushNotification d'une ligne, au plus une fois par watchdog.renotify_minutes. done → CronDelete
+     de watchdog_cron. Détail : feature.md, « Watchdog ».
+     ```
+     Garde l'id dans `pipeline.sh set <nom> watchdog_cron '"<id>"'`. Il ne se déclenche que session
+     inactive : il ne coupe jamais un tour. Il expire au bout de 7 jours : en reprise, recrée-le
+     (`CronList` d'abord, pas de doublon). Un cron de cette feature dont le prompt est encore
+     `/feature <nom> watchdog` (ancien format) : `CronDelete`, puis recrée-le.
   2. `bash ~/.claude/scripts/watchdog.sh register <worktree> <nom>` : la veille hors session
      (LaunchAgent, voir `init.md`) suit la feature même session fermée ou bloquée sur une permission.
      S'il répond « LaunchAgent absent », dis-le une fois avec le bloc « ce que tu tranches sans lui » :
      seule la veille dans la session tourne.
-  Le traitement de `/feature <nom> watchdog` est dans `feature.md` (« Watchdog »).
+  Le traitement d'un réveil est dans `feature.md` (« Watchdog »).
 - **Preflight QA** (nouveau run, ou reprise sans `qa_devices`) : `qa.platforms` vide → rien. Sinon,
   pour chaque plateforme, comment Quentin obtient son appareil à l'étape 8. Un simulateur par worktree,
   jamais le simulateur partagé (`ios.simulator`) ni le modèle (`ios.simulator_base`) : `pipeline.sh

@@ -7,8 +7,8 @@
     /reviewPR 93                     → « Revue MR · !93 »
     /fix_mr_comments                 → « Commentaires MR · <branche courante> »
 
-Le titre ne se pose qu'une fois par conversation et par cible : le watchdog renvoie
-`/feature <nom> watchdog` toutes les quelques minutes, et une reprise sans description ne doit pas
+Le titre ne se pose qu'une fois par conversation et par cible : `/feature <nom> watchdog` (à la main,
+ou par un cron d'avant l'ADR 0005 amendement 4) et une reprise sans description ne doivent pas
 effacer celle du premier lancement. `help`, `list`, `init` ne nomment rien.
 Sortie : rien, ou {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "sessionTitle": …}}.
 """

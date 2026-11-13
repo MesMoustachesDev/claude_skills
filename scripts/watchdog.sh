@@ -9,8 +9,8 @@
 #   watchdog.sh install [minutes]           LaunchAgent macOS qui lance `scan` toutes les N minutes (défaut 15)
 #   watchdog.sh uninstall                   retire le LaunchAgent
 #
-# Deux veilleurs se complètent. Dans la session de l'orchestrateur, un CronCreate relance `/feature <nom>
-# watchdog` (ou `/fix <nom> watchdog`) quand la session est inactive : c'est lui qui relance la suite. Celui-ci tourne même session
+# Deux veilleurs se complètent. Dans la session de l'orchestrateur, un CronCreate envoie un prompt court
+# (pipeline.sh watchdog, ou fix_gauntlet.sh watchdog) quand la session est inactive : c'est lui qui relance la suite. Celui-ci tourne même session
 # fermée ou bloquée sur une permission (un cron de session ne se déclenche que session inactive) : il ne
 # relance rien, il prévient Thibault (notify.sh) de ce qui est attendu. Liste suivie :
 # ~/.claude/state/feature_watchdog.tsv (worktree<TAB>nom<TAB>feature|fix ; sans 3e colonne : feature).

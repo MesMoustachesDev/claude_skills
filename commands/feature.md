@@ -20,7 +20,7 @@ Argument : **$ARGUMENTS**
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
 /feature <nom> cockpit                         publie ou rafraîchit le cockpit de la feature
-/feature <nom> watchdog                        la feature est-elle bloquée ? relance la suite ou prévient Thibault (lancé par le cron de l'étape 0)
+/feature <nom> watchdog                        la feature est-elle bloquée ? relance la suite ou prévient Thibault (à la main ; le cron envoie un prompt court)
 ```
 
 Une feature trop grosse (gabarit L) devient un **epic** : `/epic` (`~/.claude/commands/epic.md`)
@@ -82,8 +82,9 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 ### Watchdog
 
 Le pipeline n'attend jamais en silence. Deux veilleurs, posés à l'étape 0 (`00_preconditions.md`,
-« Watchdog ») : un `CronCreate` dans ta session, qui t'envoie `/feature <nom> watchdog` toutes les
-`watchdog.minutes` quand la session est inactive, et `watchdog.sh scan` hors session (LaunchAgent), qui
+« Watchdog ») : un `CronCreate` dans ta session, qui t'envoie un prompt court (pas la commande slash :
+elle recopierait tout ce fichier à chaque réveil) toutes les 1,5 × `watchdog.minutes` quand la session
+est inactive, et `watchdog.sh scan` hors session (LaunchAgent), qui
 prévient Thibault par une notification macOS si la session est fermée ou bloquée sur une permission.
 Tous deux lisent le même verdict, déterministe : `pipeline.sh watchdog <nom>`.
 

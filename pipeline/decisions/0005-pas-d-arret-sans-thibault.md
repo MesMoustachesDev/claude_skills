@@ -1,6 +1,6 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
@@ -51,11 +51,27 @@ personne ne l'a vu.
   `PASSED`), avec les mêmes seuils et les helpers de `pipeline.py`. `/fix` pose à l'étape 0 le même
   `CronCreate` (`/fix <nom> watchdog`) et `watchdog.sh register <wt> <nom> --fix` ; la liste suivie
   prend une 3e colonne `feature|fix` (sans elle : feature). `say` du fix note désormais `cockpit.at`.
+- Amendement 4 (2026-11-13) : **le cron envoie un prompt court, pas la commande slash, et toutes les
+  1,5 × `watchdog.minutes`**. Mesuré sur les runs du 5 au 13 nov. :
+  - `/feature <nom> watchdog` recopie tout `commands/feature.md` (27 Ko, environ 7k tokens) à chaque
+    réveil, et la copie reste dans la conversation : 120k à 150k tokens par feature (`library_read`,
+    `library_write`, `revenuecat_customer_attributes`), autant pour un long `/fix` ;
+  - les sessions qui reçoivent ces réveils ne sont plus compactées à la reprise : avant, 4 à 6
+    compactions par feature tenaient l'orchestrateur autour de 250k tokens ; après, aucune ou une seule
+    au-delà de 550k, contexte moyen 460k, pointes à 800k–960k. Le coût de l'orchestrateur est passé de 34 % à 44 % du total ;
+  - sur 200 réveils, environ 9 % rendaient `stalled`, environ 70 % `idle` : un cron au rythme de
+    `watchdog.minutes` arrive presque toujours avant que le blocage soit possible.
+  Le prompt court (texte dans `00_preconditions.md` et `commands/fix.md`, étape 0) dit seulement
+  quoi lancer et quoi faire de chaque verdict ; l'orchestrateur relit la commande s'il ne l'a plus en
+  tête. `/feature <nom> watchdog` et `/fix <nom> watchdog` restent pour un appel à la main. Un cron à
+  l'ancien format est remplacé à la reprise. Le lien entre réveils et absence de compaction est une
+  corrélation (les 6 sessions de features réveillées ; celles sans réveil compactaient encore), pas un mécanisme prouvé : à remesurer sur les
+  prochaines features.
 
 ## Conséquences
 
-- Un oubli de l'orchestrateur coûte au plus `watchdog.minutes`, plus le décalage du cron (jusqu'à 50 %
-  de la période), au lieu d'une nuit.
+- Un oubli de l'orchestrateur coûte au plus `watchdog.minutes` plus une période du cron
+  (1,5 × `watchdog.minutes`, 30 min par défaut), au lieu d'une nuit.
 - Une question posée sans `say` est prise pour un blocage : la session relance la boucle au lieu
   d'attendre. La consigne existe pour que ça n'arrive pas.
 - Le cron de session expire au bout de 7 jours et disparaît avec la session : il se recrée à chaque

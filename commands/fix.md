@@ -15,7 +15,7 @@ Argument : **$ARGUMENTS**
 /fix <nom> "<description>"         nouveau fix : branche fix/<nom>, dossier .claude/fixes/<nom>/
 /fix <nom>                         reprise là où on en était
 /fix <nom> status                  état sans rien lancer
-/fix <nom> watchdog                le fix est-il bloqué ? reprend la suite ou prévient Thibault (lancé par le cron de l'étape 0)
+/fix <nom> watchdog                le fix est-il bloqué ? reprend la suite ou prévient Thibault (à la main ; le cron envoie un prompt court)
 /fix <nom> accept review "<raison>"  accepte les critiques restantes de Victor, avec une raison
 ```
 
@@ -117,14 +117,24 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
   watchdog lit tout texte de `say` comme une question qui attend le dev (`waiting_thibault`) et ne verrait
   plus un fix bloqué (cas réel, premier /fix Kotlin).
 - **Watchdog** (création comme reprise, une fois par session) :
-  1. `CronCreate` récurrent, `cron` = toutes les `watchdog.minutes` de `.claude/rules/feature_pipeline.md`
-     (défaut 20 : `"*/20 * * * *"`, minute de départ décalée), `prompt` = `/fix <nom> watchdog`. Garde
-     l'id dans `fix.json → watchdog_cron`. Il ne se déclenche que session inactive. Il expire au bout de
-     7 jours : en reprise, recrée-le (`CronList` d'abord, pas de doublon).
+  1. `CronCreate` récurrent, `cron` = toutes les 1,5 × `watchdog.minutes` de
+     `.claude/rules/feature_pipeline.md`, arrondi à un diviseur de 60 (défaut 20 → 30 :
+     `"*/30 * * * *"`, minute de départ décalée). `prompt` = le texte court ci-dessous, **jamais**
+     `/fix <nom> watchdog`, qui recopie tout `fix.md` à chaque réveil (ADR 0005, amendement 4) :
+     ```
+     Watchdog <nom> : bash ~/.claude/scripts/fix_gauntlet.sh watchdog <nom>. working ou idle → fin
+     du tour, sans message. stalled → reprends à l'étape qu'il nomme, dans ce tour ; relis
+     ~/.claude/commands/fix.md si tu ne l'as plus en tête. waiting_thibault avec alert: true →
+     PushNotification d'une ligne, au plus une fois par watchdog.renotify_minutes. done → CronDelete
+     de watchdog_cron. Détail : fix.md, « Watchdog ».
+     ```
+     Garde l'id dans `fix.json → watchdog_cron`. Il ne se déclenche que session inactive. Il expire au
+     bout de 7 jours : en reprise, recrée-le (`CronList` d'abord, pas de doublon). Un cron de ce fix dont
+     le prompt est encore `/fix <nom> watchdog` (ancien format) : `CronDelete`, puis recrée-le.
   2. `bash ~/.claude/scripts/watchdog.sh register <worktree> <nom> --fix` : la veille hors session suit
      le fix même session fermée ou bloquée sur une permission. « LaunchAgent absent » → dis-le une fois
      avec le bloc « ce que tu tranches sans lui ».
-  Le traitement de `/fix <nom> watchdog` est dans « Watchdog », plus bas.
+  Le traitement d'un réveil est dans « Watchdog », plus bas.
 - **Ticket** : `~/.claude/pipeline/issue.md`, partie A, avant de lancer Bastien (nouveau run
   seulement). Un ticket existant fait partie de l'entrée de Bastien.
 
@@ -350,7 +360,7 @@ ligne de l'enregistrer en mémoire.
 
 ## Watchdog
 
-`/fix <nom> watchdog` (envoyé par le cron de l'étape 0) : `fix_gauntlet.sh watchdog <nom>`, le même verdict
+Le réveil du cron de l'étape 0 (prompt court), ou `/fix <nom> watchdog` à la main : `fix_gauntlet.sh watchdog <nom>`, le même verdict
 que `/feature` (ADR 0005), lu par la veille hors session (`watchdog.sh scan`, notification macOS) :
 
 | Verdict | Ce que c'est | Ce que tu fais |
