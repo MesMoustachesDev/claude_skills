@@ -226,6 +226,7 @@ Future<void> emit(WidgetTester tester, List<Item> items) async {
 
 `Completer`, `pumpUntil`, `pumpAndSettle`, `expectLater` sur le stream ; jamais `Future.delayed`,
 `pump(Duration(seconds: …))` ni N `pump` de durée fixe, même recopiés d'un test voisin.
+Flow Maestro : avant de le geler, lis la hiérarchie d'écran (inspect_screen, ou screen-hierarchy du rejeu rouge) pour chaque texte asserté. Sur iOS, un texte peut être fusionné dans le nœud d'accessibilité d'un voisin (description + bouton d'une boîte) : asserte alors par regex `(?s).*<texte>.*` et vérifie qu'elle échoue encore sur l'ancien écran. (learn 2026-11-13, flow_platform_behavior_unverified, 2 runs)
 
 ## Égalité
 
