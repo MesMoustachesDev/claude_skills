@@ -13,6 +13,8 @@ feature_tests_here() { scope_files "$PKG_REL/" | grep -qE '^src/test/.*\.(kt|jav
 # run_tests_json — lance la tâche de tests unitaires du module (--continue : tous les tests, même après un
 # échec), puis lit ses rapports JUnit XML (build/test-results/<tâche>/) en une ligne JSON par test
 # (test_report.jsonl, format de test_results). Rend le code de Gradle. Couche : `--tests` sur ses fichiers.
+# --rerun : le démon Gradle peut ne pas voir l'effacement des résultats et juger la tâche UP-TO-DATE (« aucun
+# test exécuté ») ; la tâche est donc toujours rejouée.
 run_tests_json() {
   TEST_REPORT="$GAUNTLET_OUT/test_report.jsonl"; TEST_NONE=0
   local none=ko task results targets=() f rc
@@ -25,7 +27,7 @@ run_tests_json() {
   task="$(unit_test_task)"; results="$PKG_DIR/build/test-results/$task"
   rm -rf "$results"
   TESTS_RAN="${TESTS_RAN:-} $TEST_REPORT"   # rapports produits par ce run (test_names les réutilise)
-  gradle_pkg ":$task" --continue ${targets[@]+"${targets[@]}"} > "$GAUNTLET_OUT/test_stderr.log" 2>&1; rc=$?
+  gradle_pkg ":$task" --rerun --continue ${targets[@]+"${targets[@]}"} > "$GAUNTLET_OUT/test_stderr.log" 2>&1; rc=$?
   # shellcheck disable=SC2046
   python3 "$ANDROID_CHECKS_DIR/reports.py" junit "$results" "$PKG_DIR" $(stack_list test_dirs | tr '\n' ' ') > "$TEST_REPORT"
   return $rc
@@ -65,7 +67,7 @@ coverage_pkg() {
     else not_applicable "ni Kover ni JaCoCo dans le build (ni coverage_task dans la config) : couverture non mesurable"; return; fi
   fi
   rm -rf "$PKG_DIR/build/reports/kover" "$PKG_DIR/build/reports/jacoco"
-  gradle_log coverage ":$(unit_test_task)" ":$task" \
+  gradle_log coverage ":$(unit_test_task)" --rerun ":$task" --rerun \
     || { tail -20 "$GAUNTLET_OUT/gradle_coverage.log"; ko "$task a échoué (voir .gauntlet/gradle_coverage.log)"; return 1; }
   xml="$(find "$PKG_DIR/build/reports/kover" "$PKG_DIR/build/reports/jacoco" -name '*.xml' 2>/dev/null | xargs ls -t 2>/dev/null | head -1)"
   [ -n "$xml" ] || { ko "$task n'a écrit aucun rapport XML sous build/reports/{kover,jacoco} (activer xml.required)"; return 1; }
@@ -124,7 +126,7 @@ check_mutation() {
   task="$(cfg mutation.task)"
   [ -n "$task" ] || { if [ "$(module_kind)" = android ]; then task=pitestDebug; else task=pitest; fi; }
   rm -rf "$PKG_DIR/build/reports/pitest"
-  gradle_log mutation ":$task" || { tail -20 "$GAUNTLET_OUT/gradle_mutation.log"; ko "$task a échoué (voir .gauntlet/gradle_mutation.log)"; return 1; }
+  gradle_log mutation ":$task" --rerun || { tail -20 "$GAUNTLET_OUT/gradle_mutation.log"; ko "$task a échoué (voir .gauntlet/gradle_mutation.log)"; return 1; }
   xml="$(find "$PKG_DIR/build/reports/pitest" -name 'mutations.xml' 2>/dev/null | xargs ls -t 2>/dev/null | head -1)"
   [ -n "$xml" ] || { ko "pas de mutations.xml sous build/reports/pitest (outputFormats doit contenir XML)"; return 1; }
   # shellcheck disable=SC2046

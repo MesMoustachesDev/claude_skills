@@ -10,6 +10,9 @@
 #   :<tâche>       → <module>:<tâche>     (`:testDebugUnitTest` → `:feature:login:testDebugUnitTest`) ;
 #                    une tâche déjà qualifiée par ce module reste telle quelle
 #   toujours       → --init-script test_logging.gradle (message d'assertion d'un test rouge sur la console)
+#   toujours       → --no-watch-fs : le démon relit le disque à chaque build. Avec la surveillance du système de
+#                    fichiers, une source modifiée ou un rapport effacé juste après le build précédent n'est pas
+#                    encore vu : compilation, tests ou lint jugés UP-TO-DATE sur un état périmé.
 #   :@unitTest     → la tâche de tests unitaires du type de module (unit_test_task, jvm_unit_test_task)
 #   :@compile      → la compilation des tests, qui compile aussi le code (compile_task, jvm_compile_task)
 #   :@lint         → Android lint (lint_task, jvm_lint_task)
@@ -88,7 +91,7 @@ for a in "$@"; do
   esac
 done
 # Le message d'assertion d'un test rouge sur la console (test_logging.gradle) : le gate red le lit.
-args+=(--init-script "$here/test_logging.gradle")
+args+=(--init-script "$here/test_logging.gradle" --no-watch-fs)
 
 if [ "${GRADLE_RUN_DRY:-0}" = 1 ]; then printf 'cd %s && %s' "$root" "$gradle"; printf ' %s' ${args[@]+"${args[@]}"}; printf '\n'; exit 0; fi
 cd "$root" || exit 2

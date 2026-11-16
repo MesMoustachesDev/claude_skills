@@ -10,6 +10,9 @@
 #   koverXmlReport    build/reports/kover/report.xml : chaque ligne de src/main couverte, sauf FAKE_UNCOVERED
 #   pitest*           build/reports/pitest/mutations.xml : un mutant tué par fichier, un survivant par FAKE_SURVIVOR
 # Chaque appel est ajouté à $FAKE_GRADLE_LOG s'il est posé.
+# FAKE_GRADLE_STALE=1 : le démon qui ne voit pas l'effacement des sorties. Une tâche déjà jouée est jugée
+# UP-TO-DATE et n'écrit rien, sauf suivie de --rerun ; lint, sauf si build/intermediates/lint_partial_results
+# a disparu. FAKE_GRADLE_NO_LINT_REPORT=1 : lint n'écrit jamais de rapport.
 set -u
 [ -n "${FAKE_GRADLE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_GRADLE_LOG"
 root="$PWD"; rc=0; filters=()
@@ -21,9 +24,23 @@ done
 pkg_of() { sed -n 's/^[[:space:]]*package[[:space:]]\{1,\}\([A-Za-z0-9_.]*\).*/\1/p' "$1" | head -1; }
 srcs() { find "$1" -type f \( -name '*.kt' -o -name '*.java' \) 2>/dev/null | sort; }
 
-for a in "$@"; do
+# up_to_date <marqueur> <i> — mode STALE : la tâche à l'index <i> est-elle jugée à jour ? Sinon, le marqueur est posé.
+up_to_date() {
+  [ "${FAKE_GRADLE_STALE:-0}" = 1 ] || return 1
+  [ "${args[$2+1]:-}" = --rerun ] && return 1
+  [ -e "$1" ] && return 0
+  mkdir -p "$1"; return 1
+}
+
+for ((ai = 0; ai < ${#args[@]}; ai++)); do
+  a="${args[ai]}"
   case "$a" in :*) ;; *) continue ;; esac
   task="${a##*:}"; mpath="${a%:*}"; mod="$root$(printf '%s' "$mpath" | tr ':' '/')"
+  case "$task" in
+    lint*) up_to_date "$mod/build/intermediates/lint_partial_results" "$ai" && continue
+           [ "${FAKE_GRADLE_NO_LINT_REPORT:-0}" = 1 ] && continue ;;
+    *) up_to_date "$mod/build/.fake_seen/$task" "$ai" && continue ;;
+  esac
   case "$task" in
     compile*)
       for f in $(srcs "$mod/src"); do

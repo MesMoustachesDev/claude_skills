@@ -29,7 +29,8 @@ analyze_pkg() {
   [ -n "$warns" ] && { printf '%s\n' "$warns" | head -30 | sed 's/^/   ✗ /'; ko "avertissements du compilateur dans le périmètre"; rc=1; }
   # Android lint : un module JVM pur n'en a que s'il applique com.android.lint.
   if [ "$(module_kind)" = android ] || has_plugin 'com\.android\.lint'; then
-    issues="$(lint_issues)" || { rc=1; issues=""; }
+    lint_issues "$GAUNTLET_OUT/lint_issues.txt" || rc=1
+    issues="$(cat "$GAUNTLET_OUT/lint_issues.txt")"
     if [ -n "$issues" ]; then
       out_of_scope="$(printf '%s\n' "$issues" | grep -c .)"
       issues="$(printf '%s\n' "$issues" | drop_generated | filter_scope_lines "$PKG_REL/")"
@@ -41,7 +42,8 @@ analyze_pkg() {
     info "module JVM sans com.android.lint : pas d'Android lint"
   fi
   if has_plugin 'detekt'; then
-    issues="$(detekt_issues)" || { rc=1; issues=""; }
+    detekt_issues "$GAUNTLET_OUT/detekt_issues.txt" || rc=1
+    issues="$(cat "$GAUNTLET_OUT/detekt_issues.txt")"
     issues="$(printf '%s\n' "$issues" | grep -v '^$' | drop_generated | filter_scope_lines "$PKG_REL/")"
     [ -n "$issues" ] && { printf '%s\n' "$issues" | head -30 | sed 's/^/   ✗ /'; ko "issues detekt dans le périmètre"; rc=1; }
   else
@@ -50,24 +52,45 @@ analyze_pkg() {
   [ "$rc" = 0 ] && info "compile ; aucune issue dans le périmètre"
   return $rc
 }
-# lint_issues — lance Android lint, rend ses issues (reports.py lint). Le code de lint ne compte pas : il échoue
-# sur une erreur ancienne comme sur une neuve, le périmètre tranche. Sans rapport : échec.
+# lint_issues <fichier> — lance Android lint, écrit ses issues (reports.py lint) dans <fichier> ; ses messages et
+# son [FAIL] vont sur la sortie (jamais avalés par une substitution). Le code de lint ne compte pas : il échoue
+# sur une erreur ancienne comme sur une neuve, le périmètre tranche. Le rapport n'est pas effacé avant : le démon
+# Gradle peut ne pas voir l'effacement et juger lintReport à jour sans le réécrire. Un rapport que Gradle n'a pas
+# réécrit vaut donc s'il a réussi (lint à jour : code inchangé) ; s'il manque malgré tout, les résultats partiels
+# de lint partent et lint est relancé une fois. Lint en échec sans rapport neuf : échec.
+lint_report() { ls -t "$PKG_DIR"/build/reports/lint-results*.xml 2>/dev/null | head -1; }
 lint_issues() {
-  local xml
-  rm -f "$PKG_DIR"/build/reports/lint-results*.xml
-  gradle_log lint :@lint
-  xml="$(ls -t "$PKG_DIR"/build/reports/lint-results*.xml 2>/dev/null | head -1)"
+  local out="$1" xml before lrc
+  : > "$out"
+  before="$(mtime_ns "$(lint_report)")"
+  gradle_log lint :@lint; lrc=$?
+  xml="$(lint_report)"
+  if [ -z "$xml" ] && [ "$lrc" = 0 ]; then
+    info "lint jugé à jour sans rapport : résultats partiels effacés, lint relancé"
+    rm -rf "$PKG_DIR/build/intermediates/lint_partial_results"
+    gradle_log lint :@lint; lrc=$?; xml="$(lint_report)"
+  fi
   [ -n "$xml" ] || { tail -20 "$GAUNTLET_OUT/gradle_lint.log"; ko "Android lint n'a produit aucun rapport (voir .gauntlet/gradle_lint.log)"; return 1; }
-  python3 "$ANDROID_CHECKS_DIR/reports.py" lint "$xml" "$PKG_DIR"
+  if [ "$lrc" != 0 ] && [ "$(mtime_ns "$xml")" = "$before" ]; then
+    tail -20 "$GAUNTLET_OUT/gradle_lint.log"; ko "Android lint a échoué sans réécrire son rapport (voir .gauntlet/gradle_lint.log)"; return 1
+  fi
+  python3 "$ANDROID_CHECKS_DIR/reports.py" lint "$xml" "$PKG_DIR" > "$out"
 }
-# detekt_issues — lance detekt, rend ses issues (rapport checkstyle build/reports/detekt/detekt.xml).
+# detekt_issues <fichier> — lance detekt (--rerun : même raison que lint), écrit ses issues (rapport checkstyle
+# build/reports/detekt/detekt.xml) dans <fichier>.
 detekt_issues() {
-  local xml="$PKG_DIR/build/reports/detekt/detekt.xml"
+  local out="$1" xml="$PKG_DIR/build/reports/detekt/detekt.xml"
+  : > "$out"
   rm -f "$xml"
-  gradle_log detekt :detekt
+  gradle_log detekt :detekt --rerun
   [ -f "$xml" ] || { tail -20 "$GAUNTLET_OUT/gradle_detekt.log"; ko "detekt n'a produit aucun rapport XML (voir .gauntlet/gradle_detekt.log)"; return 1; }
-  python3 "$ANDROID_CHECKS_DIR/reports.py" checkstyle "$xml" "$PKG_DIR"
+  python3 "$ANDROID_CHECKS_DIR/reports.py" checkstyle "$xml" "$PKG_DIR" > "$out"
 }
+# mtime_ns <fichier> — date de modification en nanosecondes (0 si absent) : un rapport réécrit dans la même
+# seconde se voit quand même.
+mtime_ns() { python3 -c 'import os,sys
+try: print(os.stat(sys.argv[1]).st_mtime_ns)
+except OSError: print(0)' "${1:-/nonexistent}"; }
 
 # format [test] — seuls les fichiers du périmètre doivent être formatés, par l'outil du projet : ktlint
 # (org.jlleitschuh.gradle.ktlint, tâche ktlintCheck) ou Spotless (spotlessCheck). Ni l'un ni l'autre : N/A.

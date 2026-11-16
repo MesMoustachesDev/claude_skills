@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Repro — les checks Android avec le VRAI Gradle, hors ligne (--offline), sur un projet jetable : settings.gradle.kts,
 # un module Kotlin/JVM (kotlin("jvm"), JUnit 4), un test. Ce que test_android.sh simule, joué pour de vrai :
-# compilation et ses erreurs (format du compilateur Kotlin), rapports JUnit XML, rouge contre un stub TODO().
+# compilation et ses erreurs (format du compilateur Kotlin), rapports JUnit XML, rouge contre un stub TODO(),
+# un gate rejoué juste après une modification ou sans changement (démon, --no-watch-fs et --rerun).
 # Ni lint ni ktlint ni Kover : un module JVM sans ces plugins, d'où format et coverage non applicables.
 #
 # Rien n'est téléchargé : il faut une distribution Gradle et le plugin Kotlin déjà dans ~/.gradle (GRADLE_TEST_DIST,
@@ -57,6 +58,7 @@ run_c test_names lib; expect_file_has "$R/.claude/features/lib/tests.md" "- adds
 echo "implémentation : suite verte"
 printf 'package x.data\n\nclass AddImpl {\n    fun add(a: Int, b: Int): Int = a + b\n}\n' > "$P/$K/AddImpl.kt"
 run_c test lib;     expect_rc 0 "test : vert"; expect_out "1 test(s), 0 échec(s)" "le rapport JUnit XML est lu"
+run_c test lib;     expect_rc 0 "test rejoué sans changement : vert"; expect_out "1 test(s), 0 échec(s)" "la tâche est rejouée (--rerun), ses tests sont vus"
 run_c no_stubs lib; expect_rc 0 "no_stubs : plus de TODO()"
 run_c format lib;   expect_rc 0 "format sans ktlint ni Spotless"; expect_out "[N/A]  format" "format non applicable"
 run_c coverage lib; expect_rc 0 "coverage sans Kover ni JaCoCo"; expect_out "[N/A]  coverage" "coverage non applicable"
