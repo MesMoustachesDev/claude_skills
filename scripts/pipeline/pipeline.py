@@ -891,9 +891,13 @@ def cmd_watchdog(c, args):
 
 
 def cmd_after_architect(c, args):
-    """1c/1e : le hook d'Arthur écrit stages.contracts, qui appartient à l'étape 2."""
-    if state_of(c.p, "hg.spec") == "PASSED":
-        print("spec validée : stages.contracts appartient bien à l'étape 2, rien à déplacer")
+    """1c/1e : le hook d'Arthur écrit stages.contracts, qui appartient à l'étape 2.
+
+    L'étape 2 commence après le point d'étape « contrats » ; avant lui (1c, 1e), stages.contracts est le
+    brouillon. Depuis l'ADR 0015 la spec est validée avant le brouillon : hg.spec ne dit rien de l'étape.
+    """
+    if state_of(c.p, "hg.contracts") == "PASSED":
+        print("contrats validés : stages.contracts appartient bien à l'étape 2, rien à déplacer")
         return
     stages = c.p.setdefault("stages", {})
     if "contracts" in stages:
