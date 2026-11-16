@@ -49,6 +49,15 @@ stack_load_checks
 # un second gauntlet dans le même worktree.
 bash "$(dirname "${BASH_SOURCE[0]}")/hook_wait.sh" "$FEATURE_DIR/.gauntlet" || exit 1
 
+# 1c/1e, avant le point d'étape « contrats » : les tests sont à Théo. Une erreur de compilation qui n'est que dans
+# des fichiers de test (un fake qui n'implémente plus l'interface élargie) ne retient pas Arthur : analyze la
+# liste dans .gauntlet/tests_to_realign.txt, l'orchestrateur lance Théo (ADR 0015, amendement du 2026-11-16).
+if [ "$target" = contracts ]; then
+  rm -f "$GAUNTLET_OUT/tests_to_realign.txt"
+  [ -f "$FEATURE_DIR/pipeline.json" ] && ! jq -e '.human_gates.contracts' "$FEATURE_DIR/pipeline.json" >/dev/null 2>&1 \
+    && export TESTS_TO_REALIGN=1
+fi
+
 checks="$(profile_checks "$target")"
 if [ -z "$checks" ]; then
   # Un check d'un autre langage reste connu : run_checks le dit non applicable à celui du package.

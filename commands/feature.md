@@ -54,7 +54,8 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `~/.claude/pipeline/feature/gabarits.md`, à lire en 0b, en 1e et à chaque reclassement.
 3. **Toute écriture de `pipeline.json` passe par `pipeline.sh`.** Tu n'édites jamais le fichier à la
    main : `pass`, `skip`, `join` (étapes 3 et 4 : gate complet après les deux moitiés), `gate`, `size`, `loop`, `debt`, `accept`, `set` (écriture libre, pour ce qu'aucune
-   commande ne couvre : `suggestions.S1`, `issue`, `suspect_tests`…), `after-architect`,
+   commande ne couvre : `suggestions.S1`, `issue`, `suspect_tests`…), `after-architect`, `replay` (un gate rejoué à la main
+   réécrit le stage de son agent),
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
    tranche. Les hooks des agents continuent d'écrire `stages.<profil>` eux-mêmes.

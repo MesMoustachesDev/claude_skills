@@ -20,6 +20,8 @@ analyze_pkg() {
     # complet, après les deux, compile tout). Une erreur sans fichier (build cassé) bloque toujours.
     if [ -n "${LAYER:-}" ] && [ -n "$errors" ] && [ -z "$(printf '%s\n' "$errors" | while IFS= read -r l; do in_layer "$LAYER" "${l%%:*}" && printf '%s\n' "$l"; done)" ]; then
       info "erreurs de compilation hors de la couche $LAYER seulement (l'autre moitié) :"; printf '%s\n' "$errors" | head -10 | sed 's/^/   · /'
+    elif tests_to_realign "$errors"; then
+      :   # 1c/1e : un fake de test cassé par le contrat, à Théo (gauntlet.sh, TESTS_TO_REALIGN)
     else
       if [ -n "$errors" ]; then printf '%s\n' "$errors" | head -30; else tail -30 "$log"; fi
       ko "erreurs de compilation"; return 1

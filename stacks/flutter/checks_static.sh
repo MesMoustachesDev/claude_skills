@@ -30,7 +30,12 @@ analyze_pkg() {
   out="$(cd "$PKG_DIR" && $FLUTTER analyze --fatal-warnings --fatal-infos --no-pub $targets 2>&1)"; rc=$?
   [ "$rc" = 0 ] && { info "aucune issue"; return 0; }
   # une erreur de compilation bloque toujours ; le reste est filtré au périmètre
-  if printf '%s\n' "$out" | grep -qE '^\s*error •'; then printf '%s\n' "$out" | grep -E '^\s*error •' | head -30; ko "erreurs de compilation"; return 1; fi
+  # (1c/1e : des erreurs dans les tests seulement sont à Théo, tests_to_realign)
+  local errors
+  errors="$(printf '%s\n' "$out" | grep -E '^\s*error •' | sed -E 's/^.* • (.*) • ([^ ]+\.dart):([0-9]+):[0-9]+ • .*$/\2:\3: \1/')"
+  if [ -n "$errors" ] && tests_to_realign "$errors"; then
+    out="$(printf '%s\n' "$out" | grep -vE '^\s*error •')"
+  elif [ -n "$errors" ]; then printf '%s\n' "$out" | grep -E '^\s*error •' | head -30; ko "erreurs de compilation"; return 1; fi
   issues="$(printf '%s\n' "$out" | grep -E '^\s*(warning|info) •' | sed -E 's/^.* • ([^ ]+\.dart):([0-9]+):[0-9]+ • (.*)$/\1:\2: \3 — &/' | filter_scope_lines "$PKG_REL/" | sed -E 's/^([^:]+:[0-9]+): [^—]*— //')"
   [ -z "$issues" ] && { info "issues hors périmètre uniquement ($(printf '%s\n' "$out" | grep -cE '^\s*(warning|info) •'), préexistantes)"; return 0; }
   printf '%s\n' "$issues" | head -30

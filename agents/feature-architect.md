@@ -162,7 +162,9 @@ d'analyse statique sur les autres packages : le gate analyse le tien. Une signat
 changes (ou que Thibault a changée) casse peut-être des appelants ailleurs : **un seul**
 `grep -rn '<nom>('` sur les fichiers du langage à la fin, et tu listes les fichiers touchés dans ton rapport
 (« Appelants cassés ») sans les corriger — les tests sont à Théo, les autres packages hors de ton
-périmètre. L'orchestrateur lance Théo en parallèle au lieu de le découvrir au rouge suivant.
+périmètre. L'orchestrateur lance Théo en parallèle au lieu de le découvrir au rouge suivant. Avant le point
+d'étape « contrats », un test qui ne compile plus contre ton contrat (un fake qui n'implémente pas ta
+nouvelle méthode) ne te retient pas : le gate le liste pour Théo. Une erreur dans le code, si.
 
 ## Interdits
 

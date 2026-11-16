@@ -23,6 +23,8 @@
 #                                                writes_extra) ; glob entre guillemets ; sans glob, liste projet + feature
 #   pipeline.sh set <nom> <clé.pointée> <json>   écriture libre (ex. suggestions.S1 '{"decision":"applied"}')
 #   pipeline.sh after-architect <nom>            après chaque retour d'Arthur avant l'étape 2 (1c, 1e)
+#   pipeline.sh replay <nom> <profil>            gate d'un agent rejoué à la main : réécrit stages.<profil> (PASSED|RED)
+#   pipeline.sh reached <nom> <clé>              exit 0 si la feature est à l'étape <clé> ou au-delà (hook de fin)
 #   pipeline.sh contracts-files <nom>            recalcule contracts.files (arbre de travail)
 #   pipeline.sh commit-contracts <nom> draft|thibault|reedit ["<quoi>"] [fichiers…]
 #   pipeline.sh freeze <nom>                     gel des tests (3b)

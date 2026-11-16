@@ -908,6 +908,52 @@ def cmd_after_architect(c, args):
     print(f"stages.contracts_draft = {st.get('status', '—')} ; attempts.contracts = 0")
     if st.get("status") == "FAILED":
         print("brouillon FAILED : point imprévu (rapport d'Arthur + 40 dernières lignes de last_contracts.log)")
+    realign = os.path.join(c.dir, ".gauntlet", "tests_to_realign.txt")
+    if os.path.isfile(realign) and open(realign).read().strip():
+        files = open(realign).read().split()
+        print(f"tests à réaligner (ils ne compilent plus contre le contrat) : {', '.join(files)} — lance Théo "
+              "(feature-test-writer) en background : « adapte ces fakes et appels au contrat, ne change aucune assertion »")
+
+
+def cmd_reached(c, args):
+    """`reached <nom> <clé>` : exit 0 si la feature est arrivée à l'étape <clé> d'ORDER (ou au-delà), 1 sinon.
+    Le hook de fin d'agent s'en sert : Théo lancé avant l'étape 3 (réaligner un fake en 1e) ne joue pas `red`.
+    Sans pipeline.json (hors pipeline), arrivée : rien ne change."""
+    keys = [k for k, *_ in ORDER]
+    if not args or args[0] not in keys:
+        die(f"usage : reached <nom> <clé> ({', '.join(keys)})")
+    cur = next_step(c.p).get("key")
+    if not c.p or cur in (None, "done", "split"):
+        sys.exit(0)
+    sys.exit(0 if keys.index(cur) >= keys.index(args[0]) else 1)
+
+
+# Gates que le hook de fin d'un agent écrit dans stages (hooks/pipeline-gate.sh) ; `replay` les rejoue.
+REPLAY_PROFILES = {"contracts", "test_plan", "red", "green", "red_data", "red_presentation", "green_data",
+                   "green_presentation", "clean", "harden", "qa", "polish"}
+
+
+def cmd_replay(c, args):
+    """`replay <nom> <profil>` : rejoue le gate d'un agent et réécrit stages.<profil> d'après le gauntlet (PASSED,
+    attempts remis à 0 ; ou RED). Pour un gate rejoué à la main après le dernier arrêt de l'agent : sans lui,
+    stages.<profil> gardait le RED du hook, et seul un nouveau tour de l'agent le réécrivait."""
+    if not args or args[0] not in REPLAY_PROFILES:
+        die(f"usage : replay <nom> <profil> ({', '.join(sorted(REPLAY_PROFILES))})")
+    profile = args[0]
+    wait_hooks(c)
+    gauntlet = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gauntlet.sh")
+    r = subprocess.run(["bash", gauntlet, profile, c.name], cwd=c.root, capture_output=True, text=True)
+    c.p = c._load()
+    ok = r.returncode == 0
+    prev = _status((c.p.get("stages") or {}).get(profile)) or "—"
+    c.p.setdefault("stages", {})[profile] = {"status": "PASSED" if ok else "RED", "at": now(), "replayed": True}
+    if ok:
+        c.p.setdefault("attempts", {})[profile] = 0
+    c.save()
+    print("\n".join(r.stdout.strip().splitlines()[-12:]))
+    log = os.path.relpath(os.path.join(c.dir, ".gauntlet", f"last_{profile}.log"), c.root)
+    print(f"stages.{profile} = {'PASSED' if ok else 'RED'} (était {prev}, gate rejoué) — log : {log}")
+    sys.exit(0 if ok else 1)
 
 
 def parse_ask(args):
@@ -1437,7 +1483,7 @@ COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say,
     "devices": cmd_devices, "watchdog": cmd_watchdog,
-    "after-architect": cmd_after_architect, "contracts-files": cmd_contracts_files,
+    "after-architect": cmd_after_architect, "reached": cmd_reached, "replay": cmd_replay, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
     "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,
 }

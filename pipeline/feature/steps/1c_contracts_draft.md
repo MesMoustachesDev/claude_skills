@@ -35,7 +35,11 @@ Rien d'autre à la main : pas de DI, de route, de modèle de données ni de mapp
 
 **Le hook d'Arthur écrit `stages.contracts`, qui appartient à l'étape 2.** Après **chaque** retour
 d'Arthur avant l'étape 2 (brouillon, mode application en 1e) : `pipeline.sh after-architect <nom>`
-(il déplace `stages.contracts` vers `stages.contracts_draft` et remet `attempts.contracts` à 0). Brouillon `FAILED` →
+(il déplace `stages.contracts` vers `stages.contracts_draft` et remet `attempts.contracts` à 0). Il nomme
+aussi les **tests à réaligner** : un fake ou un appel de test qui ne compile plus contre le brouillon ne
+retient pas Arthur (le gate `contracts` le liste dans `.gauntlet/tests_to_realign.txt`, ADR 0015 amendée) ;
+lance Théo (`feature-test-writer`) en background, « adapte ces fakes et appels au contrat, ne change aucune
+assertion ». Son hook joue `analyze` et n'écrit aucun stage. Brouillon `FAILED` →
 **point imprévu** : le rapport d'Arthur et les 40 dernières lignes de `last_contracts.log`,
 « relancer Arthur avec une consigne » / « je pars de ce qu'il y a et je corrige moi-même en 1e ».
 

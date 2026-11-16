@@ -22,6 +22,8 @@ complet (`green` : toute la suite, analyse et stubs du package entier) et écrit
   (`feature-implementer`) avec `.gauntlet/last_green.log`, puis `join` à nouveau.
 - **Reprise** : `pipeline.sh next` affiche l'état de chaque moitié ; ne relance que celle qui n'est pas
   `PASSED`.
+- **Gate d'une moitié rejoué à la main, vert** (le hook a laissé `RED` à son dernier arrêt) :
+  `pipeline.sh replay <nom> green_<moitié>` réécrit son stage d'après le gauntlet ; jamais `set`.
 - **Une seule couche touchée** : lance seulement cette moitié, et `pipeline.sh skip <nom> green_<autre>
   "<raison, tirée de §8>"` ; `join` accepte une moitié `SKIPPED`.
 

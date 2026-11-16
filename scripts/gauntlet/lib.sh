@@ -178,6 +178,21 @@ stack_ext_ere() {
 stack_includes() { stack_list extensions | sed 's/^/--include=*/'; }
 # stack_dirs — dossiers du code puis des tests, relatifs au package (lib test pour Flutter)
 stack_dirs() { { stack_list src_dirs; stack_list test_dirs; } | tr '\n' ' '; }
+# tests_to_realign <erreurs> — une ligne « fichier:ligne: message » par erreur, fichier relatif au package. Avec
+# TESTS_TO_REALIGN=1 (gauntlet.sh, profil contracts avant hg.contracts) et toutes les erreurs dans les dossiers de
+# test du langage : elles sont à Théo, pas à Arthur. Les montre, écrit tests_to_realign.txt, rend 0 ; sinon 1.
+tests_to_realign() {
+  [ "${TESTS_TO_REALIGN:-0}" = 1 ] && [ -n "$1" ] || return 1
+  local line f td hit tds; tds="$(stack_list test_dirs)"
+  while IFS= read -r line; do
+    f="${line%%:*}"; hit=0
+    while IFS= read -r td; do case "$f" in "$td"/*) hit=1 ;; esac; done <<<"$tds"
+    [ "$hit" = 1 ] || return 1
+  done <<<"$1"
+  printf '%s\n' "$1" | head -30 | sed 's/^/   · /'
+  printf '%s\n' "$1" | cut -d: -f1 | sed "s#^#$PKG_REL/#" | sort -u >> "$GAUNTLET_OUT/tests_to_realign.txt"
+  info "erreurs de compilation dans les tests seulement : à réaligner par Théo, pas par Arthur (.gauntlet/tests_to_realign.txt)"
+}
 # stack_check_known <nom> — un langage au moins a un check_<nom> (stacks/*/checks*.sh)
 stack_check_known() { grep -qsE "^check_${1}\(\)" "$CLAUDE_STACKS_DIR"/*/checks*.sh; }
 # stack_load_checks — les checks du langage courant, sourcés après les génériques : un check_<nom> du langage

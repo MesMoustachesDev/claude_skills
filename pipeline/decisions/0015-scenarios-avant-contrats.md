@@ -1,7 +1,8 @@
 # 0015 — Les scénarios Gherkin s'écrivent avant les contrats, et les contrats en sortent
 
-Statut : acceptée (2026-11-12)
-Où elle vit : `scripts/pipeline/pipeline.py` (`ORDER`, `state_of`) · `pipeline/feature/steps/1_spec.md`,
+Statut : acceptée (2026-11-12), amendée le 2026-11-16 (tests cassés par le brouillon, plus bas)
+Où elle vit : `scripts/pipeline/pipeline.py` (`ORDER`, `state_of`, `after-architect`, `reached`, `replay`) ·
+`scripts/gauntlet.sh` et `tests_to_realign` (`scripts/gauntlet/lib.sh`) · `hooks/pipeline-gate.sh` · `pipeline/feature/steps/1_spec.md`,
 `1c_contracts_draft.md`, `1d_dedup.md`, `1e_contracts.md`, `1f_spec_contracts.md` · `commands/feature.md`
 (tableau des étapes) · `agents/feature-specifier.md` · `agents/feature-architect.md` ·
 `agents/feature-spec-critic.md` · `scripts/gauntlet/spec_lint.py` et `checks_review.sh` (phase
@@ -60,3 +61,20 @@ Nouvel ordre :
 
 - Le gabarit L (découpé au cadrage) : chaque sous-feature suit le nouvel ordre.
 - `/fix` : pas de contrats ni de spec, inchangé.
+
+## Amendement du 2026-11-16 : un test cassé par le brouillon est à Théo
+
+Vécu sur une sous-feature Android : Arthur ajoute une méthode à une interface qu'un fake de test implémente.
+Le fake ne compile plus, Arthur ne peut pas y toucher (les tests sont à Théo), le gate `contracts` reste rouge
+sur `analyze` et `pipeline.sh next --after contracts` attend 540 s un agent qui ne s'en sortira pas. Théo,
+lancé en 1e pour réaligner le fake, jouait à son arrêt le gate `red` et écrivait `stages.red` avant l'étape 3.
+
+- **Avant `hg.contracts`** (1c, 1e), le gate `contracts` ne retient pas Arthur pour des erreurs de compilation
+  qui sont **toutes** dans les dossiers de test du langage : `analyze` les liste dans
+  `.gauntlet/tests_to_realign.txt` et passe ; `after-architect` les nomme, l'orchestrateur lance Théo en
+  background. Une erreur dans le code, ou n'importe laquelle après `hg.contracts`, bloque comme avant.
+- **Théo avant l'étape 3** (`pipeline.sh reached <nom> red` faux) : son hook joue `analyze` (tout compile,
+  tests compris), le renvoie au travail tant que c'est rouge, et n'écrit rien dans `pipeline.json`.
+- **Un gate rejoué à la main** après le dernier arrêt d'un agent réécrit son stage par
+  `pipeline.sh replay <nom> <profil>` (le gauntlet juge toujours, ADR 0003) ; sans lui, le RED du hook
+  restait jusqu'au tour suivant de l'agent.

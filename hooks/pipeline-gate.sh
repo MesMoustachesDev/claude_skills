@@ -54,6 +54,28 @@ init_project_context "$feature" 2>/dev/null || { echo "pipeline-gate : contexte 
 
 PIPE="$FEATURE_DIR/pipeline.json"
 [ -f "$PIPE" ] || echo '{}' > "$PIPE"
+max="$(cfg pipeline.max_attempts 5)"
+
+# Théo avant son étape (lancé en 1c/1e pour réaligner un fake ou un appel qu'un contrat a cassé) : son gate
+# n'est pas `red`, et stages.red n'est pas à lui. Il joue `analyze` (tout compile, tests compris) et n'écrit
+# rien dans pipeline.json ; ses tentatives se comptent à part (.gauntlet/realign_attempts).
+if [ "${profile%%_*}" = red ] && ! bash "$GAUNTLET_ROOT/../pipeline.sh" reached "$feature" red >/dev/null 2>&1; then
+  mkdir -p "$FEATURE_DIR/.gauntlet"; count="$FEATURE_DIR/.gauntlet/realign_attempts"
+  if env -u GAUNTLET_LAYER "$GAUNTLET" analyze "$feature" >/dev/null 2>&1; then rm -f "$count"; exit 0; fi
+  n=$(( $(cat "$count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$count"
+  if [ "$n" -ge "$max" ]; then
+    rm -f "$count"
+    echo "pipeline-gate : réalignement — analyze toujours rouge après $n tentatives. Arrête-toi et rapporte ce qui ne compile pas." >&2
+    exit 0
+  fi
+  {
+    echo "RÉALIGNEMENT (avant l'étape 3) : analyze rouge (tentative $n/$max) — adapte les tests au contrat, ne change aucune assertion."
+    echo "----------------------------------------------------------------"
+    grep -vE '^\s*$' "$FEATURE_DIR/.gauntlet/last_analyze.log" 2>/dev/null | tail -40
+    echo "----------------------------------------------------------------"
+  } >&2
+  exit 2
+fi
 # pipe_set <statut> <tentatives> — sous verrou : les deux moitiés des étapes 3 et 4 finissent parfois
 # ensemble, et deux jq > tmp && mv simultanés perdent l'écriture de l'une.
 pipe_set() {
@@ -70,7 +92,6 @@ running="$FEATURE_DIR/.gauntlet/hook_${profile}.running"
 echo "$$ $(date +%s) $agent" > "$running"
 trap 'rm -f "$running"' EXIT
 export PIPELINE_GATE_HOOK=1
-max="$(cfg pipeline.max_attempts 5)"
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 
 # QA: a run that already finished on the same state (commit + uncommitted changes) is not replayed, its

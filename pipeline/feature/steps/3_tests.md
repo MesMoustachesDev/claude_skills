@@ -45,6 +45,8 @@ complet (`red` : toute la suite, l'analyse du package entier, `tests.md`) et éc
   pas.
 - **Reprise** : `pipeline.sh next` affiche l'état de chaque moitié ; ne relance que celle qui n'est pas
   `PASSED`.
+- **Gate d'une moitié rejoué à la main, vert** (le hook a laissé `RED` à son dernier arrêt) :
+  `pipeline.sh replay <nom> red_<moitié>` réécrit son stage d'après le gauntlet ; jamais `set`.
 - **Une seule couche touchée** (mode extend dont §8 ne touche, par exemple, que la présentation) : lance
   seulement cette moitié, et `pipeline.sh skip <nom> red_data "<raison, tirée de §8>"` pour l'autre ; `join`
   accepte une moitié `SKIPPED`.

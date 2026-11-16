@@ -45,7 +45,8 @@ stubbées, imports, README) sans toucher à mes signatures » / « J'ai une ques
   « Appelants cassés » dans le rapport d'Arthur (tests ou fichiers hors package qui appellent une
   signature changée) → Théo les réaligne tout de suite, en background, sans attendre le rouge
   d'`analyze` : « ces appels ne compilent plus après le changement de signature ; adapte-les, ne
-  change aucune assertion ».
+  change aucune assertion ». Idem pour les fichiers que nomme `after-architect` (tests à réaligner). Avant
+  l'étape 3, le hook de Théo joue `analyze` et n'écrit pas `stages.red`.
 - Verdicts `architect` de Denis : déclaration remplacée par l'existant → `"accepted": true, "reason":
   "remplacé par Thibault"` sur l'entrée ; gardée → Thibault donne sa raison, `accepted` avec elle.
   Puis `gauntlet.sh dedup_verdict <nom>` vert.
