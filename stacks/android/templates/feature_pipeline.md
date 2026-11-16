@@ -112,8 +112,13 @@ deps.exempt =
 # Maintenabilité
 # ---------------------------------------------------------------------------
 deps.shared_packages = core, designsystem
-# Design system : préfixes de paquet qu'un écran (*Screen.kt) doit importer, et motifs interdits en présentation
-# (regex grep -E, séparées par des virgules, donc sans virgule dedans).
+# Design system : préfixes de paquet qu'un écran (*Screen.kt) doit importer (l'un d'eux suffit), et motifs
+# interdits en présentation (regex grep -E, séparées par des virgules, donc sans virgule dedans).
+# Plusieurs design systems (un module téléphone, un module montre) : ds.imports.<chemin du module> donne ceux
+# d'un module et remplace ds.imports pour lui ; ds.imports reste la valeur des autres. Exemple :
+#   ds.imports = com.example.wear.designsystem.
+#   ds.imports.mobile = com.example.mobile.ui.theme., com.example.designsystem.
+# Une liste unique (ds.imports = a., b.) laisse un écran importer le design system de l'autre appareil.
 ds.imports = com.example.designsystem.
 ds.forbidden = Color\(0x, [^A-Za-z_.][0-9]+(\.[0-9]+)?\.dp, [^A-Za-z_.][0-9]+(\.[0-9]+)?\.sp, FontWeight\.W[0-9], RoundedCornerShape\([0-9]
 # Globs (relatifs au module) exemptés des checks design_system / l10n_strings (le module du thème lui-même).

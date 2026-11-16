@@ -21,8 +21,12 @@ presentation_files() {
     | filter_excluded $(cfg_list ds.exempt | sed "s#^#$PKG_DIR/#" | tr '\n' ' ')
 }
 
+# ds_imports — préfixes de paquet du design system de ce module : ds.imports.<chemin du module> s'il est posé (le
+# module téléphone et le module montre d'un même repo ont chacun le leur), sinon ds.imports.
+ds_imports() { local own; own="$(cfg_list "ds.imports.$PKG_REL")"; if [ -n "$own" ]; then printf '%s\n' "$own"; else cfg_list ds.imports; fi; }
+
 # design_system — pas de valeur visuelle brute dans la présentation (ds.forbidden : Color(0x…), 16.dp, 14.sp…) ;
-# chaque écran (fichier *Screen.kt) importe le design system (ds.imports, préfixes de paquet).
+# chaque écran (fichier *Screen.kt) importe le design system (ds_imports, préfixes de paquet).
 check_design_system() {
   local rc=0 hits files f imports
   files="$(presentation_files)"; [ -n "$files" ] || { info "pas de présentation"; return 0; }
@@ -32,7 +36,7 @@ check_design_system() {
       | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|/\*)' | sed "s#^$PKG_DIR/##" | filter_scope_lines "$PKG_REL/")"
     [ -n "$hits" ] && { printf '%s\n' "$hits" | head -40 | sed 's/^/   ✗ /'; ko "valeurs visuelles en dur : passer par le thème et les tokens du design system"; rc=1; }
   fi
-  imports="$(cfg_list ds.imports)"
+  imports="$(ds_imports)"
   if [ -n "$imports" ]; then
     for f in $(printf '%s\n' "$files" | grep -E 'Screen\.kt$' | sed "s#^$PKG_DIR/##" | filter_scope_files "$PKG_REL/" | sed "s#^#$PKG_DIR/#"); do
       grep -qE "^import ($(printf '%s\n' "$imports" | sed 's/\./\\./g' | paste -sd'|' -))" "$f" \
@@ -148,6 +152,6 @@ check_dedup_candidates() {
   local scope="$GAUNTLET_OUT/scope_root.txt"
   scope_for_tool "" "$scope"
   python3 "$ANDROID_CHECKS_DIR/kotlin_dedup.py" --root "$PROJECT_ROOT" --package "$PKG_DIR" --scope "$scope" \
-    --ignore-names "$(cfg_list dup.ignore_names | paste -sd, -)" --ds-prefix "$(cfg_list ds.imports | paste -sd, -)" \
+    --ignore-names "$(cfg_list dup.ignore_names | paste -sd, -)" --ds-prefix "$(ds_imports | paste -sd, -)" \
     --out "$FEATURE_DIR/dedup_candidates.json"
 }

@@ -186,6 +186,16 @@ printf '\nfun Box() { val c = Color(0xFF00FF00); val p = 16.dp }\n' >> "$P/$K/ui
 run_c design_system login; expect_rc 1 "valeurs visuelles en dur"; expect_out "Color(0xFF00FF00)" "la ligne est nommée"
 reset; printf 'package com.x.login.ui\n\nfun ProfileScreen() = Unit\n' > "$P/$K/ui/ProfileScreen.kt"
 run_c design_system login; expect_rc 1 "un écran sans import du design system"; expect_out "ProfileScreen.kt n'importe pas le design system" "l'écran est nommé"
+# Un module téléphone et son propre design system : ds.imports.<module> remplace ds.imports pour lui.
+printf 'package com.x.login.ui\n\nimport com.x.phone.theme.AppTheme\n\nfun ProfileScreen() = Unit\n' > "$P/$K/ui/ProfileScreen.kt"
+run_c design_system login; expect_rc 1 "le design system d'un autre module ne vaut pas sans ds.imports.<module>"
+cp "$R/.claude/rules/feature_pipeline.md" "$TMP_ROOT/cfg.bak"
+awk '{print} /^ds.imports = /{print "ds.imports.feature/login = com.x.phone.theme."}' "$TMP_ROOT/cfg.bak" > "$R/.claude/rules/feature_pipeline.md"
+sed -i.bak 's#^import com.x.design.AppTheme#import com.x.phone.theme.AppTheme#' "$P/$K/ui/LoginScreen.kt"; rm -f "$P/$K/ui/LoginScreen.kt.bak"
+run_c design_system login; expect_rc 0 "ds.imports.feature/login : le design system du module"
+printf 'package com.x.login.ui\n\nimport com.x.design.AppTheme\n\nfun ProfileScreen() = Unit\n' > "$P/$K/ui/ProfileScreen.kt"
+run_c design_system login; expect_rc 1 "ds.imports.<module> remplace ds.imports : l'autre design system ne vaut plus"; expect_out "ProfileScreen.kt n'importe pas" "l'écran est nommé"
+cp "$TMP_ROOT/cfg.bak" "$R/.claude/rules/feature_pipeline.md"; reset
 reset; printf '\nfun T() { Text("Bonjour tout le monde"); Text(stringResource(R.string.login_title)) }\n' >> "$P/$K/ui/LoginScreen.kt"
 run_c l10n_strings login; expect_rc 1 "chaîne en dur dans Text()"; expect_out "Bonjour" "la chaîne est nommée"
 reset; sed -i.bak 's#</resources>#    <string name="login_error">Erreur</string>\n</resources>#' "$P/src/main/res/values/strings.xml"; rm -f "$P/src/main/res/values/strings.xml.bak"
