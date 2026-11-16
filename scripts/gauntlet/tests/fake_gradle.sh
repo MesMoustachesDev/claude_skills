@@ -3,7 +3,7 @@
 # tâches qualifiées (`:feature:login:testDebugUnitTest`, gradle_run.sh) ; le module est le dossier du chemin.
 # Écrit les mêmes rapports que les vrais outils, d'après des marqueurs dans les sources du module :
 #   compile*          FAKE_COMPILE_ERROR → « e: file:///…:1:1 », exit 1 ; FAKE_DEPRECATED → « w: … is deprecated »
-#   test* (unitaire)  un TEST-<classe>.xml par fichier de src/test (ou par --tests), un cas ; FAKE_FAIL → échec
+#   test* (unitaire)  un TEST-<classe>.xml par fichier de src/test (ou par --tests), un cas ; FAKE_FAIL → échec d'assertion, FAKE_SETUP_FAIL → exception MockK (montage)
 #   lint*             build/reports/lint-results-debug.xml, une issue Warning par ligne FAKE_LINT
 #   ktlintCheck       « /abs/X.kt:N:1 … » par ligne FAKE_FORMAT, exit 1
 #   detekt            build/reports/detekt/detekt.xml, une erreur par ligne FAKE_DETEKT
@@ -36,7 +36,9 @@ for a in "$@"; do
       for f in $(srcs "$mod/src/test"); do
         cls="$(pkg_of "$f")"; cls="${cls:+$cls.}$(basename "${f%.*}")"
         if [ ${#filters[@]} -gt 0 ]; then printf '%s\n' "${filters[@]}" | grep -qxF "$cls" || continue; fi
-        if grep -q FAKE_FAIL "$f"; then
+        if grep -q FAKE_SETUP_FAIL "$f"; then
+          body='<failure message="no answer found for: Repo(#1).load()" type="io.mockk.MockKException">io.mockk.MockKException</failure>'; nf=1; rc=1
+        elif grep -q FAKE_FAIL "$f"; then
           body='<failure message="fake">fake</failure>'; nf=1; rc=1
         else body=''; nf=0; fi
         printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="%s" tests="1" failures="%s" errors="0" skipped="0">\n  <testcase name="%s" classname="%s" time="0.0">%s</testcase>\n</testsuite>\n' \

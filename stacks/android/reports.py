@@ -3,7 +3,8 @@
 
   reports.py junit <dossier de résultats> <dossier du package> <dossier de test>…
       une ligne JSON par test : {file, name, result, skipped}, `file` relatif au package (le fichier source de la
-      classe de test, retrouvé par son paquet et son nom), comme test_results de Flutter.
+      classe de test, retrouvé par son paquet et son nom), comme test_results de Flutter ; un test en échec a
+      aussi {cause: stub|assert|other, message}.
   reports.py coverage <rapport JaCoCo ou Kover XML> <dossier du package> <dossier source>…
       « chemin relatif au package:ligne 0|1 » pour chaque ligne instrumentée (1 = au moins une instruction couverte).
   reports.py lint <lint-results.xml> <dossier du package>
@@ -18,6 +19,7 @@ Les chemins hors du package sont gardés absolus : le check les ignore (hors pé
 import glob
 import json
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -66,14 +68,29 @@ def junit(results, pkg, dirs):
             outer = cls.split("$")[0]
             pk, _, name = outer.rpartition(".")
             f = idx.get((pk, name)) or idx.get(("*", name)) or cls
-            if tc.find("failure") is not None:
-                result = "failure"
-            elif tc.find("error") is not None:
-                result = "error"
-            else:
-                result = "success"
-            print(json.dumps({"file": f, "name": tc.get("name", ""), "result": result,
-                              "skipped": tc.find("skipped") is not None}, ensure_ascii=False))
+            bad, result = tc.find("failure"), "failure"
+            if bad is None:
+                bad, result = tc.find("error"), "error"
+            row = {"file": f, "name": tc.get("name", ""), "result": result if bad is not None else "success",
+                   "skipped": tc.find("skipped") is not None}
+            if bad is not None:
+                row.update(cause(bad))
+            print(json.dumps(row, ensure_ascii=False))
+
+
+def cause(bad):
+    """Raison d'un échec, pour red_check : stub (TODO() → NotImplementedError), assert (échec d'assertion,
+    vérification MockK comprise) ou other (exception du montage). Sans type : assert, rien à juger."""
+    kind = bad.get("type", "")
+    text = "\n".join(filter(None, [kind, bad.get("message", ""), bad.text or ""]))
+    if "NotImplementedError" in text:
+        c = "stub"
+    elif not kind or re.search(r"Assertion|ComparisonFailure|MultipleFailures", kind):
+        c = "assert"
+    else:
+        c = "other"
+    lines = [l for l in (bad.get("message") or bad.text or kind).splitlines() if l.strip()]
+    return {"cause": c, "message": (lines[0] if lines else kind)[:160]}
 
 
 def coverage(report, pkg, dirs):

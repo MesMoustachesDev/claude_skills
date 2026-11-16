@@ -23,17 +23,37 @@ run_tests_json() {
   (cd "$PKG_DIR" && $FLUTTER test --reporter json --no-pub $targets > "$TEST_REPORT" 2>"$GAUNTLET_OUT/test_stderr.log")
 }
 
-# test_results — une ligne JSON par test non caché : {file, name, result, skipped}
+# test_results — une ligne JSON par test non caché : {file, name, result, skipped}, plus pour un test en
+# échec {cause, message} : cause « stub » (un UnimplementedError), « assert » (échec d'assertion, ou finder
+# qui ne trouve pas sa clé : un écran existant que la feature complète) ou « other » (exception du montage :
+# mock sans réponse, fixture qui jette…). Un testWidgets met l'exception dans ses logs (événements print),
+# son événement error dit seulement « Test failed. See exception logs above. » : les deux sont lus.
 test_results() {
   jq -c -s '
     (map(select(.type=="testStart")) | map({key:(.test.id|tostring), value:.test}) | from_entries) as $t
     # The suite path is the test file. A testWidgets url points into flutter_test (widget_tester.dart),
     # its root_url at the file: read the suite first, root_url next, url last.
     | (map(select(.type=="suite")) | map({key:(.suite.id|tostring), value:.suite.path}) | from_entries) as $s
+    | (map(select(.type=="error" or .type=="print")) | group_by(.testID)
+        | map({key:(.[0].testID|tostring),
+               value:{text:(map(.error // .message // "") | join("\n")), failure:any(.[]; .isFailure == true),
+                      first:(map(select(.type=="error") | .error // "" | split("\n")[] | select(test("\\S"))
+                                 | select(test("^Test failed. See exception logs") | not)) | .[0]),
+                      thrown:([map(.message // "" | split("\n")) | add // [] | . as $l
+                               | range(length) | select($l[.] | test("^The following .* was thrown")) | $l[.+1:][]
+                               | select(test("\\S"))] | .[0])}})
+        | from_entries) as $e
     | map(select(.type=="testDone" and (.hidden|not)))
     | map(. as $d | $t[($d.testID|tostring)] as $x
         | {file: (($s[($x.suiteID|tostring)] // $x.root_url // $x.url // "?") | sub("^file://"; "")),
-           name: $x.name, result: $d.result, skipped: $d.skipped})
+           name: $x.name, result: $d.result, skipped: $d.skipped}
+        + (if $d.result == "success" then {}
+           else ($e[($d.testID|tostring)] // {text:"", failure:false}) as $err
+             | {cause: (if ($err.text | test("UnimplementedError")) then "stub"
+                        elif $err.failure or ($err.text | test("Found 0 widgets|could not find any matching widget"))
+                        then "assert" else "other" end),
+                message: (($err.thrown // $err.first // "") | .[0:160])}
+           end))
     | .[]' < <(grep '^{' "$TEST_REPORT") 2>/dev/null | sed "s#\"file\":\"$PKG_DIR/#\"file\":\"#"
   # grep '^{' : the engine may print native log lines on stdout ("Shell: [ERROR:flutter/runtime/…]"),
   # which would make the whole JSON report unreadable.

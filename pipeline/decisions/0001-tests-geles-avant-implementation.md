@@ -1,7 +1,8 @@
 # 0001 — Les tests sont écrits et gelés avant l'implémentation
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-05
-(tests sobres, plus bas) ; amendée par 0009 (liste des tests avant l'écriture)
+(tests sobres, plus bas), le 2026-11-16 (rouge pour la bonne raison) ; amendée par 0009 (liste des
+tests avant l'écriture)
 Où elle vit : `commands/feature.md` (étapes 3, 3b, 4) · `pipeline/feature/steps/3_tests.md` (gel,
 re-gel) · `hooks/pipeline-restrict-writes.sh` · `scripts/gauntlet/checks_test.sh`
 (`red_check`, `test_freeze_check`) · `scripts/pipeline.sh freeze|refreeze`
@@ -52,6 +53,17 @@ elle précise l'étage où le test manquait, pas « à chaque maillon ».
 
 Ces règles agissaient pendant l'écriture et Gaëlle jugeait les doublons une fois écrits : 0009 décide la
 liste des tests avant l'écriture.
+
+## Amendement du 2026-11-16 : rouge pour la bonne raison
+
+`red_check` exigeait un échec par fichier, quelle qu'en soit la cause. Un test qui jette dans son propre
+montage (mock sans réponse, fixture qui jette) passait le gel et ne se voyait qu'à l'étape 4, toujours rouge
+une fois le code écrit. `/fix` vérifiait déjà la raison du rouge (`expected_failure`) ; `/feature` non.
+Désormais chaque test rouge du périmètre doit échouer sur un stub (`UnimplementedError`, `TODO()`) ou sur
+une assertion. Un finder qui ne trouve pas sa clé compte comme une assertion : sur un écran existant que la
+feature complète, c'est le rouge attendu. La stack donne la cause (`test_results` → `cause`) ; un fichier
+accepté par Thibault va dans `pipeline.json → red_accept_error`, avec sa raison, comme `red_accept_green`.
+Mesure à faire : combien de gates `red` ce contrôle refuse, et combien de re-gels `technique` il évite.
 
 ## Hors champ
 

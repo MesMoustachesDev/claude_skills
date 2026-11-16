@@ -241,7 +241,8 @@ run_suite_check() {
   each_test_package test_pkg "aucun test exécuté (ni dans $PKG_REL, ni dans les packages de writes.extra modifiés)"
 }
 
-# red_check — après TEST-WRITER : la suite compile, et chaque fichier de test contient ≥ 1 échec.
+# red_check — après TEST-WRITER : la suite compile, chaque fichier de test contient ≥ 1 échec, et chaque
+# échec vient d'un stub ou d'une assertion, pas du montage du test.
 # Les tests qui passent déjà contre les stubs sont listés (information), pas bloquants.
 # Packages de writes.extra modifiés : chacun est jugé de même ; un package sans fichier de test de la feature
 # ne fait pas échouer, mais il en faut au moins un dans le périmètre, tous packages confondus.
@@ -292,7 +293,25 @@ red_pkg() {
     ko "ces fichiers ne testent rien que les stubs ne satisfassent déjà"
     return 1
   fi
-  info "$total test(s), $(printf '%s\n' "$scoped_files" | wc -l | tr -d ' ') fichier(s) dans le périmètre, rouge dans chacun"
+  # Rouge pour la bonne raison : un test du périmètre échoue sur un stub ou sur une assertion, pas sur son
+  # propre montage (mock sans réponse, clé introuvable, fixture qui jette) — celui-là resterait rouge après
+  # Ivan. La stack donne la cause (test_results → cause) ; sans cause, rien à juger. Fichiers acceptés par
+  # Thibault : pipeline.json → red_accept_error, avec sa raison.
+  local wrong accepted_err
+  wrong="$(test_results | jq -r 'select(.result!="success" and .cause=="other") | "\(.file):0 — \(.name) — \(.message)"' | filter_scope_lines "$PKG_REL/")"
+  accepted_err="$(pipeline_get '.red_accept_error[]?.file')"
+  if [ -n "$wrong" ] && [ -n "$accepted_err" ]; then
+    for f in $(printf '%s\n' "$wrong" | cut -d: -f1 | sort -u | grep -xF -f <(printf '%s\n' "$accepted_err")); do
+      info "rouge hors stub, accepté par Thibault : $f ($(pipeline_get ".red_accept_error[] | select(.file==\"$f\") | .reason"))"
+    done
+    wrong="$(printf '%s\n' "$wrong" | awk -F: 'NR==FNR { a[$0]=1; next } !($1 in a)' <(printf '%s\n' "$accepted_err") -)"
+  fi
+  if [ -n "$wrong" ]; then
+    printf '%s\n' "$wrong" | sed 's/^/  ✗ /; s/:0 —/ —/'
+    ko "ces tests échouent sur leur montage, ni sur un stub ni sur une assertion : ils resteraient rouges une fois le code écrit"
+    return 1
+  fi
+  info "$total test(s), $(printf '%s\n' "$scoped_files" | wc -l | tr -d ' ') fichier(s) dans le périmètre, rouge dans chacun, sur un stub ou une assertion"
 }
 
 # test_names — écrit .claude/features/<f>/tests.md pour le skim du dev. Toujours vert.

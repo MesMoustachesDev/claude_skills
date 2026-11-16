@@ -2,7 +2,8 @@
 # fake_flutter.sh — remplace `flutter` dans les tests du gauntlet.
 #   --version            → une ligne
 #   test --reporter json → un rapport JSON par fichier test/**/*_test.dart du dossier courant, un test par
-#                          fichier ; le test échoue si le fichier contient FAKE_FAIL. Exit 1 si un échec.
+#                          fichier ; le test échoue si le fichier contient FAKE_FAIL (assertion),
+#                          FAKE_STUB_FAIL (UnimplementedError) ou FAKE_SETUP_FAIL (exception du montage). Exit 1 si un échec.
 #                          Des chemins en argument (gauntlet par couche) → ces fichiers seulement.
 #   analyze              → FAKE_ANALYZE_ERROR dans un fichier analysé = erreur de compilation (les chemins en
 #                          argument, sinon lib/ et test/) ; FAKE_ANALYZE_INFO = un lint (info), exit 1
@@ -30,9 +31,14 @@ id=0 rc=0
 while IFS= read -r f; do
   id=$((id+1))
   abs="$PWD/$f"
-  result=success; grep -q FAKE_FAIL "$f" && { result=failure; rc=1; }
+  result=success err=""
+  if grep -q FAKE_SETUP_FAIL "$f"; then result=error rc=1 err='"error":"Bad state: No element","isFailure":false'
+  elif grep -q FAKE_STUB_FAIL "$f"; then result=error rc=1 err='"error":"UnimplementedError","isFailure":false'
+  elif grep -q FAKE_FAIL "$f"; then result=failure rc=1 err='"error":"Expected: <1>\\n  Actual: <0>","isFailure":true'
+  fi
   printf '{"type":"suite","suite":{"id":%d,"path":"%s"}}\n' "$id" "$abs"
   printf '{"type":"testStart","test":{"id":%d,"name":"%s","suiteID":%d,"url":"file://%s"}}\n' "$id" "$(basename "$f" .dart)" "$id" "$abs"
+  [ -n "$err" ] && printf '{"type":"error","testID":%d,%s}\n' "$id" "$err"
   printf '{"type":"testDone","testID":%d,"result":"%s","hidden":false,"skipped":false}\n' "$id" "$result"
 done < <(if [ ${#paths[@]} -gt 0 ]; then printf '%s\n' "${paths[@]}"; else find test -name '*_test.dart' 2>/dev/null | sort; fi)
 exit $rc

@@ -94,6 +94,10 @@ lui, piloter un state holder mocké). Tu ne lances pas l'app.
 
 - **Chaque fichier de test contient au moins un test qui échoue contre les stubs.** Le gate `red_check`
   le vérifie fichier par fichier. Un test qui passe déjà (`initial state`) est toléré mais listé.
+- **Rouge pour la bonne raison.** Chaque test rouge échoue sur un stub (`UnimplementedError`) ou sur une
+  assertion, jamais sur son propre montage (mock sans réponse, fixture qui jette, `first` sur une liste
+  vide) : celui-là resterait rouge une fois le code écrit. `red_check` le refuse en nommant le test et son
+  message ; corrige le montage, pas l'assertion.
 - Edge cases > happy path. Les bugs vivent dans null, vide, erreur réseau, données invalides.
 - **La liste fixe le nombre de tests.** Elle a déjà tranché « un comportement, un étage » (`create_test.md`,
   principes 18 et 19) : à toi de bien écrire chaque test, pas d'en ajouter.
@@ -110,7 +114,7 @@ Thibault, c'est lui qui les complète ; tu reprendras ensuite là où tu t'es ar
 - Tu ne commites rien. L'orchestrateur gèle tes tests après le skim du dev.
 
 **Vérifie toi-même** : `~/.claude/scripts/gauntlet.sh red <feature>`. Le hook de fin te bloque tant
-que la suite ne compile pas ou qu'un fichier est tout vert.
+que la suite ne compile pas, qu'un fichier est tout vert ou qu'un test échoue sur son montage.
 
 ## Ton rapport final
 

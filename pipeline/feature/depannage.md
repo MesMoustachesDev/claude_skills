@@ -52,6 +52,10 @@
 - **Le test-writer ne peut pas écrire dans `test/` d'un package ouvert en `<pkg>/**`.** En place : un
   `<pkg>/**` de `writes.extra` (dossier avec `pubspec.yaml`) compte comme `<pkg>/lib/**` : ses `test/`
   et `pubspec.yaml` sont ouverts au test-writer et au hardener, et ses tests sont gelés pour Ivan et Nina.
+- **`red_check` : « ces tests échouent sur leur montage »** alors que l'échec est voulu (un widget qui jette
+  exprès, une erreur de la plateforme que le test provoque). En place : Thibault l'accepte fichier par
+  fichier dans `pipeline.json → red_accept_error` (`[{file, reason}]`) ; le gate le signale encore, avec
+  la raison. Sinon c'est à Théo de corriger le montage.
 - **`stub_check` / `red_check` rouges sur du code ou des tests d'une passe déjà validée** (rejeu après
   amendement). En place : `pipeline.json → pass_base` (voir « Rejeu » en 0, Préconditions) restreint ces deux gates
   à ce qui a changé depuis. Ne pas `accept` : poser `pass_base`.
