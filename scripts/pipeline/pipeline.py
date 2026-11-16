@@ -979,12 +979,29 @@ def changed_files(c, rel_dir, since):
 
 
 def compute_contract_files(c):
+    """Fichiers du package modifiés depuis la base qui suivent contract_globs, plus ceux que Thibault a édités en
+    mode extend (contracts.edited) : une interface existante hors domain/, un fichier d'events d'un autre package."""
     globs = contract_globs(c)
     top, _ = repo_of(c, c.package)
     since = merge_base(c, top)
     files = [f for d in src_dirs(c, c.package) for f in changed_files(c, f"{c.package}/{d}", since)
              if os.path.isfile(os.path.join(c.root, f))]
-    return sorted({f for f in files if any(fnmatch.fnmatch(f, g) for g in globs)})
+    edited = [f for f in (c.p.get("contracts") or {}).get("edited") or [] if os.path.isfile(os.path.join(c.root, f))]
+    return sorted({f for f in files if any(fnmatch.fnmatch(f, g) for g in globs)} | set(edited))
+
+
+def edited_contracts(c, files):
+    """Mode extend : les fichiers source que Thibault a édités en 1e sont des contrats, même hors contract_globs.
+    Ni manifeste, ni test, ni fichier de la feature (.claude/) ; vide en mode create (tout y suit les globs)."""
+    if c.p.get("mode") != "extend":
+        return []
+    manifests = set(stack_list(c, "manifests", c.package))
+    tests = [t.strip("/") for t in test_dirs(c, c.package)]
+    def is_test(f):
+        return any(f.startswith(t + "/") or f"/{t}/" in f for t in tests)
+    return sorted(f for f in files
+                  if not f.startswith(".claude/") and os.path.basename(f) not in manifests and not is_test(f)
+                  and os.path.isfile(os.path.join(c.root, f)))
 
 
 def cmd_contracts_files(c, args):
@@ -1052,6 +1069,7 @@ def cmd_commit_contracts(c, args):
         files = [f for f in changed_files(c, ".", con["draft_sha"]) if allowed_for_commit(c, f)]
         sha = commit(c, files, f"feat({c.name}): contracts (by Thibault)", allow_empty=True)
         con["sha"] = sha
+        con["edited"] = sorted(set(con.get("edited") or []) | set(edited_contracts(c, files)))
         con["files"] = compute_contract_files(c)
         c.p.setdefault("human_gates", {})["contracts"] = {"at": now(), "by": "user", "sha": sha}
         print(f"contrats de Thibault commités : {sha[:10]} · {len(files)} fichiers modifiés depuis le brouillon")
@@ -1064,6 +1082,7 @@ def cmd_commit_contracts(c, args):
             die(f"hors périmètre de la feature : {', '.join(bad)}")
         sha = commit(c, files, f"feat({c.name}): contracts (by Thibault) — {what}")
         con["sha"] = sha
+        con["edited"] = sorted(set(con.get("edited") or []) | set(edited_contracts(c, files)))
         known = set(con.get("files") or [])
         con["files"] = sorted(known | set(compute_contract_files(c)))
         con.setdefault("reedits", []).append({"at": now(), "sha": sha, "what": what, "files": files})

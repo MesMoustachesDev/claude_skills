@@ -57,7 +57,9 @@ Vert → `pipeline.sh commit-contracts <nom> thibault` : commit `feat(<nom>): co
 des seuls fichiers du package, du manifeste et de `writes.extra` modifiés depuis `draft_sha`, avec
 `--allow-empty` (Thibault peut garder le brouillon tel quel : c'est un choix, et le commit le date),
 puis `contracts.sha`, `contracts.files` recalculé (un fichier de contrat ajouté par Thibault en fait
-partie) et `human_gates.contracts`. Les fichiers de
+partie ; en mode extend, tout fichier source qu'il a édité aussi, même hors `contract_globs` : une
+interface existante hors `domain/`, un fichier d'events d'un autre package — `contracts.edited`) et
+`human_gates.contracts`. Les fichiers de
 `contracts.files` sont désormais la référence : aucun agent ne change une de leurs signatures sans
 lui (Arthur, Théo, Ivan et Nina rapportent un contrat qui ne tient pas, ils ne le contournent pas).
 
