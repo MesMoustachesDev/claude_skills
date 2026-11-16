@@ -142,7 +142,8 @@ Feature: {Feature name}
   Pour chaque I/O appelée par un contrat (canal plateforme, plugin, moteur de rendu), vérifie que la
   signature rend un résultat (`Result<T>` ou le type d'erreur du projet) ; sinon, remonte un bloquant avant d'écrire la spec. (learn 2026-11-03, spec_error_path_without_contract, 2 runs)
   Chaque ligne de §5 cite un fichier de contracts.files et un comportement que sa signature permet. (learn 2026-11-04, spec_contradicts_contracts, 2 runs)
-  Un composant que le harnais d'acceptation remplace par un mock (navigation, ViewModel appelant, service) a son propre test unitaire, nommé dans §5. (learn 2026-11-04, orchestrator_untested_because_mocked_by_consumers, 2 runs)  Pour chaque donnée que la spec lit, nomme la méthode du contrat qui la fournit ; s'il n'y en a pas, c'est un point §9 à trancher avant la spec. (learn 2026-11-04, contract_missing_input_for_mapping, 2 runs)
+  Un composant que le harnais d'acceptation remplace par un mock (navigation, ViewModel appelant, service) a son propre test unitaire, nommé dans §5. (learn 2026-11-04, orchestrator_untested_because_mocked_by_consumers, 2 runs)
+  Pour chaque donnée que la spec lit, nomme la méthode du contrat qui la fournit ; s'il n'y en a pas, c'est un point §9 à trancher avant la spec. (learn 2026-11-04, contract_missing_input_for_mapping, 2 runs)
 -->
 
 | Contrat | Fichier:ligne | Déclare | Sert |

@@ -5,7 +5,8 @@
 
 <fichier> : chemin sous ~/.claude (create_test.md, answers.md, un template, review_grid.md…).
 La ligne s'insère après la première ligne qui contient le texte de --after (la fin de la section visée,
-en pratique sa dernière puce), sinon à la fin du fichier. Puis `git commit` de ce seul fichier, dans
+en pratique sa dernière puce) et ses lignes de suite (plus indentées : une puce sur plusieurs lignes ne
+se coupe pas), sinon à la fin du fichier. Puis `git commit` de ce seul fichier, dans
 ~/.claude. Refuse un fichier qui a déjà des changements non commités : ils sont à quelqu'un d'autre.
 
 C'est le seul chemin d'une règle de learn (9b) ou d'une réponse de Thibault vers ~/.claude : le hook
@@ -22,6 +23,22 @@ HOME = Path.home() / '.claude'
 
 def git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(['git', '-C', str(HOME), *args], capture_output=True, text=True)
+
+
+def indent(l: str) -> int:
+    return len(l) - len(l.lstrip(' \t'))
+
+
+def insert_at(lines: list[str], after: str) -> int:
+    """Index où insérer : après la ligne qui contient `after` et ses lignes de suite, sinon la fin."""
+    at = next((i for i, l in enumerate(lines) if after and after in l), None)
+    if at is None:
+        return len(lines)
+    depth = indent(lines[at])
+    at += 1
+    while at < len(lines) and lines[at].strip() and indent(lines[at]) > depth:
+        at += 1
+    return at
 
 
 def main() -> int:
@@ -48,7 +65,7 @@ def main() -> int:
     if any(l.rstrip('\n') == line for l in lines):
         print(f'déjà là : {rel}')
         return 0
-    at = next((i + 1 for i, l in enumerate(lines) if args.after and args.after in l), len(lines))
+    at = insert_at(lines, args.after)
     if at == len(lines) and lines and not lines[-1].endswith('\n'):
         lines[-1] += '\n'
     lines.insert(at, line + '\n')
