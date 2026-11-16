@@ -969,8 +969,12 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
              "tour": "tour", "mutants": "tour" if has_tour else "mutants", "qa": "tour" if has_tour else "qa",
              "evidence": "tour" if has_tour else "scenarios"}
     page = Page(f"{name} · feature", first.get(focus or "", focus))
-    has_code = os.path.isdir(os.path.join(root, pkg_rel, "lib"))
-    has_tests = os.path.isdir(os.path.join(root, pkg_rel, "test")) and bool(state.get("tests_freeze_sha")
+    # Dossiers du langage (stack.ini → src_dirs, test_dirs) : lib/ et test/ pour Flutter, src/main et src/test
+    # pour un module Android ; un module sans lib/ n'avait pas de section contrats en 1e.
+    has_dir = lambda rel, key: any(os.path.isdir(os.path.join(root, rel, d))
+                                   for d in stacklib.get_list(key, os.path.join(root, rel)))
+    has_code = has_dir(pkg_rel, "src_dirs")
+    has_tests = has_dir(pkg_rel, "test_dirs") and bool(state.get("tests_freeze_sha")
                                                                             or (state.get("stages") or {}).get("red"))
 
     # Cadrage : ce qui va être fait, avec une séquence par comportement
@@ -1005,7 +1009,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     # Scénarios d'acceptation : ce qui sera testé
     inv_rows, feat_scen = test_inventory(root, pkg_rel) if has_code else ([], [])
     for ap in accept_pkgs[1:]:
-        if has_code and os.path.isdir(os.path.join(root, ap, "test")):
+        if has_code and has_dir(ap, "test_dirs"):
             feat_scen = list(feat_scen) + list(test_inventory(root, ap)[1])
     picks = [{"title": m.get("scenario"), "kind": m.get("kind"), "fr": m.get("fr")} for m in mapping]
     sc_html, sc_badge = scenarios_section(secs.get("4"), picks, {norm(x) for x in feat_scen} if feat_scen else None)
@@ -1028,7 +1032,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
         page.add("tour", "Visite guidée du code", t_html, t_badge)
 
     # Tests
-    if has_code and os.path.isdir(os.path.join(root, pkg_rel, "test")):
+    if has_code and has_dir(pkg_rel, "test_dirs"):
         rows = inv_rows
         scen = spec_scenarios(secs.get("4", ""))
         have = {norm(s) for s in feat_scen}
