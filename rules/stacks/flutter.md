@@ -101,6 +101,7 @@ autre use case, rend `Either<ErrorEntity, T>` : un `Future<void>` sur une telle 
 - Passe à un composant du design system (wrapperSize, iconSize) le token Spaces qui existe, comme les features voisines, jamais une taille brute. (learn 2026-11-10, raw_size_bypasses_ds_token, 2 runs)
 - Dans un BLoC, un `add(...)` interne qui suit un `await` (dans un handler ou une méthode qu'il appelle) est précédé de `if (isClosed) return;` : la DI (provider autoDispose) peut fermer le bloc pendant l'attente, et `add` sur un bloc fermé lève un `StateError` que personne n'intercepte (crash fatal). Plus largement, revérifie après chaque `await` toute condition vérifiée avant. (learn 2026-11-12, guard_not_rechecked_after_await, 5 runs)
 - Avant d'écrire une traduction dans un ARB, relève le registre de ce fichier dans les clés voisines (tu/vous, tú/usted, tu/Lei, accents présents ou non) et aligne le nouveau texte dessus ; si le texte validé impose un autre registre, signale-le à la revue comme écart, avec les clés voisines à harmoniser. (learn 2026-11-13, l10n-register, 2 runs)
+- Quand tu supprimes le dernier usage d'une clé l10n, d'un use case ou d'un provider, retire-les aussi dans le même changement (ARB et régénération, DI) ; hors du périmètre validé, demande-le comme écart au lieu de les laisser en dette. (learn 2026-11-16, dead_l10n_key_after_last_use, 2 runs)
 
 ## Spec (Sophie, Camille)
 
