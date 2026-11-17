@@ -1,7 +1,7 @@
 # 0003 — Le gauntlet est le seul juge d'une étape
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-10
-(trous du gauntlet, plus bas)
+(trous du gauntlet, plus bas) et le 2026-11-17 (checks d'avertissement, plus bas)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
 (gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`) · `commands/feature.md`
 (« Le script décide, pas l'agent, pas toi »)
@@ -52,3 +52,12 @@ Des règles d'`answers.md` laissaient l'orchestrateur accepter un gate rouge san
 - `metrics` est le premier fermé : le check mesure la fonction à la merge-base et ne laisse passer, en
   dette signalée, que celle qui était déjà hors seuil et n'a pas empiré (`metrics_ratchet`).
   `metrics_accepted` reste pour une acceptation de Thibault.
+
+## Amendement du 2026-11-17 : les checks d'avertissement
+
+Une faille que la revue relève plusieurs fois mais qu'un script ne reconnaît qu'à peu près (motif de code,
+pas preuve) devient un check d'avertissement : il sort en `[WARN] fichier:ligne` et rend toujours vert. Il ne
+change aucun verdict ; il met le cas sous les yeux du reviewer, qui tranche. Premier du genre :
+`server_fetch_redirect` (`scripts/gauntlet/checks_security.sh`, `fix_gauntlet.sh`), dans les profils `green`
+de `/feature` et `/fix` : `fetch()` serveur sur une URL non constante qui suit les redirections (SSRF).
+Comme tout check, il sort en `[N/A]` quand il n'a rien à lire (aucun fichier JS/TS), jamais en vert.

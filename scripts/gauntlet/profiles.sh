@@ -21,7 +21,7 @@ profile_checks() {
     test_plan)    echo "test_plan" ;;
     # format/no_secrets/test_hygiene sur test/ AVANT le gel : après, chaque correction coûte un re-gel.
     red)       echo "build_runner analyze format:test no_secrets:test test_hygiene red_check test_plan_match test_names test_dups" ;;
-    green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict" ;;
+    green)     echo "test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict server_fetch_redirect" ;;
     # Moitiés parallèles des étapes 3 et 4 (gauntlet.sh pose GAUNTLET_LAYER d'après le suffixe) : chaque
     # check ne juge que la couche. build_runner seulement côté présentation (bdd_widget_test) : deux
     # build_runner en même temps sur le même package se marchent dessus. tests.md s'écrit au gate complet.
@@ -52,7 +52,8 @@ Profils (étape → checks) :
   dedup      dedup_report           (hook de l'agent feature-dedup ; le verdict est lu par l'orchestrateur : dedup_verdict)
   red        build_runner analyze format:test no_secrets:test test_hygiene red_check test_names test_dups
   tests_review  tests_review_report (hook du test-reviewer ; verdict : tests_review_verdict)
-  green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict
+  green      test analyze format no_stubs no_temp_markers deps error_handling test_freeze_check:strict server_fetch_redirect
+             (server_fetch_redirect : [WARN] seulement, jamais bloquant)
   red_data, red_presentation, green_data, green_presentation
              moitiés parallèles des étapes 3 et 4 : mêmes checks que red / green (sans test_names ; build_runner
              côté présentation seulement), jugés sur la couche (data = lib|test/src/{data,domain,injection},

@@ -46,6 +46,8 @@ pas un détail) ; les autres devraient déjà être verts après Nina — s'ils 
 aussi. Les `[WARN]` (packages préexistants vieillissants) → `dependencies` (si la feature ne les a
 pas ajoutés, c'est de la dette : jamais une suggestion), avec le nom du package et la date de
 dernière release. Ne refais pas à la main ce que le script a déjà mesuré.
+Les `[WARN]` de `last_green.log` (checks d'avertissement, ADR 0003, ex. `server_fetch_redirect`) sont des
+motifs, pas des preuves : chacun est tranché — `critical` s'il est réel, écarté sinon avec sa raison.
 
 **2. Le référentiel.** Les contrats de Thibault (les fichiers de `contracts.files`, à `contracts.sha`), `spec.md` §7
 (erreurs), §8 (archi, dépendances), §9 (package et dépendances).

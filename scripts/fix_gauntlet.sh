@@ -26,7 +26,7 @@ profile_checks() {
   case "$1" in
     red)            echo "repro_schema only_tests_changed no_debug_markers target_red" ;;
     repro_report)   echo "repro_schema no_debug_markers" ;;
-    green)          echo "repro_schema freeze_check source_changed no_debug_markers target_green suite_green lint conventions" ;;
+    green)          echo "repro_schema freeze_check source_changed no_debug_markers target_green suite_green lint conventions server_fetch_redirect" ;;
     review_report)  echo "review_report" ;;
     review_verdict) echo "review_verdict" ;;
     *) echo "" ;;
@@ -38,7 +38,8 @@ profiles_list() {
 Profils :
   red             après le REPRODUCER : seuls des tests ont changé, le test cible échoue avec expected_failure
   repro_report    reproducer en arbitrage : repro.json valide, pas de log de debug oublié
-  green           après l'IMPLEMENTER : gel intact, du code a changé, cible verte, suite verte, lint
+  green           après l'IMPLEMENTER : gel intact, du code a changé, cible verte, suite verte, lint, conventions,
+                  server_fetch_redirect ([WARN] seulement)
   (device_red / device_green ne sont dans aucun profil : l'orchestrateur les lance lui-même, jamais un hook.
    Ils tournent sur le simulateur du fix, cloné du modèle ios.simulator_base (sim.sh ensure fix-<nom>) :
    pas de go du dev. Sans ios.simulator_base, ou avec FIX_SIM_UDID pointé sur le modèle ou un appareil
@@ -59,6 +60,9 @@ Checks :
   conventions        design_system + l10n_strings du gauntlet feature sur les lignes modifiées de chaque package touché
                      ([N/A] sans .claude/rules/feature_pipeline.md)
                      Un check qui n'a rien pu vérifier sort en [N/A] (not_applicable du JSON), jamais vert (ADR 0011).
+  server_fetch_redirect  fetch() serveur JS/TS, URL non constante, sans redirect: 'manual' | 'error', dans les
+                     fichiers modifiés hors tests depuis base_sha : [WARN] fichier:ligne, jamais bloquant ;
+                     aucun fichier JS/TS modifié → [N/A]
   device_red         device_repro.cmd (le parcours du signalement, sur device) échoue avec device_repro.expected_failure
   device_green       device_repro.cmd passe
                      (les deux sautés seulement si device_repro.not_applicable donne une raison ; la commande
@@ -306,6 +310,19 @@ check_conventions() {
     done
   done <<< "$pkgs"
   return $rc
+}
+
+# Heuristique : sort en [WARN] fichier:ligne et rend toujours vert (gauntlet/fetch_redirect.py).
+check_server_fetch_redirect() {
+  local base files out
+  base="$(state_get .base_sha)"
+  [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }
+  files="$(changed_since "$base" | while IFS= read -r f; do is_test_path "$f" || printf '%s\n' "$f"; done | grep -E '\.[cm]?[jt]s$')"
+  [ -n "$files" ] || { info "aucun fichier JS/TS modifié hors tests"; return "$NA_RC"; }
+  # shellcheck disable=SC2086
+  out="$(python3 "$SCRIPTS/gauntlet/fetch_redirect.py" "$PROJECT_ROOT" $files)"
+  [ -n "$out" ] && printf '%s\n' "$out" || info "aucun fetch() serveur qui suit les redirections d'une URL non constante"
+  return 0
 }
 
 check_review_report() {

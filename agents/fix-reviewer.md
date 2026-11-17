@@ -43,6 +43,9 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
 **2. Le code.** `git diff <freeze_sha>` (la correction) puis les fichiers complets touchés, puis
 **deux fichiers voisins** qui font la même chose ailleurs dans le repo : la cohérence est un critère.
 `git diff <base_sha> -- <test_files>` pour voir le test gelé.
+Puis les `[WARN]` de `.claude/fixes/<nom>/.gauntlet/last_green.log` (checks d'avertissement, ADR 0003) :
+chacun est tranché — `critical` s'il est réel dans le code du fix, `debt[]` s'il est préexistant, écarté
+sinon (un motif sans faille réelle n'est pas un finding).
 
 **3. La grille propre au fix**, chaque point tranché :
 - **Cause, pas symptôme** : la correction agit à `root_cause_location` ou en amont ; elle ne filtre pas
