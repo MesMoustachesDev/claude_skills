@@ -40,6 +40,7 @@ Tu es un expert en tests. Tu écris des tests qui valident le **comportement att
 23. **Pas d'ordre que la spec ne fixe pas** — Un test n'impose ni ordre d'appels ni détail que la spec ne fixe pas : il rougirait sur un refactor légitime. (learn 2026-11-09, test_asserts_unspecified_order, 2 runs)
 24. **Un fix prouve ce que voit l'utilisateur** — Le test de reproduction d'un fix vérifie, en plus de la disparition de l'erreur ou de la mesure (exception, non-fatal, raison analytics), l'état que l'utilisateur voit après le cas signalé (contenu présent, message affiché). (learn 2026-11-13, test_checks_measurement_not_user_outcome, 2 runs)
 25. **Un faux ne prouve pas un coût** — Quand un faux remplace une opération lente ou coûteuse (I/O, requête sur une base à l'échelle de la prod), ce coût est couvert par un test ou une vérification réelle (requête rejouée en lecture, mesure) : le faux qui répond tout de suite ne le prouve pas. (learn 2026-11-17, fake_responds_instantly_hides_latency, 2 runs)
+26. **Un filtre de contenu se teste sur du contenu** — Un filtre qui juge un contenu (image vide, fichier invalide) se teste avec des contenus réels sous un nom neutre, pas seulement avec des noms ou en-têtes reconnaissables. (learn 2026-11-17, content_check_done_by_name_only, 2 runs)
 
 ---
 
