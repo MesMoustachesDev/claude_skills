@@ -7,6 +7,7 @@ import { cadrageGherkin, specGherkin } from '../hooks/gherkin'
 import { parseState } from '../hooks/model'
 import { MAX_DOC, contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
 import { ago, discussionFallback, parseRecap, progress, sinceLines } from '../hooks/recap'
+import { isThibaultPrompt, parseSeen, seenFile } from '../hooks/seen'
 
 const ROOT = '/repo'
 const PIPELINE = JSON.stringify({
@@ -751,4 +752,23 @@ test('recap : ce qui a bougé depuis le dernier passage, avancement, durée', ()
   expect(ago(2 * 86_400_000)).toBe('il y a 2 j')
   expect(ago(3 * 3_600_000)).toBe('il y a 3 h')
   expect(ago(5 * 60_000)).toBe('il y a 5 min')
+})
+
+test('passage : seul ce que Thibault fait lui-même compte', () => {
+  expect(isThibaultPrompt({ origin: { kind: 'composer' } })).toBe(true)
+  expect(isThibaultPrompt({ origin: { kind: 'bridge' } })).toBe(true)
+  expect(isThibaultPrompt({ origin: { kind: 'sdk' } })).toBe(true)
+  expect(isThibaultPrompt({ origin: { kind: 'composer' }, isMeta: true })).toBe(false)
+  for (const kind of ['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'plugin', 'unclassified']) {
+    expect(isThibaultPrompt({ origin: { kind } })).toBe(false)
+  }
+  expect(isThibaultPrompt({})).toBe(false)
+})
+
+test('passage : un fichier par repo et par feature, illisible = aucun passage', () => {
+  expect(seenFile('/a', '/Users/t/work/app', 'feat')).toBe('/a/seen/_Users_t_work_app__feat.json')
+  expect(parseSeen('{"at":5}')).toBe(5)
+  expect(parseSeen('oops')).toBeNull()
+  expect(parseSeen('{"at":"5"}')).toBeNull()
+  expect(parseSeen('')).toBeNull()
 })

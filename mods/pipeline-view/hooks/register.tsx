@@ -33,6 +33,7 @@ import {
   summarize,
 } from './plan'
 import { type Scenario, type Step, cadrageGherkin, parseScenarios, specGherkin } from './gherkin'
+import { isThibaultPrompt, seenFile } from './seen'
 import { contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
@@ -167,6 +168,14 @@ let confirmed = { key: '', at: 0 }
 let home = ''
 let mine: SessionActivity | null = null
 const activityDir = () => `${home}/.claude/activity`
+/** Le fichier du dernier passage de Thibault sur la feature de cette session, vide hors d'une feature. */
+let seenPath = ''
+
+/** Thibault est passé : la ligne « Depuis » repart de maintenant. */
+const markSeen = async ($: EngineInterface): Promise<void> => {
+  if (!home || !seenPath) return
+  await $.fs.write(seenPath, JSON.stringify({ at: await $.clock.now() })).catch(() => undefined)
+}
 
 const titleOf = ($: EngineInterface, session: string): Promise<string> =>
   $.process
@@ -468,6 +477,8 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   if (!where) return null
   const dir = `${root}/.claude/${FOLDER[where.kind]}/${where.name}`
   const file = `${dir}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
+  const main = (await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).replace(/\/\.git\/?$/, '')
+  seenPath = where.kind === 'feature' && main ? seenFile(activityDir(), main, where.name) : ''
   const config = await readText($, `${root}/.claude/rules/feature_pipeline.md`)
   const text = await readText($, file)
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
@@ -658,7 +669,7 @@ export const register: Register = on => {
     home = (await $.env.get('HOME').catch(() => undefined)) ?? ''
     const session = await $.session.id().catch(() => '')
     if (home && session) {
-      await $.process.run(['mkdir', '-p', activityDir()], { timeoutMs: 5000 }).catch(() => undefined)
+      await $.process.run(['mkdir', '-p', `${activityDir()}/seen`], { timeoutMs: 5000 }).catch(() => undefined)
       mine = { session, cwd: e.cwd, title: await titleOf($, session), state: 'idle', at: 0, percent: -1, waitingOn: '' }
       await publish($, 'idle', '', true)
     }
@@ -727,6 +738,7 @@ export const register: Register = on => {
       }
     }
     const sent = await next(e)
+    if (isThibaultPrompt(e) && sent.drop === undefined) await markSeen($)
     await publish($, 'working')
 
     return sent
@@ -772,7 +784,10 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     // L'outil dont la permission attendait a tourné : elle est donnée (ou refusée), le tour reprend.
     const settled = async (ran: Awaited<ReturnType<typeof next>>) => {
-      if (mine?.state === 'waiting' && mine.waitingOn === String(e.tool)) await publish($, 'working')
+      if (mine?.state === 'waiting' && mine.waitingOn === String(e.tool)) {
+        if (ran.deny === undefined) await markSeen($)
+        await publish($, 'working')
+      }
 
       return ran
     }
@@ -809,7 +824,10 @@ export const register: Register = on => {
     await refresh($)
     await refreshPlans($)
     try {
-      return await next(e)
+      const answered = await next(e)
+      if (answered.deny === undefined && answered.isError !== true) await markSeen($)
+
+      return answered
     } finally {
       await update($, isAsking, () => false)
       await publish($, 'working')
