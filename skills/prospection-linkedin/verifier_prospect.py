@@ -2,7 +2,9 @@
 """Vérifie un prospect proposé par le modèle avant toute écriture (Notion, The Engine).
 
 Usage : verifier_prospect.py prospect.json   (ou - pour stdin)
-JSON : {name, linkedin_url, company, role, signal: {type, date, url, line}, message, relance}
+JSON : {name, linkedin_url, company, role, signal: {type, date, url, line[, fin]}, message, relance}
+signal.type : offre, levee (web, 14 jours), freelance (post FreelanceMention de 21 à 90 jours),
+fin_mission (post FreelanceMention, avec fin = fin estimée de la mission dans les 30 prochains jours).
 Sortie : ERREUR (refus, code 1) et ATTENTION (à juger, code 0).
 """
 import json
@@ -11,14 +13,20 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
-from local_config import lire_clients
+from importer_relations import EXCLUS, _contient
+from local_config import lire_clients, normaliser
 
 ICI = Path(__file__).resolve().parent
 VERIFIER_ECRIRE = ICI.parent / "ecrire-linkedin" / "verifier.py"
 CLES = ("name", "linkedin_url", "company", "role", "signal", "message", "relance")
 CLES_SIGNAL = ("type", "date", "url", "line")
-MAX_MESSAGE, MAX_RELANCE, MAX_AGE_JOURS = 400, 300, 14
+MAX_MESSAGE, MAX_RELANCE = 400, 300
+# type de signal -> (âge minimum, âge maximum) en jours. Une mission FM de moins de 21 jours reste à mission-linkedin.
+AGES = {"offre": (0, 14), "levee": (0, 14), "freelance": (21, 90), "fin_mission": (0, 180)}
+TYPES_FM = ("freelance", "fin_mission")
+FIN_MAX_JOURS = 30
 
 
 def _verifier_texte(texte: str, verifier_py: Path) -> tuple[list[str], list[str]]:
@@ -42,18 +50,34 @@ def verifier(prospect: dict, aujourd_hui: date, clients: list[str], verifier_py:
     if manquantes:
         return [f"clés manquantes : {', '.join(manquantes)}"], []
 
-    if not re.fullmatch(r"https://linkedin\.com/in/[a-z0-9-]+", prospect["linkedin_url"]):
+    if not re.fullmatch(r"https://linkedin\.com/in/(?:[a-z0-9-]|%[0-9a-f]{2})+", prospect["linkedin_url"]):
         erreurs.append(f"linkedin_url n'est pas un profil canonique : {prospect['linkedin_url']}")
-    if signal["type"] not in ("offre", "levee"):
-        erreurs.append(f"signal.type doit valoir offre ou levee : {signal['type']}")
-    try:
-        age = (aujourd_hui - date.fromisoformat(signal["date"])).days
-        if age < 0 or age > MAX_AGE_JOURS:
-            erreurs.append(f"signal.date hors des {MAX_AGE_JOURS} derniers jours : {signal['date']}")
-    except ValueError:
-        erreurs.append(f"signal.date n'est pas une date ISO : {signal['date']}")
+    if _contient(normaliser(prospect["role"]), EXCLUS):
+        erreurs.append(f"role : pas un décideur ({prospect['role']})")
+    type_ = signal["type"]
+    if type_ not in AGES:
+        erreurs.append(f"signal.type doit valoir {', '.join(AGES)} : {type_}")
+    else:
+        mini, maxi = AGES[type_]
+        try:
+            age = (aujourd_hui - date.fromisoformat(signal["date"])).days
+            if age < mini or age > maxi:
+                erreurs.append(f"signal.date hors de la fenêtre {type_} ({mini} à {maxi} jours) : {signal['date']}")
+        except ValueError:
+            erreurs.append(f"signal.date n'est pas une date ISO : {signal['date']}")
     if not re.match(r"^https?://", signal["url"]):
         erreurs.append(f"signal.url n'est pas une URL : {signal['url']}")
+    elif type_ in TYPES_FM:
+        hote = urlparse(signal["url"]).netloc.lower()
+        if hote != "linkedin.com" and not hote.endswith(".linkedin.com"):
+            erreurs.append(f"signal.url d'un signal {type_} doit être le post LinkedIn : {signal['url']}")
+    if type_ == "fin_mission":
+        try:
+            reste = (date.fromisoformat(str(signal.get("fin", ""))) - aujourd_hui).days
+            if reste < 0 or reste > FIN_MAX_JOURS:
+                erreurs.append(f"signal.fin hors des {FIN_MAX_JOURS} prochains jours : {signal['fin']}")
+        except ValueError:
+            erreurs.append(f"signal.fin manquante ou pas une date ISO : {signal.get('fin')}")
     if len(prospect["message"]) > MAX_MESSAGE:
         erreurs.append(f"message trop long : {len(prospect['message'])} caractères (max {MAX_MESSAGE})")
     if len(prospect["relance"]) > MAX_RELANCE:

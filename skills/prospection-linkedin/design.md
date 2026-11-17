@@ -115,6 +115,27 @@ Fiches « Missions » avec `Détectée le` = hier ou aujourd'hui, `Score` entre 
 Une ligne chacune : titre, entreprise, score et raison, lien du post. Aucun brouillon : si Thibault en veut
 une, il relance `mission-linkedin` ou le dit dans la session.
 
+### 4.4b Signaux FreelanceMention (ajout du 2026-11-17)
+
+Constat qui l'a motivé : sur 90 jours, une recherche FM android, kotlin, flutter, jetpack compose et wear os
+renvoie 198 missions, 45 en client direct, une dizaine vraiment utilisables (dev Android ou Flutter, France,
+vrai client), la moitié en Android. La vue `top_recruiters` par entreprise en montrait 4, parce que la
+plupart des posts n'ont pas de `company`. Le drapeau client direct se trompe parfois (une ESN, un
+« intercontrat »), d'où le filtre en plus du skill.
+
+- **Recoupement** des offres et levées : une boîte qui a publié une mission freelance prend des
+  freelances ; elle passe devant, et l'auteur du post, s'il n'est pas RH, est le décideur.
+- **`freelance`** : mission mobile en client direct, publiée il y a 21 à 90 jours. En dessous, c'est à
+  `mission-linkedin` ; la mission est sans doute pourvue, la boîte reste un client du mobile en freelance.
+- **`fin_mission`** : la durée annoncée donne une fin dans les 30 jours ; on écrit au moment où la boîte
+  décide de renouveler ou de changer.
+- **Relations** : la mission récente de la boîte d'une relation est citée dans la question, et peut l'être
+  dans le brouillon (fait public, pas un souvenir).
+- **Veille de secours** : les missions mobiles FM d'hier qui ne sont pas dans Missions sont listées (n8n
+  en panne ou alertes trop étroites).
+- **Le lundi** : une ligne de marché (`market_stats`) et jusqu'à 3 recruteurs Android ou Flutter à suivre ;
+  `follow_recruiter` seulement sur un « suis <nom> » de Thibault.
+
 ### 4.5 Rendu
 
 Trois blocs, chacun « rien » s'il est vide :
@@ -165,8 +186,11 @@ Rendu : une ligne par prospect (fiche, import, variables), une ligne sur l'état
 `verifier_prospect.py` lit un JSON `{name, linkedin_url, company, role, signal: {type, date, url, line},
 message, relance}` et refuse (code 1, raison) si :
 - `linkedin_url` n'est pas `https://linkedin.com/in/<slug>` canonique ;
-- `signal.type` n'est pas `offre` ou `levee` ; `signal.date` n'est pas une date ISO dans les 14 derniers
-  jours ; `signal.url` n'est pas une URL http(s) ;
+- `role` contient un mot de recrutement ou de RH (même liste que l'import des relations) ;
+- `signal.type` n'est pas `offre`, `levee`, `freelance` ou `fin_mission` ; `signal.date` n'est pas une date
+  ISO dans la fenêtre du type (0 à 14 jours pour `offre` et `levee`, 21 à 90 pour `freelance`, 0 à 180 pour
+  `fin_mission`) ; `signal.url` n'est pas une URL http(s), ou pas un post LinkedIn pour les deux types FM ;
+  pour `fin_mission`, `signal.fin` n'est pas une date dans les 30 prochains jours ;
 - `message` dépasse 400 caractères ou `relance` 300 ;
 - `verifier.py message` d'`ecrire-linkedin` renvoie une ERREUR sur l'un des deux textes ;
 - un nom de `~/.claude-local/clients.txt` apparaît dans un texte.
