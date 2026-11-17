@@ -140,6 +140,8 @@ Amendé le 2026-11-17 après le premier essai à blanc :
   jours) n'écarte plus un signal sur sa boîte ; elle en devient le prospect, et la passe 2 met sa fiche à
   jour au lieu d'en créer une. L'essai avait écarté une boîte qui recrutait un Android et prenait des
   freelances, parce que son CTO était déjà en fiche sans avoir jamais reçu de message.
+  Un lead existant ne passe pas par la séquence The Engine, qui commence par une invitation et ne marche
+  pas pour quelqu'un que Thibault a déjà : son message va dans la Boîte LinkedIn et Thibault l'envoie.
 - **Trouver une personne** passe par `search_people` de The Engine : la recherche web refuse les
   recherches par nom. Le `profile_id` du post FM identifie l'auteur sans homonyme.
 - **Entreprise non nommée** : un post FM sans `company` garde son prospect si l'auteur est un décideur ;
