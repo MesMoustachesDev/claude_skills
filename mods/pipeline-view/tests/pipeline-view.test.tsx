@@ -577,7 +577,7 @@ const readingEngine = (
   on: Parameters<Parameters<typeof test>[1]>[1],
   files: Record<string, string>,
   opens: string[] = [],
-  branch = 'feature/two_factor_login',
+  branch: string | (() => string) = 'feature/two_factor_login',
 ) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -592,7 +592,9 @@ const readingEngine = (
       : argv.includes('rev-parse')
         ? ROOT
         : argv.includes('branch')
-          ? branch
+          ? typeof branch === 'string'
+            ? branch
+            : branch()
           : ''
 
     return { value: { exitCode: code, stdout: out, stderr: code ? 'No application knows how to open' : '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -754,7 +756,9 @@ test('recap : ce qui a bougé depuis le dernier passage, avancement, durée', ()
   expect(sinceLines(broken, null)).toHaveLength(3)
   expect(sinceLines(broken, null)).not.toContain('review ✓ (Romain)')
   const four = { ...snap, stages: [...snap.stages, { key: 'clean', label: 'clean', status: 'SKIPPED', attempts: 0, at: '' }] }
-  expect(progress(four)).toBe('2/3')
+  // Le dénominateur est tout le pipeline, pas les étapes déjà écrites : 15 étapes, une sautée.
+  expect(progress(four)).toBe('2/14')
+  expect(progress(snap)).toBe('2/15')
   expect(ago(2 * 86_400_000)).toBe('il y a 2 j')
   expect(ago(3 * 3_600_000)).toBe('il y a 3 h')
   expect(ago(5 * 60_000)).toBe('il y a 5 min')
@@ -763,7 +767,9 @@ test('recap : ce qui a bougé depuis le dernier passage, avancement, durée', ()
 test('passage : seul ce que Thibault fait lui-même compte', () => {
   expect(isThibaultPrompt({ origin: { kind: 'composer' } })).toBe(true)
   expect(isThibaultPrompt({ origin: { kind: 'bridge' } })).toBe(true)
-  expect(isThibaultPrompt({ origin: { kind: 'sdk' } })).toBe(true)
+  expect(isThibaultPrompt({ origin: { kind: 'human' } })).toBe(true)
+  // L'app desktop marque les messages tapés `human` ; `sdk` n'est pas une preuve que Thibault a écrit.
+  expect(isThibaultPrompt({ origin: { kind: 'sdk' } })).toBe(false)
   expect(isThibaultPrompt({ origin: { kind: 'composer' }, isMeta: true })).toBe(false)
   for (const kind of ['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'plugin', 'unclassified']) {
     expect(isThibaultPrompt({ origin: { kind } })).toBe(false)
@@ -788,7 +794,11 @@ const RECAP_NOW = Date.parse('2026-10-08T00:00:00Z')
 const SEEN = '/home/.claude/activity/seen/_repo__two_factor_login.json'
 const withRecap = (stage: string) => JSON.stringify({ ...JSON.parse(WAITING), recap: { ...RECAP, at: '2026-10-07T00:00:00Z', stage } })
 
-const recapEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>, branch = 'feature/two_factor_login') => {
+const recapEngine = (
+  on: Parameters<Parameters<typeof test>[1]>[1],
+  files: Record<string, string>,
+  branch: string | (() => string) = 'feature/two_factor_login',
+) => {
   readingEngine(on, files, [], branch)
   on('env.get', () => ({ value: '/home' }))
   on('clock.now', () => ({ value: RECAP_NOW }))
@@ -806,7 +816,7 @@ test('reprendre le fil : but, étape, attente, ce qui a bougé depuis le dernier
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await textOf(ui, /^Reprendre le fil/)).toBe('Reprendre le fil · two_factor_login · vu il y a 2 j')
   expect(await textOf(ui, /^But/)).toBe('But      Se connecter avec un second facteur')
-  expect(await textOf(ui, /^Étape/)).toBe('Étape    1 — Spec, critique, point d’étape « spec » (Sophie) · 2/3')
+  expect(await textOf(ui, /^Étape/)).toBe('Étape    1 — Spec, critique, point d’étape « spec » (Sophie) · 2/15')
   expect(await textOf(ui, /^T'attend/)).toBe("T'attend Valide la spec")
   expect(await textOf(ui, /^Depuis/)).toBe('Depuis   impl (vert) ✗ (Ivan)')
   expect(await textOf(ui, /^Décidé/)).toBe('Décidé   • code par SMS')
@@ -857,6 +867,25 @@ test('reprendre le fil : un message de Thibault remet « Depuis » à zéro, un 
   expect(writes[SEEN]).toBeUndefined()
   await $.prompt.submit({ text: 'on reprend', origin: { kind: 'composer' } } as never)
   expect(writes[SEEN]).toBe(JSON.stringify({ at: RECAP_NOW }))
+})
+
+test('reprendre le fil : une session qui a quitté la feature n’écrit plus son passage', async ($, on) => {
+  const writes: Record<string, string> = {}
+  let branch = 'feature/two_factor_login'
+  recapEngine(on, { [`${SPEC_DIR}/pipeline.json`]: withRecap('spec') }, () => branch)
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  on('turn.complete', () => ({ text: '' }))
+  on('session.id', () => ({ value: '' }))
+  on('fs.write', (_, e) => {
+    writes[e.path] = e.text
+
+    return { value: undefined }
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  branch = 'develop'
+  await $.turn.complete({ answer: 'fini', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' })
+  await $.prompt.submit({ text: 'autre chose', origin: { kind: 'composer' } } as never)
+  expect(writes[SEEN]).toBeUndefined()
 })
 
 test('reprendre le fil : rien pour un fix', async ($, on) => {

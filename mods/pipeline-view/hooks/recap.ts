@@ -1,5 +1,5 @@
 import type { PipelineSnapshot, Recap } from '../types'
-import { mark, stageOwner } from './model'
+import { mark, orderKeys, stageOwner } from './model'
 
 // L'encart « Reprendre le fil » : en revenant sur une feature après une autre, Thibault y relit en un coup d'œil
 // le but, l'étape, ce qui a bougé et ce qui a été tranché. Les lignes de jugement viennent de `pipeline.sh recap`
@@ -71,11 +71,12 @@ export const sinceLines = (snap: PipelineSnapshot, seenAt: number | null): strin
       return `${s.label} ${mark(s.status)}${owner ? ` (${owner})` : ''}`
     })
 
-/** « 7/15 » : étapes passées sur étapes non sautées. */
+/** « 7/15 » : étapes passées sur tout le pipeline moins les étapes sautées. Une clé hors de l'ordre du pipeline ne compte pas. */
 export const progress = (snap: PipelineSnapshot): string => {
-  const counted = snap.stages.filter(s => s.status !== 'SKIPPED')
+  const status = new Map(snap.stages.map(s => [s.key, s.status]))
+  const counted = orderKeys(snap.kind).filter(key => status.get(key) !== 'SKIPPED')
 
-  return `${counted.filter(s => s.status === 'PASSED').length}/${counted.length}`
+  return `${counted.filter(key => status.get(key) === 'PASSED').length}/${counted.length}`
 }
 
 /** « il y a 5 min », « il y a 3 h », « il y a 2 j ». */

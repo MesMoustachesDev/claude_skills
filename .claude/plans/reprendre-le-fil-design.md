@@ -30,16 +30,16 @@ pipeline-view : un pense-bête, pas un document de plus.
 ## Maquette
 
 ```
-┌ Reprendre le fil · photo_upload ───────────────── vu il y a 2 j ┐
-│ But       Ajouter une photo depuis la galerie ou les fichiers   │
+┌ Reprendre le fil · message_attachment ─────────── vu il y a 2 j ┐
+│ But       Joindre une pièce à un message                        │
 │ Étape     revue des tests (Gaëlle) · 7/15                       │
 │ T'attend  valider la revue des tests                            │
 │ Depuis    tests (rouge) ✓ (Théo) · revue tests ✗ (Gaëlle)       │
-│ Décidé    • fichiers : images seules, converties en JPEG        │
-│           • échecs : un seul message avec le nombre             │
-│           • ancien événement d'ajout supprimé                   │
-│ Ouvert    • sélection multiple dans les fichiers ?              │
-│ À côté    bug de rotation → /fix séparé                         │
+│ Décidé    • une pièce par message                               │
+│           • une erreur réseau garde le brouillon                │
+│           • ancien bouton d'envoi supprimé                      │
+│ Ouvert    • taille maximale d'une pièce ?                       │
+│ À côté    bug d'aperçu → /fix séparé                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,8 +76,9 @@ a rien d'ouvert).
   *Ce qui compte comme un passage* (décidé par Thibault) : un message qu'il tape, sa réponse à un
   `AskUserQuestion`, une permission qu'il accorde. Ne comptent pas : les réveils du watchdog
   (`CronCreate`), les messages d'une autre session (`/epic`, `SendMessage`), les notifications de fin
-  d'agent, l'ouverture du panneau. Côté technique, `isMeta` / `turnId` de `PromptSubmitInput` et le
-  hook `tool.call` déjà branché sur `AskUserQuestion` permettent le tri.
+  d'agent, l'ouverture du panneau. Côté technique, `origin.kind` de `PromptSubmitInput` fait le tri :
+  `composer`, `bridge` et `human` (message tapé dans l'app desktop, relevé dans les transcripts) comptent,
+  `sdk`, `peer`, `task-notification` et le reste non ; `isMeta` exclut aussi.
 
 ### Lignes de jugement — écrites par l'orchestrateur, validées par un script
 

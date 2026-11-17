@@ -498,6 +498,8 @@ const loadRecap = async (
 }
 
 const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
+  // Plus de feature dans cette session : un message de Thibault ne doit plus dater le passage de l'ancienne.
+  seenPath = ''
   root = await git($, ['rev-parse', '--show-toplevel'])
   if (!root) return null
   const where = await locate($, root)

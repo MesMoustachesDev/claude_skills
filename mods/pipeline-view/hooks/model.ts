@@ -57,6 +57,9 @@ const FIX_OWNERS: Record<string, string> = {
   evidence: 'toi',
 }
 
+/** Les étapes du pipeline, dans l'ordre : tout le parcours, écrit ou pas encore. */
+export const orderKeys = (kind: 'feature' | 'fix'): string[] => (kind === 'feature' ? FEATURE_ORDER : FIX_ORDER).map(([key]) => key)
+
 /** Le prénom de qui tient l'étape, vide pour une clé inconnue. */
 export const stageOwner = (kind: 'feature' | 'fix', key: string): string =>
   (kind === 'feature' ? FEATURE_OWNERS : FIX_OWNERS)[key] ?? ''
