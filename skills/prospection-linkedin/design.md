@@ -142,6 +142,9 @@ Amendé le 2026-11-17 après le premier essai à blanc :
   freelances, parce que son CTO était déjà en fiche sans avoir jamais reçu de message.
   Un lead existant ne passe pas par la séquence The Engine, qui commence par une invitation et ne marche
   pas pour quelqu'un que Thibault a déjà : son message va dans la Boîte LinkedIn et Thibault l'envoie.
+  Un lead existant hors de ses relations (autre `Source` que « Réseau ») reçoit une invitation avec note
+  après le go : la Boîte ne peut ouvrir une conversation qu'avec une relation de 1er niveau (vu le
+  2026-11-17 : « No known conversation and no 1st-degree connection found »).
 - **Trouver une personne** passe par `search_people` de The Engine : la recherche web refuse les
   recherches par nom. Le `profile_id` du post FM identifie l'auteur sans homonyme.
 - **Entreprise non nommée** : un post FM sans `company` garde son prospect si l'auteur est un décideur ;
