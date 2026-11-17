@@ -42,6 +42,7 @@ dans `feature.md` et `fix.md`). Une règle qu'il contredit plus tard est corrig�
 - Une dev_dependency de test déjà résolue en transitif, à la même version, est acceptée sans question. (2026-10-21, fake_async)
 
 ## Périmètre et dette
+- Accepte sans demander qu'un agent mette à jour le README qui décrit le code qu'il change, même hors du plan validé ; l'écart est noté dans plan_deviations et l'evidence. (2026-11-17, « Règle », README du router accepté deux fois sur empty_recipe_images et uniform_color_recipe_images)
 
 ## Revue et suggestions
 
