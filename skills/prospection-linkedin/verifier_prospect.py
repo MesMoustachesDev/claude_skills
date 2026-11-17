@@ -44,14 +44,18 @@ def _verifier_texte(texte: str, verifier_py: Path) -> tuple[list[str], list[str]
 
 def verifier(prospect: dict, aujourd_hui: date, clients: list[str], verifier_py: Path) -> tuple[list[str], list[str]]:
     erreurs, attentions = [], []
-    manquantes = [c for c in CLES if not prospect.get(c)]
     signal = prospect.get("signal") if isinstance(prospect.get("signal"), dict) else {}
+    # Un post FM ne nomme pas toujours l'entreprise : elle peut rester vide (clé présente).
+    facultatives = ("company",) if signal.get("type") in TYPES_FM and "company" in prospect else ()
+    manquantes = [c for c in CLES if c not in facultatives and not prospect.get(c)]
     manquantes += [f"signal.{c}" for c in CLES_SIGNAL if not signal.get(c)]
     if manquantes:
         return [f"clés manquantes : {', '.join(manquantes)}"], []
 
     if not re.fullmatch(r"https://linkedin\.com/in/(?:[a-z0-9-]|%[0-9a-f]{2})+", prospect["linkedin_url"]):
         erreurs.append(f"linkedin_url n'est pas un profil canonique : {prospect['linkedin_url']}")
+    if not prospect["company"]:
+        attentions.append("entreprise non nommée : le message ne doit nommer aucune boîte")
     if _contient(normaliser(prospect["role"]), EXCLUS):
         erreurs.append(f"role : pas un décideur ({prospect['role']})")
     type_ = signal["type"]

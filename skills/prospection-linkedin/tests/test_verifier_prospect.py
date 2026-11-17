@@ -148,6 +148,15 @@ class VerifierProspectTest(unittest.TestCase):
         erreurs, _ = self.lancer(self.fm("fin_mission", 60))
         self.assertTrue(any("signal.fin" in e for e in erreurs), erreurs)
 
+    def test_entreprise_vide_acceptee_pour_un_signal_fm(self):
+        erreurs, attentions = self.lancer(self.fm("freelance", 40, company=""))
+        self.assertEqual(erreurs, [])
+        self.assertTrue(any("non nommée" in a for a in attentions), attentions)
+
+    def test_entreprise_vide_refusee_pour_une_offre(self):
+        erreurs, _ = self.lancer(self.prospect(company=""))
+        self.assertTrue(any("company" in e for e in erreurs), erreurs)
+
     def test_cli_code_de_retour(self):
         script = ICI.parent / "verifier_prospect.py"
         mauvais = self.prospect(linkedin_url="https://linkedin.com/company/x")

@@ -88,9 +88,8 @@ Faite en dernier, après le rendu des signaux, pour que la question ne bloque pa
 - 3 recherches web, 7 derniers jours, France : « développeur Flutter CDI », « développeur Android Kotlin
   CDI », « développeur mobile CDI startup ». Sites visés : Welcome to the Jungle, LinkedIn Jobs, Indeed,
   sites carrière. Exclus : ESN, cabinets, plateformes de freelances, offres d'alternance ou de stage.
-- Pour chaque entreprise retenue : doublon si elle est dans Leads CTO (`Entreprise`, insensible à la casse)
-  ou dans Missions (`Entreprise`), ou si une fiche de cette entreprise a `Dernier contact` depuis moins de
-  90 jours. Un doublon est écarté sans bruit.
+- Pour chaque entreprise retenue : doublon si elle est dans Missions avec un statut autre que « Nouvelle ».
+  Dans Leads CTO, voir « Lead existant » en 4.4b (amendé le 2026-11-17).
 - Trouver la personne : une recherche web « <entreprise> CTO LinkedIn » (puis « fondateur » si rien). Il faut
   une URL `linkedin.com/in/...` qui nomme la personne et la boîte dans son résultat. Sinon, l'entreprise est
   rendue sans prospect, en une ligne « pas de décideur trouvé ».
@@ -135,6 +134,17 @@ plupart des posts n'ont pas de `company`. Le drapeau client direct se trompe par
   en panne ou alertes trop étroites).
 - **Le lundi** : une ligne de marché (`market_stats`) et jusqu'à 3 recruteurs Android ou Flutter à suivre ;
   `follow_recruiter` seulement sur un « suis <nom> » de Thibault.
+
+Amendé le 2026-11-17 après le premier essai à blanc :
+- **Lead existant** : une fiche « À contacter » jamais contactée (pas de `Dernier contact` de moins de 90
+  jours) n'écarte plus un signal sur sa boîte ; elle en devient le prospect, et la passe 2 met sa fiche à
+  jour au lieu d'en créer une. L'essai avait écarté une boîte qui recrutait un Android et prenait des
+  freelances, parce que son CTO était déjà en fiche sans avoir jamais reçu de message.
+- **Trouver une personne** passe par `search_people` de The Engine : la recherche web refuse les
+  recherches par nom. Le `profile_id` du post FM identifie l'auteur sans homonyme.
+- **Entreprise non nommée** : un post FM sans `company` garde son prospect si l'auteur est un décideur ;
+  `verifier_prospect.py` l'accepte pour les types FM, avec une ATTENTION.
+- Notion SQL : une collection par requête.
 
 ### 4.5 Rendu
 
