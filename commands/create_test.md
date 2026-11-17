@@ -73,6 +73,7 @@ Pose-toi ces questions :
 - Y a-t-il un chemin différé ou de réessai (worker, resynchro, nouvel essai après un échec partiel) ? Il a son test, qui passe par ce chemin et pas seulement par le chemin immédiat. (learn 2026-11-07, retry-path, 2 runs)
 - Ouvre-t-il un état de plateforme (récepteur, flux, abonnement, formulaire natif) ? Un test vérifie qu'il est refermé, y compris quand l'opération lève après l'ouverture. (learn 2026-11-09, test_leaks_open_platform_state, 2 runs)
 - Décide-t-il de ce qui part vers le suivi d'erreurs (Sentry, Crashlytics : niveau, type d'exception, tags) ? Un test branche le vrai arbre ou le vrai client et ne fake que le SDK. (learn 2026-11-12, observability_decision_untested, 2 runs)
+- Consomme-t-il la sortie d'un LLM (parseur, lien, JSON) ? Il se teste sur de vraies sorties du modèle, relevées avec le prompt de prod et gardées telles quelles en fixtures, pas seulement sur une sortie idéale écrite à la main. (learn 2026-11-17, llm_fake_more_cooperative_than_model, 2 runs)
 
 Présente à l'utilisateur un résumé de ta compréhension et les scénarios de test que tu prévois AVANT de coder. Format :
 
