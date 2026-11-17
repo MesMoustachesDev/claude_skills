@@ -75,7 +75,7 @@ couverture des lignes modifiées).
 
 Si le gate liste `roles` en rouge : chaque déclaration réutilisable que la feature ajoute (widget
 public de la présentation, fonction, membre d'extension, statique) porte dans sa doc une ligne
-`/// rôle: <mot>`, le mot pris dans `.claude/roles.md`. Lis le corps pour choisir le rôle (ce que ça
+`/// rôle: <mot>`, le mot pris dans `.claude/rules/roles.md`. Lis le corps pour choisir le rôle (ce que ça
 rend ou calcule), pas le nom. Aucun mot ne convient → ajoute-le au fichier, une ligne
 « - `<mot>` : <ce que ça couvre, en une phrase> », mots courts en minuscules, sans doublon d'un
 existant ; il apparaît dans ton rapport. Un rôle déjà porté par une déclaration d'un autre package

@@ -10,7 +10,7 @@ design system) et écrit une proposition :
 Ce script la décode strictement — clés connues, mots courts en minuscules, chaque déclaration de la liste
 attribuée une fois et une seule, aucune inconnue — et la refuse sinon. Il n'exécute rien de ce qu'elle dit.
 
-  roles_init.py check --todo <roles_todo.json> --proposal <p.json> --vocab <.claude/roles.md> --root <features_root>
+  roles_init.py check --todo <roles_todo.json> --proposal <p.json> --vocab <.claude/rules/roles.md> --root <features_root>
       à blanc : ce qui changerait (vocabulaire, lignes insérées par fichier). Exit 1 si la proposition est refusée.
   roles_init.py apply  (mêmes options)
       écrit le vocabulaire et insère `/// rôle: <mot>` à la ligne prévue, en partant du bas de chaque fichier.
@@ -102,7 +102,17 @@ def plan(todo, assigned, root):
             errors.append(f"{d['id']} : {d['name']} n'est plus à la ligne {at} (relance gauntlet.sh roles_todo)")
             continue
         indent = re.match(r"\s*", lines[at - 1]).group(0)
-        by_file[d["file"]].append((at, f"{indent}/// rôle: {assigned[d['id']]}", d["name"]))
+        text = f"{indent}/// rôle: {assigned[d['id']]}"
+        if not d.get("doc"):
+            # Sans doc, au-dessus des commentaires `//` qui précèdent : un `// ignore:` doit rester
+            # collé à la ligne qu'il vise.
+            while at > 1 and re.match(r"\s*//(?!/)", lines[at - 2]):
+                at -= 1
+            # Une doc collée à la déclaration précédente : dart format veut une ligne vide entre les deux.
+            prev = lines[at - 2].strip() if at > 1 else ""
+            if prev and not prev.endswith(("{", "(", "[", ",")) and not prev.startswith(("//", "@")):
+                text = "\n" + text
+        by_file[d["file"]].append((at, text, d["name"]))
     if errors:
         refuse(errors)
     return by_file

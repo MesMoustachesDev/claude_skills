@@ -1,6 +1,6 @@
 # 0016 — Chaque déclaration réutilisable porte un rôle d'un vocabulaire fermé, et l'index des rôles est lu avant d'écrire
 
-Statut : acceptée (2026-11-17)
+Statut : acceptée (2026-11-17), amendée le 2026-11-17 (vocabulaire sous `.claude/rules/`, variantes statiques)
 Où elle vit : `scripts/gauntlet/dart_tools/bin/dup_check.dart` (`--roles`, `--roles-index`, `--roles-check`,
 candidats par rôle) · `stacks/flutter/checks_maintain.sh` (`roles_index`, `roles`) ·
 `scripts/gauntlet/profiles.sh` (`roles` dans `MAINTAIN_FIXABLE`, donc au gate `clean`) ·
@@ -24,7 +24,7 @@ il faut le mettre dans son contexte avant qu'il écrive, pas seulement le détec
 
 ## Décision
 
-- **Vocabulaire fermé, par projet** : `.claude/roles.md` (`roles.file`), une ligne
+- **Vocabulaire fermé, par projet** : `.claude/rules/roles.md` (`roles.file`), une ligne
   « - `<mot>` : description » par rôle. Le nom du rôle dit ce que la déclaration rend ou calcule
   (`état-vide`, `format-prix`), pas où elle vit.
 - **Le marqueur** : une ligne `rôle: <mot>` dans la doc (`/// rôle: état-vide`). C'est un commentaire,
@@ -42,7 +42,7 @@ il faut le mettre dans son contexte avant qu'il écrive, pas seulement le détec
   et un rôle par déclaration, en JSON ; `roles_init.py` le décode strictement (mots bornés, chaque
   déclaration attribuée une et une seule fois, aucune inconnue), le montre à blanc, et n'écrit qu'après
   le oui de Thibault. Le modèle traduit, le script décide.
-- **Opt-in** : sans `.claude/roles.md`, `roles` est non applicable et l'index ne liste que les
+- **Opt-in** : sans `.claude/rules/roles.md`, `roles` est non applicable et l'index ne liste que les
   déclarations sans rôle des packages partagés.
 
 ## Conséquences
@@ -60,3 +60,15 @@ il faut le mettre dans son contexte avant qu'il écrive, pas seulement le détec
   rôle est leur suffixe.
 - `/fix` et `/reviewPR` : le profil `pr` ne porte pas `roles` ; une PR hors pipeline n'est pas tenue
   de marquer.
+
+## Amendement du 2026-11-17 : premier passage sur un vrai projet
+
+- **Le vocabulaire vit dans `.claude/rules/roles.md`**, pas `.claude/roles.md` : les projets ignorent
+  `.claude/*` sauf quelques dossiers, dont `rules/`, versionné partout comme `feature_pipeline.md`. Il est
+  donc aussi chargé dans chaque session du projet, ce qui ne coûte qu'une quarantaine de lignes.
+- **Un statique d'un widget n'a pas de rôle propre** (`VerticalSpacer.xs`, `DesignFilledButton.small`) :
+  c'est une variante du widget, qui porte le rôle. 32 lignes de bruit sur 186 au premier passage.
+- **`roles_init.py` respecte le code autour** : sans doc, le rôle se pose au-dessus des `// ignore:` qui
+  précèdent la déclaration (sinon l'ignore ne s'applique plus), avec une ligne vide quand la déclaration
+  précédente est collée (ce que `dart format` exigerait). Vérifié par `analyze` et `dart format`
+  identiques avant et après.

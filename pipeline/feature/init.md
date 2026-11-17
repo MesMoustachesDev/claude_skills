@@ -49,7 +49,7 @@
    propose-la en une question (« Installer la veille hors session ? » : un LaunchAgent qui lance
    `watchdog.sh scan` toutes les 15 min et notifie quand une feature attend ou est bloquée, même session
    fermée). Oui → `bash ~/.claude/scripts/watchdog.sh install`. Une fois par machine, pas par projet.
-5d. **Rôles** (ADR 0016) — aussi seul : `/feature init roles`. Si `.claude/roles.md` manque, propose-le en
+5d. **Rôles** (ADR 0016) — aussi seul : `/feature init roles`. Si `.claude/rules/roles.md` manque, propose-le en
    une question (« Marquer les rôles du design system et des packages partagés ? » : l'index que lisent
    Sophie et Arthur avant d'écrire, et le check `roles` de fin de feature ; sans, les deux restent
    inactifs). Oui, ou `/feature init roles` :
@@ -61,7 +61,7 @@
       `<scratchpad>/roles/proposal.json` au format de l'en-tête de `stacks/flutter/roles_init.py` : un
       vocabulaire court (un mot par responsabilité, réutilisé partout où elle revient ; deux widgets qui
       rendent la même chose ont le même mot, c'est tout l'intérêt), les mots existants repris tels quels.
-   3. `python3 ~/.claude/stacks/flutter/roles_init.py check --todo … --proposal … --vocab .claude/roles.md
+   3. `python3 ~/.claude/stacks/flutter/roles_init.py check --todo … --proposal … --vocab .claude/rules/roles.md
       --root <features_root>` : refusé → corrige la proposition et relance ; jamais d'édition à la main du
       code ou du vocabulaire. Vert → montre à Thibault sa sortie (vocabulaire avec le nombre de
       déclarations par mot, puis un extrait des insertions) et demande en une question : « appliquer » /

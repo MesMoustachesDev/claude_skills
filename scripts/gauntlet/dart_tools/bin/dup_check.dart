@@ -15,7 +15,7 @@
 // espace de recherche que le script a réduit de 8 000 déclarations à quelques-unes.
 //
 // Rôles (ADR 0016) : une ligne `rôle: <mot>` dans la doc d'une déclaration, le mot pris dans le
-// vocabulaire fermé du projet (--roles, `.claude/roles.md` : lignes « - `<mot>` : description »).
+// vocabulaire fermé du projet (--roles, `.claude/rules/roles.md` : lignes « - `<mot>` : description »).
 // Deux déclarations du même rôle sont candidates l'une de l'autre quels que soient leurs noms.
 //   --roles-index <out.md>  l'index de tout le workspace, par rôle, lu par Sophie et Arthur AVANT
 //                           d'écrire ; plus les déclarations sans rôle des packages --shared.
@@ -75,7 +75,7 @@ class Decl {
 
 final _roleRe = RegExp(r'(?:^|\s)r[ôo]le\s*:\s*([\p{L}\p{N}-]+)', unicode: true, caseSensitive: false);
 
-/// `.claude/roles.md` du projet : « - `état-vide` : un écran ou un bloc sans données ». Le reste du
+/// `.claude/rules/roles.md` du projet : « - `état-vide` : un écran ou un bloc sans données ». Le reste du
 /// fichier (titres, explications) est ignoré.
 Map<String, String> _readVocab(String? path) {
   if (path == null || !File(path).existsSync()) return const {};
@@ -190,14 +190,16 @@ void main(List<String> args) {
 
   final vocab = _readVocab(rolesFile);
   if (rolesIndexOut != null) {
-    _writeRolesIndex(rolesIndexOut, decls, vocab, ignore, shared..addAll([if (dsPackage != null) dsPackage]));
+    _writeRolesIndex(rolesIndexOut, decls, vocab, ignore, shared..addAll([if (dsPackage != null) dsPackage]),
+        {for (final d in decls) if (_isWidget(d)) d.name});
     return;
   }
+  final widgetNames = {for (final d in decls) if (_isWidget(d)) d.name};
   if (rolesTodoOut != null) {
-    _writeRolesTodo(rolesTodoOut, decls, vocab, ignore, shared, dsPackage);
+    _writeRolesTodo(rolesTodoOut, decls, vocab, ignore, shared, dsPackage, widgetNames);
     return;
   }
-  if (rolesCheck) exit(_checkRoles(target, vocab, ignore, dsPackage));
+  if (rolesCheck) exit(_checkRoles(target, vocab, ignore, dsPackage, widgetNames));
   if (candidatesOut != null) {
     _writeCandidates(candidatesOut, target, others, ignore, dsPackage);
     return;
@@ -271,10 +273,12 @@ bool _reusable(Decl o) =>
 /// Ce qui doit porter un rôle : ce qu'une autre feature pourrait réutiliser. Les widgets publics de
 /// la présentation (ou de tout le design system), les fonctions, membres d'extension et statiques.
 /// Pas les classes non-widget ni les extensions elles-mêmes (leurs membres portent le rôle).
-bool _needsRole(Decl d, Set<String> ignore, String? dsPackage) {
+/// Un statique d'un widget (`VerticalSpacer.xs`, `DesignFilledButton.small`) est une variante du widget :
+/// c'est le widget qui porte le rôle. [widgets] : les noms des classes widget du workspace.
+bool _needsRole(Decl d, Set<String> ignore, String? dsPackage, [Set<String> widgets = const {}]) {
   if (_skipNames.contains(d.bare) || ignore.contains(d.bare)) return false;
   if (_isWidget(d)) return !_archSuffix.hasMatch(d.bare) && (d.file.contains('/presentation/') || d.pkg == dsPackage);
-  if (_archSuffix.hasMatch(d.owner ?? '')) return false;
+  if (_archSuffix.hasMatch(d.owner ?? '') || widgets.contains(d.owner)) return false;
   return _reusable(d) && (_family(d.kind) == 'callable' || d.kind.startsWith('extension sur'));
 }
 
@@ -506,19 +510,20 @@ class _Collector extends RecursiveAstVisitor<void> {
 
 
 /// Index des rôles, en markdown court : ce que Sophie et Arthur lisent avant d'écrire.
-void _writeRolesIndex(String out, List<Decl> decls, Map<String, String> vocab, Set<String> ignore, Set<String> shared) {
+void _writeRolesIndex(String out, List<Decl> decls, Map<String, String> vocab, Set<String> ignore, Set<String> shared,
+    Set<String> widgets) {
   final byRole = <String, List<Decl>>{};
   for (final d in decls) {
     final r = d.role?.toLowerCase();
     if (r != null && d.isPublic) byRole.putIfAbsent(r, () => []).add(d);
   }
   final unknown = byRole.keys.where((r) => !vocab.containsKey(r)).toList()..sort();
-  final untagged = decls.where((d) => shared.contains(d.pkg) && d.role == null && _needsRole(d, ignore, null)).toList();
+  final untagged = decls.where((d) => shared.contains(d.pkg) && d.role == null && _needsRole(d, ignore, null, widgets)).toList();
   final b = StringBuffer()
     ..writeln('# Index des rôles')
     ..writeln()
     ..writeln('${byRole.values.fold(0, (a, l) => a + l.length)} déclaration(s) marquée(s), ${byRole.length} rôle(s) utilisé(s) '
-        'sur ${vocab.length} au vocabulaire (`.claude/roles.md`).')
+        'sur ${vocab.length} au vocabulaire (`.claude/rules/roles.md`).')
     ..writeln()
     ..writeln('Avant de poser un widget, une fonction ou une extension, cherche son rôle ici. S\'il existe : '
         'réutilise-le, ou étends-le s\'il fait presque tout. Un nouveau ne se crée que si aucun ne convient, '
@@ -538,7 +543,7 @@ void _writeRolesIndex(String out, List<Decl> decls, Map<String, String> vocab, S
   final empty = vocab.keys.where((r) => !byRole.containsKey(r)).toList()..sort();
   if (empty.isNotEmpty) b..writeln('Rôles du vocabulaire sans déclaration : ${empty.map((r) => '`$r`').join(', ')}.')..writeln();
   if (unknown.isNotEmpty) {
-    b..writeln('Rôles hors vocabulaire (à ajouter à `.claude/roles.md` ou à corriger) : ${unknown.map((r) => '`$r`').join(', ')}.')..writeln();
+    b..writeln('Rôles hors vocabulaire (à ajouter à `.claude/rules/roles.md` ou à corriger) : ${unknown.map((r) => '`$r`').join(', ')}.')..writeln();
   }
   if (untagged.isNotEmpty) {
     b
@@ -558,9 +563,9 @@ void _writeRolesIndex(String out, List<Decl> decls, Map<String, String> vocab, S
 }
 
 /// Chaque déclaration réutilisable du périmètre porte un rôle, pris dans le vocabulaire.
-int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore, String? dsPackage) {
+int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore, String? dsPackage, Set<String> widgets) {
   final missing = <Decl>[], unknown = <Decl>[];
-  for (final d in target.where((d) => _needsRole(d, ignore, dsPackage))) {
+  for (final d in target.where((d) => _needsRole(d, ignore, dsPackage, widgets))) {
     final r = d.role?.toLowerCase();
     if (r == null) {
       missing.add(d);
@@ -568,7 +573,7 @@ int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore
       unknown.add(d);
     }
   }
-  final n = target.where((d) => _needsRole(d, ignore, dsPackage)).length;
+  final n = target.where((d) => _needsRole(d, ignore, dsPackage, widgets)).length;
   stdout.writeln('   $n déclaration(s) réutilisable(s) dans le périmètre, ${missing.length} sans rôle, '
       '${unknown.length} hors vocabulaire (${vocab.length} rôles)');
   for (final d in missing) {
@@ -583,9 +588,9 @@ int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore
 /// Ce que `/feature init roles` doit marquer : les déclarations réutilisables sans rôle des packages
 /// partagés et du design system, chacune avec son identifiant `fichier:ligne` et la ligne d'insertion.
 void _writeRolesTodo(String out, List<Decl> decls, Map<String, String> vocab, Set<String> ignore, Set<String> shared,
-    String? dsPackage) {
+    String? dsPackage, Set<String> widgets) {
   final pkgs = {...shared, if (dsPackage != null) dsPackage};
-  final todo = decls.where((d) => pkgs.contains(d.pkg) && d.role == null && _needsRole(d, ignore, dsPackage)).toList();
+  final todo = decls.where((d) => pkgs.contains(d.pkg) && d.role == null && _needsRole(d, ignore, dsPackage, widgets)).toList();
   File(out).writeAsStringSync(const JsonEncoder.withIndent('  ').convert({
     'vocab': vocab,
     'declarations': [

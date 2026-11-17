@@ -106,7 +106,7 @@ Maintenabilité (checks_maintain.sh) :
   dedup_candidates   produit dedup_candidates.json (déclarations ressemblantes du workspace) pour l'agent feature-dedup
   roles_index        produit roles_index.md (déclarations du workspace par rôle, ADR 0016) pour Sophie et Arthur
   roles_todo         produit roles_todo.json (déclarations sans rôle des packages partagés) pour /feature init roles
-  roles              chaque déclaration réutilisable ajoutée porte un rôle de .claude/roles.md (N/A sans vocabulaire)
+  roles              chaque déclaration réutilisable ajoutée porte un rôle de .claude/rules/roles.md (N/A sans vocabulaire)
   package_readme     README.md du package : sections (readme.sections) et chaque export du barrel nommé
   deps_features      dépendances inter-features justifiées dans la spec §8, aucun cycle dans le workspace
   pub_health         packages abandonnés / sans release depuis pub.max_age_months / majeure en retard

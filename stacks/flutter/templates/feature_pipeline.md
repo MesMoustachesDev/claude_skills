@@ -134,7 +134,7 @@ dup.min_tokens = 40
 dup.ignore_names =
 # Rôles (ADR 0016) : vocabulaire fermé, une ligne « - `<mot>` : description » par rôle. Chaque déclaration
 # réutilisable porte `/// rôle: <mot>` dans sa doc ; sans ce fichier, le check roles est non applicable.
-roles.file = .claude/roles.md
+roles.file = .claude/rules/roles.md
 # README.md de chaque package feature : sections obligatoires (regex grep -E), et chaque export du
 # barrel doit y être nommé.
 readme.sections = ^## (But|Purpose), ^## (API publique|Public API)

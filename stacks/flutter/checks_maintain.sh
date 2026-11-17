@@ -365,9 +365,9 @@ check_dedup_candidates() {
     --candidates "$FEATURE_DIR/dedup_candidates.json"
 }
 
-# Rôles (ADR 0016) — le vocabulaire fermé du projet (roles.file, défaut .claude/roles.md) : une ligne
+# Rôles (ADR 0016) — le vocabulaire fermé du projet (roles.file, défaut .claude/rules/roles.md) : une ligne
 # `rôle: <mot>` dans la doc de chaque déclaration réutilisable.
-roles_file() { printf '%s/%s' "$PROJECT_ROOT" "$(cfg roles.file .claude/roles.md)"; }
+roles_file() { printf '%s/%s' "$PROJECT_ROOT" "$(cfg roles.file .claude/rules/roles.md)"; }
 
 # roles_index — entrée de Sophie et d'Arthur AVANT qu'ils écrivent : les déclarations du workspace par
 # rôle, plus celles des packages partagés qui n'en ont pas encore. Toujours vert : c'est un producteur.
@@ -395,7 +395,7 @@ check_roles_todo() {
 # roles — chaque widget public de la présentation, fonction, membre d'extension et statique ajouté par la
 # feature porte un rôle du vocabulaire. Sans vocabulaire, non applicable : le projet n'a pas adopté les rôles.
 check_roles() {
-  [ -f "$(roles_file)" ] || { info "pas de vocabulaire de rôles ($(cfg roles.file .claude/roles.md))"; return "$NA_RC"; }
+  [ -f "$(roles_file)" ] || { info "pas de vocabulaire de rôles ($(cfg roles.file .claude/rules/roles.md))"; return "$NA_RC"; }
   ensure_dart_tools || return 1
   local root; root="$(dup_root)"
   local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
