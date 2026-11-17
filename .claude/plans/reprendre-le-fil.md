@@ -32,13 +32,13 @@
 
 ---
 
-### Task 0: Worktree et documents
+### Task 0: Worktree et documents [fait]
 
 - [ ] **Step 1:** `bash ~/.claude/scripts/claude_change.sh start reprendre-le-fil` → `worktree : ~/.claude-wt/reprendre-le-fil`.
 - [ ] **Step 2:** Copier le design en `~/.claude-wt/reprendre-le-fil/plans/reprendre-le-fil-design.md` et ce plan en `plans/reprendre-le-fil.md`, en remplaçant le nom de feature de la maquette par un exemple neutre (contrainte « aucun nom »).
 - [ ] **Step 3:** Commit `docs(pipeline-view): design et plan de l'encart « Reprendre le fil »`.
 
-### Task 1: `pipeline.sh recap`
+### Task 1: `pipeline.sh recap` [fait]
 
 **Files:**
 - Modify: `scripts/pipeline/pipeline.py` (nouvelle `cmd_recap`, `COMMANDS`, refus dans `cmd_set`)
@@ -62,7 +62,7 @@
 - [ ] **Step 5:** `bash scripts/gauntlet/tests/test_recap.sh` → tous `ok`, et les autres tests du dossier toujours verts (`for t in scripts/gauntlet/tests/test_*.sh; do bash "$t"; done`).
 - [ ] **Step 6:** Commit `feat(pipeline): pipeline.sh recap, résumé borné et validé`.
 
-### Task 2: Fonctions pures de l'encart
+### Task 2: Fonctions pures de l'encart [fait]
 
 **Files:**
 - Create: `mods/pipeline-view/hooks/recap.ts`
@@ -91,7 +91,7 @@
 - [ ] **Step 4:** `claude plugin test mods/pipeline-view` → PASS.
 - [ ] **Step 5:** Commit `feat(pipeline-view): calcul de l'encart « Reprendre le fil »`.
 
-### Task 3: Le dernier passage de Thibault
+### Task 3: Le dernier passage de Thibault [fait]
 
 **Files:**
 - Create: `mods/pipeline-view/hooks/seen.ts`
@@ -112,7 +112,7 @@
 - [ ] **Step 5:** `claude plugin test mods/pipeline-view` → PASS.
 - [ ] **Step 6:** Commit `feat(pipeline-view): retient le dernier passage de Thibault par feature`.
 
-### Task 4: Afficher l'encart
+### Task 4: Afficher l'encart [fait]
 
 **Files:**
 - Modify: `mods/pipeline-view/hooks/register.tsx` (`load` remplit l'atom `recap` ; rendu du `Pane`)
@@ -133,7 +133,7 @@
 - [ ] **Step 4:** `claude plugin test mods/pipeline-view` → PASS.
 - [ ] **Step 5:** Commit `feat(pipeline-view): encart « Reprendre le fil » en tête du panneau`.
 
-### Task 5: L'orchestrateur écrit le résumé, publication
+### Task 5: L'orchestrateur écrit le résumé, publication [fait]
 
 **Files:**
 - Modify: `commands/feature.md` (règle 4), `pipeline/feature/steps/0b_cadrage.md` (fin du cadrage)
