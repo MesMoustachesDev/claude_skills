@@ -103,6 +103,7 @@ autre use case, rend `Either<ErrorEntity, T>` : un `Future<void>` sur une telle 
 - Avant d'écrire une traduction dans un ARB, relève le registre de ce fichier dans les clés voisines (tu/vous, tú/usted, tu/Lei, accents présents ou non) et aligne le nouveau texte dessus ; si le texte validé impose un autre registre, signale-le à la revue comme écart, avec les clés voisines à harmoniser. (learn 2026-11-13, l10n-register, 2 runs)
 - Quand tu supprimes le dernier usage d'une clé l10n, d'un use case ou d'un provider, retire-les aussi dans le même changement (ARB et régénération, DI) ; hors du périmètre validé, demande-le comme écart au lieu de les laisser en dette. (learn 2026-11-16, dead_l10n_key_after_last_use, 2 runs)
 - Quand une méthode publique perd son dernier appelant en production, supprime-la avec ses tests (re-gel) ; ne la garde jamais pour un test. (learn 2026-11-16, dead_api_kept_for_frozen_test, 2 runs)
+- Un `Either` se lit par `fold` ; jamais `toOption()`, `swap()` ni `toNullable()!`, et jamais un `await` d'Either dont le résultat est ignoré. (learn 2026-11-17, either_unfolded_without_fold, 2 runs)
 
 ## Spec (Sophie, Camille)
 
