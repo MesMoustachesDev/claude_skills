@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PendingDoc, PendingView, PipelineSnapshot, PlanBranch, PlanView, QaRun, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
+import type { ActiveAgent, PendingDoc, PendingView, PipelineSnapshot, PlanBranch, PlanView, QaRun, RecapView, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -33,7 +33,8 @@ import {
   summarize,
 } from './plan'
 import { type Scenario, type Step, cadrageGherkin, parseScenarios, specGherkin } from './gherkin'
-import { isThibaultPrompt, seenFile } from './seen'
+import { ago, discussionFallback, parseRecap, progress, sinceLines } from './recap'
+import { isThibaultPrompt, parseSeen, seenFile } from './seen'
 import { contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
@@ -72,6 +73,7 @@ const openBranches = atom({ plugin: 'pipeline-view', key: 'openBranches' } as co
 const pending = atom({ plugin: 'pipeline-view', key: 'pending' } as const, null)
 const selectedDoc = atom({ plugin: 'pipeline-view', key: 'selectedDoc' } as const, '')
 const showFullDoc = atom({ plugin: 'pipeline-view', key: 'showFullDoc' } as const, false)
+const recap = atom({ plugin: 'pipeline-view', key: 'recap' } as const, null)
 
 // Racine du repo, pour raccourcir les chemins affichés. Recalculée à chaque rafraîchissement.
 let root = ''
@@ -470,6 +472,31 @@ const loadPending = async (
   return { key: step.key, title: step.title, waiting: waitingOf(text), docs }
 }
 
+/** L'encart « Reprendre le fil » d'une feature : le résumé écrit (ou l'extrait de discussion.md) et le factuel. */
+const loadRecap = async (
+  $: EngineInterface,
+  snap: PipelineSnapshot,
+  view: PendingView,
+  dir: string,
+  text: string,
+): Promise<RecapView> => {
+  const seenAt = seenPath ? parseSeen(await readText($, seenPath)) : null
+  const written = parseRecap(text)
+  const discussion = written ? '' : await readText($, `${dir}/discussion.md`)
+
+  return {
+    name: snap.name,
+    step: view.title,
+    owner: stageOwner('feature', view.key),
+    progress: progress(snap),
+    waiting: view.waiting,
+    since: sinceLines(snap, seenAt),
+    seenAgo: seenAt === null ? '' : ago((await $.clock.now()) - seenAt),
+    recap: written ?? (discussion.trim() ? discussionFallback(discussion) : null),
+    isStale: written !== null && written.stage !== view.key,
+  }
+}
+
 const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   root = await git($, ['rev-parse', '--show-toplevel'])
   if (!root) return null
@@ -484,6 +511,8 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
   const view = snap ? await loadPending($, where.kind, where.name, dir, text, snap.pkg) : null
   if (JSON.stringify(view) !== JSON.stringify(await read($, pending))) await update($, pending, () => view)
+  const fil = snap && view && where.kind === 'feature' ? await loadRecap($, snap, view, dir, text) : null
+  if (JSON.stringify(fil) !== JSON.stringify(await read($, recap))) await update($, recap, () => fil)
   let found = snap ? await loadScenarios($, snap.pkg, baseOf(text, where.kind)) : []
   if (snap && where.kind === 'feature' && found.length === 0) found = await loadPlannedScenarios($, dir)
   if (JSON.stringify(found) !== JSON.stringify(await read($, scenarios))) await update($, scenarios, () => found)
@@ -1157,15 +1186,17 @@ export const register: Register = on => {
     const doc = reading?.docs.find(d => d.path === wantedDoc) ?? reading?.docs[0]
     const isFull = await read($, showFullDoc)
     const isDiff = doc !== undefined && doc.diff !== '' && !isFull
+    // Une feature dit ce qui attend Thibault dans « Reprendre le fil » ; un fix, qui n'a pas l'encart, ici.
+    const isWaitingHere = reading !== null && reading.waiting !== '' && snap.kind === 'fix'
     const readingSection = reading && (
       <Box flexDirection="column">
         <Text> </Text>
-        {reading.waiting !== '' ? (
+        {isWaitingHere ? (
           <Text bold color="warning">À toi : {reading.waiting}</Text>
         ) : (
           <Text bold>À lire{reading.title !== '' ? ` · étape ${reading.title}` : ''}</Text>
         )}
-        {reading.waiting !== '' && reading.title !== '' && <Text dimColor>étape {reading.title}</Text>}
+        {isWaitingHere && reading.title !== '' && <Text dimColor>étape {reading.title}</Text>}
         {reading.docs.length === 0 && <Text dimColor>Rien à lire pour cette étape pour l'instant.</Text>}
         {doc && (
           <Box flexDirection="column">
@@ -1216,8 +1247,36 @@ export const register: Register = on => {
       </Box>
     )
 
+    const fil = await read($, recap)
+    // Libellés sur 9 colonnes ; les lignes suivantes d'une liste s'alignent dessous.
+    const filLines = (label: string, items: string[], bullet = '') =>
+      items.map((item, i) => <Text key={`fil-${label}-${i}`}>{`${(i === 0 ? label : '').padEnd(9)}${bullet}${item}`}</Text>)
+    const filSection = fil && (
+      <Box flexDirection="column">
+        <Text bold>
+          {[
+            `Reprendre le fil · ${fil.name}`,
+            fil.seenAgo !== '' ? `vu ${fil.seenAgo}` : '',
+            fil.recap?.source === 'discussion' ? 'extrait de discussion.md' : '',
+            fil.isStale ? `résumé de l’étape ${fil.recap?.stage ?? ''}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+        {filLines('But', fil.recap && fil.recap.goal !== '' ? [fil.recap.goal] : [])}
+        {fil.step !== '' && <Text>{`${'Étape'.padEnd(9)}${fil.step}${fil.owner !== '' ? ` (${fil.owner})` : ''} · ${fil.progress}`}</Text>}
+        {fil.waiting !== '' && <Text color="warning">{`${"T'attend".padEnd(9)}${fil.waiting}`}</Text>}
+        {filLines('Depuis', fil.since)}
+        {filLines('Décidé', fil.recap?.decided ?? [], '• ')}
+        {filLines('Ouvert', fil.recap?.open ?? [], '• ')}
+        {filLines('À côté', fil.recap?.aside ?? [])}
+        <Text> </Text>
+      </Box>
+    )
+
     return (
       <Box flexDirection="column">
+        {filSection}
         <Text bold>
           {snap.kind} {snap.name}
         </Text>

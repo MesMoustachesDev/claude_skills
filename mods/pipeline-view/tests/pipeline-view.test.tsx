@@ -95,8 +95,8 @@ test('le panneau liste les étapes dans l’ordre du pipeline', async ($, on) =>
   await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /contrats/ }))?.text).toBe('✓ contrats · Arthur, puis Thibault')
-  expect((await ui.find({ type: 'Text', text: /impl/ }))?.text).toBe('✗ impl (vert) · Ivan  2/5')
+  expect((await ui.find({ type: 'Text', text: /^✓ contrats/ }))?.text).toBe('✓ contrats · Arthur, puis Thibault')
+  expect((await ui.find({ type: 'Text', text: /^✗ impl/ }))?.text).toBe('✗ impl (vert) · Ivan  2/5')
   await ui.unmount()
 })
 
@@ -200,7 +200,7 @@ test('une question à Thibault relit l’état, le tour encore ouvert', async ($
   expect(reads).toBeGreaterThan(before)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /impl/ }))?.text).toContain('✓ impl (vert)')
+  expect((await ui.find({ type: 'Text', text: /^. impl/ }))?.text).toContain('✓ impl (vert)')
   await ui.unmount()
 })
 
@@ -573,7 +573,12 @@ const WAITING = JSON.stringify({ ...JSON.parse(PIPELINE), cockpit: { waiting: 'V
 const NEXT = JSON.stringify({ key: 'spec', step: '1', title: 'Spec, critique, point d’étape « spec »' })
 
 // `opens` : les commandes `open` lancées ; `open <chemin>` seul échoue, comme pour un .dart sans app par défaut.
-const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>, opens: string[] = []) => {
+const readingEngine = (
+  on: Parameters<Parameters<typeof test>[1]>[1],
+  files: Record<string, string>,
+  opens: string[] = [],
+  branch = 'feature/two_factor_login',
+) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: undefined }))
@@ -587,7 +592,7 @@ const readingEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Rec
       : argv.includes('rev-parse')
         ? ROOT
         : argv.includes('branch')
-          ? 'feature/two_factor_login'
+          ? branch
           : ''
 
     return { value: { exitCode: code, stdout: out, stderr: code ? 'No application knows how to open' : '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -604,7 +609,8 @@ test('l’encart montre la spec et sa critique quand la spec attend Thibault', a
   await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /^À toi/ }))?.text).toBe('À toi : Valide la spec')
+  expect(await ui.find({ type: 'Text', text: /^À toi/ })).toBeUndefined()
+  expect((await ui.find({ type: 'Text', text: /^T'attend/ }))?.text).toBe("T'attend Valide la spec")
   expect((await ui.find({ type: 'Button', key: `doc-.claude/features/two_factor_login/spec.md` }))?.props.label).toBe('spec')
   expect(await ui.find({ type: 'Button', key: `doc-.claude/features/two_factor_login/spec_review.md` })).toBeDefined()
   expect((await ui.find({ type: 'Markdown' }))?.text).toBe('# Spec\n\nLe code arrive par SMS.')
@@ -771,4 +777,93 @@ test('passage : un fichier par repo et par feature, illisible = aucun passage', 
   expect(parseSeen('oops')).toBeNull()
   expect(parseSeen('{"at":"5"}')).toBeNull()
   expect(parseSeen('')).toBeNull()
+})
+
+// ---------------------------------------------------------------------------
+// Encart « Reprendre le fil »
+// ---------------------------------------------------------------------------
+
+const DAY = 86_400_000
+const RECAP_NOW = Date.parse('2026-10-08T00:00:00Z')
+const SEEN = '/home/.claude/activity/seen/_repo__two_factor_login.json'
+const withRecap = (stage: string) => JSON.stringify({ ...JSON.parse(WAITING), recap: { ...RECAP, at: '2026-10-07T00:00:00Z', stage } })
+
+const recapEngine = (on: Parameters<Parameters<typeof test>[1]>[1], files: Record<string, string>, branch = 'feature/two_factor_login') => {
+  readingEngine(on, files, [], branch)
+  on('env.get', () => ({ value: '/home' }))
+  on('clock.now', () => ({ value: RECAP_NOW }))
+}
+
+const textOf = async (ui: { find: (q: object) => Promise<{ text?: string } | undefined> }, re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
+
+test('reprendre le fil : but, étape, attente, ce qui a bougé depuis le dernier passage, décisions', async ($, on) => {
+  recapEngine(on, {
+    [`${SPEC_DIR}/pipeline.json`]: withRecap('spec'),
+    [SEEN]: JSON.stringify({ at: RECAP_NOW - 2 * DAY }),
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textOf(ui, /^Reprendre le fil/)).toBe('Reprendre le fil · two_factor_login · vu il y a 2 j')
+  expect(await textOf(ui, /^But/)).toBe('But      Se connecter avec un second facteur')
+  expect(await textOf(ui, /^Étape/)).toBe('Étape    1 — Spec, critique, point d’étape « spec » (Sophie) · 2/3')
+  expect(await textOf(ui, /^T'attend/)).toBe("T'attend Valide la spec")
+  expect(await textOf(ui, /^Depuis/)).toBe('Depuis   impl (vert) ✗ (Ivan)')
+  expect(await textOf(ui, /^Décidé/)).toBe('Décidé   • code par SMS')
+  expect(await textOf(ui, /six chiffres/)).toBe('         • six chiffres')
+  expect(await textOf(ui, /^Ouvert/)).toBeUndefined()
+  expect(await textOf(ui, /^À côté/)).toBe('À côté   récupération du compte → /fix séparé')
+  expect(await textOf(ui, /^À lire/)).toBe('À lire · étape 1 — Spec, critique, point d’étape « spec »')
+  await ui.unmount()
+})
+
+test('reprendre le fil : un résumé d’une étape précédente le dit', async ($, on) => {
+  recapEngine(on, { [`${SPEC_DIR}/pipeline.json`]: withRecap('hg.tests'), [SEEN]: JSON.stringify({ at: RECAP_NOW - 2 * DAY }) })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textOf(ui, /^Reprendre le fil/)).toBe('Reprendre le fil · two_factor_login · vu il y a 2 j · résumé de l’étape hg.tests')
+  await ui.unmount()
+})
+
+test('reprendre le fil : sans résumé ni passage, extrait de discussion.md et trois dernières étapes', async ($, on) => {
+  recapEngine(on, {
+    [`${SPEC_DIR}/pipeline.json`]: WAITING,
+    [`${SPEC_DIR}/discussion.md`]: '## Décisions\n- code par SMS\n\n## Questions ouvertes\n- six chiffres ?\n',
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textOf(ui, /^Reprendre le fil/)).toBe('Reprendre le fil · two_factor_login · extrait de discussion.md')
+  expect(await textOf(ui, /^But/)).toBeUndefined()
+  expect(await textOf(ui, /^Depuis/)).toBe('Depuis   impl (vert) ✗ (Ivan)')
+  expect(await textOf(ui, /tests \(rouge\)/)).toBe('         tests (rouge) ✓ (Théo)')
+  expect(await textOf(ui, /^Ouvert/)).toBe('Ouvert   • six chiffres ?')
+  await ui.unmount()
+})
+
+test('reprendre le fil : un message de Thibault remet « Depuis » à zéro, un réveil planifié non', async ($, on) => {
+  const writes: Record<string, string> = {}
+  recapEngine(on, { [`${SPEC_DIR}/pipeline.json`]: withRecap('spec') })
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  on('fs.write', (_, e) => {
+    writes[e.path] = e.text
+
+    return { value: undefined }
+  })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await $.prompt.submit({ text: 'tâche planifiée', origin: { kind: 'scheduled-trigger' } } as never)
+  expect(writes[SEEN]).toBeUndefined()
+  await $.prompt.submit({ text: 'on reprend', origin: { kind: 'composer' } } as never)
+  expect(writes[SEEN]).toBe(JSON.stringify({ at: RECAP_NOW }))
+})
+
+test('reprendre le fil : rien pour un fix', async ($, on) => {
+  recapEngine(on, { [`${ROOT}/.claude/fixes/crash/fix.json`]: JSON.stringify({ stages: {} }) }, 'fix/crash')
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textOf(ui, /^Reprendre le fil/)).toBeUndefined()
+  await ui.unmount()
 })
