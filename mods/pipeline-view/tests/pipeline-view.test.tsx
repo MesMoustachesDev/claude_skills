@@ -415,7 +415,10 @@ const WROTE = `${TRANSCRIPT}:"name":"Edit","input":{"file_path":"${WT}/lib/a.dar
 const NOW = 1_800_000_000_000
 const ACTIVITY = JSON.stringify({ session: 's2', cwd: WT, title: 'Trial', state: 'waiting', at: NOW - 60_000, percent: 72, waitingOn: 'Bash' })
 
-const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: string[] = []) => {
+const ASO_MD = `# Fiche App Store\n\n## Points\n\n1. [fait] **Métadonnées**\n2. **Captures**\n`
+const WROTE_PLAN = `${TRANSCRIPT}:"name":"Write","input":{"file_path":"/repo/.claude/plans/aso.md"`
+
+const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: string[] = [], hasMine = false) => {
   on('command.register', () => ({ value: { command: 'pipeline' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: undefined }))
@@ -433,7 +436,7 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: strin
     const out = argv.includes("find \"$HOME/.claude/projects\"")
       ? `120 ${TRANSCRIPT}`
       : argv.startsWith('grep -oHE')
-        ? WROTE
+        ? hasMine ? `${WROTE}\n${WROTE_PLAN}` : WROTE
         : argv.includes('status --porcelain=v1 -z')
           ? e.init?.cwd === WT ? ' M lib/a.dart\0?? lib/b.dart\0' : ''
           : argv.includes('merge-base develop feature/trial_end_screen')
@@ -464,7 +467,12 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: strin
   })
   on('fs.list', (_, e) =>
     e.path === '/repo/.claude/plans'
-      ? { value: [{ name: 'paywall.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] }
+      ? {
+          value: [
+            ...(hasMine ? [{ name: 'aso.md', kind: 'file' as const, size: 1, mtimeMs: 1, isLink: false }] : []),
+            { name: 'paywall.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false },
+          ],
+        }
       : e.path === '/home/.claude/activity'
         ? { value: [{ name: 's2.json', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] }
         : { deny: 'ENOENT' },
@@ -472,6 +480,8 @@ const planEngine = (on: Parameters<Parameters<typeof test>[1]>[1], writes: strin
   on('fs.read', (_, e) =>
     e.path === '/repo/.claude/plans/paywall.md'
       ? { value: PLAN_MD }
+      : e.path === '/repo/.claude/plans/aso.md'
+        ? { value: ASO_MD }
       : e.path === '/home/.claude/activity/s2.json'
         ? { value: ACTIVITY }
       : e.path === `${WT}/.claude/features/trial_end_screen/pipeline.json`
@@ -509,6 +519,24 @@ test('le panneau montre le plan du repo, ses branches et les worktrees hors plan
   expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toBe(
     'Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi · 1 session attend ta réponse',
   )
+  await band.unmount()
+})
+
+test('le plan écrit par cette session est déplié en premier, les autres repliés sur une ligne', async ($, on) => {
+  planEngine(on, [], true)
+  await $.session.start({ cwd: ROOT, surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const lines = async () => (await ui.findAll({ type: 'Text', text: /faits/ })).map(t => t.text)
+  expect(await lines()).toEqual(['Fiche App Store : 1/2 faits', 'Plan — paywall : 1/3 faits · 1 en cours · 1 décision à toi'])
+  expect(await ui.find({ type: 'Text', text: /2\. Captures/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /2\. Plafonner/ })).toBeUndefined()
+  await ui.press({ key: 'plan-.claude/plans/paywall.md' })
+  expect(await ui.find({ type: 'Text', text: /2\. Plafonner/ })).toBeDefined()
+  await ui.unmount()
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await band.find({ type: 'Text', text: /faits/ }))?.text).toMatch(/^Fiche App Store : 1\/2 faits · \+1 plan/)
   await band.unmount()
 })
 

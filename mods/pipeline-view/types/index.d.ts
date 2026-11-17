@@ -146,6 +146,8 @@ export type PlanView = {
   /** Fichier lu, depuis la racine du checkout principal. */
   source: string
   phases: PlanPhase[]
+  /** Le plan de cette session : elle l'a écrit, ou il cite la branche de son worktree. */
+  isMine: boolean
 }
 
 export type PendingDoc = {
@@ -231,6 +233,8 @@ declare module 'claude-code' {
       strays: PlanBranch[]
       /** Branches dont le panneau déplie la liste de fichiers. */
       openBranches: string[]
+      /** Plans des autres sessions que le panneau déplie (leur `source`), repliés sinon. */
+      openPlans: string[]
       /** L'encart « à lire » : les documents de l'étape courante (spec, contrats, revue…). */
       pending: PendingView | null
       /** Le chemin du document affiché dans l'encart, vide pour le premier. */

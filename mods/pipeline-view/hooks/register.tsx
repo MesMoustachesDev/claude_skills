@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ActiveAgent, PendingDoc, PendingView, PipelineSnapshot, PlanBranch, PlanView, QaRun, RecapView, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
+import type { ActiveAgent, PendingDoc, PendingView, PipelineSnapshot, PlanBranch, PlanPhase, PlanView, QaRun, RecapView, ScenarioEvidence, ScenarioFile, SessionActivity, Thumb } from '../types'
 import {
   PERSONAS,
   agentEnded,
@@ -70,6 +70,7 @@ const thumbs = atom({ plugin: 'pipeline-view', key: 'thumbs' } as const, [])
 const plans = atom({ plugin: 'pipeline-view', key: 'plans' } as const, [])
 const strays = atom({ plugin: 'pipeline-view', key: 'strays' } as const, [])
 const openBranches = atom({ plugin: 'pipeline-view', key: 'openBranches' } as const, [])
+const unfoldedPlans = atom({ plugin: 'pipeline-view', key: 'openPlans' } as const, [])
 const pending = atom({ plugin: 'pipeline-view', key: 'pending' } as const, null)
 const selectedDoc = atom({ plugin: 'pipeline-view', key: 'selectedDoc' } as const, '')
 const showFullDoc = atom({ plugin: 'pipeline-view', key: 'showFullDoc' } as const, false)
@@ -583,7 +584,10 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
   const base = /^\s*base_branch\s*=\s*(\S+)/m.exec(config)?.[1] ?? 'develop'
   const found: PlanView[] = []
   const cited = new Set<string>()
-  if (worktrees.size > 0) await scanTranscripts($)
+  // Les transcripts disent aussi quel plan cette session a écrit.
+  await scanTranscripts($)
+  const myBranch = [...worktrees].find(([, path]) => path === mine?.cwd)?.[0] ?? ''
+  const citesMine = (phases: PlanPhase[]) => myBranch !== '' && phases.some(p => p.items.some(i => i.branches.some(b => b.branch === myBranch)))
   const sessions = await readActivity($)
   const at = await $.clock.now().catch(() => 0)
   const fill = (b: PlanBranch, from: string) => fillBranch($, b, from, worktrees, main, sessions, at)
@@ -598,7 +602,8 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
         item.branches = await Promise.all(item.branches.map(b => fill(b, base)))
       }
     }
-    found.push({ kind: 'plan', title: parsed.title || entry.name.replace(/\.md$/, ''), source, phases: parsed.phases })
+    const isMine = (mine !== null && (written.get(`${main}/${source}`)?.has(mine.session) ?? false)) || citesMine(parsed.phases)
+    found.push({ kind: 'plan', title: parsed.title || entry.name.replace(/\.md$/, ''), source, phases: parsed.phases, isMine })
   }
   for (const [branch, path] of worktrees) {
     const where = fromBranch(branch)
@@ -611,9 +616,11 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
       item.branches.forEach(b => cited.add(b.branch))
       item.branches = await Promise.all(item.branches.map(b => fill(b, epic.bases[b.branch] ?? branch)))
     }
-    found.push({ kind: 'epic', title: epic.title, source: `${path.slice(main.length + 1) || '.'}/${source}`, phases: epic.phases })
+    const isMine = branch === myBranch || citesMine(epic.phases)
+    found.push({ kind: 'epic', title: epic.title, source: `${path.slice(main.length + 1) || '.'}/${source}`, phases: epic.phases, isMine })
   }
-  const open = found.filter(isOpen)
+  // Les plans de cette session d'abord : la bande résume le premier.
+  const open = found.filter(isOpen).sort((a, b) => Number(b.isMine) - Number(a.isMine))
   if (open.length === 0) return { plans: [], strays: [] }
   const loose: PlanBranch[] = []
   for (const [branch, path] of worktrees) {
@@ -915,6 +922,8 @@ export const register: Register = on => {
       }
     }
     const unfolded = await read($, openBranches)
+    const unfoldedSources = await read($, unfoldedPlans)
+    const hasMine = openPlans.some(p => p.isMine)
     const hasActivity = [...openPlans.flatMap(p => p.phases.flatMap(ph => ph.items.flatMap(i => i.branches))), ...loose].some(
       b => b.activity.length > 0,
     )
@@ -1119,9 +1128,37 @@ export const register: Register = on => {
         <Box flexDirection="column">
           <Text> </Text>
           <Text bold>Plan</Text>
-          {openPlans.map(plan => (
+          {openPlans.map(plan => {
+            // Ceux d'une autre session tiennent sur une ligne tant qu'on ne les déplie pas.
+            const isFolded = hasMine && !plan.isMine && !unfoldedSources.includes(plan.source)
+            const toggle = (
+              <Button
+                key={`plan-${plan.source}`}
+                plain
+                dimColor
+                label={isFolded ? 'déplier' : 'replier'}
+                onPress={() =>
+                  update($, unfoldedPlans, list => (isFolded ? [...list, plan.source] : list.filter(x => x !== plan.source)))
+                }
+              />
+            )
+            if (isFolded) {
+              return (
+                <Box flexDirection="row" columnGap={1}>
+                  <Text dimColor wrap="truncate-end">
+                    {summarize(plan)}
+                  </Text>
+                  {toggle}
+                </Box>
+              )
+            }
+
+            return (
             <Box flexDirection="column">
-              <Text bold>{summarize(plan)}</Text>
+              <Box flexDirection="row" columnGap={1}>
+                <Text bold>{summarize(plan)}</Text>
+                {hasMine && !plan.isMine && toggle}
+              </Box>
               <Text dimColor wrap="truncate-start">
                 {plan.source}
               </Text>
@@ -1151,7 +1188,8 @@ export const register: Register = on => {
                 </Box>
               ))}
             </Box>
-          ))}
+            )
+          })}
           {loose.length > 0 && (
             <Box flexDirection="column">
               <Text> </Text>
