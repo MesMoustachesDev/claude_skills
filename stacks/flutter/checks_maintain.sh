@@ -365,6 +365,46 @@ check_dedup_candidates() {
     --candidates "$FEATURE_DIR/dedup_candidates.json"
 }
 
+# Rôles (ADR 0016) — le vocabulaire fermé du projet (roles.file, défaut .claude/roles.md) : une ligne
+# `rôle: <mot>` dans la doc de chaque déclaration réutilisable.
+roles_file() { printf '%s/%s' "$PROJECT_ROOT" "$(cfg roles.file .claude/roles.md)"; }
+
+# roles_index — entrée de Sophie et d'Arthur AVANT qu'ils écrivent : les déclarations du workspace par
+# rôle, plus celles des packages partagés qui n'en ont pas encore. Toujours vert : c'est un producteur.
+check_roles_index() {
+  ensure_dart_tools || return 1
+  local root; root="$(dup_root)"
+  local shared; shared="$(cfg_list deps.shared_packages | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    --ds-package "$(cfg ds.package design)" ${shared:+--shared "$shared"} --roles "$(roles_file)" \
+    --roles-index "$FEATURE_DIR/roles_index.md"
+}
+
+# roles_todo — entrée de `/feature init roles` : ce qui reste sans rôle dans les packages partagés et le design
+# system, avec la ligne où poser le marqueur. Toujours vert : c'est un producteur.
+check_roles_todo() {
+  ensure_dart_tools || return 1
+  local root; root="$(dup_root)"
+  local shared; shared="$(cfg_list deps.shared_packages | paste -sd, -)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" ${ignore:+--ignore-names "$ignore"} \
+    --ds-package "$(cfg ds.package design)" ${shared:+--shared "$shared"} --roles "$(roles_file)" \
+    --roles-todo "$FEATURE_DIR/roles_todo.json"
+}
+
+# roles — chaque widget public de la présentation, fonction, membre d'extension et statique ajouté par la
+# feature porte un rôle du vocabulaire. Sans vocabulaire, non applicable : le projet n'a pas adopté les rôles.
+check_roles() {
+  [ -f "$(roles_file)" ] || { info "pas de vocabulaire de rôles ($(cfg roles.file .claude/roles.md))"; return "$NA_RC"; }
+  ensure_dart_tools || return 1
+  local root; root="$(dup_root)"
+  local ignore; ignore="$(cfg_list dup.ignore_names | paste -sd, -)"
+  run_dart_tool dup_check.dart --root "$PROJECT_ROOT/$root" --package "$PKG_DIR" \
+    ${ignore:+--ignore-names "$ignore"} --ds-package "$(cfg ds.package design)" --roles "$(roles_file)" \
+    --scope "$(scope_for_tool "$root/" "$GAUNTLET_OUT/scope_root.txt"; echo "$GAUNTLET_OUT/scope_root.txt")" \
+    --roles-check
+}
+
 # ---------------------------------------------------------------------------
 # README du package : but + API publique, en phase avec le barrel
 # ---------------------------------------------------------------------------

@@ -2,6 +2,10 @@
 
 Prompt : nom, package, `last_clean.log` si présent, et `dedup.md` s'il porte des entrées
 `fix_by: cleaner` reportées depuis 1d (« applique ces factorisations ; 5b les revérifie et bloque »).
+Le gate `clean` porte le check `roles` (ADR 0016, non applicable sans `.claude/roles.md`) : Nina pose
+`/// rôle: <mot>` sur chaque déclaration réutilisable de la feature, et ajoute au vocabulaire le mot
+qu'aucun ne couvre. Son rapport les liste sous « Rôles ajoutés » : montre-les à Thibault au point
+d'étape suivant (`git diff <merge-base> -- .claude/roles.md`), c'est lui qui garde le vocabulaire fermé.
 `stages.clean = PASSED` → continue ; `FAILED` → même traitement qu'en 4.
 **Gabarit S :** identique. **En L :** n'a pas lieu.
 

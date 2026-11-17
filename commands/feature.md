@@ -14,6 +14,7 @@ Argument : **$ARGUMENTS**
 ```
 /feature help                                  cette aide, avec des exemples
 /feature init                                  prépare le projet (config, règles, brick, doctor)
+/feature init roles                            marque les rôles du design system et des packages partagés (ADR 0016)
 /feature <nom> [description]                   nouvelle feature = nouveau package features/<nom>
 /feature <nom> --in <package> [description]    ajout à un package existant (mode extend)
 /feature <sous> --parent <nom> [--in <package>] [description]   sous-feature d'une feature découpée (L)
@@ -84,7 +85,7 @@ s'il y en a. Rien d'autre.
 `/feature <nom> cockpit` : `~/.claude/pipeline/feature/cockpit.md`.
 `/feature <nom> watchdog` : voir « Watchdog » ci-dessous.
 `/feature help` : `~/.claude/pipeline/feature/help.md`. `/feature init` :
-`~/.claude/pipeline/feature/init.md`. Un symptôme déjà vu (gate qui lit 0 test, mutation lente, hook
+`~/.claude/pipeline/feature/init.md` (`/feature init roles` : son étape 5d seule). Un symptôme déjà vu (gate qui lit 0 test, mutation lente, hook
 qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de chercher.
 
 ### Watchdog

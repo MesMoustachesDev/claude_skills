@@ -13,6 +13,16 @@
 // du nom, type étendu, signature, kind) avec leur signature et leur doc. Un agent lit ce JSON et
 // tranche : même responsabilité, à étendre, ou distinct. L'IA là où elle détecte mieux, sur un
 // espace de recherche que le script a réduit de 8 000 déclarations à quelques-unes.
+//
+// Rôles (ADR 0016) : une ligne `rôle: <mot>` dans la doc d'une déclaration, le mot pris dans le
+// vocabulaire fermé du projet (--roles, `.claude/roles.md` : lignes « - `<mot>` : description »).
+// Deux déclarations du même rôle sont candidates l'une de l'autre quels que soient leurs noms.
+//   --roles-index <out.md>  l'index de tout le workspace, par rôle, lu par Sophie et Arthur AVANT
+//                           d'écrire ; plus les déclarations sans rôle des packages --shared.
+//   --roles-todo <out.json> ce qui reste à marquer dans les packages --shared et le design system, avec
+//                           la ligne où poser le rôle : l'entrée de `/feature init roles` (roles_init.py).
+//   --roles-check           chaque déclaration réutilisable du périmètre (widget public, fonction,
+//                           membre d'extension, statique) porte un rôle du vocabulaire. Exit 1 sinon.
 
 import 'dart:convert';
 import 'dart:io';
@@ -37,19 +47,43 @@ const _skipNames = {
 
 class Decl {
   Decl(this.kind, this.name, this.file, this.line, this.pkg, this.isPublic, this.nameChecked,
-      this.fingerprint, this.tokens, this.signature, this.doc, this.onType);
+      this.fingerprint, this.tokens, this.signature, this.doc, this.onType, {this.roleLine = 0, this.owner});
   final String kind, name, file, pkg, signature, doc;
   final String? onType;
+  /// La classe d'un statique : `FormDao.getId` est de l'architecture, pas une roue à marquer.
+  final String? owner;
   final int line, tokens;
+  /// Où poser `/// rôle:` : la ligne qui suit la doc, ou la première ligne de la déclaration sans doc.
+  final int roleLine;
   final bool isPublic, nameChecked;
   final int? fingerprint; // null : pas de corps (classe, enum, abstrait)
   String get where => '$file:$line';
+  String? get role => _roleRe.firstMatch(doc)?.group(1);
+  /// La doc sans la ligne de rôle, première phrase seulement : ce que l'index affiche.
+  String get summary {
+    final d = doc.replaceAll(_roleRe, '').trim();
+    final end = d.indexOf(RegExp(r'\.(\s|$)'));
+    return end < 0 ? d : d.substring(0, end + 1);
+  }
   String get bare => name.contains('.') ? name.split('.').last : name;
 
   Map<String, Object?> toJson() => {
         'kind': kind, 'name': name, 'file': file, 'line': line, 'package': pkg,
-        'signature': signature, 'doc': doc, if (onType != null) 'on': onType,
+        'signature': signature, 'doc': doc, if (onType != null) 'on': onType, if (role != null) 'role': role,
       };
+}
+
+final _roleRe = RegExp(r'(?:^|\s)r[ôo]le\s*:\s*([\p{L}\p{N}-]+)', unicode: true, caseSensitive: false);
+
+/// `.claude/roles.md` du projet : « - `état-vide` : un écran ou un bloc sans données ». Le reste du
+/// fichier (titres, explications) est ignoré.
+Map<String, String> _readVocab(String? path) {
+  if (path == null || !File(path).existsSync()) return const {};
+  final line = RegExp(r'^\s*[-*]\s*`([\p{L}\p{N}-]+)`\s*[:—–-]?\s*(.*)$', unicode: true);
+  return {
+    for (final m in File(path).readAsLinesSync().map(line.firstMatch).whereType<RegExpMatch>())
+      m.group(1)!.toLowerCase(): m.group(2)!.trim(),
+  };
 }
 
 const _stopTokens = {
@@ -78,7 +112,9 @@ String _stem(String t) {
 }
 
 void main(List<String> args) {
-  String? root, package, candidatesOut, dsPackage, scopeFile;
+  String? root, package, candidatesOut, dsPackage, scopeFile, rolesFile, rolesIndexOut, rolesTodoOut;
+  var rolesCheck = false;
+  final shared = <String>{};
   var minTokens = 40;
   final ignore = <String>{};
   for (var i = 0; i < args.length; i++) {
@@ -97,6 +133,16 @@ void main(List<String> args) {
         dsPackage = args[++i];
       case '--scope':
         scopeFile = args[++i];
+      case '--roles':
+        rolesFile = args[++i];
+      case '--roles-index':
+        rolesIndexOut = args[++i];
+      case '--roles-check':
+        rolesCheck = true;
+      case '--roles-todo':
+        rolesTodoOut = args[++i];
+      case '--shared':
+        shared.addAll(args[++i].split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
     }
   }
   // Périmètre (mode extend) : seules les déclarations nouvelles du package sont des cibles.
@@ -142,6 +188,16 @@ void main(List<String> args) {
   final target = inPackage.where(inScope).toList();
   if (!scopeAll) others.addAll(inPackage.where((d) => !inScope(d)));
 
+  final vocab = _readVocab(rolesFile);
+  if (rolesIndexOut != null) {
+    _writeRolesIndex(rolesIndexOut, decls, vocab, ignore, shared..addAll([if (dsPackage != null) dsPackage]));
+    return;
+  }
+  if (rolesTodoOut != null) {
+    _writeRolesTodo(rolesTodoOut, decls, vocab, ignore, shared, dsPackage);
+    return;
+  }
+  if (rolesCheck) exit(_checkRoles(target, vocab, ignore, dsPackage));
   if (candidatesOut != null) {
     _writeCandidates(candidatesOut, target, others, ignore, dsPackage);
     return;
@@ -202,22 +258,35 @@ final _archSuffix = RegExp(
 /// étendu, +1 même liste de types de paramètres. Même famille (type ↔ type, callable ↔ callable).
 final _widgetBase = RegExp(r'extends \w*(Widget|State<)');
 
+bool _isWidget(Decl d) => d.isPublic && d.kind == 'classe' && _widgetBase.hasMatch(d.signature);
+
+// Events et states de BLoC vivent sous /bloc/ : un jeu par feature, jamais des roues.
+bool _reusable(Decl o) =>
+    o.isPublic &&
+    !(o.kind == 'méthode' && o.onType == null) &&
+    !o.file.contains('/bloc/') &&
+    !_archSuffix.hasMatch(o.bare) &&
+    !_archSuffix.hasMatch(o.onType ?? '');
+
+/// Ce qui doit porter un rôle : ce qu'une autre feature pourrait réutiliser. Les widgets publics de
+/// la présentation (ou de tout le design system), les fonctions, membres d'extension et statiques.
+/// Pas les classes non-widget ni les extensions elles-mêmes (leurs membres portent le rôle).
+bool _needsRole(Decl d, Set<String> ignore, String? dsPackage) {
+  if (_skipNames.contains(d.bare) || ignore.contains(d.bare)) return false;
+  if (_isWidget(d)) return !_archSuffix.hasMatch(d.bare) && (d.file.contains('/presentation/') || d.pkg == dsPackage);
+  if (_archSuffix.hasMatch(d.owner ?? '')) return false;
+  return _reusable(d) && (_family(d.kind) == 'callable' || d.kind.startsWith('extension sur'));
+}
+
 void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<String> ignore, String? dsPackage) {
   // Catalogue du design system (tous ses widgets publics) et widgets de la feature : l'agent compare
   // chaque widget au catalogue par rôle, indépendamment des noms — le grep design_system ne voit que
   // les valeurs brutes, pas un Container qui refait une DesignCard avec les bons tokens.
   final designCatalog = dsPackage == null
       ? const <Decl>[]
-      : others.where((o) => o.pkg == dsPackage && o.isPublic && o.kind == 'classe' && _widgetBase.hasMatch(o.signature)).toList();
-  final widgets = target.where((d) => d.isPublic && d.kind == 'classe' && _widgetBase.hasMatch(d.signature) && d.file.contains('/presentation/')).toList();
-  // Events et states de BLoC vivent sous /bloc/ : un jeu par feature, jamais des roues.
-  bool reusable(Decl o) =>
-      o.isPublic &&
-      !(o.kind == 'méthode' && o.onType == null) &&
-      !o.file.contains('/bloc/') &&
-      !_archSuffix.hasMatch(o.bare) &&
-      !_archSuffix.hasMatch(o.onType ?? '');
-  final pool = others.where(reusable).map((o) => (o, _nameTokens(o.name))).toList();
+      : others.where((o) => o.pkg == dsPackage && _isWidget(o)).toList();
+  final widgets = target.where((d) => _isWidget(d) && d.file.contains('/presentation/')).toList();
+  final pool = others.where((o) => _reusable(o) || _isWidget(o)).map((o) => (o, _nameTokens(o.name))).toList();
   // IDF sur l'ensemble du workspace
   final df = <String, int>{};
   for (final (_, toks) in pool) {
@@ -231,26 +300,30 @@ void _writeCandidates(String out, List<Decl> target, List<Decl> others, Set<Stri
   final entries = <Map<String, Object?>>[];
   var pairs = 0;
   for (final d in target) {
-    if (!reusable(d) || _skipNames.contains(d.bare) || ignore.contains(d.bare)) continue;
+    if (!(_reusable(d) || _isWidget(d)) || _skipNames.contains(d.bare) || ignore.contains(d.bare)) continue;
     if (_archSuffix.hasMatch(d.bare)) continue;
     final toks = _nameTokens(d.name);
-    if (toks.isEmpty) continue;
     final scored = <(Decl, double)>[];
+    // Même rôle déclaré : candidate quel que soit le nom (HomeEmptyContent ↔ DesignEmptyState).
+    final byRole = d.role == null ? const <Decl>[] : [for (final (o, _) in pool) if (o.role == d.role) o];
     for (final (o, otoks) in pool) {
-      if (_family(d.kind) != _family(o.kind)) continue;
+      if (_family(d.kind) != _family(o.kind) || byRole.contains(o)) continue;
       var s = toks.intersection(otoks).fold(0.0, (acc, t) => acc + w(t));
       if (s <= 0) continue;
       if (d.onType != null && d.onType == o.onType) s += 2;
       if (d.signature.isNotEmpty && _paramTypes(d.signature) == _paramTypes(o.signature)) s += 1;
       if (s >= 3.0) scored.add((o, s));
     }
-    if (scored.isEmpty) continue;
+    if (scored.isEmpty && byRole.isEmpty) continue;
     scored.sort((a, b) => b.$2.compareTo(a.$2));
     final top = scored.take(3).toList();
-    pairs += top.length;
+    pairs += top.length + min(byRole.length, 5);
     entries.add({
       'target': d.toJson(),
-      'candidates': [for (final (o, s) in top) {...o.toJson(), 'score': double.parse(s.toStringAsFixed(1))}],
+      'candidates': [
+        for (final o in byRole.take(5)) {...o.toJson(), 'match': 'rôle'},
+        for (final (o, s) in top) {...o.toJson(), 'score': double.parse(s.toStringAsFixed(1))},
+      ],
     });
   }
   File(out).writeAsStringSync(const JsonEncoder.withIndent('  ').convert({
@@ -309,7 +382,7 @@ class _Collector extends RecursiveAstVisitor<void> {
   }
 
   void _add(String kind, String name, AstNode node,
-      {FunctionBody? body, bool nameChecked = true, String signature = '', String? onType}) {
+      {FunctionBody? body, bool nameChecked = true, String signature = '', String? onType, String? owner}) {
     if (_ignored(node)) return;
     int? fp;
     var count = 0;
@@ -319,8 +392,10 @@ class _Collector extends RecursiveAstVisitor<void> {
       fp = norm.join(' ').hashCode;
     }
     final bare = name.contains('.') ? name.split('.').last : name;
+    final doc = node is AnnotatedNode ? node.documentationComment : null;
+    final roleLine = doc == null ? _line(node) : unit.lineInfo.getLocation(doc.end).lineNumber + 1;
     out.add(Decl(kind, name, file, _line(node), pkg, !bare.startsWith('_'), nameChecked, fp, count,
-        signature, _doc(node), onType));
+        signature, _doc(node), onType, roleLine: roleLine, owner: owner));
   }
 
   static String _doc(AstNode node) {
@@ -390,7 +465,8 @@ class _Collector extends RecursiveAstVisitor<void> {
       final on = ext.onClause?.extendedType.toSource() ?? '?';
       _add('extension sur $on', '$on.${node.name.lexeme}', node, body: node.body, signature: sig, onType: on);
     } else {
-      _add(isStatic ? 'static' : 'méthode', node.name.lexeme, node, body: node.body, nameChecked: isStatic, signature: sig);
+      _add(isStatic ? 'static' : 'méthode', node.name.lexeme, node, body: node.body, nameChecked: isStatic, signature: sig,
+          owner: node.thisOrAncestorOfType<ClassDeclaration>()?.namePart.typeName.lexeme);
     }
     super.visitMethodDeclaration(node);
   }
@@ -426,4 +502,95 @@ class _Collector extends RecursiveAstVisitor<void> {
     _add('typedef', node.name.lexeme, node);
     super.visitGenericTypeAlias(node);
   }
+}
+
+
+/// Index des rôles, en markdown court : ce que Sophie et Arthur lisent avant d'écrire.
+void _writeRolesIndex(String out, List<Decl> decls, Map<String, String> vocab, Set<String> ignore, Set<String> shared) {
+  final byRole = <String, List<Decl>>{};
+  for (final d in decls) {
+    final r = d.role?.toLowerCase();
+    if (r != null && d.isPublic) byRole.putIfAbsent(r, () => []).add(d);
+  }
+  final unknown = byRole.keys.where((r) => !vocab.containsKey(r)).toList()..sort();
+  final untagged = decls.where((d) => shared.contains(d.pkg) && d.role == null && _needsRole(d, ignore, null)).toList();
+  final b = StringBuffer()
+    ..writeln('# Index des rôles')
+    ..writeln()
+    ..writeln('${byRole.values.fold(0, (a, l) => a + l.length)} déclaration(s) marquée(s), ${byRole.length} rôle(s) utilisé(s) '
+        'sur ${vocab.length} au vocabulaire (`.claude/roles.md`).')
+    ..writeln()
+    ..writeln('Avant de poser un widget, une fonction ou une extension, cherche son rôle ici. S\'il existe : '
+        'réutilise-le, ou étends-le s\'il fait presque tout. Un nouveau ne se crée que si aucun ne convient, '
+        'et la raison se dit (spec §8, rapport d\'Arthur).')
+    ..writeln();
+  final roles = {...vocab.keys, ...byRole.keys}.toList()..sort();
+  for (final r in roles) {
+    final list = byRole[r];
+    if (list == null) continue;
+    b.writeln('## `$r`${vocab[r] == null || vocab[r]!.isEmpty ? '' : ' — ${vocab[r]}'}');
+    for (final d in list..sort((x, y) => x.where.compareTo(y.where))) {
+      final s = d.summary;
+      b.writeln('- `${d.name}` (${d.kind}, ${d.pkg}) `${d.where}`${s.isEmpty ? '' : ' — $s'}');
+    }
+    b.writeln();
+  }
+  final empty = vocab.keys.where((r) => !byRole.containsKey(r)).toList()..sort();
+  if (empty.isNotEmpty) b..writeln('Rôles du vocabulaire sans déclaration : ${empty.map((r) => '`$r`').join(', ')}.')..writeln();
+  if (unknown.isNotEmpty) {
+    b..writeln('Rôles hors vocabulaire (à ajouter à `.claude/roles.md` ou à corriger) : ${unknown.map((r) => '`$r`').join(', ')}.')..writeln();
+  }
+  if (untagged.isNotEmpty) {
+    b
+      ..writeln('## Sans rôle dans les packages partagés (${shared.join(', ')}) : ${untagged.length}')
+      ..writeln()
+      ..writeln('Invisibles pour l\'index : lis-les avant de conclure qu\'une chose n\'existe pas.')
+      ..writeln();
+    for (final d in untagged.take(150)) {
+      final s = d.summary;
+      b.writeln('- `${d.name}` (${d.kind}, ${d.pkg}) `${d.where}`${s.isEmpty ? '' : ' — $s'}');
+    }
+    if (untagged.length > 150) b.writeln('- … et ${untagged.length - 150} autres');
+  }
+  File(out).writeAsStringSync(b.toString());
+  stdout.writeln('   ${byRole.length} rôle(s), ${byRole.values.fold(0, (a, l) => a + l.length)} déclaration(s) marquée(s), '
+      '${untagged.length} sans rôle dans ${shared.join(', ')} → $out');
+}
+
+/// Chaque déclaration réutilisable du périmètre porte un rôle, pris dans le vocabulaire.
+int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore, String? dsPackage) {
+  final missing = <Decl>[], unknown = <Decl>[];
+  for (final d in target.where((d) => _needsRole(d, ignore, dsPackage))) {
+    final r = d.role?.toLowerCase();
+    if (r == null) {
+      missing.add(d);
+    } else if (!vocab.containsKey(r)) {
+      unknown.add(d);
+    }
+  }
+  final n = target.where((d) => _needsRole(d, ignore, dsPackage)).length;
+  stdout.writeln('   $n déclaration(s) réutilisable(s) dans le périmètre, ${missing.length} sans rôle, '
+      '${unknown.length} hors vocabulaire (${vocab.length} rôles)');
+  for (final d in missing) {
+    stdout.writeln('   ✗ sans rôle    ${d.kind} ${d.name}  ${d.where}');
+  }
+  for (final d in unknown) {
+    stdout.writeln('   ✗ hors vocab.  ${d.kind} ${d.name}  ${d.where}  rôle: ${d.role}');
+  }
+  return missing.isEmpty && unknown.isEmpty ? 0 : 1;
+}
+
+/// Ce que `/feature init roles` doit marquer : les déclarations réutilisables sans rôle des packages
+/// partagés et du design system, chacune avec son identifiant `fichier:ligne` et la ligne d'insertion.
+void _writeRolesTodo(String out, List<Decl> decls, Map<String, String> vocab, Set<String> ignore, Set<String> shared,
+    String? dsPackage) {
+  final pkgs = {...shared, if (dsPackage != null) dsPackage};
+  final todo = decls.where((d) => pkgs.contains(d.pkg) && d.role == null && _needsRole(d, ignore, dsPackage)).toList();
+  File(out).writeAsStringSync(const JsonEncoder.withIndent('  ').convert({
+    'vocab': vocab,
+    'declarations': [
+      for (final d in todo) {'id': d.where, ...d.toJson(), 'role_line': d.roleLine},
+    ],
+  }));
+  stdout.writeln('   ${todo.length} déclaration(s) sans rôle dans ${pkgs.join(', ')}, ${vocab.length} rôle(s) au vocabulaire → $out');
 }

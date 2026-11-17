@@ -49,5 +49,26 @@
    propose-la en une question (« Installer la veille hors session ? » : un LaunchAgent qui lance
    `watchdog.sh scan` toutes les 15 min et notifie quand une feature attend ou est bloquée, même session
    fermée). Oui → `bash ~/.claude/scripts/watchdog.sh install`. Une fois par machine, pas par projet.
+5d. **Rôles** (ADR 0016) — aussi seul : `/feature init roles`. Si `.claude/roles.md` manque, propose-le en
+   une question (« Marquer les rôles du design system et des packages partagés ? » : l'index que lisent
+   Sophie et Arthur avant d'écrire, et le check `roles` de fin de feature ; sans, les deux restent
+   inactifs). Oui, ou `/feature init roles` :
+   1. Sur une branche du projet (`chore/roles`, depuis `base_branch`, jamais sur elle) :
+      `GAUNTLET_FEATURES_ROOT=<scratchpad> GAUNTLET_PACKAGE=<features_root>/<premier de deps.shared_packages>
+      gauntlet.sh roles_todo roles` → `<scratchpad>/roles/roles_todo.json` (déclarations sans rôle, avec
+      signature et doc ; `vocab` = les mots déjà là). Rien à marquer → dis-le et arrête-toi.
+   2. Lis le code de chaque déclaration (ce qu'elle rend ou calcule, pas son nom) et écris la proposition
+      `<scratchpad>/roles/proposal.json` au format de l'en-tête de `stacks/flutter/roles_init.py` : un
+      vocabulaire court (un mot par responsabilité, réutilisé partout où elle revient ; deux widgets qui
+      rendent la même chose ont le même mot, c'est tout l'intérêt), les mots existants repris tels quels.
+   3. `python3 ~/.claude/stacks/flutter/roles_init.py check --todo … --proposal … --vocab .claude/roles.md
+      --root <features_root>` : refusé → corrige la proposition et relance ; jamais d'édition à la main du
+      code ou du vocabulaire. Vert → montre à Thibault sa sortie (vocabulaire avec le nombre de
+      déclarations par mot, puis un extrait des insertions) et demande en une question : « appliquer » /
+      « changer des mots » (il dit lesquels ; nouvelle proposition, nouveau check).
+   4. Sur son oui : `roles_init.py apply` (mêmes options), puis `gauntlet.sh roles_todo` à nouveau (0 attendu)
+      et `analyze` du langage sur les packages touchés. Commite `chore: rôles des déclarations (ADR 0016)` ;
+      la MR reste à Thibault. Une déclaration qui mérite d'être fusionnée avec une autre du même rôle :
+      liste-la dans ton résumé, ne la touche pas.
 6. `gauntlet.sh doctor` à nouveau. Tant qu'il est rouge, corrige ou demande. Résume ce qui a été créé.
 

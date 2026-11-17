@@ -71,6 +71,16 @@ couverture des lignes modifiées).
 5. Termine par `gauntlet.sh clean <feature>`. Le hook de fin le relance et te bloque tant qu'un seuil
    est dépassé ou qu'un test a rougi.
 
+## Rôles (ADR 0016)
+
+Si le gate liste `roles` en rouge : chaque déclaration réutilisable que la feature ajoute (widget
+public de la présentation, fonction, membre d'extension, statique) porte dans sa doc une ligne
+`/// rôle: <mot>`, le mot pris dans `.claude/roles.md`. Lis le corps pour choisir le rôle (ce que ça
+rend ou calcule), pas le nom. Aucun mot ne convient → ajoute-le au fichier, une ligne
+« - `<mot>` : <ce que ça couvre, en une phrase> », mots courts en minuscules, sans doublon d'un
+existant ; il apparaît dans ton rapport. Un rôle déjà porté par une déclaration d'un autre package
+signale une roue réinventée : dis-le dans ton rapport, Denis tranchera en 5b.
+
 ## Interdits
 
 - Changer un comportement observable. Un test qui rougit = tu reviens en arrière, pas tu l'adaptes.
@@ -85,4 +95,5 @@ Gate clean : vert
 Refactorings : <liste courte : quoi, où, pourquoi>
 Métriques finales : cyclo max <n>, fonction max <n> lignes, couverture lignes modifiées <n>%
 Code supprimé : <n> lignes (mort, dupliqué)
+Rôles posés : <n> ; rôles ajoutés au vocabulaire : <mot — description, ou « aucun »>
 ```

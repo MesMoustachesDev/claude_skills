@@ -10,8 +10,8 @@ L'architecture appartient à Thibault, et il la possède mieux en l'écrivant qu
 propositions : Arthur ne fait que lui éviter la page blanche. Prompt : « mode brouillon », nom,
 **mode**, `cadrage.md` validé, `spec.md` (scénarios validés : §4, §6, §7) et `archi.json`,
 `create_feature_rules.md`, package, valeur de `brick`, la feature de
-référence (« Notes pour les agents » de la config), et le chemin du graphe (`graph=` de l'étape 0)
-si `prepare` a dit `ok`. En `extend` : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ».
+référence (« Notes pour les agents » de la config), le chemin du graphe (`graph=` de l'étape 0)
+si `prepare` a dit `ok`, et `roles_index.md` s'il a été produit en 0b. En `extend` : « pas de scaffold ; ajoute dans l'existant ; ne renomme rien ».
 
 Arthur scaffolde (en `create`) et pose **dans les vrais fichiers du package**, en stubs, le court
 brouillon de ce que Thibault doit posséder : entités, interfaces de repository et de data sources,

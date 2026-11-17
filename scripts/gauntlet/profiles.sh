@@ -9,7 +9,7 @@
 # étapes que l'orchestrateur lance, et du nombre de plateformes QA (checks_qa.sh).
 
 # Maintenabilité que le cleaner peut corriger lui-même (voir checks_maintain.sh).
-MAINTAIN_FIXABLE="deps_unused reinvented package_readme design_system widget_functions l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
+MAINTAIN_FIXABLE="deps_unused reinvented roles package_readme design_system widget_functions l10n_strings l10n_arb barrel_api unused_code unused_files test_hygiene todo_tickets deprecated_api generated_fresh footprint no_secrets"
 
 profile_checks() {
   case "$1" in
@@ -104,6 +104,9 @@ Maintenabilité (checks_maintain.sh) :
   deps_unused        chaque dépendance déclarée est importée
   reinvented         roue réinventée : nom public déjà pris ailleurs, ou corps identique à renommage près (AST)
   dedup_candidates   produit dedup_candidates.json (déclarations ressemblantes du workspace) pour l'agent feature-dedup
+  roles_index        produit roles_index.md (déclarations du workspace par rôle, ADR 0016) pour Sophie et Arthur
+  roles_todo         produit roles_todo.json (déclarations sans rôle des packages partagés) pour /feature init roles
+  roles              chaque déclaration réutilisable ajoutée porte un rôle de .claude/roles.md (N/A sans vocabulaire)
   package_readme     README.md du package : sections (readme.sections) et chaque export du barrel nommé
   deps_features      dépendances inter-features justifiées dans la spec §8, aucun cycle dans le workspace
   pub_health         packages abandonnés / sans release depuis pub.max_age_months / majeure en retard

@@ -62,6 +62,10 @@ lieu** : `discussion.md` en garde les décisions et le périmètre, `exploration
   **Si ton prompt donne un graphe graphify** (son chemin, ex. `app/graphify-out/graph.json`),
   pars de lui, comme décrit dans `~/.claude/pipeline/graphify.md` (section Explorer : `--graph <chemin>`
   à chaque commande) : carte d'abord, `query` en dernier recours.
+  **Si ton prompt donne l'index des rôles** (`roles_index.md`, ADR 0016), lis-le avant de chercher :
+  chaque rôle dont le besoin a l'usage (un état vide, un format de prix, une carte…) y donne ce qui
+  existe déjà, quel que soit son nom. Ce que tu y trouves va dans « Ce qui existe déjà », puis en §8 de
+  la spec ; la fin de l'index liste ce que les packages partagés ont sans rôle, à lire aussi.
   Lis le code pour vérifier ce que le graphe montre, pas pour le redécouvrir. Cite les nœuds avec leur
   `fichier:ligne`, et ajoute une **carte** : un `flowchart` Mermaid de ce qui existe autour du besoin
   (packages, classes, flux), avec ce que la feature touchera.

@@ -25,3 +25,4 @@ se supprime pas.
 | [0013](0013-epic-lance-les-sous-sessions.md) | /epic orchestre les /feature et les /fix et lance lui-même leurs sessions | acceptée |
 | [0014](0014-un-epic-a-son-plan.md) | Un epic a son plan dans `.claude/plans/`, écrit avant tout lancement | acceptée |
 | [0015](0015-scenarios-avant-contrats.md) | Les scénarios Gherkin s'écrivent avant les contrats, et les contrats en sortent | acceptée, amendée |
+| [0016](0016-roles-des-declarations.md) | Chaque déclaration réutilisable porte un rôle d'un vocabulaire fermé, l'index des rôles est lu avant d'écrire | acceptée |

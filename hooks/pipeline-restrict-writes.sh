@@ -188,7 +188,8 @@ case "$agent" in
   feature-implementer|feature-cleaner)
     is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel$via"
     # Nina retire une dépendance ou déplace un fichier : le README du package le dit (cas réel, par sed).
-    readme=""; [ "$agent" = feature-cleaner ] && readme="$PKG_REL/README.md"
+    # Elle ajoute aussi au vocabulaire des rôles le mot qu'aucun ne couvre (ADR 0016) ; Thibault le voit au point d'étape.
+    readme=""; [ "$agent" = feature-cleaner ] && readme="$PKG_REL/README.md $(cfg roles.file .claude/roles.md)"
     match "$rel" $pkg_src $pkg_manifests $MANIFESTS $readme $extra \
       || deny "${agent#feature-} : zone autorisée = $(label $pkg_src), $(label $MANIFESTS)${readme:+, $readme}${extra:+, $extra}. Refusé : $rel$via"
     ;;

@@ -11,7 +11,7 @@
 #   checks_test_dups.sh test_dups (test_dups.py lit les noms de test Dart)
 #   checks_maintain.sh  deps_unused, deps_features, pub_health, design_system, widget_functions, l10n_strings,
 #                       l10n_arb, barrel_api, unused_code, unused_files, test_hygiene, deprecated_api,
-#                       generated_fresh, reinvented, dedup_candidates, package_readme
+#                       generated_fresh, reinvented, dedup_candidates, roles_index, roles_todo, roles, package_readme
 #   stack_doctor        ce que le doctor vérifie pour Flutter (SDK, fvm, outils pub, brick)
 FLUTTER_CHECKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for _f in checks_static.sh checks_test.sh checks_test_plan.sh checks_test_dups.sh checks_maintain.sh; do

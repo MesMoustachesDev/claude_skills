@@ -6,9 +6,13 @@ code qu'il découvre après coup. Aucun agent n'écrit de cadrage, de contrat ou
 discussion n'est pas finie. Le cadrage fige le *quoi* **et** les choix techniques structurants ; les
 contrats de Thibault, puis la spec, détaillent le *comment*.
 
+0. **Index des rôles** (ADR 0016) : `GAUNTLET_PACKAGE=<features_root>/<premier de deps.shared_packages>
+   gauntlet.sh roles_index <nom>` (le package de la feature n'existe pas encore ; l'index couvre tout le
+   workspace quel que soit le package donné) → `.claude/features/<nom>/roles_index.md`. Il sert à Sophie
+   maintenant, et à Arthur en 1c. En échec, note la ligne et continue sans index.
 1. **Sophie explore, en arrière-plan** (`feature-specifier`, `run_in_background: true`, prompt : « mode
    exploration », nom, description brute, issue s'il y en a une, racine, le chemin du graphe (`graph=`
-   de l'étape 0) si `prepare` a dit `ok`, sortie `.claude/features/<nom>/exploration.md`). Elle relève
+   de l'étape 0) si `prepare` a dit `ok`, l'index des rôles s'il a été produit, sortie `.claude/features/<nom>/exploration.md`). Elle relève
    des **faits**, sans rien proposer : le code qui fait déjà tout ou partie du besoin (ici et ailleurs :
    autre plateforme, web, backend, feature voisine), les valeurs en dur, la carte de ce qui entoure le
    besoin, les règles non négociables qui s'appliquent, et les **points techniques qui structureront la
