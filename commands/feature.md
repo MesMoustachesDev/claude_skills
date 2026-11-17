@@ -59,7 +59,14 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
    tranche. Les hooks des agents continuent d'écrire `stages.<profil>` eux-mêmes.
-4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>` :
+4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>`, écris
+   d'abord le résumé « Reprendre le fil » (l'encart en tête du panneau pipeline-view, que Thibault relit
+   en revenant d'une autre feature) : un JSON `{goal, decided, open, aside}` dans le dossier de la
+   feature, puis `pipeline.sh recap <nom> <fichier>`. `goal` : le but en une ligne ; `decided` : les 5
+   décisions les plus structurantes de `discussion.md` et du cadrage, une ligne chacune, pas tout le
+   journal ; `open` : ce qui reste à trancher (3 au plus) ; `aside` : ce qui a été sorti du périmètre et
+   où c'est parti (3 au plus). 80 caractères par ligne. Un refus : corrige le JSON, ne passe jamais par
+   `set`. Aucune question à Thibault. Ensuite :
    `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
    « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
    sous le bandeau. **Un choix se pose toujours en `AskUserQuestion`**, qui se suffit à lui-même (« Une question se

@@ -101,3 +101,6 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
 brouillon en appliquant les décisions techniques prises (il ne les repose pas), Sophie le reprend en §1-§2 tel quel ; ni un contrat ni §9 ne le contredisent. Un changement
 de périmètre demandé plus tard repasse par 0b (cadrage mis à jour et revalidé) avant toute relance.
 
+Cadrage validé : écris le premier résumé « Reprendre le fil » (`pipeline.sh recap`, règle 4 de
+`commands/feature.md`), avant de lancer la suite.
+
