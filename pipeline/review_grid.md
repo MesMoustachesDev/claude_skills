@@ -29,6 +29,7 @@ font partie de la grille.
 - Requêtes ou opérations lourdes dans des boucles
 - Allocations mémoire inutiles ou fréquentes
 - Appels réseau bloquants sur le thread principal (mobile)
+- Ressource ouverte (image décodée, codec, flux, corps de réponse HTTP) non libérée sur chaque sortie, erreurs comprises (learn 2026-11-17, native_resource_not_disposed, 2 runs)
 
 **Maintenabilité**
 - Nommage ambigu ou trompeur
