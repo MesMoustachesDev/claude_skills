@@ -4,7 +4,9 @@ import { activityOf, describeActivity, parseActivity, pipelineTarget } from '../
 import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from '../hooks/attribution'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
 import { cadrageGherkin, specGherkin } from '../hooks/gherkin'
+import { parseState } from '../hooks/model'
 import { MAX_DOC, contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
+import { ago, discussionFallback, parseRecap, progress, sinceLines } from '../hooks/recap'
 
 const ROOT = '/repo'
 const PIPELINE = JSON.stringify({
@@ -693,4 +695,60 @@ test('ouvrir : l’app par défaut, sinon Android Studio, et le dit', async ($, 
   expect(runs).toEqual([`open ${SPEC_DIR}/spec.md`, `open -a Android Studio ${SPEC_DIR}/spec.md`])
   expect(toasts).toEqual(['Ouvert dans Android Studio : spec.md'])
   await ui.unmount()
+})
+
+const RECAP = { goal: 'Se connecter avec un second facteur', decided: ['code par SMS', 'six chiffres'], open: [], aside: ['récupération du compte → /fix séparé'] }
+
+test('recap : lu depuis pipeline.json, refusé hors bornes', () => {
+  const withRecap = (recap: unknown) => JSON.stringify({ ...JSON.parse(PIPELINE), recap: { ...(recap as object), at: '2026-10-13T12:00:00Z', stage: 'green' } })
+  expect(parseRecap(withRecap(RECAP))).toEqual({ ...RECAP, stage: 'green', source: 'recap' })
+  expect(parseRecap(withRecap({ ...RECAP, decided: ['1', '2', '3', '4', '5', '6'] }))).toBeNull()
+  expect(parseRecap(withRecap({ ...RECAP, goal: 'a'.repeat(81) }))).toBeNull()
+  expect(parseRecap(PIPELINE)).toBeNull()
+  expect(parseRecap('{oops')).toBeNull()
+})
+
+test('recap : repli sur discussion.md, coupé et borné', () => {
+  const long = `une décision très longue ${'x'.repeat(120)}`
+  const md = [
+    '# Discussion — x',
+    '',
+    '## Décisions',
+    `- ${long}`,
+    '  suite de la puce, ignorée',
+    '- deux',
+    '- trois',
+    '- quatre',
+    '- cinq',
+    '- six',
+    '- sept',
+    '',
+    '## Questions ouvertes',
+    '- RÉSOLU : la base de la feature',
+    '- sélection multiple ?',
+  ].join('\n')
+  const recap = discussionFallback(md)
+  expect(recap.source).toBe('discussion')
+  expect(recap.goal).toBe('')
+  expect(recap.decided).toHaveLength(5)
+  expect(recap.decided[0]).toHaveLength(80)
+  expect(recap.decided[0]?.endsWith('…')).toBe(true)
+  expect(recap.decided[1]).toBe('deux')
+  expect(recap.open).toEqual(['sélection multiple ?'])
+  expect(discussionFallback('')).toEqual({ goal: '', decided: [], open: [], aside: [], stage: '', source: 'discussion' })
+  expect(discussionFallback('# rien\n- une puce hors section').decided).toEqual([])
+})
+
+test('recap : ce qui a bougé depuis le dernier passage, avancement, durée', () => {
+  const snap = parseState('feature', 'two_factor_login', PIPELINE, 5)!
+  expect(sinceLines(snap, Date.parse('2026-10-06T00:00:00Z'))).toEqual(['impl (vert) ✗ (Ivan)'])
+  expect(sinceLines(snap, null)).toEqual(['impl (vert) ✗ (Ivan)', 'tests (rouge) ✓ (Théo)', 'contrats ✓ (Arthur, puis Thibault)'])
+  const broken = { ...snap, stages: [...snap.stages, { key: 'review', label: 'review', status: 'PASSED', attempts: 0, at: 'nope' }] }
+  expect(sinceLines(broken, null)).toHaveLength(3)
+  expect(sinceLines(broken, null)).not.toContain('review ✓ (Romain)')
+  const four = { ...snap, stages: [...snap.stages, { key: 'clean', label: 'clean', status: 'SKIPPED', attempts: 0, at: '' }] }
+  expect(progress(four)).toBe('2/3')
+  expect(ago(2 * 86_400_000)).toBe('il y a 2 j')
+  expect(ago(3 * 3_600_000)).toBe('il y a 3 h')
+  expect(ago(5 * 60_000)).toBe('il y a 5 min')
 })

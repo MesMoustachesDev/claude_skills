@@ -175,6 +175,39 @@ export type PendingView = {
   docs: PendingDoc[]
 }
 
+/** Le résumé « Reprendre le fil » : écrit par l'orchestrateur (`pipeline.sh recap`), ou extrait de discussion.md. */
+export type Recap = {
+  /** Le but de la feature en une ligne, vide pour un extrait de discussion.md. */
+  goal: string
+  decided: string[]
+  open: string[]
+  /** Ce qui a été sorti du périmètre, et où c'est parti. */
+  aside: string[]
+  /** L'étape courante quand le résumé a été écrit, vide pour un extrait. */
+  stage: string
+  source: 'recap' | 'discussion'
+}
+
+/** L'encart « Reprendre le fil » d'une feature, prêt à dessiner. */
+export type RecapView = {
+  name: string
+  /** « 3b — Revue des tests », depuis `pipeline.sh next`. */
+  step: string
+  /** Qui tient l'étape, vide si inconnu. */
+  owner: string
+  /** « 7/15 » : étapes passées sur étapes non sautées. */
+  progress: string
+  /** cockpit.waiting, vide sinon. */
+  waiting: string
+  /** Ce qui a bougé depuis le dernier passage de Thibault. */
+  since: string[]
+  /** « il y a 2 j », vide sans passage connu. */
+  seenAgo: string
+  recap: Recap | null
+  /** Le résumé date d'une étape précédente. */
+  isStale: boolean
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'pipeline-view': {
@@ -204,6 +237,8 @@ declare module 'claude-code' {
       selectedDoc: string
       /** L'encart montre le fichier entier au lieu de son diff. */
       showFullDoc: boolean
+      /** L'encart « Reprendre le fil », null hors d'une feature. */
+      recap: RecapView | null
     }
   }
 }
