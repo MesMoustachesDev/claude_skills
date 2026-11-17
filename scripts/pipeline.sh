@@ -33,6 +33,8 @@
 #                                                preflight QA : appareil de Quentin (pipeline.json → qa_devices)
 #   pipeline.sh watchdog <nom> [--json] [--notify]  feature bloquée ? done|working|waiting_thibault|stalled|idle
 #   pipeline.sh say <nom> "<texte>" [--report <étape>] [--ask <id> --options "A|B"]  « en attente de toi » du cockpit (+ étape du rapport)
+#   pipeline.sh recap <nom> <fichier.json>       résumé « Reprendre le fil » du panneau (goal, decided ≤5, open ≤3,
+#                                                aside ≤3, une ligne de 80 caractères au plus) ; refusé hors schéma
 #   pipeline.sh cockpit-push <nom> <dossier> [--versions id=v,…] [--hub-version N]  documents de la page de la feature (writes) et de sa ligne dans l'accueil (hub_writes)
 #   pipeline.sh cockpit-pull <nom> <dossier>     applique les éditions de contrats lues du cockpit
 #   pipeline.sh cockpit-page <nom> <dossier>     copie de la page du cockpit pour cette feature (à publier au démarrage)

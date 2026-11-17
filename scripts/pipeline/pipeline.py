@@ -633,6 +633,8 @@ def tests_added_paths(c, paths):
 
 def cmd_set(c, args):
     key, raw = args[0], args[1]
+    if key == "recap" or key.startswith("recap."):
+        die("recap s'écrit par pipeline.sh recap <nom> <fichier.json> (validé), jamais par set")
     try:
         val = json.loads(raw)
     except json.JSONDecodeError:
@@ -675,6 +677,64 @@ def cmd_say(c, args):
     c.p["cockpit"]["at"] = now()
     c.save()
     print("message du cockpit écrit")
+
+
+# Le résumé « Reprendre le fil » du panneau pipeline-view : une ligne par chaîne, de quoi le lire d'un coup d'œil.
+RECAP_LINE = 80
+RECAP_LISTS = {"decided": 5, "open": 3, "aside": 3}
+
+
+def recap_errors(raw):
+    """Les écarts du JSON au schéma du résumé, un message par écart, nommant le champ. Vide : il passe."""
+    if not isinstance(raw, dict):
+        return ["un objet JSON est attendu"]
+    errs = [f"champ inconnu : {k}" for k in raw if k != "goal" and k not in RECAP_LISTS]
+
+    def line(field, v):
+        if not isinstance(v, str):
+            return f"{field} : une chaîne est attendue, reçu {json.dumps(v, ensure_ascii=False)}"
+        if not v.strip():
+            return f"{field} : chaîne vide"
+        if "\n" in v or "\r" in v:
+            return f"{field} : une seule ligne"
+        if len(v) > RECAP_LINE:
+            return f"{field} : {len(v)} caractères, {RECAP_LINE} au plus"
+        return None
+
+    if "goal" not in raw:
+        errs.append("goal : absent")
+    else:
+        errs.append(line("goal", raw["goal"]))
+    for field, most in RECAP_LISTS.items():
+        items = raw.get(field, [])
+        if not isinstance(items, list):
+            errs.append(f"{field} : une liste est attendue")
+            continue
+        if len(items) > most:
+            errs.append(f"{field} : {len(items)} éléments, {most} au plus")
+        errs += [line(f"{field}[{i}]", v) for i, v in enumerate(items)]
+    return [e for e in errs if e]
+
+
+def cmd_recap(c, args):
+    """Le résumé « Reprendre le fil », écrit par l'orchestrateur à chaque point d'étape. Texte de modèle : refusé
+    hors schéma, pipeline.json intact."""
+    if not args:
+        die("usage : recap <nom> <fichier.json>  ({goal, decided ≤5, open ≤3, aside ≤3}, 80 caractères par ligne)")
+    try:
+        with open(args[0], encoding="utf-8") as f:
+            raw = json.load(f)
+    except OSError as e:
+        die(f"recap refusé : {args[0]} illisible ({e.strerror})")
+    except json.JSONDecodeError as e:
+        die(f"recap refusé : JSON illisible ({e.msg}, ligne {e.lineno})")
+    errs = recap_errors(raw)
+    if errs:
+        die("recap refusé : " + " ; ".join(errs))
+    c.p["recap"] = {"goal": raw["goal"], **{k: raw.get(k, []) for k in RECAP_LISTS},
+                    "at": now(), "stage": next_step(c.p)["key"]}
+    c.save()
+    print("recap écrit")
 
 
 QA_DEVICE_MODES = ("fresh", "prepared", "reuse")
@@ -1481,7 +1541,7 @@ def cmd_cockpit_page(c, args):
 
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
-    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say,
+    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say, "recap": cmd_recap,
     "devices": cmd_devices, "watchdog": cmd_watchdog,
     "after-architect": cmd_after_architect, "reached": cmd_reached, "replay": cmd_replay, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
