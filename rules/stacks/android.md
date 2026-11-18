@@ -119,6 +119,7 @@ un **bloquant** (critique de spec) et un **critique** (revue). Gate : `error_han
   calcul lourd dans la composition (`remember`, `derivedStateOf`), lambdas stables.
 - Un bloc ajouté à une fonction existante qui la ferait dépasser le seuil de longueur (`threshold.function_lines`) ou d'imbrication (`threshold.nesting`) s'extrait en fonction nommée, pas en ligne. (learn 2026-11-12, inline_block_exceeds_function_length, 2 runs)
 - Quand une méthode publique perd son dernier appelant en production, supprime-la avec ses tests (re-gel) ; ne la garde jamais pour un test. (learn 2026-11-16, dead_api_kept_for_frozen_test, 2 runs)
+- Une lecture ponctuelle passe par une fonction `suspend` de la data source ou du repository (ajoutée à l'interface s'il le faut), jamais par `first()` ou `take(1)` sur un Flow d'observation. (learn 2026-11-18, one_shot_read_through_watch_flow, 2 runs)
 
 ## Voir un écran sans appareil (Android CLI)
 
