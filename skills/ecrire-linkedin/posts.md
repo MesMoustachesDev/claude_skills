@@ -15,9 +15,19 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 ## La forme
 
 - **Jamais de hashtags.**
-- Uniquement des caractères tapables au clavier : pas de tiret cadratin ni demi-cadratin, pas de flèche, pas de puce spéciale, pas d'apostrophe typographique ’, pas de « … » en un seul caractère (trois points tapés). Les guillemets « » sont permis dans un post.
-- Listes en « - » en début de ligne, introduites par une ligne finie par « : ».
+- Uniquement des caractères tapables au clavier : pas de tiret cadratin ni demi-cadratin, pas de flèche, pas de puce spéciale, pas d'apostrophe typographique ’, pas de « … » en un seul caractère (trois points tapés), pas de guillemets « » (Option+7 sur un Mac, comme le tiret cadratin) : les citations vont entre guillemets droits ".
+- Listes en « - » en début de ligne, un élément par ligne, introduites par une ligne finie par « : ».
+- Des blocs d'1 ou 2 lignes, une ligne vide entre chaque.
+- Les nombres en chiffres. Un montant garde la devise du fait réel (des tokens facturés en $ restent en $).
 - Pas de tournures IA : pas de « Le problème n'est pas… », « Ce qui fait la différence… », « Pas X. Mais Y. », « X, c'est A. Y, c'est B. », pas de « c'est comme », pas de maxime de mug, pas d'enchaînement de petites phrases-constats. Écrire simple, comme à un enfant de 8 ans. Un storytelling en phrases courtes, ça va.
+- Autres tournures qui font IA, interdites aussi :
+  - une phrase courte suivie d'un fragment (« X coûte moins cher. Et ça produit plus. »)
+  - une question rhétorique suivie d'une réponse courte (« Et honnêtement ? Je le comprends. »)
+  - les négations empilées et les chutes sèches (« Pas de miracle, de la data. », « 20 $ par feature, pour rien. »)
+  - les phrases explicatives équilibrées (« ça n'a pas marché parce que X, ça a marché parce que Y »)
+  - les anaphores et les structures parallèles répétées
+  - les stats empilées en lignes courtes : on écrit une vraie phrase avec un verbe
+  - Mes interjections sans verbe restent permises (« La vache. », « Bah oui », « Raté. ») : c'est la rafale de constats sans verbe qui sent l'IA.
 - Je ne suis pas PO : « ce à quoi on pense » plutôt que « ce qui a été décidé ».
 - 2 ou 3 tics de `voix.md`, une touche Kaamelott au maximum.
 - Emojis : zéro, ou un seul qui ajoute le ton. Jamais 🚀 💡 🎯 🔥 ✅ 👉 💪 🙌.
@@ -26,7 +36,7 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 ## Le ton
 
 Constaté sur la MegaSearch de novembre 2026 : les posts tech FR qui marchent sont courts et prennent position.
-- **Le hook prend position** : un pari (« Je prends le pari inverse »), un désaccord, ou une phrase de hype citée puis démontée en une ligne (« Non. Tu as ouvert 7 sessions Claude Code avec un dashboard. »). Plutôt ça que « voilà ce qui m'est arrivé ». L'anecdote vient ensuite, comme preuve.
+- **Le hook annonce le sujet, avec un chiffre ou un aveu**, et prend position : un pari (« Je prends le pari inverse »), un désaccord, ou une phrase de hype citée puis démontée en une ligne (« Non. Tu as ouvert 7 sessions Claude Code avec un dashboard. »). Plutôt ça que « voilà ce qui m'est arrivé ». L'anecdote vient ensuite, comme preuve.
 - **Une vraie question de désaccord est permise** en toute fin, après la punchline (à la place du PS, ou après lui). Elle porte sur un point précis du post et invite à me contredire : « Je me trompe sur quel point ? », « Vous auriez gardé l'auto-enchaînement, vous ? ». La question au bateau (« Et vous, vous en pensez quoi ? ») reste interdite.
 - **Le texte seul est une option à part entière.** Une image seulement si elle montre quelque chose (une capture, un chiffre), pas pour décorer.
 
@@ -41,7 +51,7 @@ Obligatoires :
 6. **Une punchline avant la fin** (avant le PS ou la question de désaccord). Essentielle. Une question ne compte pas comme punchline.
 
 Facultatives, seulement si le post s'y prête (pas toutes à la fois, sinon tous les posts ont le même moule) :
-7. Un bloc en escalier : des lignes courtes qui s'enchaînent.
+7. Un bloc en escalier : des lignes qui raccourcissent chacune du même nombre de caractères que la précédente (compte-les).
 8. Une ligne finie par « : » avant une liste en « - ».
 9. Des mots de liaison en début de ligne (« Sauf que », « Bah oui », « Et », « Du coup »).
 10. Dire à qui il s'adresse (« Si tu es dev mobile… »).

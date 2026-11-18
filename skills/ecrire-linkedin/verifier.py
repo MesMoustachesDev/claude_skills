@@ -31,6 +31,9 @@ for car, nom in [("—", "tiret cadratin"), ("–", "tiret demi-cadratin"), ("�
                  ("…", "points de suspension en un caractère (taper ...)")]:
     if car in texte:
         erreurs.append(f"{nom} ({texte.count(car)}x)")
+for car, nom in [("«", "guillemet « (Option+7, taper des guillemets droits)"), ("»", "guillemet »")]:
+    if car in texte:
+        erreurs.append(f"{nom} ({texte.count(car)}x)")
 for car in "→←⇒⇨➜➡•▸►▪◦✓✔":
     if car in texte:
         erreurs.append(f"symbole non tapable « {car} »")
@@ -73,10 +76,14 @@ TOURNURES = [
 ]
 cherche(TOURNURES, erreurs, "tournure IA")
 
+# Question rhétorique suivie d'une réponse courte (« Et honnêtement ? Je le comprends. »)
+for m in re.finditer(r"\?\s+([A-Za-zÀ-ÿ][^?!.\n]*)[.!]", texte):
+    if len(m.group(1).split()) <= 4:
+        attentions.append(f"question suivie d'une réponse courte : « {texte[max(0, m.start() - 40):m.end()].strip().replace(chr(10), " / ")} »")
+
 if mode in ("commentaire", "message"):
-    for car, nom in [("«", "guillemet « (guillemets droits en commentaire)"), ("»", "guillemet »"), (";", "point-virgule")]:
-        if car in texte:
-            erreurs.append(nom)
+    if ";" in texte:
+        erreurs.append("point-virgule")
     cherche([r"^(exactement|tellement vrai|totalement d'accord|bien vu|smart|top ?!|très juste)",
              r"\bje vois que\b", r"\bje retiens\b", r"\bvaut mieux que\b", r"\bpas forcément\b",
              r"\breste toujours\b", r"\bau final\b", r"\bfinalement\b", r"\ben réalité\b",

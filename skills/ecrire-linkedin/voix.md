@@ -58,7 +58,7 @@ Post : 2 ou 3 touches, pas plus. Commentaire ou message : une au maximum, et pas
 
 ## Règles de style
 - Jamais de tiret cadratin (—).
-- Uniquement des caractères que je tape au clavier : pas de flèches (→), pas de puces spéciales (•, ▸), pas de symboles copiés. Pour une liste : « - » en début de ligne.
+- Uniquement des caractères que je tape au clavier : pas de flèches (→), pas de puces spéciales (•, ▸), pas de guillemets « » (guillemets droits "), pas de symboles copiés. Pour une liste : « - » en début de ligne.
 - Pas de tournures IA : pas de formules toutes faites (« Le problème n'est pas… », « Ce qui fait la différence… », « Pas X. Mais Y. », « X, c'est A. Y, c'est B. »), pas d'enchaînement de petites phrases-constats, pas de question « au bateau » seule pour l'engagement. Écrire simple, comme à un enfant de 8 ans. Un storytelling en phrases courtes, ça va.
 - Je ne suis pas PO : « ce à quoi on pense » plutôt que « ce qui a été décidé ».
 
