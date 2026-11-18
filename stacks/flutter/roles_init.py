@@ -13,7 +13,7 @@ attribuée une fois et une seule, aucune inconnue — et la refuse sinon. Il n'e
   roles_init.py check --todo <roles_todo.json> --proposal <p.json> --vocab <.claude/rules/roles.md> --root <features_root>
       à blanc : ce qui changerait (vocabulaire, lignes insérées par fichier). Exit 1 si la proposition est refusée.
   roles_init.py apply  (mêmes options)
-      écrit le vocabulaire et insère `/// rôle: <mot>` à la ligne prévue, en partant du bas de chaque fichier.
+      écrit le vocabulaire et insère `/// role: <word>` à la ligne prévue, en partant du bas de chaque fichier.
 """
 import argparse
 import json
@@ -22,7 +22,8 @@ import re
 import sys
 from collections import defaultdict
 
-WORD = re.compile(r"^[a-zà-öø-ÿ0-9]+(-[a-zà-öø-ÿ0-9]+)*$")
+# Un mot en anglais, comme le reste du code : minuscules ASCII et tirets.
+WORD = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 VOCAB_LINE = re.compile(r"^\s*[-*]\s*`([^`]+)`")
 
 
@@ -102,7 +103,7 @@ def plan(todo, assigned, root):
             errors.append(f"{d['id']} : {d['name']} n'est plus à la ligne {at} (relance gauntlet.sh roles_todo)")
             continue
         indent = re.match(r"\s*", lines[at - 1]).group(0)
-        text = f"{indent}/// rôle: {assigned[d['id']]}"
+        text = f"{indent}/// role: {assigned[d['id']]}"
         if not d.get("doc"):
             # Sans doc, au-dessus des commentaires `//` qui précèdent : un `// ignore:` doit rester
             # collé à la ligne qu'il vise.
@@ -161,7 +162,7 @@ def main():
         os.makedirs(os.path.dirname(a.vocab) or ".", exist_ok=True)
         head = "" if os.path.exists(a.vocab) else (
             "# Rôles des déclarations\n\nVocabulaire fermé (ADR 0016 du pipeline) : chaque widget, fonction ou extension "
-            "réutilisable porte `/// rôle: <mot>` dans sa doc, le mot pris ici. Un mot dit ce que la déclaration rend "
+            "réutilisable porte `/// role: <word>` dans sa doc, le mot pris ici, en anglais comme le reste du code. Un mot dit ce que la déclaration rend "
             "ou calcule, pas où elle vit.\n\n")
         with open(a.vocab, "a", encoding="utf-8") as out:
             out.write(head + "".join(f"- `{m}` : {new_words[m]}\n" for m in sorted(new_words)))

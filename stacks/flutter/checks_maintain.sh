@@ -366,7 +366,7 @@ check_dedup_candidates() {
 }
 
 # Rôles (ADR 0016) — le vocabulaire fermé du projet (roles.file, défaut .claude/rules/roles.md) : une ligne
-# `rôle: <mot>` dans la doc de chaque déclaration réutilisable.
+# `role: <word>` (en anglais) dans la doc de chaque déclaration réutilisable.
 roles_file() { printf '%s/%s' "$PROJECT_ROOT" "$(cfg roles.file .claude/rules/roles.md)"; }
 
 # roles_index — entrée de Sophie et d'Arthur AVANT qu'ils écrivent : les déclarations du workspace par

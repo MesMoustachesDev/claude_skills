@@ -1,6 +1,6 @@
 # 0016 — Chaque déclaration réutilisable porte un rôle d'un vocabulaire fermé, et l'index des rôles est lu avant d'écrire
 
-Statut : acceptée (2026-11-17), amendée le 2026-11-17 (vocabulaire sous `.claude/rules/`, variantes statiques)
+Statut : acceptée (2026-11-17), amendée le 2026-11-17 (vocabulaire sous `.claude/rules/`, variantes statiques), puis le 2026-11-18 (marqueurs en anglais)
 Où elle vit : `scripts/gauntlet/dart_tools/bin/dup_check.dart` (`--roles`, `--roles-index`, `--roles-check`,
 candidats par rôle) · `stacks/flutter/checks_maintain.sh` (`roles_index`, `roles`) ·
 `scripts/gauntlet/profiles.sh` (`roles` dans `MAINTAIN_FIXABLE`, donc au gate `clean`) ·
@@ -26,8 +26,8 @@ il faut le mettre dans son contexte avant qu'il écrive, pas seulement le détec
 
 - **Vocabulaire fermé, par projet** : `.claude/rules/roles.md` (`roles.file`), une ligne
   « - `<mot>` : description » par rôle. Le nom du rôle dit ce que la déclaration rend ou calcule
-  (`état-vide`, `format-prix`), pas où elle vit.
-- **Le marqueur** : une ligne `rôle: <mot>` dans la doc (`/// rôle: état-vide`). C'est un commentaire,
+  (`empty-state`, `price-format`), pas où elle vit. Les mots sont en anglais, comme le reste du code.
+- **Le marqueur** : une ligne `role: <word>` dans la doc (`/// role: empty-state`). C'est un commentaire,
   pas une annotation Dart : rien à importer, lisible par grep, et la même syntaxe sert à d'autres langages.
 - **Avant d'écrire** : `gauntlet.sh roles_index` produit en 0b `roles_index.md`, les déclarations du
   workspace par rôle et celles des packages partagés qui n'en ont pas encore. Sophie (exploration, §8)
@@ -72,3 +72,11 @@ il faut le mettre dans son contexte avant qu'il écrive, pas seulement le détec
   précèdent la déclaration (sinon l'ignore ne s'applique plus), avec une ligne vide quand la déclaration
   précédente est collée (ce que `dart format` exigerait). Vérifié par `analyze` et `dart format`
   identiques avant et après.
+
+## Amendement du 2026-11-18 : marqueurs en anglais
+
+Le premier vocabulaire posé dans un projet était en français (`/// rôle: accès-contexte`), au milieu d'une
+doc de code écrite en anglais. Le marqueur devient `/// role: <word>` et les mots sont en anglais :
+`roles_init.py` refuse un mot qui n'est pas en minuscules ASCII avec tirets, et Nina ajoute ses mots en
+anglais. `dup_check.dart` lit encore `rôle:` pour les projets pas encore migrés. Seules les descriptions
+du vocabulaire, lues par les agents, restent en français.

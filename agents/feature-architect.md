@@ -69,7 +69,7 @@ rien ne fournit, deux Then incompatibles) : ne le tords pas, remonte-le sous « 
    Ton prompt donne l'index des rôles (`roles_index.md`, ADR 0016) → avant de poser un widget, une
    fonction ou une extension, cherche son rôle dans l'index : ce qui existe se réutilise, ou s'étend
    s'il fait presque tout (« Ajouts proposés » le dit). Ce que tu poses de réutilisable porte
-   `/// rôle: <mot>` du vocabulaire (`.claude/rules/roles.md`) : Denis le compare en 1d à tout ce qui porte
+   `/// role: <word>` du vocabulaire (`.claude/rules/roles.md`) : Denis le compare en 1d à tout ce qui porte
    le même rôle.
 4. Rien d'autre à la main (ce que le brick génère reste tel quel) : pas de DI, de route, de clé
    l10n, de modèle de données ni de mapper — ce sera le mode complétion, une fois les contrats de Thibault et la spec écrits. Le `README.md`

@@ -59,7 +59,7 @@
       signature et doc ; `vocab` = les mots déjà là). Rien à marquer → dis-le et arrête-toi.
    2. Lis le code de chaque déclaration (ce qu'elle rend ou calcule, pas son nom) et écris la proposition
       `<scratchpad>/roles/proposal.json` au format de l'en-tête de `stacks/flutter/roles_init.py` : un
-      vocabulaire court (un mot par responsabilité, réutilisé partout où elle revient ; deux widgets qui
+      vocabulaire court, en anglais comme le code (un mot par responsabilité, réutilisé partout où elle revient ; deux widgets qui
       rendent la même chose ont le même mot, c'est tout l'intérêt), les mots existants repris tels quels.
    3. `python3 ~/.claude/stacks/flutter/roles_init.py check --todo … --proposal … --vocab .claude/rules/roles.md
       --root <features_root>` : refusé → corrige la proposition et relance ; jamais d'édition à la main du
@@ -67,7 +67,7 @@
       déclarations par mot, puis un extrait des insertions) et demande en une question : « appliquer » /
       « changer des mots » (il dit lesquels ; nouvelle proposition, nouveau check).
    4. Sur son oui : `roles_init.py apply` (mêmes options), puis `gauntlet.sh roles_todo` à nouveau (0 attendu)
-      et `analyze` du langage sur les packages touchés. Commite `chore: rôles des déclarations (ADR 0016)` ;
+      et `analyze` du langage sur les packages touchés. Commite `chore: declaration roles (ADR 0016)` ;
       la MR reste à Thibault. Une déclaration qui mérite d'être fusionnée avec une autre du même rôle :
       liste-la dans ton résumé, ne la touche pas.
 6. `gauntlet.sh doctor` à nouveau. Tant qu'il est rouge, corrige ou demande. Résume ce qui a été créé.

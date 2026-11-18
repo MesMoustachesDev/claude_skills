@@ -14,7 +14,7 @@
 // tranche : même responsabilité, à étendre, ou distinct. L'IA là où elle détecte mieux, sur un
 // espace de recherche que le script a réduit de 8 000 déclarations à quelques-unes.
 //
-// Rôles (ADR 0016) : une ligne `rôle: <mot>` dans la doc d'une déclaration, le mot pris dans le
+// Rôles (ADR 0016) : une ligne `role: <word>` (`rôle:` lu aussi) dans la doc d'une déclaration, le mot pris dans le
 // vocabulaire fermé du projet (--roles, `.claude/rules/roles.md` : lignes « - `<mot>` : description »).
 // Deux déclarations du même rôle sont candidates l'une de l'autre quels que soient leurs noms.
 //   --roles-index <out.md>  l'index de tout le workspace, par rôle, lu par Sophie et Arthur AVANT
@@ -53,7 +53,7 @@ class Decl {
   /// La classe d'un statique : `FormDao.getId` est de l'architecture, pas une roue à marquer.
   final String? owner;
   final int line, tokens;
-  /// Où poser `/// rôle:` : la ligne qui suit la doc, ou la première ligne de la déclaration sans doc.
+  /// Où poser `/// role:` : la ligne qui suit la doc, ou la première ligne de la déclaration sans doc.
   final int roleLine;
   final bool isPublic, nameChecked;
   final int? fingerprint; // null : pas de corps (classe, enum, abstrait)
@@ -580,7 +580,7 @@ int _checkRoles(List<Decl> target, Map<String, String> vocab, Set<String> ignore
     stdout.writeln('   ✗ sans rôle    ${d.kind} ${d.name}  ${d.where}');
   }
   for (final d in unknown) {
-    stdout.writeln('   ✗ hors vocab.  ${d.kind} ${d.name}  ${d.where}  rôle: ${d.role}');
+    stdout.writeln('   ✗ hors vocab.  ${d.kind} ${d.name}  ${d.where}  role: ${d.role}');
   }
   return missing.isEmpty && unknown.isEmpty ? 0 : 1;
 }
