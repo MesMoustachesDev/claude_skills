@@ -1,35 +1,30 @@
 ### 6. Tri des remarques par Thibault
 
-Le tri se fait dans la session, en `AskUserQuestion`, **par paquets de 4 remarques au plus, critiques
-d'abord** (puis suggestions, questions, « à vérifier »). Une question par remarque, avec deux options :
-« Commenter (Recommandé) » / « Écarter ». Chaque question se suffit à elle-même (il répond souvent depuis
-Remote Control, où il ne voit qu'elle) : `fichier:ligne`, l'agent et la gravité, le problème en une
-phrase, l'extrait de code (le `snippet` de `findings.json`, réduit aux lignes utiles), puis le
-**commentaire proposé** tel qu'il partirait. Une remarque dont tu doutes de la preuve (étape 5) :
-dis-le dans sa question. Une remarque `to_verify` : dis qu'elle n'est pas prouvée et qu'elle ne sera
-pas postée telle quelle.
+Dans le cockpit, chaque remarque montre son agent, sa gravité, `fichier:ligne`, le problème, le
+pourquoi, la preuve, la suggestion, et le commentaire proposé. Thibault choisit **Commenter** ou
+**Écarter**, et peut réécrire le commentaire à la main, ou l'**orienter** : un champ de consigne (« plus
+court », « sous forme de question », « avec la correction en code »…) et Claude le réécrit depuis la
+page, avec la remarque, sa preuve et le code autour ; « Revenir à la version d'avant » annule. Le cockpit enregistre, rien ne part.
 
-Une réponse « Other » de Thibault vaut **nouveau texte du commentaire** (la remarque est donc
-commentée, avec ce texte). Si elle ressemble plutôt à une consigne (« plus court », « en question »)
-ou à une question, ce n'est pas un texte : réécris le commentaire selon la consigne et repose la
-question pour cette remarque, ou réponds-lui.
+**Attendre.** Un seul `AskUserQuestion` : « J'ai trié dans le cockpit » / « Trions ici, dans la
+session » / « Discuter — je veux comprendre une remarque avant de trier ». Un message
+`[cockpit <clé>]` reçu par le cockpit vaut « J'ai trié dans le cockpit ».
 
-**Chaque paquet s'enregistre aussitôt**, par `review.sh` et jamais à la main :
-- les choix sans texte : `review.sh triage <slug> F1=comment F2=skip F4=comment` (le commentaire
-  proposé est gardé) ;
-- un texte donné par Thibault : `review.sh triage <slug> F3 comment "<son texte>"`.
-
-Le script refuse un id inconnu ou une décision autre que `comment` / `skip` (rien n'est enregistré) ;
-il réécrit `comments.md` et imprime ce qui reste **NON TRIÉ** : c'est le paquet suivant. Rien ne part :
-le tri est un filtre.
-
-Avant le premier paquet, un seul `AskUserQuestion` : « Trions maintenant » / « Discuter — je veux
-comprendre une remarque avant de trier ». **Discuter** → explique la remarque (le code, la preuve, ce
-que chaque choix change), réponds, puis repose la même question. Une remarque déjà triée ne se
-redemande pas, sauf si Thibault veut revenir dessus.
+- **Trié dans le cockpit** → « Trier » (`~/.claude/pipeline/review/cockpit.md`) : `review.sh
+  triage-pull` applique ses choix et écrit `comments.md`. **Ce que Thibault a trié dans le cockpit ne
+  se redemande jamais** : si `triage-pull` échoue ou annonce des remarques « NON TRIÉES » alors qu'il dit
+  avoir tout trié, c'est ta lecture qui a raté (mauvais dossier, liste incomplète) — relis
+  `reviews/<clé>/triage` et recommence, sans lui reposer une seule question. Seules les remarques
+  vraiment absentes du cockpit (la liste ArtifactData ne les contient pas) se posent ici, par paquets de 4 au plus (« Commenter (Recommandé) » / « Écarter », chacune précédée de son
+  `fichier:ligne` et de l'extrait de code), puis écris ses choix dans le cockpit par la même voie
+  (`ArtifactData` `set` sur `reviews/<clé>/triage/<id>` : `{id, decision, text, saved_at}`), et
+  « Trier » à nouveau.
+- **Trions ici** → même chose, toutes les remarques, critiques d'abord.
+- **Discuter** → explique la remarque (le code, la preuve, ce que chaque choix change), réponds, puis
+  repose la même question.
 
 Le tri n'est **pas** une validation de ce qui sera posté : c'est l'étape 7.
 
-`pr_rules.md` impose son propre workflow de triage : il remplace celui-ci, l'enregistrement passe
-toujours par `review.sh triage`. Fin : `review.sh triage` passe l'étape quand toutes les remarques sont
-triées.
+Une remarque dont tu doutes de la preuve (étape 5) : dis-le dans le tri, à côté d'elle.
+`pr_rules.md` impose son propre workflow de triage : il remplace celui-ci, le cockpit reste le
+support. Fin : `triage-pull` passe l'étape quand toutes les remarques sont triées.

@@ -21,19 +21,22 @@ l'étape en cours**. L'état vit dans `~/.cache/gauntlet/review/<slug>/review.js
 `~/.claude/scripts/review.sh` : tu ne l'édites jamais à la main.
 
 0. **Début** (depuis le repo du projet) : `review.sh init <cible>`. Il résout la MR (titre, auteur,
-   description, source, cible, remote) et imprime le `slug` et le dossier de la revue. Une revue déjà
-   en cours sur ce slug reprend.
+   description, source, cible, remote) et imprime le `slug`, le dossier de la revue et la clé du
+   cockpit. Une revue déjà en cours sur ce slug reprend. Puis **crée la page de la revue**
+   (`~/.claude/pipeline/review/cockpit.md`, « Créer la page ») : c'est elle, et elle seule, que ta
+   session surveille.
    L'étape 1 est le **préflight** : tout ce qui empêcherait une partie de la revue (outillage, QA,
    graphe, authentification) est vérifié et tranché avec Thibault avant de lancer quoi que ce soit.
 1. **`review.sh next <slug>`** : l'étape à jouer, le fichier d'étape à lire, le rapport du gauntlet, le
    worktree, l'état des trois agents.
 2. **Lis le fichier d'étape qu'il indique**, puis exécute l'étape.
-3. **Toute écriture d'état passe par `review.sh`** (`pass`, `agent`, `findings`, `merge`, `triage`,
+3. **Toute écriture d'état passe par `review.sh`** (`pass`, `agent`, `say`, `findings`, `triage-pull`,
    `post`, `cleanup`). `review.sh --help` les liste.
-4. **Chaque arrêt pour Thibault se tranche en `AskUserQuestion`.** La question se suffit à elle-même —
-   il répond souvent depuis Remote Control, où il ne voit qu'elle : de quoi on parle (`fichier:ligne`,
-   le constat en une phrase), ce que chaque option change, jamais un identifiant seul (`F3`, « le
-   point 2 ») sans ce qu'il désigne.
+4. **Chaque arrêt pour Thibault se tranche en `AskUserQuestion`**, précédé de `review.sh say <slug> "<ce
+   qu'on attend de lui>"` puis « Rafraîchir » : il ne répond plus depuis la page (2026-11-05). La
+   question se suffit à elle-même — il répond souvent depuis Remote Control, où il ne voit qu'elle : de
+   quoi on parle (`fichier:ligne`, le constat en une phrase), ce que chaque option change, jamais un
+   identifiant seul (`F3`, « le point 2 ») sans ce qu'il désigne.
 5. Retour en 1.
 
 `/reviewPR <slug> status` : `review.sh status <slug>` tel quel.
@@ -55,11 +58,12 @@ captures restent (`~/.cache/gauntlet/review/<slug>/`, `~/.cache/gauntlet/pr/<bra
 | Gauntlet PR | `~/.claude/scripts/pr_gauntlet.sh` (appelé par `review.sh gauntlet`) |
 | Grille partagée | `~/.claude/pipeline/review_grid.md` (avec `feature-reviewer` et `fix-reviewer`) |
 | Format des remarques | `~/.claude/pipeline/review/findings_format.md` |
+| Cockpit | `~/.claude/pipeline/review/cockpit.md` — onglet Revues du cockpit /feature |
 | Règles projet | `.claude/rules/pr_rules.md` (priorité absolue), `.claude/rules/create_feature_rules.md` |
 
 ## Règles de conduite
 
-- **Rien n'est posté sans validation du texte exact.** Le tri (commenter / écarter)
+- **Rien n'est posté sans validation du texte exact.** Le tri dans le cockpit (commenter / écarter)
   n'est **pas** une validation : c'est un filtre. Avant `review.sh post --go`, tu montres dans la
   session le texte exact de chaque commentaire (`review.sh post <slug>` sans `--go`) et tu attends un
   « go » explicite. Valable aussi pour une réponse, une approbation ou un label sur la MR.

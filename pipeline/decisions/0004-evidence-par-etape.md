@@ -17,8 +17,9 @@ une feature n'a pas non plus l'historique de la précédente.
   le log de chaque gate. `pipeline.sh loop` archive chaque verdict de boucle dans `history/`.
 - Chaque point d'étape commence par un rapport régénéré (`gauntlet.sh report`), cité par un lien
   vers `report.html` dans la session.
-- Amendement (2026-11-19) : **le cockpit est retiré** (page Artifact par feature, par fix et par revue,
-  accueil commun, envois `ArtifactData`). Thibault ne s'en servait plus : il suit le pipeline dans les
+- Amendement (2026-11-19) : **le cockpit de /feature et /fix est retiré** (page Artifact par feature et
+  par fix, leurs cartes dans l'accueil, envois `ArtifactData`). Celui de /reviewPR reste
+  (`pipeline/review/cockpit.md`). Thibault ne s'en servait plus pour /feature et /fix : il les suit dans les
   mods pipeline-view et pipeline-band, qui lisent l'étape (`pipeline.sh next --json`,
   `fix/steps.py next --json`), ce qui l'attend (`waiting`, posé par `ask`) et les documents à lire.
   Les appels qui tenaient la page à jour coûtaient environ 1 600 tours d'orchestrateur par mois.

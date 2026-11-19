@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """review.py — état et mécanique de /reviewPR. Usage : voir ../review.sh.
 
-La cible, le worktree, l'état des trois agents, la fusion des remarques, le tri de Thibault et la
-publication sur la MR vivent ici, pas dans le prompt de l'orchestrateur.
+La cible, le worktree, l'état des trois agents, la fusion des remarques, le tri fait dans le cockpit et
+la publication sur la MR vivent ici, pas dans le prompt de l'orchestrateur.
 """
 import difflib
 import fnmatch
@@ -37,7 +37,7 @@ ORDER = [
     ("gauntlet", "2", "Gauntlet sur la branche, worktree conservé", "2_gauntlet.md"),
     ("context", "3", "Le pourquoi avant le comment", "3_contexte.md"),
     ("agents", "4", "Trois relectures en parallèle (archi, code, QA)", "4_agents.md"),
-    ("briefing", "5", "Fusion des remarques, briefing", "5_briefing.md"),
+    ("briefing", "5", "Fusion des remarques, briefing, cockpit", "5_briefing.md"),
     ("triage", "6", "Tri des remarques par Thibault", "6_triage.md"),
     ("posted", "7", "Publication validée sur la MR", "7_publication.md"),
     ("synthesis", "8", "Synthèse finale et suppression du worktree", "8_synthese.md"),
@@ -182,7 +182,7 @@ def cmd_init(args):
         "launched_from": os.getcwd(), **info, "created": now(), "dir": d,
         "gauntlet_out": os.path.join(GAUNTLET_OUT_ROOT, re.sub(r"[^A-Za-z0-9_]", "_", (info["source"] or slug).replace("origin/", "", 1))),
         "worktree": None, "stages": {}, "agents": {r: {"status": "pending"} for r in ROLES},
-        "triage": {}, "posted": [],
+        "triage": {}, "posted": [], "cockpit": {},
     }
     statefile.update(path, lambda _old: s)
     print(f"revue {slug} : {info.get('source')} → {info.get('base') or '(base de la config)'}"
@@ -352,7 +352,7 @@ def cmd_next(r, args):
     print(f"étape     : {n['step']} — {n['title']}")
     if info["step_file"]:
         print(f"lis       : {info['step_file']}")
-    print(f"revue     : {s.get('source')} → {s.get('base')} · {s.get('title') or 'sans titre'}")
+    print(f"revue     : {s.get('source')} → {s.get('base')} · {s.get('title') or 'sans titre'} · clé cockpit {s['key']}")
     print(f"dossier   : {r.dir}")
     if s.get("worktree"):
         print(f"worktree  : {s['worktree']}")
@@ -363,6 +363,8 @@ def cmd_next(r, args):
         print(f"décidé    : {area} — {d['decision']}")
     if n["key"] == "preflight" and s.get("preflight") and preflight_open(s):
         print(f"à trancher: {', '.join(preflight_open(s))}")
+    if (s.get("cockpit") or {}).get("waiting"):
+        print(f"cockpit   : en attente — {s['cockpit']['waiting']}")
 
 
 def cmd_status(r, args):
@@ -382,6 +384,48 @@ def cmd_pass(r, args):
     r.s.setdefault("stages", {})[args[0]] = {"status": "PASSED", "at": now()}
     r.save()
     print(f"{args[0]} : fait")
+
+
+def cmd_page_deleted(r, args):
+    """Thibault a fait supprimer la page de cette revue : l'accueil garde la carte, sans lien."""
+    r.s.setdefault("cockpit", {})["deleted"] = True
+    r.s["cockpit"]["deleted_at"] = now()
+    r.save()
+    print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
+
+
+def parse_ask(args):
+    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
+    if "--ask" not in args:
+        return args, None
+    i = args.index("--ask")
+    ask_id = args[i + 1]
+    rest = args[:i] + args[i + 2:]
+    opts = []
+    if "--options" in rest:
+        j = rest.index("--options")
+        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
+        rest = rest[:j] + rest[j + 2:]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
+        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
+    return rest, {"id": ask_id, "options": opts, "at": now()}
+
+
+def cmd_set_cockpit(r, args):
+    """L'URL de la page de cette revue (publiée par la session au démarrage)."""
+    if not args or not args[0].startswith("https://"):
+        die("usage : set-cockpit <slug> <url de l'artifact>")
+    r.s.setdefault("cockpit", {})["url"] = args[0]
+    r.save()
+    print(f"page de la revue : {args[0]}")
+
+
+def cmd_say(r, args):
+    args, ask = parse_ask(args)
+    r.s.setdefault("cockpit", {})["ask"] = ask
+    r.s.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
+    r.save()
+    print("message du cockpit écrit")
 
 
 def cmd_agent(r, args):
@@ -756,6 +800,21 @@ def snippet(r, path, line, changed):
             "changed": sorted(n for n in changed if start <= n <= end), "target": line}
 
 
+def parse_context(text):
+    """context.md en sections « ## Titre » : objectif, résumé, ce qui existait, ce qui est promis."""
+    out, cur = {}, None
+    for line in (text or "").splitlines():
+        m = re.match(r"^##\s+(.*)$", line)
+        if m:
+            cur = m.group(1).strip().lower()
+            out[cur] = []
+        elif cur:
+            out[cur].append(line)
+    pick = lambda *names: next(("\n".join(v).strip() for k, v in out.items() if any(n in k for n in names)), None)
+    return {"why": pick("pourquoi", "objectif"), "what": pick("ce que fait", "résumé", "resume"),
+            "delta": pick("existait"), "visible": pick("visible", "promet"), "neighbor": pick("voisin")}
+
+
 def finding_key(x):
     return [x.get("file"), x.get("line"), (x.get("title") or "").strip().lower()]
 
@@ -816,8 +875,21 @@ def load_findings(r):
 
 
 # ---------------------------------------------------------------------------
-# Tri et commentaires
+# Cockpit
 # ---------------------------------------------------------------------------
+VOICE_FILE = os.path.join(HOME, ".claude", "skills", "ecrire-linkedin", "voix.md")
+VOICE_REVIEW = os.path.join(HOME, ".claude", "pipeline", "review", "voix_revue.md")
+
+
+def voice_text():
+    """Ma voix pour un commentaire de MR : voix_revue.md, plus les « Règles de style » de voix.md (source unique)."""
+    review = read_text(VOICE_REVIEW) or ""
+    voix = read_text(VOICE_FILE) or ""
+    m = re.search(r"^## Règles de style\n(.*?)(?=^## |\Z)", voix, re.M | re.S)
+    rules = m.group(1).strip() if m else ""
+    return (review + ("\n\n## Règles de style (voix.md)\n" + rules if rules else "")).strip() or None
+
+
 # Vérification mécanique d'un commentaire (même esprit que skills/ecrire-linkedin/verifier.py, adapté à la revue)
 CHECK_ERRORS = [
     (r"—|–", "tiret cadratin ou demi-cadratin"), (r"’", "apostrophe typographique"), (r"…", "points de suspension en un caractère"),
@@ -851,33 +923,93 @@ def cmd_check_comments(r, args):
     sys.exit(1 if bad else 0)
 
 
-def cmd_triage(r, args):
-    """Le tri de Thibault, posé dans la session : review.sh triage <slug> F1=comment F2=skip, ou
-    review.sh triage <slug> F3 comment "<texte du commentaire>". Texte vide : le commentaire proposé."""
-    usage = 'usage : triage <slug> <id> <comment|skip> ["<texte>"]  ou  triage <slug> F1=comment F2=skip …'
+def cmd_cockpit_push(r, args):
     if not args:
-        die(usage)
-    if "=" in args[0]:
-        pairs = []
-        for a in args:
-            fid, sep, decision = a.partition("=")
-            if not sep:
-                die(usage)
-            pairs.append((fid.strip(), decision.strip(), ""))
-    elif len(args) in (2, 3):
-        pairs = [(args[0], args[1], args[2] if len(args) == 3 else "")]
-    else:
-        die(usage)
+        die("usage : cockpit-push <slug> <dossier> [--versions id=v,…]")
+    out_dir = os.path.abspath(args[0])
+    os.makedirs(out_dir, exist_ok=True)
+    versions = {}
+    if "--versions" in args:
+        for pair in filter(None, (x.strip() for x in args[args.index("--versions") + 1].split(","))):
+            k, _, v = pair.partition("=")
+            versions[k.strip().replace("@", "~")] = int(v)
+    s, f = r.s, load_findings(r)
+    n = next_step(s)
+    doc = {
+        "kind": "review", "project": s["project"], "slug": r.slug, "key": s["key"], "number": s.get("number"),
+        "title": s.get("title") or s.get("source"), "author": s.get("author"), "url": s.get("url"),
+        "source": s.get("source"), "base": s.get("base"), "labels": s.get("labels") or [],
+        "step": {"step": n["step"], "title": n["title"], "key": n["key"]},
+        "waiting": (s.get("cockpit") or {}).get("waiting"),
+        "ask": (s.get("cockpit") or {}).get("ask") if (s.get("cockpit") or {}).get("waiting") else None,
+        "agents": {k: {"status": v.get("status"), "summary": v.get("summary")} for k, v in (s.get("agents") or {}).items()},
+        "briefing_md": read_text(r.file("briefing.md"), 60_000),
+        "context": parse_context(read_text(r.file("context.md"))),
+        "description_md": (s.get("description") or "")[:20_000],
+        "gauntlet_md": read_text(os.path.join(s["gauntlet_out"], "report.md"), 60_000),
+        "findings": f.get("findings") or [], "grids": f.get("grids") or {}, "qa": f.get("qa"),
+        "triage": s.get("triage") or {}, "posted": s.get("posted") or [],
+        "preflight": s.get("preflight"),
+        "voice": voice_text(),
+        "updated_at": now(),
+    }
+    fp = os.path.join(out_dir, "review.json")
+    with open(fp, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh, ensure_ascii=False)
+    w = {"op": "set", "collection": "reviews", "doc_id": s["key"], "file_path": fp}
+    if s["key"] in versions:
+        w["if_version"] = versions[s["key"]]
+    cockpit = s.get("cockpit") or {}
+    done = stage_done(s, "synthesis")
+    verdict = None
+    m = re.search(r"### Verdict\s*\n+(.+)", read_text(r.file("synthesis.md")) or "")
+    if m:
+        verdict = m.group(1).strip().strip("_")[:160]
+    posted = len(s.get("posted") or [])
+    index = {"kind": "review", "key": s["key"], "project": s["project"], "title": doc["title"],
+             "number": s.get("number"), "url": None if cockpit.get("deleted") else cockpit.get("url"),
+             "page_deleted": bool(cockpit.get("deleted")), "mr_url": s.get("url"),
+             "step": doc["step"], "waiting": None if done else doc["waiting"], "done": done,
+             "done_at": (s.get("stages") or {}).get("synthesis", {}).get("at") if done else None,
+             "outcome": " · ".join(x for x in (verdict, f"{posted} commentaire{'s' if posted > 1 else ''} publié{'s' if posted > 1 else ''}") if x) if done else None,
+             "updated_at": now()}
+    ip = os.path.join(out_dir, "index.json")
+    with open(ip, "w", encoding="utf-8") as fh:
+        json.dump(index, fh, ensure_ascii=False)
+    hub = {"op": "set", "collection": "index", "doc_id": s["key"], "file_path": ip}
+    if "--hub-version" in args:
+        hub["if_version"] = int(args[args.index("--hub-version") + 1])
+    manifest = {"key": s["key"], "page": cockpit.get("url"), "writes": [w], "hub_writes": [hub]}
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
+
+
+def cmd_triage_pull(r, args):
+    """Le tri fait dans le cockpit (reviews/<clé>/triage/<id>) → review.json et comments.md."""
+    if not args:
+        die("usage : triage-pull <slug> <dossier lu par ArtifactData out_dir>")
+    base = os.path.abspath(args[0])
+    # ArtifactData out_dir range les documents sous <dossier>/reviews/<clé>/triage/ ; on accepte aussi ce
+    # dossier lui-même. Rien de trouvé n'est JAMAIS « rien n'a été trié » : c'est une lecture ratée.
+    candidates = [os.path.join(base, "reviews", r.s["key"], "triage"), base]
+    candidates += [d for d, _, fs in os.walk(base) if d.endswith(os.path.join(r.s["key"], "triage"))]
+    tdir = next((d for d in candidates if os.path.isdir(d) and any(x.endswith(".json") for x in os.listdir(d))), None)
+    if not tdir:
+        die(f"aucun document de tri lu dans {base}. Relis-le : ArtifactData list, collection "
+            f"reviews/{r.s['key']}/triage, out_dir = {base} ; puis relance. Ne repose PAS le tri à Thibault.")
     f = load_findings(r)
     by_id = {x["id"]: x for x in f["findings"]}
-    bad = [f"{fid} (inconnue)" for fid, _, _ in pairs if fid not in by_id]
-    bad += [f"{fid} : « {d} » (comment ou skip)" for fid, d, _ in pairs if d not in ("comment", "skip")]
-    if bad:
-        die("rien enregistré — " + " ; ".join(bad))
     triage = r.s.setdefault("triage", {})
-    for fid, decision, text in pairs:
-        triage[fid] = {"decision": decision, "text": text.strip() or by_id[fid].get("comment"), "at": now()}
-    if f["findings"] and all(x["id"] in triage for x in f["findings"]):
+    for fn in sorted(os.listdir(tdir)) if os.path.isdir(tdir) else []:
+        if not fn.endswith(".json"):
+            continue
+        with open(os.path.join(tdir, fn), encoding="utf-8") as fh:
+            t = json.load(fh)
+        fid = t.get("id") or fn[:-5]
+        if fid not in by_id or t.get("decision") not in ("comment", "skip"):
+            continue
+        triage[fid] = {"decision": t["decision"], "text": (t.get("text") or "").strip() or by_id[fid].get("comment"),
+                       "reason": t.get("reason"), "at": t.get("saved_at") or now()}
+    if all(x["id"] in triage for x in f["findings"]):
         r.s.setdefault("stages", {})["triage"] = {"status": "PASSED", "at": now()}
     r.save()
     write_comments(r, f, triage)
@@ -1283,11 +1415,37 @@ def preflight_open(s):
     return sorted(areas - set((pf.get("decisions") or {}).keys()))
 
 
+
+
+COCKPIT_SRC = os.path.join(HOME, ".claude", "scripts", "cockpit", "cockpit.html")
+
+
+def write_page(dest_dir, title):
+    """Copie de la page du cockpit pour UN élément, avec son propre titre (la galerie les distingue)."""
+    html = read_text(COCKPIT_SRC)
+    if html is None:
+        die(f"page source introuvable : {COCKPIT_SRC}")
+    os.makedirs(dest_dir, exist_ok=True)
+    safe = re.sub(r"[<>&]", "", title)
+    html = re.sub(r"<title>.*?</title>", f'<title>{safe}</title>\n<meta name="cockpit-role" content="item">', html, count=1)
+    path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(path)
+
+
+def cmd_cockpit_page(r, args):
+    if not args:
+        die("usage : cockpit-page <slug> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
+    num = r.s.get("number")
+    write_page(args[0], f"Revue {'!' + num if num else r.slug} {r.s['project']}")
+
+
 COMMANDS = {
-    "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "agent": cmd_agent,
+    "next": cmd_next, "status": cmd_status, "pass": cmd_pass, "say": cmd_say, "agent": cmd_agent,
     "gauntlet": cmd_gauntlet, "qa": cmd_qa, "sim": cmd_sim, "run-tests": cmd_run_tests, "probe": cmd_probe, "cleanup": cmd_cleanup, "findings": cmd_findings,
-    "preflight": cmd_preflight, "merge": cmd_merge, "triage": cmd_triage,
-    "check-comments": cmd_check_comments, "decide": cmd_decide, "post": cmd_post,
+    "cockpit-push": cmd_cockpit_push, "preflight": cmd_preflight, "merge": cmd_merge,
+    "check-comments": cmd_check_comments, "set-cockpit": cmd_set_cockpit, "page-deleted": cmd_page_deleted, "cockpit-page": cmd_cockpit_page, "decide": cmd_decide, "triage-pull": cmd_triage_pull, "post": cmd_post,
 }
 
 
