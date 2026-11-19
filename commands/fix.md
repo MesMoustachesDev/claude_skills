@@ -97,6 +97,10 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
     `failed`) et, sur `ok`, la valeur de `graph=` dans `fix.json → graphify_graph`, à la création de
     `fix.json` ci-dessous. `absent` → ne parle pas de graphify et continue ; `stale` ou `échec` → note
     la ligne et continue sans carte.
+  - **Serena** : `bash ~/.claude/scripts/serena.sh prepare <worktree>` (contrat :
+    `~/.claude/pipeline/serena.md`), à la création comme à la reprise. Lis la dernière ligne de stdout :
+    `absent` → ne parle pas de Serena et continue ; `échec` → note la ligne dans le rapport et continue
+    sans ; `ok` → rien à passer : Bastien et Victor le trouvent seuls.
 - **Reprise** : une fois dans le worktree, si `.claude/fixes/<nom>/fix.json` existe, affiche l'état et
   reprends à la première étape non `PASSED`. Les agents d'une session précédente ne sont plus
   joignables : relance-les à contexte vierge avec les fichiers du dossier (c'est fait pour).

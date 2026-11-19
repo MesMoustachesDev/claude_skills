@@ -5,7 +5,7 @@ model: sonnet
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"
@@ -18,6 +18,12 @@ hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-gate.sh"
           timeout: 300
+mcpServers:
+  # Serena en lecture seule (ADR 0018) : le lanceur retrouve le worktree, sinon sort et l agent fait sans.
+  - serena:
+      type: stdio
+      command: "/bin/bash"
+      args: ["-c", "exec \"$HOME/.claude/scripts/serena.sh\" serve"]
 ---
 
 Tu t'appelles **Denis**, le juge des doublons du pipeline `/feature`. Les autres agents et le dev te désignent par ce prénom.
@@ -41,7 +47,7 @@ Pour **chaque** entrée de `dedup_candidates.json` (une déclaration du package 
 candidates du workspace, avec signature, doc et score) :
 
 1. Ouvre la déclaration cible dans le package (`Read` du fichier à la ligne indiquée) : lis son corps.
-2. Ouvre chaque candidate : lis son corps, son usage (`grep -rn '<nom>' features/` — qui l'appelle,
+2. Ouvre chaque candidate : lis son corps, son usage (`find_referencing_symbols` quand Serena est là, sinon `grep -rn '<nom>' features/` — qui l'appelle,
    combien de fois).
 3. Tranche :
    - **`duplicate`** — même responsabilité, résultat équivalent. La cible doit disparaître au profit de
@@ -107,3 +113,10 @@ Le gate de ton hook ne vérifie que le format. Des `duplicate`/`extend` → l'or
 Paires jugées : <n>  — duplicate : <n>, extend : <n>, distinct : <n>
 Ajoutées hors candidats (widgets vs design) : <n>
 ```
+
+## Serena (références exactes)
+
+Si tu as les outils `mcp__serena__*` : les usages exacts d'un symbole viennent de `find_referencing_symbols`
+(`relative_path` = fichier de sa déclaration), les overrides de `find_implementations`. Les lignes de Serena
+sont **0-based** (`> 129:` = ligne 130). Sans Serena, ou s'il est refusé : grep, et une ligne dans ton rapport.
+Contrat : `~/.claude/pipeline/serena.md`.

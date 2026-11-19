@@ -8,7 +8,7 @@ skills:
   - create_test
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/fix-restrict-writes.sh"
@@ -21,6 +21,12 @@ hooks:
         - type: command
           command: "$HOME/.claude/hooks/fix-gate.sh"
           timeout: 1200
+mcpServers:
+  # Serena en lecture seule (ADR 0018) : le lanceur retrouve le worktree, sinon sort et l agent fait sans.
+  - serena:
+      type: stdio
+      command: "/bin/bash"
+      args: ["-c", "exec \"$HOME/.claude/scripts/serena.sh\" serve"]
 ---
 
 Tu t'appelles **Bastien**, le reproducteur du bug du pipeline `/fix`. Les autres agents et le dev te désignent par ce prénom.
@@ -229,3 +235,10 @@ Besoin du dev : aucun | <ce qu'il faut>
 Gate red : vert
 ```
 En arbitrage : `Verdict : test juste | test corrigé — <raison>`.
+
+## Serena (références exactes)
+
+Si tu as les outils `mcp__serena__*` : les usages exacts d'un symbole viennent de `find_referencing_symbols`
+(`relative_path` = fichier de sa déclaration), les overrides de `find_implementations`. Les lignes de Serena
+sont **0-based** (`> 129:` = ligne 130). Sans Serena, ou s'il est refusé : grep, et une ligne dans ton rapport.
+Contrat : `~/.claude/pipeline/serena.md`.

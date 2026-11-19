@@ -5,7 +5,7 @@ model: sonnet
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/review-restrict-writes.sh"

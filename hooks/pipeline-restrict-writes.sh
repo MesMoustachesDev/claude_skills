@@ -26,21 +26,36 @@ cwd="$(jq -r '.cwd // empty' <<<"$input")"
 scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
 tool="$(jq -r '.tool_name // empty' <<<"$input")"
 GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
-if [ "$tool" = Bash ]; then
-  targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
-else
-  targets="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")"
-fi
-[ -n "$targets" ] || exit 0
-file="${targets%%$'\n'*}"
-
 deny() {
   jq -n --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   exit 0
 }
-# Contexte illisible : Edit/Write refusés ; Bash laissé passer (un `> /tmp/log` n'a pas besoin de la
-# feature, et le gate reste le filet).
+# Contexte illisible : Edit/Write (et Serena) refusés ; Bash laissé passer (un `> /tmp/log` n'a pas besoin
+# de la feature, et le gate reste le filet).
 ctx_deny() { [ "$tool" = Bash ] && exit 0; deny "$1"; }
+
+# Serena (ADR 0018) : liste fermée d'outils. La lecture passe si le serveur de l'agent sert bien ce
+# worktree ; un outil d'écriture va à la même zone qu'un Edit du fichier de relative_path ; tout autre
+# outil Serena est refusé.
+source "$GAUNTLET_ROOT/serena_guard.sh"
+skind="$(serena_kind "$tool")"; served=""
+if [ -n "$skind" ]; then
+  [ "$skind" = other ] && deny "pipeline : outil Serena hors liste ($tool). Permis : $SERENA_READ_TOOLS. Un refus se rapporte, il ne se contourne pas."
+  served="$(serena_served "${cwd:-$PWD}")"
+  [ -n "$served" ] || deny "pipeline : Serena ne sert aucun worktree connu. Cherche les usages avec grep, et dis-le dans ton rapport."
+  targets=""
+  if [ "$skind" = write ]; then
+    rp="$(jq -r '.tool_input.relative_path // empty' <<<"$input")"
+    [ -n "$rp" ] || deny "pipeline : $tool sans relative_path."
+    targets="$(serena_target "$served" "$rp")"
+  fi
+elif [ "$tool" = Bash ]; then
+  targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
+else
+  targets="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")"
+fi
+[ -n "$targets" ] || [ -n "$skind" ] || exit 0
+file="${targets%%$'\n'*}"
 
 # --- contexte projet (réutilise le gauntlet) --------------------------------------------------
 # shellcheck source=../scripts/gauntlet/lib.sh
@@ -49,8 +64,8 @@ source "$GAUNTLET_ROOT/lib.sh"
 # checkout principal (session ouverte sur le projet, reprise) — la branche y est develop et tout serait
 # refusé, ou contourné par Bash. Le fichier écrit, puis le cwd, puis la racine du prompt de l'agent.
 root="$(hook_feature_root "$cwd" "$file" "$(hook_agent_transcript "$input")")" && cwd="$root"
-cd "$cwd" 2>/dev/null || exit 0
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$cwd" 2>/dev/null || { [ -n "$skind" ] && deny "pipeline : Serena, worktree illisible ($cwd)"; exit 0; }
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { [ -n "$skind" ] && deny "pipeline : Serena, $cwd n'est pas un dépôt git"; exit 0; }
 feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
 [ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
 [ -n "$feature" ] || ctx_deny "pipeline : feature courante inconnue (branche feature/<nom> ou .claude/features/.current)"
@@ -80,6 +95,11 @@ normalize() {
   printf '%s%s' "$(cd "$p" && pwd -P)" "$rest"
 }
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd -P)"
+# Serena : le serveur de l'agent doit servir ce worktree (serena.sh which : cwd, sinon dernier prepare du repo).
+if [ -n "$skind" ]; then
+  [ "$served" = "$PROJECT_ROOT" ] || deny "pipeline : Serena sert $served, pas ton worktree ($PROJECT_ROOT). N'utilise pas Serena ici : grep pour les usages, et dis-le dans ton rapport."
+  [ "$skind" = read ] && exit 0
+fi
 
 FEAT_REL=".claude/features/$feature"
 FEATURE_DIR="${FEATURE_DIR:-$PROJECT_ROOT/$FEAT_REL}"
@@ -148,6 +168,7 @@ via=""; [ "$tool" = Bash ] && via=" (écriture par Bash : même zone que Edit/Wr
 check() {
   local file="$1" abs
   abs="$(normalize "$file")"
+  in_serena_dir "$abs" && deny "pipeline : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
   [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0     # brouillons : toujours permis
   if [[ "$abs" != "$PROJECT_ROOT"/* ]]; then
     [ "$tool" = Bash ] && return 0                                  # journaux, /tmp : hors zone, hors sujet

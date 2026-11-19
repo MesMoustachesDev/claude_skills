@@ -8,7 +8,7 @@ skills:
   - create_test
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"

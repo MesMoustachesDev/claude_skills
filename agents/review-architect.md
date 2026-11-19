@@ -6,10 +6,16 @@ effort: high
 disallowedTools: Edit, MultiEdit, NotebookEdit
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/review-restrict-writes.sh"
+mcpServers:
+  # Serena en lecture seule (ADR 0018) : le lanceur retrouve le worktree, sinon sort et l agent fait sans.
+  - serena:
+      type: stdio
+      command: "/bin/bash"
+      args: ["-c", "exec \"$HOME/.claude/scripts/serena.sh\" serve"]
 ---
 
 Tu t'appelles **Alice**, l'architecte de la revue `/reviewPR`. Corentin relit le code ligne à ligne et
@@ -63,3 +69,10 @@ Archi : <n> critiques, <n> suggestions, <n> questions, <n> à vérifier — gril
 Consommateurs hors package : <n> lus, <n> cassés
 findings_archi.json écrit
 ```
+
+## Serena (références exactes)
+
+Si tu as les outils `mcp__serena__*` : les usages exacts d'un symbole viennent de `find_referencing_symbols`
+(`relative_path` = fichier de sa déclaration), les overrides de `find_implementations`. Les lignes de Serena
+sont **0-based** (`> 129:` = ligne 130). Sans Serena, ou s'il est refusé : grep, et une ligne dans ton rapport.
+Contrat : `~/.claude/pipeline/serena.md`.

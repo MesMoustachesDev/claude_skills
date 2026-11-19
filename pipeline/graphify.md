@@ -84,6 +84,7 @@ Sophie en tire aussi la **carte** du cadrage : un `flowchart` Mermaid de ce qui 
 - **Le graphe localise, la lecture et les logs prouvent.** Un nœud ou une arête n'est jamais une preuve
   de comportement ni de cause : va lire le code.
 - `.graphifyignore` exclut le code généré (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `generated_l10n/`)
-  et les tests : le graphe ne voit ni leurs usages ni ceux qui passent par du code généré. Le `grep` des
-  usages d'un symbole modifié reste donc **obligatoire**, `impact.md` ne le remplace pas.
+  et les tests : le graphe ne voit ni leurs usages ni ceux qui passent par du code généré. Les usages
+  d'un symbole modifié se cherchent donc toujours : **`find_referencing_symbols` quand Serena est là, grep
+  sinon** (`~/.claude/pipeline/serena.md`) ; `impact.md` ne les remplace pas.
 - Ne modifie ni le graphe ni `graphify-out/` à la main ; `prepare` et `impact` sont les seuls points d'entrée.

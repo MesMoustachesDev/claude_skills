@@ -1,5 +1,10 @@
 ### 4. Trois relectures en parallèle
 
+**Serena d'abord** (s'il y a un worktree) : `bash ~/.claude/scripts/serena.sh prepare <worktree>` (contrat :
+`~/.claude/pipeline/serena.md`). Dernière ligne de stdout : `absent` → n'en parle pas ; `échec` → une ligne
+dans la synthèse, et les agents font sans ; `ok` → Alice et Corentin l'ont. Le worktree doit figurer dans
+leur prompt (ci-dessous) : c'est à lui que le hook vérifie que Serena sert la bonne revue.
+
 Lance **dans un seul message, trois appels `Agent`** (ils tournent en même temps, en arrière-plan) :
 `review-architect` (Alice), `review-code` (Corentin), `review-qa` (Maëlle). Avant l'envoi,
 `review.sh agent <slug> archi running`, puis `code`, puis `qa`.

@@ -8,10 +8,16 @@ skills:
   - doctrine-review-grid
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/review-restrict-writes.sh"
+mcpServers:
+  # Serena en lecture seule (ADR 0018) : le lanceur retrouve le worktree, sinon sort et l agent fait sans.
+  - serena:
+      type: stdio
+      command: "/bin/bash"
+      args: ["-c", "exec \"$HOME/.claude/scripts/serena.sh\" serve"]
 ---
 
 Tu t'appelles **Corentin**, le relecteur de code de `/reviewPR`. Alice juge l'architecture et Maëlle
@@ -61,3 +67,10 @@ Code : <n> critiques (dont <n> du gauntlet), <n> suggestions, <n> questions, <n>
 Tests : <n> comportements ajoutés, <n> sans test qui les prouve
 findings_code.json écrit
 ```
+
+## Serena (références exactes)
+
+Si tu as les outils `mcp__serena__*` : les usages exacts d'un symbole viennent de `find_referencing_symbols`
+(`relative_path` = fichier de sa déclaration), les overrides de `find_implementations`. Les lignes de Serena
+sont **0-based** (`> 129:` = ligne 130). Sans Serena, ou s'il est refusé : grep, et une ligne dans ton rapport.
+Contrat : `~/.claude/pipeline/serena.md`.

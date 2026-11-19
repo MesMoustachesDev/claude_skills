@@ -22,27 +22,47 @@ cwd="$(jq -r '.cwd // empty' <<<"$input")"
 scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
 tool="$(jq -r '.tool_name // empty' <<<"$input")"
 GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
-if [ "$tool" = Bash ]; then
-  targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
-else
-  targets="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")"
-fi
-[ -n "$targets" ] || exit 0
-
 via=""
 [ "$tool" = Bash ] && via=" (écriture par Bash : même zone que Edit/Write ; un refus ne se contourne pas, il se rapporte)"
 deny() {
   jq -n --arg r "$1$via" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   exit 0
 }
-# Contexte illisible : Edit/Write refusés ; Bash laissé passer (le gauntlet reste le filet).
+# Contexte illisible : Edit/Write (et Serena) refusés ; Bash laissé passer (le gauntlet reste le filet).
 ctx_deny() { [ "$tool" = Bash ] && exit 0; deny "$1"; }
 
+# Serena (ADR 0018) : liste fermée d'outils. La lecture passe si le serveur de l'agent sert bien ce
+# worktree ; un outil d'écriture va à la même zone qu'un Edit du fichier de relative_path ; tout autre
+# outil Serena est refusé.
+source "$GAUNTLET_ROOT/serena_guard.sh"
+skind="$(serena_kind "$tool")"; served=""
+if [ -n "$skind" ]; then
+  [ "$skind" = other ] && deny "fix : outil Serena hors liste ($tool). Permis : $SERENA_READ_TOOLS. Un refus se rapporte, il ne se contourne pas."
+  served="$(serena_served "${cwd:-$PWD}")"
+  [ -n "$served" ] || deny "fix : Serena ne sert aucun worktree connu. Cherche les usages avec grep, et dis-le dans ton rapport."
+  targets=""
+  if [ "$skind" = write ]; then
+    rp="$(jq -r '.tool_input.relative_path // empty' <<<"$input")"
+    [ -n "$rp" ] || deny "fix : $tool sans relative_path."
+    targets="$(serena_target "$served" "$rp")"
+  fi
+elif [ "$tool" = Bash ]; then
+  targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
+else
+  targets="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")"
+fi
+[ -n "$targets" ] || [ -n "$skind" ] || exit 0
+
 source "${FIX_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/fix" && pwd)/lib.sh}"
-cd "$cwd" 2>/dev/null || exit 0
+cd "$cwd" 2>/dev/null || { [ -n "$skind" ] && deny "fix : Serena, worktree illisible ($cwd)"; exit 0; }
 name="$(current_fix)"
 [ -n "$name" ] || ctx_deny "fix : fix courant inconnu (branche fix/<nom> ou .claude/fixes/.current)"
-fix_context "$name" || exit 0
+fix_context "$name" || { [ -n "$skind" ] && deny "fix : Serena, contexte du fix illisible"; exit 0; }
+# Serena : le serveur de l'agent doit servir ce worktree (serena.sh which : cwd, sinon dernier prepare du repo).
+if [ -n "$skind" ]; then
+  [ "$served" = "$PROJECT_ROOT" ] || deny "fix : Serena sert $served, pas ton worktree ($PROJECT_ROOT). N'utilise pas Serena ici : grep pour les usages, et dis-le dans ton rapport."
+  [ "$skind" = read ] && exit 0
+fi
 
 normalize() {
   local p="$1" rest=""
@@ -70,6 +90,7 @@ debug_only() {
 check() {
   local file="$1" abs
   abs="$(normalize "$file")"
+  in_serena_dir "$abs" && deny "fix : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
   [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0
   if [[ "$abs" != "$PROJECT_ROOT"/* ]]; then
     [ "$tool" = Bash ] && return 0                       # journaux, /tmp : hors du projet, libre

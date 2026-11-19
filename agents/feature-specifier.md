@@ -7,7 +7,7 @@ skills:
   - doctrine-answers
 hooks:
   PreToolUse:
-    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash"
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*"
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-restrict-writes.sh"
@@ -20,6 +20,12 @@ hooks:
         - type: command
           command: "$HOME/.claude/hooks/pipeline-gate.sh"
           timeout: 300
+mcpServers:
+  # Serena en lecture seule (ADR 0018) : le lanceur retrouve le worktree, sinon sort et l agent fait sans.
+  - serena:
+      type: stdio
+      command: "/bin/bash"
+      args: ["-c", "exec \"$HOME/.claude/scripts/serena.sh\" serve"]
 ---
 
 Tu t'appelles **Sophie**, la tech lead qui écrit la spec du pipeline `/feature`. Les autres agents et le dev te désignent par ce prénom.
@@ -308,3 +314,10 @@ Dette existante (hors feature) : aucune | <fichier — ce qui ne va pas>, une pa
 Ajouts proposés (spec) : aucun | <Détail | Proposition | Pourquoi c'est utile>, une ligne par élément
   de §5-§8 que ni le cadrage ni les contrats de Thibault ne nomment
 ```
+
+## Serena (références exactes)
+
+Si tu as les outils `mcp__serena__*` : les usages exacts d'un symbole viennent de `find_referencing_symbols`
+(`relative_path` = fichier de sa déclaration), les overrides de `find_implementations`. Les lignes de Serena
+sont **0-based** (`> 129:` = ligne 130). Sans Serena, ou s'il est refusé : grep, et une ligne dans ton rapport.
+Contrat : `~/.claude/pipeline/serena.md`.

@@ -24,6 +24,10 @@
     écris-la dans `pipeline.json → graphify_graph` (à la création, ou en remplacement à la reprise ;
     `null` hors `ok`) : tu la passes à Sophie et à Arthur, qui s'en servent dès le cadrage, et à tout
     agent relancé plus tard ; 9a le mettra à jour.
+  - **Serena** : `bash ~/.claude/scripts/serena.sh prepare <worktree>` (contrat :
+    `~/.claude/pipeline/serena.md`), après la carte et à chaque reprise. Lis la dernière ligne de stdout :
+    `absent` → ne parle pas de Serena et continue ; `échec` → note la ligne et continue sans ; `ok` → rien à
+    passer : Sophie, Arthur, Denis et Romain le trouvent seuls.
   - **Fichiers non versionnés** (création comme reprise), avant l'installation des dépendances :
     `bash ~/.claude/scripts/worktree_untracked.sh <worktree>`. Il copie depuis le checkout principal
     (le premier de `git worktree list`) les fichiers gitignorés que le build et les tests lisent et qui
