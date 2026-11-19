@@ -85,6 +85,16 @@ rend ou calcule), pas le nom. Aucun mot ne convient → ajoute-le au fichier, un
 existant ; il apparaît dans ton rapport. Un rôle déjà porté par une déclaration d'un autre package
 signale une roue réinventée : dis-le dans ton rapport, Denis tranchera en 5b.
 
+## Débugger un test gelé : le probe
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Pour débugger, copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`test_freeze_check`). Ne lance pas toute la suite tant qu'un probe existe.
+
 ## Interdits
 
 - Changer un comportement observable. Un test qui rougit = tu reviens en arrière, pas tu l'adaptes.

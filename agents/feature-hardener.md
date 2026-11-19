@@ -80,6 +80,24 @@ et un refus qui te semble faux va dans ton rapport final, avec le message du hoo
 Si un test existant est **faux** (il rend un mutant intuable parce qu'il fige un comportement
 incorrect), tu ne le corriges pas : tu le signales dans ton rapport final.
 
+## Débugger un test gelé : le probe
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Pour débugger, copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`test_freeze_check`) : il n'est pas un de tes tests `_mutation_test`, qui eux restent. Ne lance pas toute la suite tant qu'un probe existe.
+
+## Les critiques « à vérifier »
+
+La revue peut te renvoyer `review.json → to_verify` (`owner: "hardener"`) : une critique que Romain n'a pas pu prouver
+en lisant le code ou en rejouant un test existant, avec `how`, ce qu'il faudrait lancer. Pour chacune :
+prouve-la par un probe (ci-dessus) ou par le test que `how` désigne, ou écarte-la avec ta preuve. Prouvée → le test qui la prouve devient un de tes nouveaux fichiers (`_mutation_test`), comme un `missing_tests` ; si elle demande de changer le code, dis-le dans ton rapport : l'orchestrateur la renvoie à Ivan.
+Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre> — <ce que tu as fait>` ou
+`écartée — <ce qui la contredit>`. Pas de verdict sans exécution ou sans lecture citée.
+
 ## `mutants.md`
 
 ```

@@ -82,6 +82,24 @@ transmet à Bastien, qui tranche ; tu seras relancé avec sa réponse, ton conte
 Même chose si `baseline_suite` était déjà rouge et que ces échecs te bloquent : dis-le, ne les « répare »
 pas en passant.
 
+## Débugger un test gelé : le probe
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Pour débugger, copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`no_probes`, `freeze_check`). Ne lance pas toute la suite tant qu'un probe existe.
+
+## Les critiques « à vérifier »
+
+La revue peut te renvoyer `review.json → to_verify` (`owner: "implementer"`) : une critique que Victor n'a pas pu prouver
+en lisant le code ou en rejouant un test existant, avec `how`, ce qu'il faudrait lancer. Pour chacune :
+prouve-la par un probe (ci-dessus) ou par le test que `how` désigne, ou écarte-la avec ta preuve. Prouvée → corrige-la comme une critique.
+Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre> — <ce que tu as fait>` ou
+`écartée — <ce qui la contredit>`. Pas de verdict sans exécution ou sans lecture citée.
+
 ## Interdits
 
 - Tout fichier de test, `maestro/`, `.claude/fixes/` : gelés ou hors de ton rôle.

@@ -181,6 +181,16 @@ tests et ton dossier ont changé, aucun `[DEBUG_ISSUE]` ne reste, `target_cmd` �
 contient `expected_failure`. Lance-le toi-même avant de terminer. Le hook projet `test-on-edit` peut te
 signaler que la suite est rouge pendant que tu écris : c'est attendu.
 
+## Débugger un test gelé : le probe
+
+Pour débugger un test (le tien après le gel, ou un test existant), sans le toucher : copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`no_probes`) et le gel le refuserait. Ne lance pas toute la suite tant qu'un probe existe.
+
 ## En arbitrage (relancé par l'orchestrateur)
 
 L'implementer conteste un test. Tu reçois sa contestation. Relis le test, la cause racine, et tranche :
@@ -191,6 +201,14 @@ L'implementer conteste un test. Tu reçois sa contestation. Relis le test, la ca
   Le gate est alors `repro_report` : la rougeur n'est plus exigée, Fanny a déjà avancé.
 
 Un test ne devient jamais plus laxiste pour arranger Fanny : il devient plus juste.
+
+## Les critiques « à vérifier »
+
+La revue peut te renvoyer `review.json → to_verify` (`owner: "reproducer"`, relancé par l'orchestrateur) : une critique que Victor n'a pas pu prouver
+en lisant le code ou en rejouant un test existant, avec `how`, ce qu'il faudrait lancer. Pour chacune :
+prouve-la par un probe (ci-dessus) ou par le test que `how` désigne, ou écarte-la avec ta preuve. Prouvée → écris le test qui la prouve (un vrai test, pas le probe) : l'orchestrateur le re-gèle et renvoie la correction à Fanny.
+Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre> — <ce que tu as fait>` ou
+`écartée — <ce qui la contredit>`. Pas de verdict sans exécution ou sans lecture citée.
 
 ## Interdits
 

@@ -51,6 +51,16 @@ la commande de test du langage sur le fichier que tu cibles. Le hook de fin rela
 les tests rouges de la présentation ne te bloquent pas ; n'y touche pas. Le gate complet (`green`) se joue
 après vous deux.
 
+## Débugger un test gelé : le probe
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Pour débugger, copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`test_freeze_check`). Ne lance pas toute la suite tant qu'un probe existe : l'autre moitié travaille en même temps et ramasserait le tien.
+
 ## Ton rapport final
 
 Celui d'Ivan, avec `Gate green_data : vert` et `Implémenté :` limité à tes couches.

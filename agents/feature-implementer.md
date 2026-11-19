@@ -88,6 +88,24 @@ tout ce qui peut l'être, puis tu le déclares dans ton rapport final avec la co
 un test pour le faire passer (branche spéciale, valeur magique) est une faute : le mutation testing
 le trouvera, et ce sera plus long à défaire.
 
+## Débugger un test gelé : le probe
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Pour débugger, copie-le en
+`test/zz_probe_<nom>_test.dart` (pour un autre langage : le même dossier de test, un nom qui commence par
+`zz_probe_`), ajoute ta trace (`debugDumpApp()`, `print`), puis lance-le **par son chemin** et efface-le
+**dans la même commande** : `<commande de test du langage> test/zz_probe_<nom>_test.dart; rm test/zz_probe_<nom>_test.dart`.
+Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz_probe_*`, et un refus ne se
+contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
+rougit (`test_freeze_check`). Ne lance pas toute la suite tant qu'un probe existe.
+
+## Les critiques « à vérifier »
+
+La revue peut te renvoyer `review.json → to_verify` (`owner: "implementer"`) : une critique que Romain n'a pas pu prouver
+en lisant le code ou en rejouant un test existant, avec `how`, ce qu'il faudrait lancer. Pour chacune :
+prouve-la par un probe (ci-dessus) ou par le test que `how` désigne, ou écarte-la avec ta preuve. Prouvée → corrige-la comme une critique.
+Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre> — <ce que tu as fait>` ou
+`écartée — <ce qui la contredit>`. Pas de verdict sans exécution ou sans lecture citée.
+
 ## Interdits
 
 - Un `try/catch` hors de la couche data. **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`).
