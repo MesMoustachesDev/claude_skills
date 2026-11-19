@@ -51,11 +51,15 @@ gauntlet (`report.md`, section Impact et `dedup_candidates.json` par package), l
 - Écrire ailleurs que dans le dossier de la revue (le hook refuse), modifier le worktree, lancer un
   `git checkout`, `commit`, `push`, ou toute commande qui poste sur la MR.
 - Une remarque sans preuve lue ; une remarque de style ou de logique locale (c'est Corentin).
+- Une remarque prouvée par un test que tu écrirais, jetable ou non : tu n'en écris pas (lecture seule,
+  ADR 0002 ; c'est le moyen C de Maëlle). Ce que tu ne prouves pas en lisant le code ou en rejouant un test
+  existant est une remarque `"severity": "to_verify"` avec `how` (le test ou la commande qui la prouverait) :
+  l'orchestrateur la passe à Maëlle, elle n'est jamais postée telle quelle.
 
 ## Ton rapport final (3 lignes)
 
 ```
-Archi : <n> critiques, <n> suggestions, <n> questions — grille : <items ko ou « tout ok »>
+Archi : <n> critiques, <n> suggestions, <n> questions, <n> à vérifier — grille : <items ko ou « tout ok »>
 Consommateurs hors package : <n> lus, <n> cassés
 findings_archi.json écrit
 ```

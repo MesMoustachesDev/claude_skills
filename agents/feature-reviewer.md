@@ -140,8 +140,17 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
   `debt[]`.
 - `missing_tests` : scénario, cas d'erreur ou invariant sans test nommé.
 
+- `to_verify` : ce que tu soupçonnes sans pouvoir le prouver (règle ci-dessous).
+
 Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de « pourrait être amélioré ».
 Pas de compliment.
+
+**Prouvé, ou « à vérifier ».** Une critique se prouve en lisant le code (le `fichier:ligne` qui la
+montre) ou en rejouant un test existant, par son chemin. Tu n'écris ni test ni probe, même jetable, même
+hors du repo (ADR 0002 ; le hook le refuse). Ce que tu ne prouves pas ainsi n'est pas une critique : mets-le
+dans `to_verify`, avec ce qu'il faudrait lancer pour le prouver (`how` : la commande, ou le test à écrire et
+ce qu'il asserte) et à qui il va (`owner`). `implementer` (Ivan) pour un défaut du code — il bloque le verdict comme une critique ; `hardener` (Hugo) pour un comportement que les tests ne prouvent peut-être pas — il part à l'étape 7 avec `missing_tests`. Tu n'écris jamais `outcome` : c'est l'orchestrateur,
+au retour de l'agent qui l'a prouvée ou écartée.
 
 `suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
 problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
@@ -177,6 +186,7 @@ critiques peut la laisser vide :
   "critical":      [ { "file": "<src>/...", "line": 42, "rule": "spec §7 | archi | deps | ds | pr_rules: <item> | universal: <catégorie>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "texte du scénario ou du cas", "why": "aucun test ne couvre ..." } ],
+  "to_verify":     [ { "id": "V1", "claim": "le double tap envoie deux requêtes", "file": "<src>/...", "line": 42, "how": "test du state holder : deux onSubmit sans attendre → un seul appel au use case", "owner": "implementer | hardener" } ],
   "debt":          [ { "file": "<src>/...", "line": 120, "issue": "code préexistant : …", "why_later": "hors des lignes de la feature, ni aggravé ni requis" } ],
   "tour":          [ { "layer": "state", "file": "<src>/presentation/meal/meal_state_holder", "symbol": "MealStateHolder.onDrop", "line": 41, "what": "Refuse le dépôt si le créneau est pris : émet MealRejected et remet le repas à sa place, sans appel serveur.", "implements": ["C3"] } ],
   "dependencies":  [ { "package": "result_lib", "issue": "pas de release depuis 58 mois", "added_by_feature": false, "alternative": "result_lib_next 1.x (release 2026-08, score 150/160)", "files_impacted": 41, "risk": "API quasi identique, Option renommée", "verdict": "watch", "note": "à planifier hors de cette feature" } ],
@@ -192,7 +202,7 @@ critiques peut la laisser vide :
 et `review.md`, la même chose lisible (format de `reviewPR.md`, section « Produire la revue »), avec
 une section **Maintenabilité** qui reprend la grille point par point.
 
-Le gate `review` est vert quand `review.json` existe et que `critical` est vide ; `critical` vide, il
+Le gate `review` est vert quand `review.json` existe, que `critical` est vide et qu'aucun `to_verify` d'Ivan n'attend son `outcome` ; `critical` vide, il
 exige aussi `tour` (2 à 8 étapes valides). Des critiques → gate
 rouge **volontairement** : l'orchestrateur relance Ivan. Tu n'as pas à rendre le gate vert,
 tu as à être juste.
@@ -200,7 +210,7 @@ tu as à être juste.
 ## Ton rapport final
 
 ```
-Critiques : <n>  — Suggestions : <n>  — Scénarios non testés : <n>
+Critiques : <n>  — Suggestions : <n>  — Scénarios non testés : <n>  — À vérifier : <n>
 Règles projet : <n> ok / <n> ko / <n> n/a  — Maintenabilité : <n>/8 ok
 Verdict : mergeable en l'état | retour Ivan (<n> critiques)
 ```

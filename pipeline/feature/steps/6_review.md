@@ -34,6 +34,15 @@ reviewer qui trouve des critiques doit pouvoir rendre la main) :
   "debt"}` (la visite et l'evidence ne la montrent pas comme « à trancher » ni « non appliquée »).
 - `review.json → missing_tests` ne déclenche jamais de boucle ni de re-gel : la liste va à Hugo (7),
   qui ajoute ces tests en fichiers nouveaux.
+- `review.json → to_verify` (ADR 0002) : ce que Romain soupçonne sans l'avoir prouvé en lisant le code ou
+  en rejouant un test existant ; il n'écrit pas de probe. `owner: "implementer"` : bloque le verdict comme
+  une critique et part à **Ivan** dans la même relance (`claim`, `how`) ; il la prouve par un probe
+  `zz_probe_*` ou l'écarte, et la corrige si elle est prouvée. `owner: "hardener"` : ne bloque pas, part à
+  **Hugo** (7) avec `missing_tests`. Au rapport de l'agent, note sur l'entrée de `review.json`
+  `outcome: "proved"|"dismissed"` et `note` (sa preuve en une ligne), et garde la liste pour le prompt de la
+  passe suivante de Romain : une entrée écartée ne revient pas sans fait nouveau. Tout écarté et aucune
+  critique → rejoue `gauntlet.sh review_verdict <nom>`, vert, sans relancer Nina ni Romain. Les
+  `outcome` sortent dans l'evidence avec les critiques résolues.
 
 **Gabarit S :** identique (critiques, suggestions, boucle vers Ivan). Les `missing_tests` vont à
 Hugo, et c'est ce qui le fait lancer même sans logique à muter (voir 7). **En L :** n'a pas lieu.

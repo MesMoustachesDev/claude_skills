@@ -76,6 +76,11 @@ Puis `gauntlet.sh tests_review_verdict <nom>` : rouge → relance **Théo comple
 `tests_review.md` (il complète et corrige les tests cités, il ne réécrit pas les autres), puis
 `gauntlet.sh red`, puis 3b ; `pipeline.sh loop <nom> tests` avant chaque relance ; code 3 (au-delà de 2) : point d'étape avec les bloquants restants.
 Un bloquant qui est un contrat manquant suit « Contrat manquant » (3) avant la relance de Théo.
+`tests_review.json → to_verify` (ce que Gaëlle soupçonne sans pouvoir le prouver à la lecture, ADR 0002) part
+à Théo dans la même relance : pour chacun, il rejoue ce que dit `how` (un probe `zz_probe_*` s'il faut écrire,
+effacé dans la même commande) et rapporte `prouvé` (il corrige le test) ou `écarté` (avec la sortie). Tu notes
+alors `outcome: "proved"|"dismissed"` et `note` sur l'entrée de `tests_review.json` : le verdict reste rouge tant
+qu'une entrée n'a pas d'`outcome`. Tout écarté et aucun bloquant → rejoue `tests_review_verdict`, sans relancer Gaëlle.
 **Gabarit S :** identique, gel compris. **En L :** n'a pas lieu.
 
 Vert → **Point d'étape « tests ».** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`

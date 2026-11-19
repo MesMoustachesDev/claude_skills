@@ -10,7 +10,9 @@
 #
 # review.json : { critical:[{file,line,rule,summary,fix}], suggestions:[{id,summary,file,line,rule,problem,why,cause,
 #                 consequences,fix,pros,cons,effort}] (pipeline/suggestions.md), missing_tests:[{scenario,why}], rules_checked:{},
-#                 tour:[{layer,file,symbol,line,what,implements}] (visite guidée, 2 à 8 étapes) }
+#                 tour:[{layer,file,symbol,line,what,implements}] (visite guidée, 2 à 8 étapes),
+#                 to_verify:[{id,claim,file,line,how,owner:"implementer|hardener",outcome?,note?}] (ADR 0002 : critique que
+#                 le relecteur n'a pas prouvée ; l'orchestrateur écrit outcome "proved|dismissed" après Ivan ou Hugo) }
 # dedup.json  : { verdicts:[{target:{name,file,line}, existing:{name,file,line,package}, verdict:"duplicate|extend|distinct", reason, accepted?}] }
 
 check_review_report() {
@@ -20,22 +22,51 @@ check_review_report() {
     || { ko "review.json invalide : clés attendues critical, suggestions, missing_tests"; return 1; }
   local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
   [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
+  _to_verify_ok "$f" '"implementer","hardener"' || return 1
   # La visite guidée n'est exigée qu'à la passe qui rend critical vide (une passe avec critiques rend la main à Ivan).
   if jq -e '[.critical[] | select(.accepted != true)] | length == 0' "$f" >/dev/null 2>&1; then
     jq -e '(.tour|type=="array") and (.tour|length>=2 and length<=8) and all(.tour[]; type=="object" and (.file|type=="string") and (.what|type=="string") and (.what|length>0))' "$f" >/dev/null 2>&1 \
       || { ko "review.json : tour absent ou invalide — 2 à 8 étapes {layer, file, symbol, line, what, implements} dans l'ordre du flux de données (exigé dès que critical est vide)"; return 1; }
   fi
-  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f"), dette : $(jq '(.debt // [])|length' "$f"), visite : $(jq '(.tour // [])|length' "$f") étapes"
+  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), scénarios non couverts : $(jq '.missing_tests|length' "$f"), à vérifier : $(jq '(.to_verify // [])|length' "$f"), dette : $(jq '(.debt // [])|length' "$f"), visite : $(jq '(.tour // [])|length' "$f") étapes"
+}
+
+# _to_verify_ok <fichier> <owners jq, ex. '"implementer","hardener"'> — `to_verify` (optionnel) : critiques que le
+# relecteur n'a pas prouvées en lisant le code ou en rejouant un test existant (ADR 0002). Chacune dit ce qu'il
+# faudrait lancer (`how`) et à qui elle va (`owner`) ; `outcome` est écrit par l'orchestrateur, jamais par le relecteur.
+_to_verify_ok() {
+  local bad
+  jq -e '(.to_verify // []) | type=="array"' "$1" >/dev/null 2>&1 || { ko "${1##*/} : to_verify doit être une liste"; return 1; }
+  bad="$(jq -r --argjson owners "[$2]" '[(.to_verify // []) | to_entries[] | select(
+      ([.value | .id, .claim, .how] | map(type=="string" and length>0) | all | not)
+      or ((.value.owner // "") as $o | $owners | index($o) | not)
+      or (.value.outcome != null and (.value.outcome | IN("proved","dismissed") | not))
+    ) | (.value.id // "#\(.key+1)")] | join(", ")' "$1" 2>/dev/null)"
+  [ -z "$bad" ] || { ko "${1##*/} : to_verify incomplet ($bad) : id, claim, how (la commande ou le test qui la prouverait), owner ∈ $2 ; outcome, s'il est là, ∈ proved|dismissed"; return 1; }
+}
+
+# _to_verify_open <fichier> <owner> — les entrées de to_verify de cet owner sans outcome, une ligne chacune
+_to_verify_open() {
+  jq -r --arg o "$2" '(.to_verify // [])[] | select(.owner == $o and .outcome == null) | "   ? \(.id) \(.file // "-"):\(.line // "?") \(.claim) — à lancer : \(.how)"' "$1"
 }
 
 check_review_verdict() {
   check_review_report || return 1
-  local f="$FEATURE_DIR/review.json" n
+  local f="$FEATURE_DIR/review.json" n v h rc=0
   n="$(jq '[.critical[] | select(.accepted != true)] | length' "$f")"
-  [ "$n" = 0 ] && return 0
-  jq -r '.critical[] | select(.accepted != true) | "   ✗ \(.file):\(.line // "?") [\(.rule // "-")] \(.summary)"' "$f"
-  ko "$n finding(s) critique(s) → retour à l'implementer"
-  return 1
+  v="$(jq '[(.to_verify // [])[] | select(.owner == "implementer" and .outcome == null)] | length' "$f")"
+  h="$(jq '[(.to_verify // [])[] | select(.owner == "hardener" and .outcome == null)] | length' "$f")"
+  if [ "$n" != 0 ]; then
+    jq -r '.critical[] | select(.accepted != true) | "   ✗ \(.file):\(.line // "?") [\(.rule // "-")] \(.summary)"' "$f"
+    ko "$n finding(s) critique(s) → retour à l'implementer"; rc=1
+  fi
+  if [ "$v" != 0 ]; then
+    _to_verify_open "$f" implementer
+    ko "$v critique(s) à vérifier → Ivan : la prouver par un probe ou l'écarter (outcome dans review.json)"; rc=1
+  fi
+  # Celles de Hugo ne bloquent pas la revue : elles partent à l'étape 7 avec missing_tests.
+  [ "$h" != 0 ] && { _to_verify_open "$f" hardener; info "$h critique(s) à vérifier → Hugo (étape 7), avec missing_tests"; }
+  return $rc
 }
 
 check_dedup_report() {
@@ -68,7 +99,8 @@ check_dedup_verdict() {
 }
 
 # spec_review.json  : { blocking:[{section,issue,fix,owner?:"spec|thibault"}], notes:[{section,issue}] }   (agent feature-spec-critic)
-# tests_review.json : { blocking:[{file,line,test,issue,fix}], notes:[...], coverage:{scenario:"tested|missing"} }  (agent feature-test-reviewer)
+# tests_review.json : { blocking:[{file,line,test,issue,fix}], notes:[...], coverage:{scenario:"tested|missing"},
+#                       to_verify:[{id,claim,file,line,how,owner:"test-writer",outcome?,note?}] }  (agent feature-test-reviewer)
 
 _report_ok() { # _report_ok <file> <label> <jq-schema>
   [ -f "$1" ] || { ko "$2 absent — l'agent doit produire ${1#$PROJECT_ROOT/}"; return 1; }
@@ -118,5 +150,15 @@ check_spec_review_verdict() {
   return 1
 }
 
-check_tests_review_report()  { _report_ok "$FEATURE_DIR/tests_review.json" "tests_review.json" '(.blocking|type=="array") and (.notes|type=="array") and (.coverage|type=="object")' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/tests_review.json"), scénarios sans test : $(jq '[.coverage[]|select(.=="missing")]|length' "$FEATURE_DIR/tests_review.json")"; }
-check_tests_review_verdict() { check_tests_review_report || return 1; _verdict_ok "$FEATURE_DIR/tests_review.json" "tests_review" "retour au test-writer"; }
+check_tests_review_report()  { _report_ok "$FEATURE_DIR/tests_review.json" "tests_review.json" '(.blocking|type=="array") and (.notes|type=="array") and (.coverage|type=="object")' && _to_verify_ok "$FEATURE_DIR/tests_review.json" '"test-writer"' && info "bloquants : $(jq '.blocking|length' "$FEATURE_DIR/tests_review.json"), scénarios sans test : $(jq '[.coverage[]|select(.=="missing")]|length' "$FEATURE_DIR/tests_review.json"), à vérifier : $(jq '(.to_verify // [])|length' "$FEATURE_DIR/tests_review.json")"; }
+check_tests_review_verdict() {
+  check_tests_review_report || return 1
+  local f="$FEATURE_DIR/tests_review.json" v rc=0
+  _verdict_ok "$f" "tests_review" "retour au test-writer" || rc=1
+  v="$(jq '[(.to_verify // [])[] | select(.outcome == null)] | length' "$f")"
+  if [ "$v" != 0 ]; then
+    _to_verify_open "$f" test-writer
+    ko "$v point(s) à vérifier → Théo : le prouver (test rejoué, probe) ou l'écarter (outcome dans tests_review.json)"; rc=1
+  fi
+  return $rc
+}

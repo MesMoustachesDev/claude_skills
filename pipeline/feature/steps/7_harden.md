@@ -11,7 +11,10 @@ les fichiers modifiés), et `review.json → missing_tests`.
 - Des fichiers → comme en M.
 **En L :** n'a pas lieu.
 
-Prompt : nom, package, gabarit, chemin du rapport de mutation, `review.json` (pour `missing_tests`).
+Prompt : nom, package, gabarit, chemin du rapport de mutation, `review.json` (pour `missing_tests` et
+les `to_verify` d'`owner: "hardener"` : Hugo les prouve par un test, gardé en `_mutation_test`, ou les écarte ;
+note leur `outcome` dans `review.json` à son rapport). Des `to_verify` de Hugo comptent comme des
+`missing_tests` pour le gabarit S : ils suffisent à lancer Hugo.
 `stages.harden = PASSED` → pas d'arrêt : passe à 8. Les mutants expliqués (`mutants.md`), le score et
 les tests ajoutés sont montrés dans la visite guidée, rattachés à l'étape du fichier muté. Les tests
 ajoutés, c'est le gate de Hugo qui les note (check `tests_added` du profil `harden` → `pipeline.json →

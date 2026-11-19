@@ -27,7 +27,9 @@ SIM_SH = os.path.join(HOME, ".claude", "scripts", "sim.sh")
 WORKTREE_UNTRACKED = os.path.join(HOME, ".claude", "scripts", "worktree_untracked.sh")
 ROLES = ("archi", "code", "qa")
 AGENT_DONE = {"done", "skipped", "failed"}
-SEVERITY_ORDER = {"critical": 0, "suggestion": 1, "question": 2}
+# to_verify (ADR 0002) : une critique qu'Alice ou Corentin n'ont pas prouvée en lisant le code ou en rejouant un
+# test existant. Elle porte `how` (ce qu'il faudrait lancer), part à Maëlle pour preuve, et n'est jamais postée.
+SEVERITY_ORDER = {"critical": 0, "suggestion": 1, "question": 2, "to_verify": 3}
 
 ORDER = [
     ("preflight", "1", "Préflight : ce qui manque, demandé avant de lancer quoi que ce soit", "1_preflight.md"),
@@ -570,6 +572,8 @@ def cmd_findings(r, args):
             qa = {"scenarios": data.get("scenarios") or [], "summary": data.get("summary"), "device": data.get("device")}
         for x in data.get("findings") or []:
             missing = [k for k in REQUIRED if not x.get(k)]
+            if x.get("severity") == "to_verify" and not x.get("how"):
+                missing.append("how")
             if missing or x.get("severity") not in SEVERITY_ORDER:
                 problems.append(f"{role} : remarque « {x.get('title', '?')} » incomplète ({', '.join(missing) or 'severity'})")
                 continue
@@ -615,7 +619,8 @@ def cmd_findings(r, args):
     with open(r.file("findings.json"), "w", encoding="utf-8") as fh:
         json.dump(result, fh, ensure_ascii=False, indent=2)
     counts = {k: sum(1 for x in out if x["severity"] == k) for k in SEVERITY_ORDER}
-    print(f"{len(out)} remarques : {counts['critical']} critiques, {counts['suggestion']} suggestions, {counts['question']} questions")
+    print(f"{len(out)} remarques : {counts['critical']} critiques, {counts['suggestion']} suggestions, {counts['question']} questions"
+          + (f", {counts['to_verify']} à vérifier (à prouver avant le tri, jamais postées telles quelles)" if counts["to_verify"] else ""))
     for p in problems:
         print(f"[WARN] {p}")
 
@@ -878,7 +883,7 @@ def write_comments(r, f, triage):
     lines, todo = ["# Commentaires à publier — validation de Thibault requise avant tout envoi", ""], []
     for x in f["findings"]:
         t = triage.get(x["id"])
-        if not t or t["decision"] != "comment":
+        if not t or t["decision"] != "comment" or x["severity"] == "to_verify":
             continue
         where = f"{x['file']}:{x['line']}" if x.get("file") and x.get("line") else (x.get("file") or "commentaire général")
         lines += [f"## {x['id']} · {where}", "", t["text"], ""]
@@ -887,8 +892,11 @@ def write_comments(r, f, triage):
     pending = [x["id"] for x in f["findings"] if x["id"] not in triage]
     with open(r.file("comments.md"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
+    unproven = [x["id"] for x in f["findings"] if x["severity"] == "to_verify"
+                and (triage.get(x["id"]) or {}).get("decision") == "comment"]
     print(f"à commenter : {', '.join(todo) or 'aucun'} · écartées : {', '.join(skipped) or 'aucune'}"
-          + (f" · NON TRIÉES : {', '.join(pending)}" if pending else ""))
+          + (f" · NON TRIÉES : {', '.join(pending)}" if pending else "")
+          + (f" · À VÉRIFIER, non postées : {', '.join(unproven)} (prouve-les d'abord : Maëlle ou une commande)" if unproven else ""))
     print(f"texte exact : {r.file('comments.md')}")
 
 
@@ -976,6 +984,8 @@ def post_calls(r):
     for x in f["findings"]:
         t = triage.get(x["id"])
         if not t or t["decision"] != "comment" or x["id"] in done:
+            continue
+        if x["severity"] == "to_verify":   # non prouvée : jamais postée, même cochée « commenter »
             continue
         body = t["text"]
         inline = x.get("file") and x.get("line") and int(x["line"]) in in_diff.get(x["file"], set())

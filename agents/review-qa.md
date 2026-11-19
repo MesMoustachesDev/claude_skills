@@ -75,6 +75,11 @@ comportement et pas ton test (relis l'assertion contre `context.md`) avant d'en 
 Un scénario de non-régression prouvé par un test jetable vert, c'est aussi une **suggestion** utile :
 « ce comportement n'a aucun test dans le repo ; voici celui qui le prouve » (le test en `evidence`).
 
+**Relancée avec des « à vérifier ».** L'orchestrateur peut te relancer avec les remarques `to_verify`
+d'Alice et de Corentin (`F<n>`, `claim`, `how`) : chacune devient un scénario, prouvé par B ou C comme les
+tiens. Prouvée → une remarque `critical` ou `suggestion` avec sa preuve en `evidence` et son `F<n>` dans
+`problem` ; contredite → une ligne dans ton `summary` (« F4 contredit : <test>, vert »).
+
 ## 3. Écris `findings_qa.json`
 
 Au format de `~/.claude/pipeline/review/findings_format.md`, plus :

@@ -111,7 +111,8 @@ tu juges :
 - **Sobre** : *Doublons*, plus bas, appliqué à la liste. Les items signalés `?` par le gate (prouvés par
   beaucoup de tests) se relisent en premier. Un doublon est un **bloquant** dont le `fix` est « retirer
   <test>, déjà prouvé par <test> ».
-Même sortie (`tests_review.json`, `tests_review.md`) ; `coverage` = l'item → `tested` ou `missing`.
+Même sortie (`tests_review.json`, `tests_review.md`) ; `coverage` = l'item → `tested` ou `missing`. Pas de
+`to_verify` en mode liste : aucun test n'existe encore, tout se juge à la lecture.
 
 ## Ce que tu produis
 
@@ -121,9 +122,16 @@ Même sortie (`tests_review.json`, `tests_review.md`) ; `coverage` = l'item → 
 {
   "blocking": [ { "file": "<tests>/data/mapper/x_mapper_test", "line": 0, "test": "-", "issue": "aucun test pour createdAt null (§6 cas limite)", "fix": "test 'maps null createdAt to null' …" } ],
   "notes":    [ { "file": "…", "line": 31, "test": "emits Loaded", "issue": "having() sur items.length seulement ; vérifier aussi le premier item" } ],
-  "coverage": { "shows recipes when loaded": "tested", "shows an error when the network fails": "missing", "§7 NotFoundError → Empty": "tested" }
+  "coverage": { "shows recipes when loaded": "tested", "shows an error when the network fails": "missing", "§7 NotFoundError → Empty": "tested" },
+  "to_verify": [ { "id": "V1", "claim": "le test passerait aussi si le use case n'était jamais appelé", "file": "…", "line": 31, "how": "rejouer le test avec le use case mocké sans réponse : il doit rougir", "owner": "test-writer" } ]
 }
 ```
+
+**Prouvé, ou « à vérifier ».** Un bloquant se prouve en lisant le test, la spec et les contrats, ou en
+rejouant un test existant par son chemin. Tu n'écris ni test ni probe, même jetable (ADR 0002 ; le hook le
+refuse). Ce que tu ne prouves pas ainsi va dans `to_verify`, avec `how` (ce qu'il faudrait lancer) et
+`owner: "test-writer"` : Théo le prouve ou l'écarte, l'orchestrateur note l'`outcome` ; tant qu'il manque,
+le verdict reste rouge.
 
 Et `tests_review.md`, lisible : la table de couverture d'abord, puis les bloquants, puis les notes.
 
@@ -133,5 +141,5 @@ Ton hook ne vérifie que le format. Des bloquants → l'orchestrateur relance Th
 ## Ton rapport final
 
 ```
-Scénarios : <n> testés / <n> manquants  — Bloquants : <n>  — Notes : <n>
+Scénarios : <n> testés / <n> manquants  — Bloquants : <n>  — Notes : <n>  — À vérifier : <n>
 ```

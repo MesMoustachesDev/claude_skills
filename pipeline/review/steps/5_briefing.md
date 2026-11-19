@@ -9,6 +9,11 @@ fusionne-les**, il ne doit avoir qu'une carte à trier par problème. Les numér
 remarque fusionnée laisse un trou). Pour chaque remarque
 critique, vérifie toi-même sa preuve en une commande (`git grep`, le fichier à la ligne) ; une preuve
 qui ne tient pas se signale à Thibault au tri (« F4 : je n'ai pas retrouvé … »), elle ne se supprime pas.
+Les remarques `to_verify` (Alice ou Corentin n'ont pas pu les prouver en lisant ; ils n'écrivent pas de test,
+ADR 0002) : relance **Maëlle** une fois avec leur liste (`F<n>`, `claim`, `how`), qui les prouve comme ses
+scénarios (test existant rejoué, test jetable hors du repo) ; puis `review.sh findings` à nouveau et
+`review.sh merge` de chaque `to_verify` prouvée avec la remarque de Maëlle qui la prouve. Maëlle sautée ou en
+échec : elles restent « à vérifier » au tri, avec leur `how` ; le script ne les poste jamais.
 
 **2. Le briefing**, dans `<dossier de la revue>/briefing.md` : un écran, **aucun verdict, aucune
 remarque** — du contexte. Il comprend :

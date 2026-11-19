@@ -1139,7 +1139,7 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
       const d = decisionOf(f);
       const card = el("article", `finding ${f.severity}`);
       const head = el("div", "head");
-      head.append(el("span", "num", f.id), el("span", `chip ${f.severity}`, { critical: "critique", suggestion: "suggestion", question: "question" }[f.severity] || f.severity),
+      head.append(el("span", "num", f.id), el("span", `chip ${f.severity}`, { critical: "critique", suggestion: "suggestion", question: "question", to_verify: "à vérifier" }[f.severity] || f.severity),
                   el("b", null, f.title), el("span", "status", (f.role || "").replace("archi", "Alice").replace("code", "Corentin").replace("qa", "Maëlle")));
       card.append(head);
       if (f.file) card.append(el("div", "where", f.line ? `${f.file}:${f.line}` : f.file));

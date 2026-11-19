@@ -49,7 +49,7 @@ Ticket : <ref> <url>                ← si pipeline.json → issue existe (issue
 ## Mesures
 Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) | sautée (gabarit S) · Complexité max : <n> · Dépendances : ✓
-Revue : <n> critiques (résolues), <n> suggestions · Règles projet : <n>/<n> · Maintenabilité : <n>/8
+Revue : <n> critiques (résolues), <n> suggestions, <n> à vérifier (<n> prouvées, <n> écartées) · Règles projet : <n>/<n> · Maintenabilité : <n>/8
 
 ## Non vérifiés                       ← .gauntlet/last_*.json → not_applicable (et .gauntlet/<couche>/), ADR 0011
 | Check | Gates | Pourquoi |           ← « aucun » si la liste est vide ; jamais omise

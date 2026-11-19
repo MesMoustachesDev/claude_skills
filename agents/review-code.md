@@ -49,11 +49,15 @@ et les logs par package), la base et la source.
   `git checkout`, `commit`, `push`, ou toute commande qui poste sur la MR.
 - Refaire une mesure du gauntlet ; une remarque d'architecture (c'est Alice) ; une remarque sans le
   `fichier:ligne` qui la prouve.
+- Une remarque prouvée par un test que tu écrirais, jetable ou non : tu n'en écris pas (lecture seule,
+  ADR 0002 ; c'est le moyen C de Maëlle). Ce que tu ne prouves pas en lisant le code ou en rejouant un test
+  existant est une remarque `"severity": "to_verify"` avec `how` (le test ou la commande qui la prouverait) :
+  l'orchestrateur la passe à Maëlle, elle n'est jamais postée telle quelle.
 
 ## Ton rapport final (3 lignes)
 
 ```
-Code : <n> critiques (dont <n> du gauntlet), <n> suggestions, <n> questions
+Code : <n> critiques (dont <n> du gauntlet), <n> suggestions, <n> questions, <n> à vérifier
 Tests : <n> comportements ajoutés, <n> sans test qui les prouve
 findings_code.json écrit
 ```

@@ -186,7 +186,8 @@ Validation → **gel** :
 git add <test_files> <manifestes touchés> .claude/fixes/<nom>/repro.json .claude/fixes/<nom>/diagnosis.md
 git commit -m "test(<nom>): reproduce <bug en une phrase> (frozen)"
 ```
-(+ le flow `maestro/fix_<nom>.yaml` et `shots/red/`, + tout test existant corrigé par Bastien). `freeze_sha` = ce
+(+ le flow `maestro/fix_<nom>.yaml` et `shots/red/`, + tout test existant corrigé par Bastien ; jamais un `zz_probe_*`,
+le gate `red` le refuse). `freeze_sha` = ce
 commit, `human_gates.repro = {at, by: "user"}`, `phase = "impl"`. Le plan est gelé avec `repro.json`.
 
 **Tout re-gel** (arbitrage, second passage de Bastien sur un diagnostic incomplet ou des
@@ -262,6 +263,15 @@ propre classification : critique, bloquant, erreur) comptent comme des critiques
   signales au dev dans l'evidence, avec les fichiers hors plan du rapport.
 - `missing_tests` de Victor : **ne relance personne**. Ils vont dans l'evidence ; le dev décidera
   s'ils méritent un second passage de Bastien.
+- `to_verify` de Victor (ADR 0002 : ce qu'il soupçonne sans l'avoir prouvé en lisant ou en rejouant un test
+  existant ; il n'écrit pas de probe) : `review_verdict` reste rouge tant qu'une entrée n'a pas d'`outcome`.
+  `owner: "implementer"` → `SendMessage` à Fanny avec les critiques (`claim`, `how`) : elle la prouve par un
+  probe `zz_probe_*` et la corrige, ou l'écarte. `owner: "reproducer"` → `SendMessage` à Bastien : prouvée,
+  il écrit le vrai test, tu re-gèles (`cause` selon la liste ci-dessus) et Fanny reprend ; écartée, rien ne
+  bouge. Au rapport, note sur l'entrée de `review.json` `outcome: "proved"|"dismissed"` et `note` (la preuve
+  en une ligne), puis rejoue `review_verdict`. Tout écarté et aucune critique → vert sans relancer Victor ;
+  sinon gate green puis revue à nouveau, comme pour une critique (`loops.review += 1`). Les `outcome` vont
+  dans l'evidence (« Revue »).
 
 ### 4. Captures — dès que `device_repro.cmd` existe
 
@@ -300,7 +310,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Plan validé             couche, approche, alternative écartée ; choix du dev (proposé / alternative / autre)
 ## Correction               l'arbre du changement : `python3 ~/.claude/scripts/change_tree.py <base_sha>` depuis le worktree, le rôle de chaque fichier en une ligne à la place de `<rôle>` (volumes et reformatage mesurés : ne les recalcule pas), chaque fichier marqué prévu / écart accepté ; même défaut corrigé ailleurs
 ## Non vérifiés             .gauntlet/last_*.json → not_applicable (check@package : conventions sans version pour le langage, ou outil absent du projet), avec la ligne [N/A] du journal ; « aucun » sinon (ADR 0011 : signalé, pas bloquant)
-## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; reviewers projet : verdicts
+## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; à vérifier : n prouvées, n écartées (review.json → to_verify.outcome) ; reviewers projet : verdicts
 ## Impact (graphify)        consommateurs hors package (impact.json, touched: false) × verdict de Victor (review.json → impact_checked) ; omise sans graphe ; `stale` : tableau gardé, précédé de « Impact : calculé sur le graphe de la base (update en échec) » ; `échec` : la seule ligne « Impact : non calculé (<raison>) »
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
 ## Re-gels                  n, par cause (fix.json → refreezes)

@@ -91,12 +91,12 @@ Checks individuels :
   mutation           mutation_test sur les globs configurés, score ≥ seuil
   mutation_scope     informatif : fichiers de logique que la mutation toucherait (.gauntlet/mutation_scope.txt) ; en gabarit S, vide = Hugo sauté
                      + fichiers de logique modifiés dans les packages de writes.extra, jamais mutés (.gauntlet/mutation_scope_extra.txt)
-  review_report      review.json présent et valide        review_verdict   aucun critique non accepté
+  review_report      review.json présent et valide        review_verdict   aucun critique non accepté, aucun to_verify d'Ivan sans outcome
   dedup_report       dedup.json présent et valide         dedup_verdict    aucun duplicate/extend non accepté
   spec_lint          spec.md : clés citées dans keys.dart, chaque erreur §7 cite son C<n>, symboles §5 et `Classe.membre`
                      du workspace existants, scénarios d'archi.json dans §4, plafond du gabarit (S 15 Kio, M 40 Kio)
   spec_review_report  spec_review.json valide             spec_review_verdict   aucun bloquant non accepté
-  tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté
+  tests_review_report tests_review.json valide            tests_review_verdict  aucun bloquant non accepté, aucun to_verify sans outcome
   qa                 flows Maestro sur chaque plateforme (gabarit S : une seule, qa.platform_s ou la première), captures
   qa_device          démarre ou clone l'appareil QA de la feature (pipeline.json → qa_devices, preflight), sans build ni flow
 

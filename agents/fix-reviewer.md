@@ -79,11 +79,20 @@ de convention bloquante, régression probable, même bug laissé ailleurs. `sugg
 `critical` ; il l'aggrave → finding sur la ligne du correctif ; sinon → `debt[]`.
 Un défaut préexistant visible sur le parcours que le correctif livre (même écran, même widget, même
 état que le scénario du bug : safe area, geste de fermeture, élément masqué…) est **toujours**
-`critical`, jamais de la dette : l'utilisateur le verra en vérifiant le fix. Sur un bug d'UI, sonde
-les gestes **réels** de l'utilisateur (glisser sur le contenu, pas seulement sur la poignée) et avec
-un `MediaQuery` réaliste (status bar, encoche, `viewPadding`).
+`critical`, jamais de la dette : l'utilisateur le verra en vérifiant le fix. Sur un bug d'UI, pense
+aux gestes **réels** de l'utilisateur (glisser sur le contenu, pas seulement sur la poignée) et à un
+`MediaQuery` réaliste (status bar, encoche, `viewPadding`) : lis le code et les tests qui les couvrent ;
+ce qu'aucun ne montre va dans `to_verify`, avec le test qui le prouverait.
 `missing_tests` : cas voisins du bug que le test gelé ne couvre pas — ils iront au dev, pas à
-Fanny. Précis : fichier, ligne, règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
+Fanny. `to_verify` : ce que tu soupçonnes sans pouvoir le prouver (règle ci-dessous). Précis : fichier, ligne,
+règle, ce qui est faux, ce qu'il faudrait. Pas de compliment.
+
+**Prouvé, ou « à vérifier ».** Une critique se prouve en lisant le code (le `fichier:ligne` qui la
+montre) ou en rejouant un test existant, par son chemin. Tu n'écris ni test ni probe, même jetable, même
+hors du repo (ADR 0002 ; le hook le refuse). Ce que tu ne prouves pas ainsi n'est pas une critique : mets-le
+dans `to_verify`, avec ce qu'il faudrait lancer pour le prouver (`how` : la commande, ou le test à écrire et
+ce qu'il asserte) et à qui il va (`owner`). `implementer` (Fanny) pour un défaut du correctif, `reproducer` (Bastien) pour un trou du test de reproduction ; les deux bloquent le verdict tant qu'elles n'ont pas leur `outcome`. Tu n'écris jamais `outcome` : c'est l'orchestrateur,
+au retour de l'agent qui l'a prouvée ou écartée.
 
 `suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
 problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
@@ -100,6 +109,7 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
   "critical":      [ { "file": "src/...", "line": 42, "rule": "fix: cause | fix: plan | fix: scope | fix: elsewhere | fix: regression | grid: <item> | project: <règle>", "summary": "...", "fix": "..." } ],
   "suggestions":   [ { "id": "S1", "summary": "titre court", "file": "...", "line": 0, "rule": "...", "problem": "...", "why": "...", "cause": "...", "consequences": "...", "fix": "...", "pros": "...", "cons": "...", "effort": "S|M|L" } ],
   "missing_tests": [ { "scenario": "...", "why": "..." } ],
+  "to_verify":     [ { "id": "V1", "claim": "...", "file": "src/...", "line": 42, "how": "la commande ou le test qui la prouverait", "owner": "implementer | reproducer" } ],
   "debt":          [ { "file": "src/...", "line": 12, "issue": "code préexistant : …", "why_later": "hors des lignes du correctif, ni aggravé ni requis" } ],
   "impact_checked": [ { "package": "…", "symbol": "…", "verdict": "ok | critical", "why": "…" } ],
   "rules_checked": { "grid": { "<item>": "ok|ko|na" }, "project": { "<règle>": "ok|ko|na" } }
@@ -107,14 +117,14 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
 ```
 
 et `review.md`, la même chose lisible. Gate de fin : le format seulement. Des critiques → l'orchestrateur
-renvoie à Fanny. Tu n'as pas à rendre le gate vert, tu as à être juste.
+renvoie à Fanny ; des « à vérifier » → à Fanny ou à Bastien, qui les prouvent ou les écartent. Tu n'as pas à rendre le gate vert, tu as à être juste.
 
 ## Ton rapport final
 
 ```
 Cause racine traitée : oui | non | partiellement — <une phrase>
 Plan respecté : oui | non | partiellement — <fichiers hors plan s'il y en a>
-Critiques : <n>  — Suggestions : <n>  — Cas voisins non testés : <n>
+Critiques : <n>  — Suggestions : <n>  — Cas voisins non testés : <n>  — À vérifier : <n>
 Impact hors package : <n> vérifiés, <n> critiques | pas de graphe
 Verdict : mergeable | retour Fanny (<n> critiques)
 ```

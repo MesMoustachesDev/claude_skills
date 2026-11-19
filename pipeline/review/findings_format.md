@@ -32,7 +32,10 @@ en tête. Une remarque incomplète est écartée et signalée : remplis tous les
 
 - `severity` : `critical` (à corriger avant merge : bug, régression, faille, violation d'architecture,
   roue réinventée avérée, `[FAIL]` du gauntlet), `suggestion` (non bloquant, `[WARN]` compris),
-  `question` (contexte manquant, à demander à l'auteur).
+  `question` (contexte manquant, à demander à l'auteur), `to_verify` (une critique que tu n'as pas prouvée
+  en lisant le code ou en rejouant un test existant ; ADR 0002). `to_verify` exige `how` : le test ou la
+  commande qui la prouverait. Elle part à Maëlle pour preuve et n'est jamais postée, même cochée
+  « commenter » au tri. Alice et Corentin n'écrivent aucun test, jetable ou non : c'est le travail de Maëlle.
 - `file` est relatif à la racine du repo ; `line` est une ligne de la **nouvelle** version du fichier,
   dans le diff de la MR si possible (un commentaire en ligne n'est accepté que sur une ligne modifiée ;
   ailleurs, il est posté en commentaire général). Remarque sans fichier : omets `file` et `line`.

@@ -36,6 +36,14 @@ L'orchestrateur ne montre jamais `debt[]` comme un choix : il l'ajoute à `pipel
 « Dette existante ». Une suggestion qui aurait dû être de la dette (hors diff) est traitée de même et
 notée `suggestions.<id> = {"decision": "debt"}` : ni présentée, ni listée « non appliquée ».
 
+## Ce qui n'est pas prouvé : `to_verify`
+
+Une suggestion, comme une critique, se prouve en lisant le code ou en rejouant un test existant. Le
+relecteur n'écrit ni test ni probe (ADR 0002). Ce qu'il soupçonne sans pouvoir le prouver ainsi n'est ni
+une critique ni une suggestion : il va dans `review.json → to_verify` (`id`, `claim`, `file`, `line`, `how`,
+`owner`), que l'orchestrateur fait prouver ou écarter par l'agent qui en a la charge (`/feature` : Ivan ou
+Hugo ; `/fix` : Fanny ou Bastien) avant d'en noter l'`outcome`. Le dev ne la voit jamais comme un choix.
+
 ## Ce que le reviewer écrit — `review.json → suggestions[]`
 
 ```json

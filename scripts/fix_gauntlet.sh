@@ -45,7 +45,7 @@ Profils :
    pas de go du dev. Sans ios.simulator_base, ou avec FIX_SIM_UDID pointé sur le modèle ou un appareil
    partagé, le go du dev reste requis avant chaque lancement)
   review_report   review.json présent et valide (hook du reviewer)
-  review_verdict  aucun critique non accepté (lu par l'orchestrateur)
+  review_verdict  aucun critique non accepté, aucun « à vérifier » sans outcome (lu par l'orchestrateur)
 
 Checks :
   repro_schema       repro.json : package, target_cmd, expected_failure, suite_cmd, test_files existants et reconnus comme tests, fix_plan
@@ -343,17 +343,37 @@ check_review_report() {
     || { ko "review.json invalide : critical[], suggestions[], missing_tests[], root_cause_addressed (yes|no|partial), plan_respected (yes|no|partial)"; return 1; }
   local incomplete; incomplete="$(jq -r '[.suggestions | to_entries[] | select(([.value | .id,.summary,.problem,.why,.cause,.consequences,.fix,.pros,.cons] | map(type=="string" and length>0) | all | not) or ((.value.effort|IN("S","M","L"))|not)) | (.value.id // "#\(.key+1)")] | join(", ")' "$f")"
   [ -z "$incomplete" ] || { ko "suggestions incomplètes ($incomplete) : id, summary, problem, why, cause, consequences, fix, pros, cons, effort (S|M|L) — voir ~/.claude/pipeline/suggestions.md"; return 1; }
-  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), cause racine traitée : $(jq -r .root_cause_addressed "$f"), plan respecté : $(jq -r .plan_respected "$f")"
+  _to_verify_ok "$f" '"implementer","reproducer"' || return 1
+  info "critiques : $(jq '.critical|length' "$f"), suggestions : $(jq '.suggestions|length' "$f"), à vérifier : $(jq '(.to_verify // [])|length' "$f"), cause racine traitée : $(jq -r .root_cause_addressed "$f"), plan respecté : $(jq -r .plan_respected "$f")"
+}
+
+# to_verify (ADR 0002) : critique que Victor n'a pas prouvée en lisant ou en rejouant un test existant ;
+# owner implementer → Fanny, reproducer → Bastien ; outcome (proved|dismissed) écrit par l'orchestrateur.
+_to_verify_ok() {
+  local bad
+  jq -e '(.to_verify // []) | type=="array"' "$1" >/dev/null 2>&1 || { ko "review.json : to_verify doit être une liste"; return 1; }
+  bad="$(jq -r --argjson owners "[$2]" '[(.to_verify // []) | to_entries[] | select(
+      ([.value | .id, .claim, .how] | map(type=="string" and length>0) | all | not)
+      or ((.value.owner // "") as $o | $owners | index($o) | not)
+      or (.value.outcome != null and (.value.outcome | IN("proved","dismissed") | not))
+    ) | (.value.id // "#\(.key+1)")] | join(", ")' "$1" 2>/dev/null)"
+  [ -z "$bad" ] || { ko "review.json : to_verify incomplet ($bad) : id, claim, how (la commande ou le test qui la prouverait), owner ∈ $2 ; outcome, s'il est là, ∈ proved|dismissed"; return 1; }
 }
 
 check_review_verdict() {
   check_review_report || return 1
-  local f="$FIX_DIR/review.json" n
+  local f="$FIX_DIR/review.json" n v rc=0
   n="$(jq '[.critical[] | select(.accepted != true)] | length' "$f")"
-  [ "$n" = 0 ] && return 0
-  jq -r '.critical[] | select(.accepted != true) | "   ✗ \(.file):\(.line // "?") [\(.rule // "-")] \(.summary)"' "$f"
-  ko "$n finding(s) critique(s) → retour à l'implementer"
-  return 1
+  v="$(jq '[(.to_verify // [])[] | select(.outcome == null)] | length' "$f")"
+  if [ "$n" != 0 ]; then
+    jq -r '.critical[] | select(.accepted != true) | "   ✗ \(.file):\(.line // "?") [\(.rule // "-")] \(.summary)"' "$f"
+    ko "$n finding(s) critique(s) → retour à l'implementer"; rc=1
+  fi
+  if [ "$v" != 0 ]; then
+    jq -r '(.to_verify // [])[] | select(.outcome == null) | "   ? \(.id) \(.file // "-"):\(.line // "?") \(.claim) — à lancer : \(.how) → \(if .owner == "reproducer" then "Bastien" else "Fanny" end)"' "$f"
+    ko "$v critique(s) à vérifier : à prouver par un probe ou à écarter (outcome dans review.json)"; rc=1
+  fi
+  return $rc
 }
 
 # fix_after <profil> <nom> — au rapport (hand-back) d'un agent, dans le même tour : attend que le hook de fin de
