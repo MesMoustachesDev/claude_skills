@@ -31,6 +31,12 @@ case "$agent" in
 esac
 
 GAUNTLET="$HOME/.claude/scripts/fix_gauntlet.sh"
+# Journal (ADR 0019) : gate rouge et FAILED, une ligne dans .gauntlet/hooks.jsonl ; jamais bloquant.
+source "${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}/hook_log.sh"
+gate_log() {   # gate_log <issue> <raison>
+  local failed; failed="$(jq -r '(.failed // []) | join(" ")' "$FIX_OUT/last_${profile}.json" 2>/dev/null)"
+  hook_log "$FIX_DIR" fix-gate "$agent" Stop "" "$1" "$2${failed:+ : $failed}" "$profile"
+}
 # Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook
 # (hook_wait.sh, appelé par fix_gauntlet.sh).
 mkdir -p "$FIX_OUT"
@@ -50,6 +56,7 @@ attempts=$((attempts+1))
 log="$FIX_OUT/last_${profile}.log"
 if [ "$attempts" -ge "$max" ]; then
   state_set '.attempts[$p]=$a | .stages[$p]={status:"FAILED", at:(now|todate)}' --arg p "$profile" --argjson a "$attempts"
+  gate_log failed "gate $profile rouge après $attempts tentatives, étape FAILED"
   {
     echo "fix-gate : gate '$profile' toujours rouge après $attempts tentatives. Étape marquée FAILED."
     echo "Arrête-toi et rends un rapport : ce qui bloque, ce que tu as essayé, ce que tu recommandes."
@@ -58,6 +65,7 @@ if [ "$attempts" -ge "$max" ]; then
 fi
 
 state_set '.attempts[$p]=$a | .stages[$p]={status:"RED", at:(now|todate)}' --arg p "$profile" --argjson a "$attempts"
+gate_log red "gate $profile rouge (tentative $attempts/$max)"
 {
   echo "GATE '$profile' ROUGE (tentative $attempts/$max) — tu ne peux pas t'arrêter tant que ce n'est pas vert."
   echo "Sortie (${log#$PROJECT_ROOT/}) :"

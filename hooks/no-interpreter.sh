@@ -18,6 +18,10 @@ why="$(jq -r '.tool_input.command // empty' <<<"$input" \
   | python3 -I "$GAUNTLET_ROOT/interpreter_check.py" "${cwd:-$PWD}" "$scratch" 2>&1)"
 [ -n "$why" ] || exit 0
 
+# Journal (ADR 0019) : le refus s'écrit dans le dossier du run, s'il est connu ; jamais bloquant.
+source "$GAUNTLET_ROOT/hook_log.sh"
+hook_log "$(hook_run_dir "$agent" "${cwd:-$PWD}" "$input")" no-interpreter "$agent" Bash \
+  "$(jq -r '.tool_input.command // empty' <<<"$input")" deny "$why"
 msg="$agent : interpréteur refusé — $why. Pour écrire un fichier : Edit ou MultiEdit (Write pour en créer un). Pour lire du JSON : jq. Pour une recherche : grep, rg, sed -n. Les scripts du pipeline (python3 -I ~/.claude/scripts/…) restent permis. Un refus se rapporte, il ne se contourne pas : s'il te manque un outil, arrête-toi et dis-le dans ton rapport final (ADR 0017)."
 jq -n --arg r "$msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 exit 0

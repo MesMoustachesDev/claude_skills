@@ -161,6 +161,30 @@ def timeline(state: dict | None) -> str:
     return f'<div class="timeline">{"".join(chips)}</div>' if chips else ""
 
 
+def hook_refusals(run_dir: str) -> str:
+    """Journal des hooks (ADR 0019) : refus par agent et étape, gates rouges, contournements ; vide sans journal."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        import hook_journal
+    except ImportError:
+        return ""
+    rows = hook_journal.load(run_dir)
+    cnt = hook_journal.counts(rows)
+    if not cnt:
+        return ""
+    out = "<h3>Refus des hooks</h3>" + table(
+        ["agent", "étape", "refus", "gate rouge", "gate FAILED"],
+        [[esc(a), esc(st), esc(c["deny"] + c["ask"]), esc(c["red"]), esc(c["failed"])] for (a, st), c in cnt.items()],
+        raw=True)
+    bp = hook_journal.bypasses(rows)
+    if bp:
+        items = "".join(f"<li>{esc(d.get('agent'))} : <code>{esc(d.get('target'))}</code> refusé par {esc(d.get('hook'))} "
+                        f"({esc(d.get('tool'))}), puis <code>{esc(w.get('target'))}</code> écrit par {esc(w.get('tool'))} "
+                        f"({esc(how)})</li>" for d, w, how in bp)
+        out += f"<p><b>Contournements</b> : refus suivis d'une écriture par un autre chemin.</p><ul>{items}</ul>"
+    return out
+
+
 def gauntlet_results(out_dir: str) -> str:
     """Un gate par ligne. Les checks non applicables (ADR 0011 : pas de version pour le langage, ou outil absent du
     projet) ne bloquent pas : ils sont listés à part, pour qu'un vert ne cache pas ce qui n'a pas été vérifié."""
@@ -1061,7 +1085,7 @@ def feature_report(root: str, name: str, focus: str | None) -> str:
     qa = read(os.path.join(fdir, "qa.md"))
     if qa:
         page.add("qa", "QA device", page.md(qa) + images(fdir, "qa/**/*.png"))
-    page.add("gauntlet", "Gauntlet", gauntlet_results(os.path.join(fdir, ".gauntlet")))
+    page.add("gauntlet", "Gauntlet", gauntlet_results(os.path.join(fdir, ".gauntlet")) + hook_refusals(fdir))
 
     header = (f"<h1>{esc(name)}</h1><p class='meta'>feature · mode {esc(mode)} · <code>{esc(pkg_rel)}</code>"
               f" · base {esc(state.get('base', '?'))} · étape <b>{esc(focus or '—')}</b> · "
@@ -1161,7 +1185,7 @@ def fix_report(root: str, name: str, focus: str | None) -> str:
     rv = read(os.path.join(fdir, "review.md"))
     if rv:
         page.add("review", "review.md", page.md(rv))
-    page.add("gauntlet", "Gauntlet", gauntlet_results(os.path.join(fdir, ".gauntlet")))
+    page.add("gauntlet", "Gauntlet", gauntlet_results(os.path.join(fdir, ".gauntlet")) + hook_refusals(fdir))
 
     header = (f"<h1>{esc(name)}</h1><p class='meta'>fix · <code>{esc(repro.get('package', '?'))}</code> · "
               f"base {esc((base_sha or '?')[:8])} · gel {esc((freeze or '—')[:8])} · étape <b>{esc(focus or '—')}</b> · "

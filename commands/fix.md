@@ -316,6 +316,7 @@ Issue : #<iid> <url>       si fix.json → issue existe (issue.md, partie C)
 ## Non vérifiés             .gauntlet/last_*.json → not_applicable (check@package : conventions sans version pour le langage, ou outil absent du projet), avec la ligne [N/A] du journal ; « aucun » sinon (ADR 0011 : signalé, pas bloquant)
 ## Revue                    cause traitée : yes/partial ; plan respecté : yes/partial ; critiques résolues : n ; à vérifier : n prouvées, n écartées (review.json → to_verify.outcome) ; reviewers projet : verdicts
 ## Impact (graphify)        consommateurs hors package (impact.json, touched: false) × verdict de Victor (review.json → impact_checked) ; omise sans graphe ; `stale` : tableau gardé, précédé de « Impact : calculé sur le graphe de la base (update en échec) » ; `échec` : la seule ligne « Impact : non calculé (<raison>) »
+## Refus des hooks         `python3 ~/.claude/scripts/hook_journal.py summary .claude/fixes/<nom>` tel quel (refus par agent et étape, gates rouges, contournements) ; omise s'il n'imprime rien (ADR 0019)
 ## Arbitrages               contestations de Fanny et verdicts (si présents)
 ## Re-gels                  n, par cause (fix.json → refreezes)
 ## Suggestions             appliquées (id, titre) ; non appliquées : un bloc chacune (problème, si on ne fait rien, correctif, contre)

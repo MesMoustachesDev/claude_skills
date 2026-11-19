@@ -21,6 +21,14 @@ compte ; toi, tu étiquettes et tu rédiges. Tu n'édites jamais `ledger.jsonl` 
 roues réinventées, `miss_reason` de Bastien, écarts au plan, arbitrages, re-gels, acceptations — et
 les patterns déjà connus (`known_patterns`).
 
+Il lit aussi le journal des hooks (`.gauntlet/hooks.jsonl`, ADR 0019, lu par `scripts/hook_journal.py`) :
+- `hook_bypass` : un agent refusé sur un fichier, puis le même fichier écrit par un autre outil, ou un fichier
+  du même nom écrit ailleurs (la copie d'un test gelé). Le refus ne disait pas assez quoi faire, ou la zone a
+  un trou ;
+- `hook_denied_repeat` : le même agent refusé au moins deux fois sur la même zone (dossier, ou motif pour un
+  interpréteur) : sa consigne lui fait faire ce que son hook interdit ;
+- `gate_failed` : un gate resté rouge jusqu'à FAILED.
+
 ## 2. Étiqueter
 
 Pour chaque signal, un `pattern` : un slug en snake_case qui nomme **la cause qui se répète**, pas le
@@ -50,6 +58,7 @@ dans ce que lit l'agent qui l'a produite, pas celui qui l'a rattrapée :
 | la spec (Sophie) | `spec_blocking`, re-gel `spec` | `~/.claude/stacks/<langage>/templates/feature_spec_template.md` (la section concernée) |
 | la revue elle-même : un défaut vu tard (re-gel, QA, visite) qu'aucune revue n'a signalé | `refreeze`, `accepted` répété | `~/.claude/pipeline/review_grid.md` |
 | un choix que Thibault tranche toujours pareil | `accepted` répété | `~/.claude/pipeline/answers.md` (son format) |
+| la consigne d'un agent qui le pousse contre son hook | `hook_denied_repeat`, `hook_bypass` | la consigne de l'agent (`~/.claude/agents/<agent>.md`) ou le message de refus du hook ; un trou de zone → carte de session pour le hook |
 
 **Détectable par un script ?** (un import interdit, un `try/catch` hors `data/`, une valeur brute, un
 fichier oublié) → la règle textuelle ne suffit pas : propose en plus un check du gauntlet, en carte de

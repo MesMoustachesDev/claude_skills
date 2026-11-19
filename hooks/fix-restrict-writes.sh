@@ -24,7 +24,16 @@ tool="$(jq -r '.tool_name // empty' <<<"$input")"
 GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
 via=""
 [ "$tool" = Bash ] && via=" (écriture par Bash : même zone que Edit/Write ; un refus ne se contourne pas, il se rapporte)"
+# Journal (ADR 0019) : une ligne par décision dans <dossier du run>/.gauntlet/hooks.jsonl ; jamais bloquant.
+source "$GAUNTLET_ROOT/hook_log.sh"
+RUN_DIR=""; LOG_TARGET=""
+log_cmd="$(jq -r '.tool_input.command // empty' <<<"$input")"
+log_decision() {   # log_decision <issue> <raison>
+  [ -n "$RUN_DIR" ] || RUN_DIR="$(hook_run_dir "$agent" "${cwd:-$PWD}" "$input" "${file:-}")"
+  hook_log "$RUN_DIR" fix-restrict-writes "$agent" "$tool" "${LOG_TARGET:-${file:-$log_cmd}}" "$1" "$2${log_cmd:+ — bash: $log_cmd}"
+}
 deny() {
+  log_decision deny "$1"
   jq -n --arg r "$1$via" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   exit 0
 }
@@ -71,6 +80,7 @@ normalize() {
   printf '%s%s' "$(cd "$p" && pwd -P)" "$rest"
 }
 fix_rel="${FIX_DIR#$PROJECT_ROOT/}"
+[ -d "$FIX_DIR" ] && RUN_DIR="$FIX_DIR"
 in_fix_dir() { [[ "$rel" == "$fix_rel"/* ]]; }
 
 # debug_only — l'édition n'ajoute ou ne retire que des lignes contenant [DEBUG_ISSUE]
@@ -89,7 +99,7 @@ debug_only() {
 # check <fichier> — refuse (et sort) si le fichier est hors de la zone de l'agent ; sinon rend la main
 check() {
   local file="$1" abs
-  abs="$(normalize "$file")"
+  abs="$(normalize "$file")"; LOG_TARGET="$abs"; IN_ZONE=0
   in_serena_dir "$abs" && deny "fix : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
   [ "$skind" = write ] && serena_generated "$abs" && deny "fix : $file est un fichier généré : Serena n'y écrit pas, la prochaine génération l'écraserait. Change sa source et relance le générateur (build_runner, gen-l10n)."
   [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0
@@ -97,7 +107,7 @@ check() {
     [ "$tool" = Bash ] && return 0                       # journaux, /tmp : hors du projet, libre
     deny "fix : écriture hors du projet refusée ($file)"
   fi
-  rel="${abs#$PROJECT_ROOT/}"
+  rel="${abs#$PROJECT_ROOT/}"; LOG_TARGET="$rel"; IN_ZONE=1
   case "$agent" in
     fix-reproducer)
       in_fix_dir && return 0
@@ -119,5 +129,9 @@ check() {
   return 0
 }
 
-while IFS= read -r t; do [ -n "$t" ] && check "$t"; done <<<"$targets"
+while IFS= read -r t; do
+  [ -n "$t" ] || continue
+  check "$t"
+  [ "${IN_ZONE:-0}" = 1 ] && log_decision allow ""
+done <<<"$targets"
 exit 0

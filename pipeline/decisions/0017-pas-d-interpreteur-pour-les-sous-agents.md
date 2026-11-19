@@ -4,7 +4,8 @@ Statut : acceptée (2026-11-19)
 Où elle vit : `hooks/no-interpreter.sh` (PreToolUse Bash, déclaré dans le frontmatter de tous les agents
 `feature-*` et `fix-*`) · `scripts/gauntlet/interpreter_check.py` (ce qui est reconnu) ·
 `scripts/gauntlet/bash_write_targets.py` (les écritures par Bash que voient les `*-restrict-writes.sh`) ·
-`scripts/gauntlet/tests/test_hook_interpreter.sh`, `test_hook_fix_bash.sh`
+`scripts/gauntlet/tests/test_hook_interpreter.sh`, `test_hook_fix_bash.sh` · chaque refus s'écrit au journal
+des hooks (`.gauntlet/hooks.jsonl`, 0019)
 
 ## Contexte
 

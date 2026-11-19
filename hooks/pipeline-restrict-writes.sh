@@ -26,7 +26,16 @@ cwd="$(jq -r '.cwd // empty' <<<"$input")"
 scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
 tool="$(jq -r '.tool_name // empty' <<<"$input")"
 GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
+# Journal (ADR 0019) : une ligne par décision dans <dossier du run>/.gauntlet/hooks.jsonl ; jamais bloquant.
+source "$GAUNTLET_ROOT/hook_log.sh"
+RUN_DIR=""; LOG_TARGET=""
+log_cmd="$(jq -r '.tool_input.command // empty' <<<"$input")"
+log_decision() {   # log_decision <issue> <raison>
+  [ -n "$RUN_DIR" ] || RUN_DIR="$(hook_run_dir "$agent" "${cwd:-$PWD}" "$input" "${file:-}")"
+  hook_log "$RUN_DIR" pipeline-restrict-writes "$agent" "$tool" "${LOG_TARGET:-${file:-$log_cmd}}" "$1" "$2${log_cmd:+ — bash: $log_cmd}"
+}
 deny() {
+  log_decision deny "$1"
   jq -n --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   exit 0
 }
@@ -103,6 +112,7 @@ fi
 
 FEAT_REL=".claude/features/$feature"
 FEATURE_DIR="${FEATURE_DIR:-$PROJECT_ROOT/$FEAT_REL}"
+[ -d "$FEATURE_DIR" ] && RUN_DIR="$FEATURE_DIR"
 extra="$(writes_extra | tr '\n' ' ')"   # zones supplémentaires : config projet (router, l10n…) + pipeline.json de la feature
 
 # match <chemin> <glob>... — case avec * traversant /
@@ -167,7 +177,7 @@ via=""; [ "$tool" = Bash ] && via=" (écriture par Bash : même zone que Edit/Wr
 # check <fichier> — décide pour un fichier ; deny sort du hook au premier refus.
 check() {
   local file="$1" abs
-  abs="$(normalize "$file")"
+  abs="$(normalize "$file")"; LOG_TARGET="$abs"; IN_ZONE=0
   in_serena_dir "$abs" && deny "pipeline : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
   [ "$skind" = write ] && serena_generated "$abs" && deny "pipeline : $file est un fichier généré : Serena n'y écrit pas, la prochaine génération l'écraserait. Change sa source et relance le générateur (build_runner, gen-l10n)."
   [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0     # brouillons : toujours permis
@@ -175,7 +185,7 @@ check() {
     [ "$tool" = Bash ] && return 0                                  # journaux, /tmp : hors zone, hors sujet
     deny "pipeline : écriture hors du worktree de la feature refusée ($file). Le worktree est $PROJECT_ROOT : écris sous ce chemin."
   fi
-  rel="${abs#$PROJECT_ROOT/}"
+  rel="${abs#$PROJECT_ROOT/}"; LOG_TARGET="$rel"; IN_ZONE=1
 case "$agent" in
   feature-specifier)
     match "$rel" "$FEAT_REL/*" || deny "specifier : n'écrit que dans $FEAT_REL/ (spec.md). Le code vient après validation.$via"
@@ -267,5 +277,11 @@ case "$agent" in
 esac
 }
 
-while IFS= read -r t; do [ -n "$t" ] && check "$t"; done <<<"$targets"
+# Une écriture permise par la zone s'écrit aussi au journal (« allow ») : c'est elle qui, après un refus,
+# montre le même fichier écrit par un autre chemin.
+while IFS= read -r t; do
+  [ -n "$t" ] || continue
+  check "$t"
+  [ "${IN_ZONE:-0}" = 1 ] && log_decision allow ""
+done <<<"$targets"
 exit 0

@@ -52,6 +52,12 @@ fi
 case "$profile" in *_data|*_presentation) export GAUNTLET_LAYER="${profile##*_}" ;; esac   # sorties de la couche (log)
 init_project_context "$feature" 2>/dev/null || { echo "pipeline-gate : contexte projet illisible, gate ignoré" >&2; exit 0; }
 
+# Journal (ADR 0019) : gate rouge et FAILED, une ligne dans .gauntlet/hooks.jsonl ; jamais bloquant.
+source "$GAUNTLET_ROOT/hook_log.sh"
+gate_log() {   # gate_log <issue> <raison> [étape]
+  local failed; failed="$(jq -r '(.failed // []) | join(" ")' "$GAUNTLET_OUT/last_${3:-$profile}.json" 2>/dev/null)"
+  hook_log "$FEATURE_DIR" pipeline-gate "$agent" Stop "" "$1" "$2${failed:+ : $failed}" "${3:-$profile}"
+}
 PIPE="$FEATURE_DIR/pipeline.json"
 [ -f "$PIPE" ] || echo '{}' > "$PIPE"
 max="$(cfg pipeline.max_attempts 5)"
@@ -65,9 +71,11 @@ if [ "${profile%%_*}" = red ] && ! bash "$GAUNTLET_ROOT/../pipeline.sh" reached 
   n=$(( $(cat "$count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$count"
   if [ "$n" -ge "$max" ]; then
     rm -f "$count"
+    hook_log "$FEATURE_DIR" pipeline-gate "$agent" Stop "" failed "réalignement : analyze rouge après $n tentatives" realign
     echo "pipeline-gate : réalignement — analyze toujours rouge après $n tentatives. Arrête-toi et rapporte ce qui ne compile pas." >&2
     exit 0
   fi
+  hook_log "$FEATURE_DIR" pipeline-gate "$agent" Stop "" red "réalignement : analyze rouge (tentative $n/$max)" realign
   {
     echo "RÉALIGNEMENT (avant l'étape 3) : analyze rouge (tentative $n/$max) — adapte les tests au contrat, ne change aucune assertion."
     echo "----------------------------------------------------------------"
@@ -106,6 +114,7 @@ attempts=$((attempts+1))
 log="$GAUNTLET_OUT/last_${profile}.log"
 if [ "$attempts" -ge "$max" ]; then
   pipe_set FAILED "$attempts"
+  gate_log failed "gate $profile rouge après $attempts tentatives, étape FAILED"
   {
     echo "pipeline-gate : gate '$profile' toujours rouge après $attempts tentatives. Étape marquée FAILED."
     echo "Arrête-toi et rends un rapport : ce qui bloque, ce que tu as essayé, ce que tu recommandes (spec ? test faux ? contrat ?)."
@@ -114,6 +123,7 @@ if [ "$attempts" -ge "$max" ]; then
 fi
 
 pipe_set RED "$attempts"
+gate_log red "gate $profile rouge (tentative $attempts/$max)"
 {
   echo "GATE '$profile' ROUGE (tentative $attempts/$max) — tu ne peux pas t'arrêter tant que ce n'est pas vert."
   echo "Sortie du gauntlet (${log#$PROJECT_ROOT/}) :"

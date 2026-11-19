@@ -9,7 +9,17 @@ set -u
 input="$(cat)"
 tool="$(jq -r '.tool_name // empty' <<<"$input")"
 GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"
-refuse() { echo "review-restrict-writes : $1" >&2; exit 2; }
+# Journal (ADR 0019) : dans le dossier de la revue cité dans le prompt de l'agent ; jamais bloquant.
+source "$GAUNTLET_ROOT/hook_log.sh"
+agent="$(jq -r '.agent_type // empty' <<<"$input")"
+log_decision() {   # log_decision <issue> <cible> <raison>
+  hook_log "$(hook_run_dir "$agent" "$(jq -r '.cwd // empty' <<<"$input")" "$input")" review-restrict-writes \
+    "$agent" "$tool" "$2" "$1" "$3"
+}
+refuse() {
+  log_decision deny "$(jq -r '.tool_input.file_path // .tool_input.notebook_path // .tool_input.command // .tool_input.relative_path // empty' <<<"$input")" "$1"
+  echo "review-restrict-writes : $1" >&2; exit 2
+}
 
 case "$tool" in
   mcp__serena__*)
@@ -37,8 +47,9 @@ path="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"
 root="$HOME/.cache/gauntlet/review/"
 case "$path" in
   "$root"*)
-    case "$path" in *"/../"*|*"/.."|*"/./"*|*/.serena/*) ;; *) exit 0 ;; esac ;;
+    case "$path" in *"/../"*|*"/.."|*"/./"*|*/.serena/*) ;; *) log_decision allow "$path" ""; exit 0 ;; esac ;;
 esac
+log_decision deny "$path" "écriture hors du dossier de la revue"
 {
   echo "review-restrict-writes : écriture refusée — $path"
   echo "Une revue ne touche pas au code relu. Tu n'écris que dans ton dossier de revue : $root<slug>/"

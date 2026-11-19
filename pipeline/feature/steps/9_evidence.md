@@ -51,6 +51,7 @@ Tests : <n> (dont <n> ajoutés par Hugo) · Couverture lignes modifiées : <n>%
 Mutation : <n>% (<n> mutants, <n> survivants expliqués) | sautée (gabarit S) · Complexité max : <n> · Dépendances : ✓
 Revue : <n> critiques (résolues), <n> suggestions, <n> à vérifier (<n> prouvées, <n> écartées) · Règles projet : <n>/<n> · Maintenabilité : <n>/8
 
+## Refus des hooks                   ← `python3 ~/.claude/scripts/hook_journal.py summary .claude/features/<nom>` tel quel (refus par agent et étape, gates rouges, contournements) ; omise s'il n'imprime rien (ADR 0019)
 ## Non vérifiés                       ← .gauntlet/last_*.json → not_applicable (et .gauntlet/<couche>/), ADR 0011
 | Check | Gates | Pourquoi |           ← « aucun » si la liste est vide ; jamais omise
 Un check non applicable (pas de version pour le langage du package, ou outil absent du projet : pas de

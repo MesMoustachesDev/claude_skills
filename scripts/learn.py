@@ -5,7 +5,8 @@ Ce qui est déterministe est ici : extraire les signaux d'un run, tenir le regis
 récurrences. Ce qui demande du jugement (rattacher un signal à un pattern, rédiger la règle) reste à
 l'orchestrateur.
 
-  learn.py extract <dossier du run>          signaux pas encore étiquetés (JSON) + patterns connus
+  learn.py extract <dossier du run>          signaux pas encore étiquetés (JSON) + patterns connus ; lit aussi
+                                             .gauntlet/hooks.jsonl (contournements, refus répétés, gates FAILED)
   learn.py record <labels.json>              enregistre les étiquettes {"run": clé, "patterns": {slug: desc}, "labels": [{id, pattern}]}
   learn.py candidates [--min-runs N]         patterns récurrents à proposer (défaut : 2 runs distincts)
   learn.py examples <slug>                   signaux rattachés à un pattern
@@ -18,6 +19,9 @@ import glob
 import json
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hook_journal  # noqa: E402  (journal des hooks, ADR 0019)
 
 HOME = os.environ.get("LEARN_HOME") or os.path.expanduser("~/.claude/pipeline/lessons")
 LEDGER = os.path.join(HOME, "ledger.jsonl")
@@ -159,6 +163,22 @@ def extract_signals(run_dir):
             if r.get("cause") else f"re-gel : {r.get('reason', '')}", r.get("cause"))
     for a in state.get("accepted") or []:
         add("accepted", "state", f"{a.get('stage')} : {a.get('reason')}", a.get("stage"))
+
+    # Journal des hooks (.gauntlet/hooks.jsonl, ADR 0019) : contournements, refus répétés, gates FAILED.
+    rows = hook_journal.load(run_dir)
+    for d, a, how in hook_journal.bypasses(rows):
+        add("hook_bypass", ".gauntlet/hooks.jsonl",
+            f"{d.get('agent')} refusé par {d.get('hook')} ({d.get('tool')}) sur {d.get('target')}, puis "
+            f"{a.get('target')} écrit par {a.get('tool')} ({how}) : {d.get('reason', '')}",
+            d.get("hook"), d.get("target"), {"agent": d.get("agent")})
+    for agent, hook, zone, n, ex in hook_journal.repeats(rows):
+        add("hook_denied_repeat", ".gauntlet/hooks.jsonl",
+            f"{agent} refusé {n} fois par {hook} sur {zone} : {ex.get('reason', '')}", hook,
+            zone if hook_journal._is_path(ex.get("target", "")) else None, {"agent": agent, "count": n})
+    for g in rows:
+        if g.get("outcome") == "failed":
+            add("gate_failed", ".gauntlet/hooks.jsonl",
+                f"{g.get('agent')} : {g.get('reason', '')}", g.get("stage"), None, {"agent": g.get("agent")})
 
     return key, signals
 

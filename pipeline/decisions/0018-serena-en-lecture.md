@@ -5,7 +5,8 @@ Où elle vit : `scripts/serena.sh` (prepare, serve, which) · `serena/contexts/p
 `scripts/gauntlet/serena_guard.sh` et les hooks `pipeline-restrict-writes.sh`, `fix-restrict-writes.sh`,
 `review-restrict-writes.sh` · `mcpServers` du frontmatter de fix-reproducer, feature-specifier,
 feature-architect, feature-dedup, feature-reviewer, fix-reviewer, review-architect, review-code ·
-`pipeline/serena.md` (contrat) · `serena/contexts/pipeline-ecriture.yml`, `mcpServers` de feature-implementer, ses deux moitiés et feature-cleaner (écriture) · `pipeline/graphify.md` · `scripts/gauntlet/tests/test_serena.sh`
+`pipeline/serena.md` (contrat) · `serena/contexts/pipeline-ecriture.yml`, `mcpServers` de feature-implementer, ses deux moitiés et feature-cleaner (écriture) · `pipeline/graphify.md` · `scripts/gauntlet/tests/test_serena.sh` · refus et écritures Serena au journal des hooks
+(`.gauntlet/hooks.jsonl`, 0019)
 
 ## Contexte
 

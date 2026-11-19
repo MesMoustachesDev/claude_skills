@@ -77,6 +77,9 @@ pipeline "$R" login "$AT_1C"
 hook feature-test-writer
 expect_rc 2 "fake toujours cassé : Théo est renvoyé au travail"
 expect_out "RÉALIGNEMENT" "par le réalignement, pas par le gate red"
+OUT="$(tail -1 "$R/.claude/features/login/.gauntlet/hooks.jsonl" 2>/dev/null)"
+expect_out '"outcome":"red"' "journal (ADR 0019) : le gate rouge s'écrit"
+expect_out '"stage":"realign"' "… avec son étape (réalignement)"
 OUT="$(jq -r '.stages.red // "absent"' "$PJ")"; expect_out "absent" "stages.red n'est pas écrit"
 printf 'package com.x.login.domain\n\nclass FakeLoginRepository : LoginRepository {\n    override fun login() = 1\n    override fun logout() = Unit\n}\n' > "$P/$T/domain/FakeLoginRepository.kt"
 hook feature-test-writer
