@@ -40,3 +40,11 @@ Realistic LinkedIn profile headshot, shot on a Sony A7 IV with an 85mm f/1.8 len
 - Tight head-and-shoulders crop from mid-chest up: the head and beard fill about 60% of the frame, eyes about 40% down from the top, small headroom, nothing important near the corners (the photo will be cropped to a circle)
 - Plain solid seamless studio backdrop (the colour given in the scene, default muted slate blue-grey), evenly lit. Absolutely no window, no wall edge, no room, no furniture, no objects
 - Face toward the camera, shoulders turned slightly, looking straight into the lens with his own natural relaxed smile
+
+## affiche-gta
+Painted key-art illustration in the style of a modern open-world crime video game's promotional campaign art (late-2020s Miami-like setting).
+- Digital painting with crisp clean edges, slightly stylised realism, bold confident brushwork, smooth gradients
+- Saturated sunset palette: hot pink, magenta, orange and teal, neon pink and electric blue light accents, warm golden-hour glow
+- High-contrast cinematic lighting with strong coloured rim light from the neon sources
+- The person rendered with strong likeness, painted the same way as the scene
+- Original artwork only: no game logo, no title, no lettering, no characters from any existing game
