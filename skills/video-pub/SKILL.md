@@ -15,6 +15,7 @@ Dans ce skill (`~/.claude/skills/video-pub/`) :
 - `scripts/sim.sh` : simulateur à soi (clone, langue, barre d'état 9:41), enregistrement d'écran.
 - `scripts/clips.sh` : planches horodatées, découpe des plans, images fixes.
 - `scripts/render.js` : rendu image par image puis MP4, ou quelques captures pour vérifier.
+- `scripts/transit.sh` : registre des vidéos déposées dans le bucket de transit, pour le ménage.
 
 ## 0. La config du projet
 
@@ -132,5 +133,22 @@ pendant le tournage fait foi (un quota, une option payante).
 
 Envoie le MP4 (SendUserFile, `render`) et dis en peu de lignes : le déroulé (tableau), ce qui est filmé et
 ce qui est dessiné, ce qui a touché la production, ce que la vidéo ne montre pas encore. Elle est
-**muette** : la musique s'ajoute dans l'outil de pub (bibliothèque commerciale de TikTok Ads Manager),
-seule à couvrir les droits d'une pub. Ne publie rien, ne lance aucune campagne.
+**muette** : la musique s'ajoute dans l'outil de publication (bibliothèque de la plateforme, ou bibliothèque
+commerciale de TikTok Ads Manager pour une pub). Ne publie rien toi-même, ne lance aucune campagne.
+
+## 7. Transmettre à l'agent marketing (seulement si Thibault le demande)
+
+L'agent marketing ne reçoit que du texte : il lui faut une URL publique directe pour chaque MP4. La config
+projet donne le bucket de transit (connecteur Appwrite, projet, bucket, forme de l'URL) et l'agent.
+1. Ménage d'abord : `scripts/transit.sh due` liste les dépôts à supprimer (téléchargement confirmé, ou plus
+   de 7 jours). Supprime chacun avec `storage_delete_file` du connecteur, puis `scripts/transit.sh gone <file_id>`.
+2. Dépose la vidéo avec `storage_create_file` (`file` = `{path, filename, mime_type: video/mp4}`, id
+   `pub-<date>-<nom>`), puis vérifie l'URL sans connexion : `curl -s -o /tmp/x.mp4 -w '%{http_code} %{content_type}'`
+   doit donner `200 video/mp4`, et le md5 du fichier téléchargé doit être celui de l'original.
+3. `scripts/transit.sh add <projet> <bucket> <file_id> <url> <fichier local>`.
+4. Envoie à l'agent : les liens, le déroulé de chaque vidéo, ce qu'elle promet et ne promet pas, la consigne
+   de Thibault telle qu'il l'a dite (plateformes, organique ou pub, créneaux), la demande de confirmer le
+   téléchargement, et celle de suivre vues et abonnés gagnés.
+5. Quand l'agent confirme le téléchargement : `scripts/transit.sh ok <file_id>` ; le fichier part au prochain ménage.
+
+Un bucket de transit est public en lecture : n'y dépose que des vidéos destinées à être publiées.
