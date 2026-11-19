@@ -77,7 +77,7 @@ which_wt() {
 app_root() {
   local w="$1" d cfgf
   [ -f "$w/.fvmrc" ] && { printf '%s' "$w"; return 0; }
-  for cfgf in "$w/.claude/rules/feature_pipeline.md"; do
+  for cfgf in "$w/.claude/pipeline/feature_pipeline.md" "$w/.claude/rules/feature_pipeline.md"; do   # nouvel emplacement, puis l'ancien
     d="$(awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfgf" 2>/dev/null | grep -E '^[[:space:]]*app_dir[[:space:]]*=' \
       | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$d" ] && [ -f "$w/$d/.fvmrc" ] && { printf '%s' "$w/${d%/}"; return 0; }

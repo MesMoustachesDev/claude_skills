@@ -1,5 +1,8 @@
 # Create MR Rules — GitLab / Android
 
+> Vit dans `.claude/pipeline/` du projet (lu par `/create_mr`, `/fix_mr_comments` et l'evidence de `/feature`), pas
+> dans `.claude/rules/`, que Claude Code charge dans chaque agent (ADR 0008).
+
 ## Provider & CLI
 
 - **Provider** : GitLab (self-hosted)

@@ -7,7 +7,11 @@
    de `$(bash ~/.claude/scripts/stack.sh dir <app_dir>)/templates/` (« le template » dans la suite). Lis le
    manifeste du package : c'est ce qui charge la règle de langage, qui ajoute ses questions propres.
    Rien détecté : demande le langage à Thibault, et écris `stack = <langage>` dans le bloc `ini`.
-2. **Config** — si `.claude/rules/feature_pipeline.md` manque : copie le template `feature_pipeline.md`, puis
+2. **Config** — la config des scripts vit dans `.claude/pipeline/`, pas dans `.claude/rules/` (que Claude Code
+   charge dans chaque agent, ADR 0008). Si l'ancien `.claude/rules/feature_pipeline.md` existe, propose en une
+   question de le déplacer (`git mv` vers `.claude/pipeline/`, avec `deploy_app.md` et `create_mr_rules.md`
+   s'ils y sont, sur une branche du projet, jamais sur `base_branch`) ; les scripts lisent l'ancien en attendant.
+   Si `.claude/pipeline/feature_pipeline.md` manque : copie le template `feature_pipeline.md` dans `.claude/pipeline/`, puis
    pose en **un** `AskUserQuestion` les questions dont tu n'as pas la réponse dans le repo : commandes
    (wrapper de SDK, comme la règle de langage le dit), `base_branch` (détecte `develop`/`main`), plateformes QA, `android.app_id`
    (lis `android/app/build.gradle*` → `applicationId`), `ios.app_id` (lis `ios/Runner.xcodeproj/project.pbxproj`
@@ -25,7 +29,8 @@
 3. **Règles de code** — si `.claude/rules/create_feature_rules.md` manque : propose le template global
    (comme `/create_feature`), copie-le dans `.claude/rules/`.
 3b. **Règles d'écran** — si `.claude/rules/create_screen_rules.md` manque : copie le
-   template `create_screen_rules.md`. Si sa section **Anatomie du projet**
+   template `create_screen_rules.md`. Son frontmatter `paths:` la réserve aux fichiers de présentation :
+   ajuste les globs à l'arbre du projet (dossiers des écrans, des widgets, du design system). Si sa section **Anatomie du projet**
    est vide, propose 2 ou 3 écrans du repo qui partagent un squelette (`AskUserQuestion` : « lesquels
    sont les bons modèles ? »), lis-les, et remplis la section avec les vrais widgets et tokens. Ivan,
    Romain, Quentin et Pauline s'y alignent.
@@ -38,7 +43,8 @@
    sait scaffolder à la main.
 5. **`.gitignore`** du projet : ajoute `.claude/features/*/.gauntlet/`, `.claude/features/*/report.html`,
    `.claude/features/.current` et `coverage/` (le gate coverage écrit `<package>/coverage/lcov.info`)
-   s'ils n'y sont pas.
+   s'ils n'y sont pas. Si le `.gitignore` exclut `.claude/*` avec une liste blanche, ajoute
+   `!.claude/pipeline/` à côté de `!.claude/rules/`.
 5b. **Clés du pipeline sans question** (valeurs par défaut écrites dans le bloc `ini`, à ajuster) :
    `generated.exclude` (ajoute le dossier de sortie de gen-l10n : `output-dir` de `l10n.yaml`, s'il
    n'est pas couvert par le défaut), `worktree.copy_untracked` (lance

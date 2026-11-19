@@ -17,8 +17,8 @@ command -v java >/dev/null && [ -x "${DIST:-/nonexistent}" ] \
 
 R="$TMP_ROOT/repo"; mk_repo "$R"
 M=lib; P="$R/$M"; K="src/main/kotlin/x/data"; T="src/test/kotlin/x/data"
-mkdir -p "$R/.claude/rules" "$P/$K" "$P/$T"
-cat > "$R/.claude/rules/feature_pipeline.md" <<EOF
+mkdir -p "$R/.claude/rules" "$R/.claude/pipeline" "$P/$K" "$P/$T"
+cat > "$R/.claude/pipeline/feature_pipeline.md" <<EOF
 # test
 \`\`\`ini
 gradle = $DIST --offline

@@ -178,7 +178,7 @@ export const fromBranch = (
   return match ? { kind: match[1] as 'feature' | 'fix', name: match[2] ?? '' } : null
 }
 
-/** pipeline.max_attempts du bloc ini de .claude/rules/feature_pipeline.md. */
+/** pipeline.max_attempts du bloc ini de .claude/pipeline/feature_pipeline.md (ou de l'ancien .claude/rules/). */
 export const maxAttemptsFromConfig = (text: string): number => {
   const match = /^\s*pipeline\.max_attempts\s*=\s*(\d+)/m.exec(text)
 

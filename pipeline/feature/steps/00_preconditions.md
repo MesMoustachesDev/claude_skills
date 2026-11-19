@@ -52,7 +52,7 @@
     `.claude/rules/<fichier>` du worktree, ouvre-le pour qu'il l'adapte (`open_in_editor`), commit avec la
     feature ;
   - « Prendre le template tel quel » → la même copie, sans l'ouvrir ;
-  - « Le projet n'en a pas besoin » → ajoute le fichier à `rules.none` de `.claude/rules/feature_pipeline.md`.
+  - « Le projet n'en a pas besoin » → ajoute le fichier à `rules.none` de `.claude/pipeline/feature_pipeline.md`.
 
 - **Mode et package** : `--in <package>` → `mode: extend`, `package` = ce chemin (doit exister, avec
   un marqueur de package de son langage : `stack.sh detect <chemin>` répond). Sinon `mode: create`, `package` = `package_path` avec `{name}` — sauf si le

@@ -1,6 +1,6 @@
 {
   "name": "pipeline-view",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Affiche, en tête, un encart « Reprendre le fil » pour la feature de la session (but, étape, ce qui t'attend, ce qui a bougé depuis ton dernier passage, décisions, questions ouvertes, hors périmètre), puis l'état du pipeline /feature ou /fix en cours (étapes, gates, tentatives, agent actif et, dans un encart « à lire », les documents de l'étape courante (spec et sa critique, contrats, revue, diagnostic et plan d'un fix…), scénarios Gherkin, un par carte en carousel, avec leur test, leur flow Maestro et ses captures) et les plans du repo (.claude/plans/*.md, epics ; celui de la session déplié en premier, les autres repliés sur une ligne) avec l’état de chaque branche liée et, pour chaque fichier modifié ou commité, la session qui l’a écrit, et ce que font les sessions de chaque worktree. Chaque session y publie son état (au travail, attend ta réponse, au repos) et son contexte rempli dans ~/.claude/activity, et ton dernier passage sur chaque feature dans ~/.claude/activity/seen ; le reste est en lecture seule.",
   "types": "./types/index.d.ts"
 }

@@ -225,6 +225,11 @@ const readText = ($: EngineInterface, path: string): Promise<string> =>
     () => '',
   )
 
+/** La config du projet sous <root> : .claude/pipeline/feature_pipeline.md, à défaut l'ancien emplacement
+ * .claude/rules/feature_pipeline.md (projet pas encore migré, ADR 0008). */
+const readConfig = async ($: EngineInterface, root: string): Promise<string> =>
+  (await readText($, `${root}/.claude/pipeline/feature_pipeline.md`)) || readText($, `${root}/.claude/rules/feature_pipeline.md`)
+
 /** Feature ou fix courant : branche feature/<nom> ou fix/<nom>, sinon les fichiers .current. */
 const locate = async ($: EngineInterface, root: string) => {
   const byBranch = fromBranch(await git($, ['branch', '--show-current'], root))
@@ -511,7 +516,7 @@ const load = async ($: EngineInterface): Promise<PipelineSnapshot | null> => {
   const file = `${dir}/${where.kind === 'feature' ? 'pipeline.json' : 'fix.json'}`
   const main = (await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).replace(/\/\.git\/?$/, '')
   seenPath = where.kind === 'feature' && main ? seenFile(activityDir(), main, where.name) : ''
-  const config = await readText($, `${root}/.claude/rules/feature_pipeline.md`)
+  const config = await readConfig($, root)
   const text = await readText($, file)
   const snap = parseState(where.kind, where.name, text, maxAttemptsFromConfig(config))
   const view = snap ? await loadPending($, where.kind, where.name, dir, text, snap.pkg) : null
@@ -582,7 +587,7 @@ const loadPlans = async ($: EngineInterface): Promise<{ plans: PlanView[]; stray
   if (!common) return { plans: [], strays: [] }
   const main = common.replace(/\/\.git\/?$/, '')
   const worktrees = parseWorktrees(await git($, ['worktree', 'list', '--porcelain'], main))
-  const config = await readText($, `${main}/.claude/rules/feature_pipeline.md`)
+  const config = await readConfig($, main)
   const base = /^\s*base_branch\s*=\s*(\S+)/m.exec(config)?.[1] ?? 'develop'
   const found: PlanView[] = []
   const cited = new Set<string>()

@@ -31,7 +31,7 @@ de la revue se vérifie ici, avant le gauntlet, et se tranche **en un seul arrê
      récupère maintenant (coffre de secrets), je te dis quand c'est fait » / « Continuer : la QA device
      sera faite sans ce fichier, donc non probante ». Ne lis ni n'affiche jamais son contenu.
 4. **Applique ses réponses** avant d'aller plus loin :
-   - valeurs QA données → écris-les dans `.claude/rules/feature_pipeline.md` du projet (bloc `ini` et
+   - valeurs QA données → écris-les dans `.claude/pipeline/feature_pipeline.md` du projet (bloc `ini` et
      « Notes pour les agents »), montre le diff à Thibault en une ligne par clé ; c'est sa config, il
      vient de te la donner ;
    - corrections d'outillage, graphe → lance-les, puis `review.sh preflight <slug>` à nouveau ;

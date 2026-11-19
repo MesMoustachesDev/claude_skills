@@ -12,7 +12,7 @@ FAKE_GRADLE="$TESTS_DIR/fake_gradle.sh"
 
 R="$TMP_ROOT/repo"; mk_repo "$R"
 M=feature/login; P="$R/$M"; K="src/main/kotlin/com/x/login"; T="src/test/kotlin/com/x/login"
-mkdir -p "$R/.claude/rules" "$P/$K/ui" "$P/$T/ui"
+mkdir -p "$R/.claude/rules" "$R/.claude/pipeline" "$P/$K/ui" "$P/$T/ui"
 {
   echo '# test'; echo '```ini'
   echo "gradle = $FAKE_GRADLE"
@@ -21,7 +21,7 @@ mkdir -p "$R/.claude/rules" "$P/$K/ui" "$P/$T/ui"
   echo 'base_branch = develop'
   echo 'qa.platforms ='
   echo '```'
-} > "$R/.claude/rules/feature_pipeline.md"
+} > "$R/.claude/pipeline/feature_pipeline.md"
 echo 'include(":feature:login")' > "$R/settings.gradle.kts"
 printf 'plugins {\n  id("com.android.library")\n}\n' > "$P/build.gradle.kts"
 printf 'package com.x.login.ui\n\nfun LoginScreen() {\n    val title = 1\n}\n' > "$P/$K/ui/LoginScreen.kt"

@@ -152,7 +152,7 @@ Ton prompt dit le mode :
 
 **1. Explore avant de demander.** Ne pose aucune question dont la réponse est dans le repo.
 
-- `.claude/rules/feature_pipeline.md` — section « Notes pour les agents » : feature de référence, spécificités.
+- `.claude/pipeline/feature_pipeline.md` (à défaut, l'ancien `.claude/rules/`) — section « Notes pour les agents » : feature de référence, spécificités.
 - `.claude/rules/create_feature_rules.md` — la structure, les conventions, la section « Questions à poser ».
 - `CLAUDE.md` du projet.
 - La feature de référence désignée, et une ou deux features voisines de ce que tu vas spécifier :

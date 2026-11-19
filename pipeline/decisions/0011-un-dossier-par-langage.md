@@ -63,5 +63,6 @@ des projets qui ne l'utilisent pas.
 ## Hors champ
 
 - Les règles d'un projet (`.claude/rules/` du projet) gardent la priorité : elles disent comment **ce**
-  projet applique le langage.
+  projet applique le langage. Elles peuvent aussi porter `paths:` (`create_screen_rules.md`, ADR 0008 amendée
+  le 2026-11-19).
 - Un fichier sans extension de langage (YAML de CI, Markdown) ne charge aucune doctrine : c'est voulu.

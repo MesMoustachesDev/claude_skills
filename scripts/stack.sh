@@ -3,7 +3,7 @@
 #
 #   stack.sh detect [chemin]       nom du langage du package qui contient <chemin> (défaut : le dossier courant)
 #   stack.sh dir [chemin]          ~/.claude/stacks/<langage>
-#   stack.sh get <clé> [chemin]    valeur de la clé : config du projet (bloc ini de .claude/rules/feature_pipeline.md)
+#   stack.sh get <clé> [chemin]    valeur de la clé : config du projet (bloc ini de .claude/pipeline/feature_pipeline.md)
 #                                  si elle la donne, sinon stacks/<langage>/stack.ini ; vide si aucun ne la donne
 #   stack.sh vals <chemin> <clé>…  une valeur par ligne, dans l'ordre des clés (un seul processus, pour les hooks)
 #   stack.sh package <chemin>      le dossier du package qui contient <chemin> : le plus proche, en remontant
@@ -20,7 +20,8 @@
 # ~/.claude/rules/stacks/<langage>*.md, chargée par Claude Code seulement quand un fichier de ce langage est lu
 # (frontmatter `paths:`). Voir ~/.claude/stacks/README.md et l'ADR 0011.
 #
-# STACK_CFG=<fichier> : la config du projet à lire à la place de <racine>/.claude/rules/feature_pipeline.md
+# STACK_CFG=<fichier> : la config du projet à lire à la place de <racine>/.claude/pipeline/feature_pipeline.md
+# (à défaut, l'ancien emplacement <racine>/.claude/rules/feature_pipeline.md)
 # (GAUNTLET_CFG du gauntlet, template de pr_gauntlet.sh). Une valeur qui commence par `~/` est rendue absolue.
 set -u
 STACKS="${CLAUDE_STACKS_DIR:-$HOME/.claude/stacks}"
@@ -39,7 +40,8 @@ ini_get() {
 
 # project_cfg <racine> <clé> — même lecture que cfg() du gauntlet : blocs ```ini de feature_pipeline.md
 project_cfg() {
-  local f="${STACK_CFG:-$1/.claude/rules/feature_pipeline.md}"
+  local f="${STACK_CFG:-$1/.claude/pipeline/feature_pipeline.md}"
+  [ -n "${STACK_CFG:-}" ] || [ -f "$f" ] || f="$1/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
   [ -f "$f" ] || return 0
   awk '/^```ini/{f=1;next} /^```/{f=0} f' "$f" \
     | grep -E "^[[:space:]]*${2//./\\.}[[:space:]]*=" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'

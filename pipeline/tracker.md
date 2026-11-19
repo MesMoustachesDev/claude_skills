@@ -6,7 +6,7 @@ tickets (gabarits) est dans `issue.md` ; ici, seulement le comment.
 
 ## Config
 
-Bloc `ini` de `.claude/rules/feature_pipeline.md` :
+Bloc `ini` de `.claude/pipeline/feature_pipeline.md` :
 
 ```ini
 # gitlab | notion | none

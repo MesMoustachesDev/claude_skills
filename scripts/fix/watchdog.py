@@ -6,7 +6,7 @@
 done | working | waiting_thibault | stalled | idle. L'étape vient de fix/steps.py → steps() ; l'attente
 de Thibault de fix.json → waiting (posé par `fix/steps.py ask`) ; « ça tourne » des hooks de
 .gauntlet/hook_*.running et des sous-agents des sessions de ce worktree. Seuil watchdog.minutes de
-.claude/rules/feature_pipeline.md (défaut 20). --notify : notify.sh, au plus une fois par verdict et par
+.claude/pipeline/feature_pipeline.md (défaut 20). --notify : notify.sh, au plus une fois par verdict et par
 watchdog.renotify_minutes, état dans .watchdog.json ; un blocage n'est signalé qu'après deux délais.
 Cas réel : gate green de Fanny passé, Victor jamais lancé, personne ne l'a vu jusqu'au retour du dev.
 """
@@ -24,7 +24,7 @@ import pipeline as pl  # noqa: E402
 
 
 def verdict(fx):
-    cfg = types.SimpleNamespace(cfg_file=os.path.join(fx.root, ".claude", "rules", "feature_pipeline.md"))
+    cfg = types.SimpleNamespace(cfg_file=pl.project_cfg_file(fx.root))
     minutes = int(pl.Ctx.cfg(cfg, "watchdog.minutes", "20") or 20)
     t = pl.time_now()
     _, n = fix_steps.steps(fx)
@@ -86,7 +86,7 @@ def main(args):
     fx = fix_steps.Fix(args[0])
     v = verdict(fx)
     if "--notify" in args and v.get("alert"):
-        cfg = types.SimpleNamespace(cfg_file=os.path.join(fx.root, ".claude", "rules", "feature_pipeline.md"))
+        cfg = types.SimpleNamespace(cfg_file=pl.project_cfg_file(fx.root))
         state_f = os.path.join(fx.dir, ".watchdog.json")
         try:
             last = json.load(open(state_f))

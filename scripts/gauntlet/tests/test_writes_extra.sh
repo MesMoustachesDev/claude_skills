@@ -19,7 +19,7 @@ echo "int o() => 1;" > "$R/$F/other/lib/src/data/o.dart"
 commit "$R" "develop" >/dev/null
 git -C "$R" checkout -q -b feature/x
 pipeline "$R" x '{"mode":"extend","package":"app/features/feat"}'
-CFG_BEFORE="$(cat "$R/.claude/rules/feature_pipeline.md")"
+CFG_BEFORE="$(cat "$R/.claude/pipeline/feature_pipeline.md")"
 
 # hook_write <agent> <fichier> — décision du hook dans $OUT ("deny…" ou vide)
 hook_write() {
@@ -32,7 +32,7 @@ OUT="$(cd "$R" && bash "$PIPELINE_SH" extra x "app/features/other/lib/**" 2>&1)"
 expect_rc 0 "pipeline.sh extra réussit"
 expect_out "app/features/router/**  (projet)" "la zone du projet est listée"
 expect_out "app/features/other/lib/**  (feature)" "la zone de la feature est listée"
-[ "$(cat "$R/.claude/rules/feature_pipeline.md")" = "$CFG_BEFORE" ] && _pass "feature_pipeline.md inchangé" || _fail "feature_pipeline.md modifié"
+[ "$(cat "$R/.claude/pipeline/feature_pipeline.md")" = "$CFG_BEFORE" ] && _pass "feature_pipeline.md inchangé" || _fail "feature_pipeline.md modifié"
 OUT="$(jq -r '.writes_extra | join(",")' "$R/.claude/features/x/pipeline.json")"
 expect_out "app/features/other/lib/**" "pipeline.json → writes_extra contient la zone"
 

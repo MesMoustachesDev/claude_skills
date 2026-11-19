@@ -168,6 +168,14 @@ def extract(repo: Path, wt: Path, ref: str, *paths: str) -> None:
     subprocess.run(['tar', '-x', '-C', str(wt)], input=archive.stdout, check=True)
 
 
+def project_rules(repo: Path) -> list:
+    """Les dossiers de règles et de config du projet sur develop : .claude/rules, et .claude/pipeline (config des
+    scripts, sortie de rules/ par l'ADR 0008) une fois le projet migré."""
+    ok = lambda d: subprocess.run(['git', '-C', str(repo), 'cat-file', '-e', f'develop:{d}'],
+                                  capture_output=True).returncode == 0
+    return [d for d in ('.claude/rules', '.claude/pipeline') if ok(d)]
+
+
 def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
     if stage in FIX_STAGES:
         return prepare_fix(repo, name, case, stage)
@@ -178,7 +186,7 @@ def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
     # Les fichiers de la feature à la fin, puis les règles actuelles du projet.
     feat = f'.claude/features/{name}'
     extract(repo, wt, case['docs'], feat)
-    extract(repo, wt, 'develop', '.claude/rules')
+    extract(repo, wt, 'develop', *project_rules(repo))
     fdir = wt / feat
     for rel in PRODUCED[stage] + LATER:
         target = fdir / rel
@@ -224,7 +232,7 @@ def prepare_fix(repo: Path, name: str, case: dict, stage: str) -> Path:
     wt = Path(tempfile.mkdtemp(prefix=f'replay-{name[:20]}-{stage}-'))
     wt.rmdir()
     git(repo, 'worktree', 'add', '--detach', str(wt), start)
-    extract(repo, wt, 'develop', '.claude/rules')
+    extract(repo, wt, 'develop', *project_rules(repo))
     rel = f'.claude/fixes/{name}'
     fdir = wt / rel
     if stage == 'repro':
@@ -240,7 +248,7 @@ def prepare_fix(repo: Path, name: str, case: dict, stage: str) -> Path:
     if stage in ('repro', 'fix'):
         # Les règles d'aujourd'hui dans un commit du worktree : le gate compte ce qui a changé depuis base_sha
         # (repro) ou freeze_sha (fix), et elles ne sont pas l'œuvre de l'agent.
-        git(wt, 'add', '-A', '--', '.claude/rules')
+        git(wt, 'add', '-A', '--', *project_rules(repo))
         if sh(['git', '-C', str(wt), 'diff', '--cached', '--quiet']).returncode:
             git(wt, '-c', 'user.name=replay', '-c', 'user.email=replay@localhost', 'commit', '-q', '--no-verify',
                 '-m', 'replay: règles du projet d\'aujourd\'hui')

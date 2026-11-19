@@ -59,7 +59,14 @@ def doc_id(s):
     return re.sub(r"[^A-Za-z0-9_\-.~:@+]", "-", s.replace("/", "~"))[:200]
 
 
-CFG_REL = os.path.join(".claude", "rules", "feature_pipeline.md")
+CFG_REL = os.path.join(".claude", "pipeline", "feature_pipeline.md")
+CFG_REL_OLD = os.path.join(".claude", "rules", "feature_pipeline.md")  # ancien emplacement (ADR 0008)
+
+
+def cfg_path(root):
+    """La config du projet sous <root> : le nouvel emplacement, à défaut l'ancien (projet pas encore migré)."""
+    new, old = os.path.join(root, CFG_REL), os.path.join(root, CFG_REL_OLD)
+    return new if os.path.isfile(new) or not os.path.isfile(old) else old
 
 
 def main_checkout(cwd=None):
@@ -72,9 +79,9 @@ def project_root():
     """La racine du repo, jamais le dossier courant : review.sh se lance aussi depuis l'app, dans un
     sous-dossier. Depuis un worktree sans la config (souvent non suivie), le checkout principal, qui l'a."""
     top = git("rev-parse", "--show-toplevel")
-    if not os.path.isfile(os.path.join(top, CFG_REL)):
+    if not os.path.isfile(cfg_path(top)):
         main = main_checkout(top)
-        if main and os.path.isfile(os.path.join(main, CFG_REL)):
+        if main and os.path.isfile(cfg_path(main)):
             return main
     return top
 
@@ -480,7 +487,7 @@ def cmd_gauntlet(r, args):
     report = os.path.join(s["gauntlet_out"], "report.md")
     print(f"gauntlet : {'vert' if p.returncode == 0 else 'rouge (exit ' + str(p.returncode) + ')'} · rapport {report}")
     print(f"worktree : {s.get('worktree') or 'non conservé (échec avant sa création ?) — voir ' + r.file('gauntlet.log')}")
-    cfg = read_text(os.path.join(s["project_root"], CFG_REL))
+    cfg = read_text(cfg_path(s["project_root"]))
     if s.get("worktree") and cfg is not None:
         missing = [f for f in untracked_needed(s["project_root"], cfg, copy_patterns(s["project_root"], cfg))
                    if not os.path.exists(os.path.join(s["worktree"], f))]
@@ -498,7 +505,7 @@ def cmd_qa(r, args):
     flows = r.file("maestro")
     if not os.path.isdir(flows) or not any(f.endswith(".yaml") for f in os.listdir(flows)):
         die(f"aucun flow dans {flows}")
-    cfg = os.path.join(wt, CFG_REL)
+    cfg = cfg_path(wt)
     cfg_text = read_text(cfg)
     if cfg_text is None:
         die("config du projet absente dans le worktree : QA impossible")
@@ -530,7 +537,7 @@ def sim_config(s):
     peut être partie avant l'ajout d'une clé, et sa config (celle du worktree) ne l'a pas. Le worktree ne
     sert qu'en dernier recours."""
     roots = [main_checkout(s["project_root"]), s["project_root"], s.get("worktree")]
-    texts = [t for t in (read_text(os.path.join(p, CFG_REL)) for p in roots if p) if t]
+    texts = [t for t in (read_text(cfg_path(p)) for p in roots if p) if t]
     pick = lambda key: next((v for v in (cfg_value(t, key) for t in texts) if v), "")
     return pick("ios.simulator_base"), pick("ios.simulator")
 
@@ -1313,8 +1320,8 @@ def cmd_preflight(r, args):
     add = lambda id_, area, status, detail, fix=None: items.append(
         {"id": id_, "area": area, "status": status, "detail": detail, "fix": fix})
     print(f"racine du repo : {root}" + (f" (lancé depuis {s['launched_from']})" if s.get("launched_from") not in (None, root) else ""))
-    cfg_path = os.path.join(root, CFG_REL)
-    cfg = read_text(cfg_path)
+    cfg_file = cfg_path(root)
+    cfg = read_text(cfg_file)
     stray = stray_rules(root)
     for f in stray:
         if not os.path.isfile(os.path.join(root, ".claude", "rules", os.path.basename(f))):
@@ -1322,7 +1329,7 @@ def cmd_preflight(r, args):
                 f"{os.path.join(root, '.claude', 'rules')}/, cette règle serait ignorée",
                 f"mv {os.path.join(root, f)} {os.path.join(root, '.claude', 'rules')}/ puis review.sh preflight")
     if cfg is None and not stray:
-        add("config", "projet", "warn", "pas de .claude/rules/feature_pipeline.md : le gauntlet prend le template générique "
+        add("config", "projet", "warn", "pas de .claude/pipeline/feature_pipeline.md : le gauntlet prend le template générique "
             "(pas de QA device, seuils par défaut)", "/feature init dans le projet")
     if cfg is not None and not os.path.isfile(os.path.join(root, ".claude", "rules", "pr_rules.md")) and not stray:
         add("rules:pr_rules", "projet", "warn", "pas de .claude/rules/pr_rules.md : les relecteurs n'appliquent que la grille partagée")

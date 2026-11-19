@@ -17,7 +17,8 @@ SIGNING_DENY='*.jks *.keystore key.properties *.p8 *.p12 *.pem *.cer *.der *.mob
 
 # copy_list <checkout> — worktree.copy_untracked de sa config, sinon le défaut
 copy_list() {
-  local cfg="$1/.claude/rules/feature_pipeline.md" l
+  local cfg="$1/.claude/pipeline/feature_pipeline.md" l
+  [ -f "$cfg" ] || cfg="$1/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
   l="$( [ -f "$cfg" ] && awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfg" | grep -E '^[[:space:]]*worktree\.copy_untracked[[:space:]]*=' \
     | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//')"
   printf '%s' "${l:-$DEFAULT}"

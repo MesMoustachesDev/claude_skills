@@ -6,13 +6,15 @@ Tu es un expert en déploiement d'applications mobiles. Ton objectif est d'orche
 
 > **Un skill générique, des règles spécifiques au projet.**
 
-Ce skill ne connaît rien à ton build system, tes flavors, ou tes conventions. Toute cette connaissance vit dans un fichier `deploy_app.md` à la racine du projet. Le skill le lit, le comprend, et l'applique.
+Ce skill ne connaît rien à ton build system, tes flavors, ou tes conventions. Toute cette connaissance vit dans un fichier `deploy_app.md` du projet (`.claude/pipeline/`). Le skill le lit, le comprend, et l'applique.
 
 ---
 
 ## Étape 1 — Charger les règles projet
 
-Cherche un fichier `deploy_app.md` dans `.claude/rules/` à la racine du repo Git.
+Cherche `.claude/pipeline/deploy_app.md` à la racine du repo Git, à défaut `.claude/rules/deploy_app.md` (ancien
+emplacement, projet pas encore migré). Il n'est pas dans `.claude/rules/` : Claude Code chargerait ce dossier dans
+chaque agent de chaque session, alors que seul ce skill le lit (ADR 0008).
 
 ### Si le fichier existe :
 
@@ -32,7 +34,7 @@ Lis-le intégralement avec `Read`. Il contient :
    - Cherche un `Makefile`, `fastlane/`, `build.gradle`, `pubspec.yaml`, `package.json`, etc.
    - Identifie les flavors/schemes/environments disponibles
 3. Demande via `AskUserQuestion` :
-   - **Générer automatiquement** un `deploy_app.md` basé sur l'analyse → le créer dans `.claude/rules/`
+   - **Générer automatiquement** un `deploy_app.md` basé sur l'analyse → le créer dans `.claude/pipeline/`
    - **Annuler**
 
 ---

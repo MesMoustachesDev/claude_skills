@@ -33,7 +33,7 @@ commit() { git -C "$1" add -A && git -C "$1" commit -q -m "$2" && git -C "$1" re
 # write_cfg <root> [lignes ini…] — config du pipeline, app dans app/ avec son .fvmrc
 write_cfg() {
   local root="$1"; shift
-  mkdir -p "$root/.claude/rules" "$root/app"
+  mkdir -p "$root/.claude/rules" "$root/.claude/pipeline" "$root/app"
   printf '{\n  "flutter": "%s"\n}\n' "$FVM_FLUTTER_VERSION" > "$root/app/.fvmrc"
   {
     echo '# test'; echo '```ini'
@@ -48,7 +48,7 @@ write_cfg() {
     echo "qa.platforms ="
     for l in "$@"; do echo "$l"; done
     echo '```'
-  } > "$root/.claude/rules/feature_pipeline.md"
+  } > "$root/.claude/pipeline/feature_pipeline.md"
 }
 
 # mk_pkg <dir> <name> [dep_path…] — package Dart minimal ; chaque dep_path = "nom:chemin relatif"

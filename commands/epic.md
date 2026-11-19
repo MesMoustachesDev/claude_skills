@@ -72,7 +72,7 @@ Le bloc d'usage, puis ces exemples, tels quels :
 ```
 
 Puis en deux lignes : le tracker se règle par projet (`tracker = gitlab | notion | none` dans
-`.claude/rules/feature_pipeline.md`, posé par `/feature init`), et rien n'y est écrit sans que tu aies
+`.claude/pipeline/feature_pipeline.md`, posé par `/feature init`), et rien n'y est écrit sans que tu aies
 vu et validé le contenu exact.
 
 ## `/epic <nom> "<description>"` — nouvel epic

@@ -22,7 +22,7 @@ dernier recours, jamais le premier.
 
 Le slug et le dossier de la revue (`~/.cache/gauntlet/review/<slug>/`), le worktree de la branche
 relue (lecture seule), `context.md` (le pourquoi, ce que la MR ajoute réellement, ce qu'elle promet de
-visible), la config du projet (`<worktree>/.claude/rules/feature_pipeline.md` : plateformes, appIds,
+visible), la config du projet (`<worktree>/.claude/pipeline/feature_pipeline.md`, à défaut l'ancien `.claude/rules/` : plateformes, appIds,
 « Notes pour les agents » pour le compte de test), le rapport du gauntlet (les tests du package y ont
 déjà tourné).
 

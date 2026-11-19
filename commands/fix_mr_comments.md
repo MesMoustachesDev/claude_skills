@@ -6,7 +6,8 @@ Tu es un expert en code review côté auteur. Ton objectif : récupérer une MR,
 
 > **Un skill générique, des règles spécifiques au projet.**
 
-Le provider Git, le CLI et les conventions vivent dans `.claude/rules/create_mr_rules.md`. Ce skill lit ces règles et les applique.
+Le provider Git, le CLI et les conventions vivent dans `.claude/pipeline/create_mr_rules.md` (à défaut, l'ancien
+`.claude/rules/create_mr_rules.md`). Ce skill lit ces règles et les applique.
 
 > **Rien ne part vers l'extérieur sans validation explicite du texte exact.**
 
@@ -19,7 +20,8 @@ Deux validations distinctes et obligatoires :
 ## Étape 1 — Charger les règles projet
 
 ```bash
-[ -f .claude/rules/create_mr_rules.md ] && cat .claude/rules/create_mr_rules.md || echo "NO_RULES"
+r="$(git rev-parse --show-toplevel)"; f="$r/.claude/pipeline/create_mr_rules.md"; [ -f "$f" ] || f="$r/.claude/rules/create_mr_rules.md"
+[ -f "$f" ] && cat "$f" || echo "NO_RULES"
 ```
 
 Tu y trouves le provider, le CLI (`glab`, `gh`…), la branche de base et les conventions. **Priorité absolue.**

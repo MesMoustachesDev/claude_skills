@@ -9,7 +9,7 @@ PR_GAUNTLET="${PR_GAUNTLET:-$TESTS_DIR/../../pr_gauntlet.sh}"
 new_pr() {
   local d="$TMP_ROOT/$1"; REPO="$d/work"; mkdir -p "$d"
   mk_impact_repo "$REPO" plain
-  write_cfg "$REPO"; sed -i.bak 's/^dart = .*/dart = dart/' "$REPO/.claude/rules/feature_pipeline.md"; rm -f "$REPO/.claude/rules/feature_pipeline.md.bak"
+  write_cfg "$REPO"; sed -i.bak 's/^dart = .*/dart = dart/' "$REPO/.claude/pipeline/feature_pipeline.md"; rm -f "$REPO/.claude/pipeline/feature_pipeline.md.bak"
   # le graphe n'est pas versionné (graphify-out/ est local au checkout principal)
   git -C "$REPO" rm -r -q --cached graphify-out; printf 'graphify-out/\n' >> "$REPO/.git/info/exclude"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m "feat(a): modifie foo_impl"

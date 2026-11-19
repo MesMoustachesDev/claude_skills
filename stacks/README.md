@@ -16,7 +16,7 @@ inversement (ADR `pipeline/decisions/0011-un-dossier-par-langage.md`).
 `stack.sh detect <chemin>` remonte de `<chemin>` vers la racine du repo ; le premier dossier qui contient un
 marqueur (`markers`) décide, le plus petit `priority` gagnant à égalité. Une app Flutter est donc du Flutter
 dans `lib/` et du Kotlin dans `android/app/`. `stack = <langage>` dans le bloc ini de
-`.claude/rules/feature_pipeline.md` force le langage de tout le repo.
+`.claude/pipeline/feature_pipeline.md` force le langage de tout le repo.
 
 `stack.sh get <clé> <chemin>` rend la valeur de la config du projet si elle la donne, sinon celle de
 `stack.ini`. Dans une valeur, `{flutter}`, `{dart}`, `{gradle}` renvoient aux clés du même nom.

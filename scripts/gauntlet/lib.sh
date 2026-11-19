@@ -66,8 +66,10 @@ hook_feature_root() {
 init_project_context() {
   PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "pas dans un repo git"
   # GAUNTLET_CFG : surcharge de la config (tests du gauntlet lui-même, dry-run sur un projet non initialisé).
-  CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/rules/feature_pipeline.md}"
-  [ -f "$CFG_FILE" ] || die "config absente : $CFG_FILE (lancer /feature init)"
+  CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/pipeline/feature_pipeline.md}"
+  # ancien emplacement, projet pas encore migré (ADR 0008)
+  [ -n "${GAUNTLET_CFG:-}" ] || [ -f "$CFG_FILE" ] || CFG_FILE="$PROJECT_ROOT/.claude/rules/feature_pipeline.md"
+  [ -f "$CFG_FILE" ] || die "config absente : $PROJECT_ROOT/.claude/pipeline/feature_pipeline.md (lancer /feature init)"
 
   BASE_BRANCH="$(cfg base_branch 'develop')"
 

@@ -12,7 +12,9 @@ Ce skill ne connaît rien à ton provider Git, ton CLI, ou tes conventions de MR
 
 ## Étape 1 — Charger les règles projet
 
-Cherche un fichier `create_mr_rules.md` dans `.claude/rules/` à la racine du repo Git.
+Cherche `.claude/pipeline/create_mr_rules.md` à la racine du repo Git, à défaut `.claude/rules/create_mr_rules.md`
+(ancien emplacement, projet pas encore migré). Il n'est pas dans `.claude/rules/` : Claude Code chargerait ce dossier
+dans chaque agent de chaque session, alors que seuls les skills de MR le lisent (ADR 0008).
 
 ### Si le fichier existe :
 
@@ -30,8 +32,8 @@ Lis-le intégralement avec `Read`. Il contient :
 1. Informe l'utilisateur
 2. Liste les gabarits disponibles via `ls -d ~/.claude/stacks/*/templates/` (le langage du projet : `bash ~/.claude/scripts/stack.sh detect .`)
 3. Demande via `AskUserQuestion` :
-   - Choisir un template existant → copier `~/.claude/stacks/{choice}/templates/create_mr_rules.md` dans `.claude/rules/`
-   - Créer un `create_mr_rules.md` minimal → demande le provider (GitHub, GitLab, etc.), le CLI, la branche de base, et génère le fichier dans `.claude/rules/`
+   - Choisir un template existant → copier `~/.claude/stacks/{choice}/templates/create_mr_rules.md` dans `.claude/pipeline/`
+   - Créer un `create_mr_rules.md` minimal → demande le provider (GitHub, GitLab, etc.), le CLI, la branche de base, et génère le fichier dans `.claude/pipeline/`
    - Annuler
 
 ---

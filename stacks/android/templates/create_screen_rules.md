@@ -1,3 +1,15 @@
+---
+# Chargée par Claude Code seulement au premier fichier de présentation lu ou écrit (ADR 0008). Ajuste ces globs
+# à l'arbre du projet (/feature init, 3b) : dossiers des écrans, des composants, du thème.
+paths:
+  - "**/presentation/**/*.kt"
+  - "**/ui/**/*.kt"
+  - "**/components/**/*.kt"
+  - "**/theme/**/*.kt"
+  - "**/navigation/**/*.kt"
+  - "**/*Screen.kt"
+  - "**/*Page.kt"
+---
 # Create Screen Rules — Android / Jetpack Compose
 
 Ce fichier définit comment créer ou refaire un écran Compose dans ce projet : où il vit, ce qu'il lit, ce qu'il

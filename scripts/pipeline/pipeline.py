@@ -62,6 +62,14 @@ def git(*args, cwd=None, check=True):
     return r.stdout.strip()
 
 
+def project_cfg_file(root):
+    """La config du projet : .claude/pipeline/feature_pipeline.md, à défaut l'ancien emplacement
+    .claude/rules/feature_pipeline.md (projet pas encore migré, ADR 0008)."""
+    new = os.path.join(root, ".claude", "pipeline", "feature_pipeline.md")
+    old = os.path.join(root, ".claude", "rules", "feature_pipeline.md")
+    return new if os.path.isfile(new) or not os.path.isfile(old) else old
+
+
 # ---------------------------------------------------------------------------
 # Contexte
 # ---------------------------------------------------------------------------
@@ -73,7 +81,7 @@ class Ctx:
         self.root = git("rev-parse", "--show-toplevel")
         self.dir = os.path.join(self.root, ".claude", "features", name)
         self.path = os.path.join(self.dir, "pipeline.json")
-        self.cfg_file = os.path.join(self.root, ".claude", "rules", "feature_pipeline.md")
+        self.cfg_file = project_cfg_file(self.root)
         if must_exist and not os.path.isfile(self.path):
             die(f"pipeline.json absent : {self.path} (nouvelle feature : étape 0, puis pipeline.sh init)")
         self.reload()

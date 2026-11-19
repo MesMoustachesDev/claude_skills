@@ -119,7 +119,7 @@ Pour que le verdict soit juste : **un tour qui finit sur une question à Thibaul
 | Rapport pour le dev | `~/.claude/scripts/gauntlet.sh report <nom> <étape>` → `.claude/features/<nom>/report.html` |
 | Langage du package | `bash ~/.claude/scripts/stack.sh detect <chemin>` ; doctrine : `~/.claude/rules/stacks/<langage>*.md`, chargée au premier fichier du langage lu |
 | Gabarits du langage | `$(bash ~/.claude/scripts/stack.sh dir <package>)/templates/` : `feature_pipeline.md`, `create_feature_rules.md`, `feature_spec_template.md`… |
-| Config projet | `.claude/rules/feature_pipeline.md` (gabarit : `feature_pipeline.md` du langage) |
+| Config projet | `.claude/pipeline/feature_pipeline.md`, à défaut l'ancien `.claude/rules/feature_pipeline.md` (gabarit : `feature_pipeline.md` du langage ; hors de `rules/`, ADR 0008) |
 | Règles de code | `.claude/rules/create_feature_rules.md` (gabarit : `create_feature_rules.md` du langage) |
 | Template de spec | `feature_spec_template.md` du langage |
 | Brick global | celui du langage (règle de langage) |

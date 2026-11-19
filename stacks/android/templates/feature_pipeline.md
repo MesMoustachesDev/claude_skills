@@ -3,6 +3,9 @@
 Ce fichier est lu par `/feature`, par les agents `feature-*` et par `~/.claude/scripts/gauntlet.sh`.
 Il contient **uniquement des faits du projet** : le process, les rôles et les scripts sont globaux
 (`~/.claude`) et ne se dupliquent pas ici.
+Il vit dans `.claude/pipeline/` du projet, pas dans `.claude/rules/` : Claude Code charge ce dossier-là dans
+chaque agent, et seuls les scripts et `/feature` en ont besoin (ADR 0008). Les scripts lisent encore l'ancien
+`.claude/rules/feature_pipeline.md` tant que le projet ne l'a pas déplacé.
 
 Le bloc `ini` ci-dessous est la partie machine. Le gauntlet le parse ligne à ligne (`clé = valeur`,
 `#` pour les commentaires, listes séparées par des virgules). Tout ce qui est en dehors du bloc

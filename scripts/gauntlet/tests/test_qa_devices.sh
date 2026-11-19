@@ -5,7 +5,7 @@
 source "$(dirname "$0")/fixture.sh"
 command -v xcrun >/dev/null || { echo "SKIP: xcrun requis"; exit 0; }
 R="$TMP_ROOT/repo"; mk_repo "$R"; write_cfg "$R" "qa.platforms = ios" "ios.simulator = Simulateur partagé inexistant"
-sed -i "" "/^qa.platforms =$/d" "$R/.claude/rules/feature_pipeline.md"   # write_cfg pose « qa.platforms = » vide en tête
+sed -i "" "/^qa.platforms =$/d" "$R/.claude/pipeline/feature_pipeline.md"   # write_cfg pose « qa.platforms = » vide en tête
 mk_pkg "$R/app/features/feat" feat; mkdir -p "$R/app/features/feat/maestro"; echo 'appId: x' > "$R/app/features/feat/maestro/s1.yaml"
 commit "$R" init >/dev/null; git -C "$R" checkout -q -b feature/x
 

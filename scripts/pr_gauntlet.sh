@@ -78,11 +78,13 @@ lang_dir() {
     [ -n "$f" ] && { dirname "$f"; return; }
   done
 }
-cfg_file="$PROJECT/.claude/rules/feature_pipeline.md"
+cfg_file="$PROJECT/.claude/pipeline/feature_pipeline.md"
+[ -f "$cfg_file" ] || cfg_file="$PROJECT/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
+project_cfg_file="$cfg_file"
 if [ ! -f "$cfg_file" ]; then
   ld="$(lang_dir)"; tpl="$(bash "$STACK_SH" get templates "${ld:-$PROJECT}" 2>/dev/null)"
   cfg_file="$tpl/feature_pipeline.md"
-  [ -f "$cfg_file" ] || { echo "ni config du projet (.claude/rules/feature_pipeline.md) ni gabarit du langage ($tpl)" >&2; exit 2; }
+  [ -f "$cfg_file" ] || { echo "ni config du projet (.claude/pipeline/feature_pipeline.md) ni gabarit du langage ($tpl)" >&2; exit 2; }
 fi
 cfg() { awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfg_file" | grep -E "^[[:space:]]*$1[[:space:]]*=" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'; }
 # stack_vals <dossier> <clé>… — valeurs du langage de <dossier>, une par ligne (config du projet, sinon stack.ini)
@@ -138,7 +140,9 @@ for f in $(cfg pr.copy_untracked | tr ',' ' '); do
   if [ -e "$PROJECT/$f" ] && [ ! -e "$wt/$f" ]; then mkdir -p "$wt/$(dirname "$f")"; cp -R "$PROJECT/$f" "$wt/$f"; fi
 done
 # La config projet doit être visible du gauntlet dans le worktree
-[ -f "$wt/.claude/rules/feature_pipeline.md" ] || { mkdir -p "$wt/.claude/rules"; cp "$cfg_file" "$wt/.claude/rules/feature_pipeline.md"; }
+wt_cfg="$wt/.claude/pipeline/feature_pipeline.md"
+[ -f "$wt_cfg" ] || [ ! -f "$wt/.claude/rules/feature_pipeline.md" ] || wt_cfg="$wt/.claude/rules/feature_pipeline.md"   # ancien emplacement
+[ -f "$wt_cfg" ] || { mkdir -p "$(dirname "$wt_cfg")"; cp "$cfg_file" "$wt_cfg"; }
 # .fvmrc est souvent non suivi : sans lui, fvm retombe sur son SDK global (et demande à l'installer).
 # On le recopie partout où le checkout principal en a un (racine et chaque package).
 while IFS= read -r rc; do
@@ -160,7 +164,7 @@ pkgs="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do pkg_o
 outside="$(printf '%s\n' "$changed" | grep -v '^$' | while IFS= read -r f; do [ -z "$(pkg_of "$f")" ] && printf '%s\n' "$f"; done || true)"
 
 [ -z "$pkgs" ] && echo "[WARN] aucun package touché (aucun marqueur — $MARKERS— au-dessus des fichiers modifiés) : seuls les checks PR tournent" >&2
-project_cfg=0; [ "$cfg_file" = "$PROJECT/.claude/rules/feature_pipeline.md" ] && project_cfg=1
+project_cfg=0; [ "$cfg_file" = "$project_cfg_file" ] && project_cfg=1
 {
   printf '# Gauntlet PR — `%s` → `%s`\n\n' "$branch" "$base"
   printf '%s · %s commit(s) · packages touchés : %s\n\n' "$stat" "$ncommits" "$(printf '%s' "$pkgs" | tr '\n' ' ' | sed 's/ $//')"
@@ -250,7 +254,7 @@ fi
 for p in $pkgs; do
   name="$(basename "$p")"; [ "$p" = "." ] && name="$(basename "$PROJECT")"
   echo "## Package \`$p\`" >> "$report"; echo >> "$report"
-  export GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$p" GAUNTLET_FEATURES_ROOT="$out/features" GAUNTLET_CFG="$wt/.claude/rules/feature_pipeline.md"
+  export GAUNTLET_MODE=extend GAUNTLET_PACKAGE="$p" GAUNTLET_FEATURES_ROOT="$out/features" GAUNTLET_CFG="$wt_cfg"
   profile=pr; [ "$mutation" = 1 ] && profile=pr_mutation
   (cd "$wt" && "$GAUNTLET" "$profile" "$name") > "$out/$name.log" 2>&1; rc=$?
   [ "$rc" = 0 ] || pr_rc=1

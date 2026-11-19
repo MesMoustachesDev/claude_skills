@@ -9,7 +9,7 @@
 #   sim.sh base           nom du modèle résolu, exit 1 si aucun n'est configuré
 #
 # Le modèle : --base <nom|udid>, sinon $SIM_BASE, sinon `ios.simulator_base` du bloc ini de
-# .claude/rules/feature_pipeline.md (checkout principal du repo courant, sinon racine du worktree). Il est déjà connecté au compte de test et
+# .claude/pipeline/feature_pipeline.md (checkout principal du repo courant, sinon racine du worktree). Il est déjà connecté au compte de test et
 # porte les données de QA (rapports téléchargés) : chaque clone part de cet état. Il doit être éteint pour
 # être cloné ; un clone existant, lui, se reboote sans le modèle.
 #
@@ -25,7 +25,8 @@ msg() { printf 'sim.sh: %s\n' "$*" >&2; }
 die() { msg "$*"; exit 2; }
 
 cfg_base() {
-  local cfg="$1/.claude/rules/feature_pipeline.md"
+  local cfg="$1/.claude/pipeline/feature_pipeline.md"
+  [ -f "$cfg" ] || cfg="$1/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
   [ -f "$cfg" ] || return 0
   awk '/^```ini/{f=1;next} /^```/{f=0} f' "$cfg" | grep -E '^[[:space:]]*ios\.simulator_base[[:space:]]*=' \
     | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//'
@@ -61,7 +62,7 @@ Le simulateur modèle « $1 » n'existe pas. Pour le créer une fois :
   2. Le préparer : xcrun simctl boot "$1" && open -a Simulator, installer l'app staging, se connecter au
      compte de test, télécharger les rapports dont les flows ont besoin.
   3. L'éteindre : xcrun simctl shutdown "$1"   (un modèle allumé ne se clone pas)
-  4. Le nommer dans .claude/rules/feature_pipeline.md : ios.simulator_base = $1
+  4. Le nommer dans .claude/pipeline/feature_pipeline.md : ios.simulator_base = $1
 EOF
 }
 
@@ -127,7 +128,7 @@ case "$action" in
 esac
 [ -n "$base" ] || base="$(base_name)"
 [ "$action" = base ] && { [ -n "$base" ] || exit 1; printf '%s\n' "$base"; exit 0; }
-[ -n "$base" ] || die "pas de simulateur modèle : --base <nom>, SIM_BASE, ou ios.simulator_base dans .claude/rules/feature_pipeline.md"
+[ -n "$base" ] || die "pas de simulateur modèle : --base <nom>, SIM_BASE, ou ios.simulator_base dans .claude/pipeline/feature_pipeline.md"
 case "$action" in
   list) xcrun simctl list devices available -j \
           | jq -r --arg p "$base · " '.devices[][] | select(.name|startswith($p)) | "\(.udid)  \(.state)  \(.name)"' ;;

@@ -17,7 +17,7 @@ se supprime pas.
 | [0005](0005-pas-d-arret-sans-thibault.md) | Le pipeline ne s'arrête que pour attendre Thibault (watchdog /feature et /fix, attente bloquante) | amendée |
 | [0006](0006-doctrine-injectee.md) | La doctrine d'un agent est injectée dans son contexte, pas demandée | remplacée par 0008 |
 | [0007](0007-pas-d-ecriture-dans-le-checkout-partage.md) | Personne n'écrit directement dans le checkout principal de ~/.claude | acceptée |
-| [0008](0008-doctrine-prechargee.md) | La doctrine est préchargée comme skill, les règles projet viennent de .claude/rules | acceptée |
+| [0008](0008-doctrine-prechargee.md) | La doctrine est préchargée comme skill, les règles projet viennent de .claude/rules | amendée (2026-11-19 : config des scripts dans .claude/pipeline, règles d'écran sous paths:) |
 | [0009](0009-liste-des-tests-avant-ecriture.md) | La liste des tests se décide avant d'en écrire un | acceptée |
 | [0010](0010-question-qui-se-suffit.md) | Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même | acceptée |
 | [0011](0011-un-dossier-par-langage.md) | Ce qui est propre à un langage vit dans son dossier et ne se charge que pour ce langage | acceptée |

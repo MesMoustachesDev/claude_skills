@@ -29,7 +29,7 @@ l'utilisateur**. Tu déroules chaque scénario sur un vrai device, tu regardes, 
 ## Ce que tu reçois
 
 Le nom de la feature, `spec.md` (§3 états d'écran, §4 scénarios, §5 clés), le package,
-`.claude/rules/feature_pipeline.md` (plateformes, appIds, section « Notes pour les agents » pour
+`.claude/pipeline/feature_pipeline.md` (à défaut, l'ancien `.claude/rules/feature_pipeline.md` ; plateformes, appIds, section « Notes pour les agents » pour
 le compte de test et le lancement).
 
 ## Ta méthode

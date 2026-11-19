@@ -59,7 +59,7 @@ Checks :
   suite_green        suite_cmd passe
   lint               lint_cmd passe ; vide → lint_cmd du langage du package (stack.ini) ; aucun → [N/A]
   conventions        design_system + l10n_strings du gauntlet feature sur les lignes modifiées de chaque package touché
-                     ([N/A] sans .claude/rules/feature_pipeline.md)
+                     ([N/A] sans .claude/pipeline/feature_pipeline.md)
                      Un check qui n'a rien pu vérifier sort en [N/A] (not_applicable du JSON), jamais vert (ADR 0011).
   server_fetch_redirect  fetch() serveur JS/TS, URL non constante, sans redirect: 'manual' | 'error', dans les
                      fichiers modifiés hors tests depuis base_sha : [WARN] fichier:ligne, jamais bloquant ;
@@ -280,8 +280,8 @@ check_lint() {
 # (stack.ini → extensions : .dart pour Flutter, .kt/.kts/.java pour Android). Un check sans version pour ce langage
 # est dit non applicable, pas vert en silence.
 check_conventions() {
-  [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] \
-    || { not_applicable "pas de .claude/rules/feature_pipeline.md (/feature init)"; return; }
+  [ -f "$PROJECT_ROOT/.claude/pipeline/feature_pipeline.md" ] || [ -f "$PROJECT_ROOT/.claude/rules/feature_pipeline.md" ] \
+    || { not_applicable "pas de .claude/pipeline/feature_pipeline.md (/feature init)"; return; }
   local base f d pkgs="" pkg c rc=0 lang ext ok_ext others=""
   base="$(state_get .base_sha)"
   [ -n "$base" ] || { ko "fix.json → base_sha absent"; return 1; }

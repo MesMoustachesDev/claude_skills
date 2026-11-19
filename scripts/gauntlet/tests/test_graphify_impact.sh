@@ -142,8 +142,8 @@ expect_json "$REPO/out/impact.json" "any(x['package']=='features/c' for x in d['
 
 echo "impact_ignore_cfg"
 new_repo ignore
-mkdir -p "$REPO/.claude/rules"
-printf '# t\n```ini\ngraphify.ignore_packages = b\n```\n' > "$REPO/.claude/rules/feature_pipeline.md"
+mkdir -p "$REPO/.claude/rules" "$REPO/.claude/pipeline"
+printf '# t\n```ini\ngraphify.ignore_packages = b\n```\n' > "$REPO/.claude/pipeline/feature_pipeline.md"
 run_impact "$REPO"
 expect_json "$REPO/out/impact.json" "d['consumers']==[]" "ignore_packages = b → aucun consommateur"
 

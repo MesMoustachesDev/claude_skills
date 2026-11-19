@@ -120,7 +120,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
   bloqué (cas réel, premier /fix Kotlin).
 - **Watchdog** (création comme reprise, une fois par session) :
   1. `CronCreate` récurrent, `cron` = toutes les 1,5 × `watchdog.minutes` de
-     `.claude/rules/feature_pipeline.md`, arrondi à un diviseur de 60 (défaut 20 → 30 :
+     `.claude/pipeline/feature_pipeline.md`, arrondi à un diviseur de 60 (défaut 20 → 30 :
      `"*/30 * * * *"`, minute de départ décalée). `prompt` = le texte court ci-dessous, **jamais**
      `/fix <nom> watchdog`, qui recopie tout `fix.md` à chaque réveil (ADR 0005, amendement 4) :
      ```

@@ -6,14 +6,14 @@ source "$(dirname "$0")/fixture.sh"
 
 R="$TMP_ROOT/repo"; mk_repo "$R"
 M=feature/login; P="$R/$M"; K="src/main/kotlin/com/x/login"
-mkdir -p "$R/.claude/rules" "$P/$K/domain"
+mkdir -p "$R/.claude/rules" "$R/.claude/pipeline" "$P/$K/domain"
 {
   echo '# test'; echo '```ini'
   echo 'package_path = feature/{name}'
   echo 'features_root = feature'
   echo 'base_branch = develop'
   echo '```'
-} > "$R/.claude/rules/feature_pipeline.md"
+} > "$R/.claude/pipeline/feature_pipeline.md"
 echo 'include(":feature:login")' > "$R/settings.gradle.kts"
 printf 'plugins {\n  id("com.android.library")\n}\n' > "$P/build.gradle.kts"
 commit "$R" base >/dev/null

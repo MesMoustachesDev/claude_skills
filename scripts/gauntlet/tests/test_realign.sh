@@ -16,7 +16,7 @@ export PIPELINE_GAUNTLET_ROOT="$TESTS_DIR/.."
 
 R="$TMP_ROOT/repo"; mk_repo "$R"
 M=feature/login; P="$R/$M"; K="src/main/kotlin/com/x/login"; T="src/test/kotlin/com/x/login"
-mkdir -p "$R/.claude/rules" "$P/$K/domain" "$P/$K/data" "$P/$T/domain"
+mkdir -p "$R/.claude/rules" "$R/.claude/pipeline" "$P/$K/domain" "$P/$K/data" "$P/$T/domain"
 {
   echo '# test'; echo '```ini'
   echo "gradle = $FAKE_GRADLE"
@@ -27,7 +27,7 @@ mkdir -p "$R/.claude/rules" "$P/$K/domain" "$P/$K/data" "$P/$T/domain"
   echo 'stub.include = src/main/**/data/*Impl.kt'
   echo 'deps.data = domain'
   echo '```'
-} > "$R/.claude/rules/feature_pipeline.md"
+} > "$R/.claude/pipeline/feature_pipeline.md"
 echo 'include(":feature:login")' > "$R/settings.gradle.kts"
 printf 'plugins {\n  kotlin("jvm")\n}\n' > "$P/build.gradle.kts"
 printf '# login\n\nConnexion.\n' > "$P/README.md"

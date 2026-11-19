@@ -98,11 +98,11 @@ expect_no_out "$F : design_system non applicable" "contrôle Flutter : jamais di
 
 echo "fix_gauntlet.sh lint et conventions — rien de vérifié n'est jamais vert"
 repro "$A"
-sed -i.bak 's/^```ini$/```ini\nlint_cmd = echo LINT_DU_LANGAGE/' "$R/.claude/rules/feature_pipeline.md"
+sed -i.bak 's/^```ini$/```ini\nlint_cmd = echo LINT_DU_LANGAGE/' "$R/.claude/pipeline/feature_pipeline.md"
 OUT="$(cd "$R" && bash "$FIX_G" lint crash 2>&1)"; RC=$?
 expect_rc 0 "lint : sans lint_cmd dans repro.json, la commande du langage tourne"
 expect_out "lint du langage : echo LINT_DU_LANGAGE" "la commande du langage est nommée"
-mv "$R/.claude/rules/feature_pipeline.md" "$R/.claude/rules/feature_pipeline.md.off"
+mv "$R/.claude/pipeline/feature_pipeline.md" "$R/.claude/pipeline/feature_pipeline.md.off"
 repro "$F"
 OUT="$(cd "$R" && bash "$FIX_G" lint crash 2>&1)"; RC=$?
 expect_rc 0 "lint sans commande nulle part : non bloquant"
@@ -113,6 +113,6 @@ expect_out '["lint"]' "last_lint.json porte lint dans not_applicable"
 OUT="$(cd "$R" && bash "$FIX_G" conventions crash 2>&1)"; RC=$?
 expect_rc 0 "conventions sans feature_pipeline.md : non bloquant"
 expect_out "[N/A]  conventions" "conventions sans feature_pipeline.md : [N/A], pas [OK]"
-mv "$R/.claude/rules/feature_pipeline.md.off" "$R/.claude/rules/feature_pipeline.md"
+mv "$R/.claude/pipeline/feature_pipeline.md.off" "$R/.claude/pipeline/feature_pipeline.md"
 
 finish

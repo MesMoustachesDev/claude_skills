@@ -12,7 +12,7 @@
 #           red_data | red_presentation | green_data | green_presentation : une couche (étapes 3 et 4 en parallèle)
 # Checks  : n'importe quel check individuel (gauntlet.sh list)
 #
-# À lancer depuis n'importe où dans le repo du projet. Lit .claude/rules/feature_pipeline.md et, s'il
+# À lancer depuis n'importe où dans le repo du projet. Lit .claude/pipeline/feature_pipeline.md et, s'il
 # existe, .claude/features/<feature>/pipeline.json (mode create|extend, package cible).
 #   create : tout le package est dans le périmètre des gates.
 #   extend : le périmètre = fichiers et lignes ajoutés depuis base_branch ; les gates d'intégrité

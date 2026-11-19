@@ -24,9 +24,10 @@ find_graph_dir() {
   return 1
 }
 
-# read_cfg <root> <clé> — valeur dans le bloc ini de <root>/.claude/rules/feature_pipeline.md (même awk que cfg() de pr_gauntlet.sh)
+# read_cfg <root> <clé> — valeur dans le bloc ini de <root>/.claude/pipeline/feature_pipeline.md (même awk que cfg() de pr_gauntlet.sh)
 read_cfg() {
-  local f="$1/.claude/rules/feature_pipeline.md" k="${2//./\\.}" here
+  local f="$1/.claude/pipeline/feature_pipeline.md" k="${2//./\\.}" here
+  [ -f "$f" ] || f="$1/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
   # Sans config du projet : le gabarit du langage de <root> (stack.sh get templates, langages de ce checkout).
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   [ -f "$f" ] || f="$(CLAUDE_STACKS_DIR="${CLAUDE_STACKS_DIR:-$here/../stacks}" bash "$here/stack.sh" get templates "$1" 2>/dev/null)/feature_pipeline.md"

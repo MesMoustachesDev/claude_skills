@@ -13,4 +13,4 @@ mason make flutter_feature --name recipe_list --remote true --local false --bloc
 ```
 
 Un projet dont les conventions divergent (dossiers, nommage, imports) dérive son propre brick dans
-`./bricks/feature/` via `/feature init`, et met `brick = project` dans `.claude/rules/feature_pipeline.md`.
+`./bricks/feature/` via `/feature init`, et met `brick = project` dans `.claude/pipeline/feature_pipeline.md`.

@@ -88,7 +88,8 @@ if [ -n "$pkg_planned" ] && [ ! -d "$PROJECT_ROOT/$pkg_planned" ]; then
     feature-specifier|feature-architect) ;;
     *) ctx_deny "pipeline : le package $pkg_planned n'existe pas encore (mode create, avant le scaffold d'Arthur)." ;;
   esac
-  CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/rules/feature_pipeline.md}"
+  CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/pipeline/feature_pipeline.md}"
+  [ -n "${GAUNTLET_CFG:-}" ] || [ -f "$CFG_FILE" ] || CFG_FILE="$PROJECT_ROOT/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
   [ -f "$CFG_FILE" ] || ctx_deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
   PKG_REL="$pkg_planned"
   stack_init "$PROJECT_ROOT/$pkg_planned"   # le dossier n'existe pas encore : le langage du parent qui existe

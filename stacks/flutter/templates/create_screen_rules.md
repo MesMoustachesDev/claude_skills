@@ -1,3 +1,15 @@
+---
+# Chargée par Claude Code seulement au premier fichier de présentation lu ou écrit (ADR 0008). Ajuste ces globs
+# à l'arbre du projet (/feature init, 3b) : dossiers des écrans, des widgets, du design system.
+paths:
+  - "**/presentation/**/*.dart"
+  - "**/ui/**/*.dart"
+  - "**/widgets/**/*.dart"
+  - "**/*_screen.dart"
+  - "**/*_page.dart"
+  - "**/*_view.dart"
+  - "**/*_widget.dart"
+---
 # Create Screen Rules — Flutter
 
 Ce fichier définit les conventions et templates pour générer un écran Flutter depuis un input visuel (screenshot, code Figma) ou textuel.

@@ -16,8 +16,8 @@ RUNNER="$TESTS_DIR/../../../stacks/android/gradle_run.sh"
 
 R="$TMP_ROOT/repo"; mk_repo "$R"
 M=feature/login; P="$R/$M"; K="src/main/kotlin/com/x/login"; T="src/test/kotlin/com/x/login"
-mkdir -p "$R/.claude/rules" "$P/$K/domain" "$P/$K/data" "$P/$K/ui" "$P/$T/ui" "$P/src/main/res/values" "$P/src/main/res/values-en"
-cat > "$R/.claude/rules/feature_pipeline.md" <<EOF
+mkdir -p "$R/.claude/rules" "$R/.claude/pipeline" "$P/$K/domain" "$P/$K/data" "$P/$K/ui" "$P/$T/ui" "$P/src/main/res/values" "$P/src/main/res/values-en"
+cat > "$R/.claude/pipeline/feature_pipeline.md" <<EOF
 # test
 \`\`\`ini
 gradle = $FAKE_GRADLE
@@ -64,7 +64,7 @@ reset() { git -C "$R" checkout -q -- . && git -C "$R" clean -qfd -e .claude; }
 
 echo "gradle_run.sh — tâches du module, type, fichiers de test"
 OUT="$(cd "$P" && bash "$RUNNER" --where)"; expect_out "$(printf ':feature:login\tandroid')" "--where : chemin Gradle du module, android"
-OUT="$(cd "$P" && GRADLE_RUN_DRY=1 STACK_CFG="$R/.claude/rules/feature_pipeline.md" bash "$RUNNER" :@unitTest --continue "$T/ui/LoginScreenTest.kt")"
+OUT="$(cd "$P" && GRADLE_RUN_DRY=1 STACK_CFG="$R/.claude/pipeline/feature_pipeline.md" bash "$RUNNER" :@unitTest --continue "$T/ui/LoginScreenTest.kt")"
 expect_out ":feature:login:testDebugUnitTest --continue --tests com.x.login.ui.LoginScreenTest" ":@unitTest et --tests <classe>"
 expect_out "$FAKE_GRADLE" "la commande gradle de la config du projet"
 expect_out "test_logging.gradle" "init script : le message d'assertion d'un test rouge sur la console"
@@ -189,13 +189,13 @@ run_c design_system login; expect_rc 1 "un écran sans import du design system";
 # Un module téléphone et son propre design system : ds.imports.<module> remplace ds.imports pour lui.
 printf 'package com.x.login.ui\n\nimport com.x.phone.theme.AppTheme\n\nfun ProfileScreen() = Unit\n' > "$P/$K/ui/ProfileScreen.kt"
 run_c design_system login; expect_rc 1 "le design system d'un autre module ne vaut pas sans ds.imports.<module>"
-cp "$R/.claude/rules/feature_pipeline.md" "$TMP_ROOT/cfg.bak"
-awk '{print} /^ds.imports = /{print "ds.imports.feature/login = com.x.phone.theme."}' "$TMP_ROOT/cfg.bak" > "$R/.claude/rules/feature_pipeline.md"
+cp "$R/.claude/pipeline/feature_pipeline.md" "$TMP_ROOT/cfg.bak"
+awk '{print} /^ds.imports = /{print "ds.imports.feature/login = com.x.phone.theme."}' "$TMP_ROOT/cfg.bak" > "$R/.claude/pipeline/feature_pipeline.md"
 sed -i.bak 's#^import com.x.design.AppTheme#import com.x.phone.theme.AppTheme#' "$P/$K/ui/LoginScreen.kt"; rm -f "$P/$K/ui/LoginScreen.kt.bak"
 run_c design_system login; expect_rc 0 "ds.imports.feature/login : le design system du module"
 printf 'package com.x.login.ui\n\nimport com.x.design.AppTheme\n\nfun ProfileScreen() = Unit\n' > "$P/$K/ui/ProfileScreen.kt"
 run_c design_system login; expect_rc 1 "ds.imports.<module> remplace ds.imports : l'autre design system ne vaut plus"; expect_out "ProfileScreen.kt n'importe pas" "l'écran est nommé"
-cp "$TMP_ROOT/cfg.bak" "$R/.claude/rules/feature_pipeline.md"; reset
+cp "$TMP_ROOT/cfg.bak" "$R/.claude/pipeline/feature_pipeline.md"; reset
 reset; printf '\nfun T() { Text("Bonjour tout le monde"); Text(stringResource(R.string.login_title)) }\n' >> "$P/$K/ui/LoginScreen.kt"
 run_c l10n_strings login; expect_rc 1 "chaîne en dur dans Text()"; expect_out "Bonjour" "la chaîne est nommée"
 reset; sed -i.bak 's#</resources>#    <string name="login_error">Erreur</string>\n</resources>#' "$P/src/main/res/values/strings.xml"; rm -f "$P/src/main/res/values/strings.xml.bak"
@@ -323,7 +323,7 @@ run_x test_plan_match login; expect_rc 1 "un test hors liste rougit"; expect_out
 reset; rm -rf "$FD/spec.md" "$FD/tests_plan.json"
 
 echo "qa — feature sans écran : verdicts de qa.md au lieu des flows Maestro"
-CFG="$R/.claude/rules/feature_pipeline.md"; sed -i.bak 's/^qa.platforms =$/qa.platforms = android/' "$CFG"
+CFG="$R/.claude/pipeline/feature_pipeline.md"; sed -i.bak 's/^qa.platforms =$/qa.platforms = android/' "$CFG"
 FD="$R/.claude/features/login"; mkdir -p "$FD/qa/android"
 printf '# Spec\n## 4. Scénarios\n```gherkin\n  Scenario: Lists the workouts\n  Scenario: Reports not found\n```\n## 5. Contrats\n' > "$FD/spec.md"
 printf 'liste\n' > "$FD/qa/android/01_list.txt"; printf 'introuvable\n' > "$FD/qa/android/02_not_found.txt"

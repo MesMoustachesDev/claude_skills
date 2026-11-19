@@ -20,7 +20,7 @@ EOF
 
 # develop sans ios.simulator_base, la MR part de là ; la clé arrive ensuite sur develop (checkout principal).
 R="$TMP_ROOT/repo"; mk_repo "$R"
-cfg_ios() { write_cfg "$R" "qa.platforms = ios" "ios.simulator = Shared" "$@"; sed -i "" "/^qa.platforms =$/d" "$R/.claude/rules/feature_pipeline.md"; }
+cfg_ios() { write_cfg "$R" "qa.platforms = ios" "ios.simulator = Shared" "$@"; sed -i "" "/^qa.platforms =$/d" "$R/.claude/pipeline/feature_pipeline.md"; }
 cfg_ios; commit "$R" init >/dev/null
 git -C "$R" branch mr
 cfg_ios "ios.simulator_base = QA base"; commit "$R" "simulateur modèle" >/dev/null
