@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Rejoue de vraies étapes de features mergées, avec le vrai agent, ses hooks et son gate, sur un ou
-plusieurs modèles, et juge chaque passe par ce qu'on sait déjà de la feature.
+"""Rejoue de vraies étapes de features et de fixes mergés, avec le vrai agent, ses hooks et son gate, sur
+un ou plusieurs modèles, et juge chaque passe par ce qu'on sait déjà de la feature ou du fix.
 
     pipeline/bench/replay/replay.py --stage green --model sonnet --model opus --runs 3
-    pipeline/bench/replay/replay.py --feature report_port --stage red --model sonnet
+    pipeline/bench/replay/replay.py --case report_port --stage red --model sonnet
     pipeline/bench/replay/replay.py --stage review --dry      # prépare, joue le juge sans agent
+    pipeline/bench/replay/replay.py --stage repro --stage fix --stage fix_review   # les cas /fix
 
 Une passe : worktree détaché du dépôt au commit où l'étape commençait (`cases.json`), avec
 `.claude/features/<nom>/` tel qu'à la fin de la feature, moins ce que l'étape et les suivantes ont
@@ -13,6 +14,13 @@ de develop aujourd'hui : on mesure le pipeline actuel. L'agent est lancé comme 
 lance (prompt des steps de /feature, « Racine : <worktree> »), avec ses hooks : son gate de fin
 tourne, ses tentatives se comptent dans pipeline.json.
 
+Un fix (`cases.json → fixes`) se rejoue pareil : worktree au commit où l'étape commençait (base, gel ou
+fin de la correction), `.claude/fixes/<nom>/` réduit à ce que l'orchestrateur aurait à ce moment
+(`repro.json` et `diagnosis.md` du commit de gel à partir de `fix`), `fix.json` écrit dans la phase de
+l'étape. Les règles d'aujourd'hui sont commitées dans le worktree pour `repro` et `fix` (commit jeté avec
+lui), et ce commit sert de `base_sha` ou de `freeze_sha` : sans lui, le gate compterait les règles comme
+des fichiers changés par l'agent.
+
 Juges :
   red     gate red ; puis la vraie implémentation (le code non-test du commit `impl`) posée sous ses
           tests : le gate green doit passer (des tests qui refusent le code mergé sont faux) ;
@@ -20,6 +28,13 @@ Juges :
   green   gate green, tentatives, fichiers écrits.
   review  constats de la vraie revue (critical + suggestions) retrouvés, même fichier à ±8 lignes ;
           constats en plus comptés à part.
+  repro   gate red de fix_gauntlet.sh (le test cible rouge pour la raison annoncée) ; puis le code non-test du
+          vrai commit de correction (`impl`) posé sous ses tests : le test cible doit passer (un test qui
+          reste rouge sous la vraie correction ne reproduit pas ce bug).
+  fix     gate green de fix_gauntlet.sh, tentatives, fichiers écrits.
+  fix_review  constats de la vraie revue retrouvés, comme `review` ; vraie revue sans constat (les revues
+          intermédiaires d'un fix portent sur du code jamais commité) : réussi si aucune critique,
+          constats en plus comptés.
 
 Rien n'est poussé ni commité : push, commit, reset, checkout et les CLI GitLab/GitHub sont refusés à
 l'agent, et le worktree est supprimé après le juge (`--keep` le garde). Le transcript de chaque passe
@@ -45,10 +60,35 @@ LOCAL = Path.home() / '.claude-local' / 'bench'
 CASES = LOCAL / 'cases.json'
 CLAUDE = HERE.parent.parent.parent
 GAUNTLET = CLAUDE / 'scripts' / 'gauntlet.sh'
-AGENT = {'red': 'feature-test-writer', 'green': 'feature-implementer', 'review': 'feature-reviewer'}
-ORDER = ['cadrage', 'spec_lint', 'spec_review', 'spec', 'contracts_draft', 'dedup', 'spec_contracts', 'contracts', 'red_data',
-         'red_presentation', 'red', 'tests_review', 'green_data', 'green_presentation', 'green', 'clean',
-         'dedup_clean', 'review', 'suggestions', 'harden', 'qa', 'polish', 'evidence']
+FIX_GAUNTLET = CLAUDE / 'scripts' / 'fix_gauntlet.sh'
+FEATURE_STAGES = {'red': 'feature-test-writer', 'green': 'feature-implementer', 'review': 'feature-reviewer'}
+FIX_STAGES = {'repro': 'fix-reproducer', 'fix': 'fix-implementer', 'fix_review': 'fix-reviewer'}
+AGENT = {**FEATURE_STAGES, **FIX_STAGES}
+# Profil du gate de fix-gate.sh pour chaque étape : clé de fix.json → attempts.
+FIX_PROFILE = {'repro': 'red', 'fix': 'green', 'fix_review': 'review_report'}
+
+
+def _pipeline_order() -> list[str]:
+    """Les clés d'état de /feature, dans l'ordre de reprise de pipeline.py (sa source unique)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('pipeline_state', CLAUDE / 'scripts' / 'pipeline' / 'pipeline.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return [entry[0] for entry in module.ORDER]
+
+
+ORDER = _pipeline_order()
+# Clés d'anciens pipeline.json (cas d'avant l'ordre actuel) : rangées à la place de l'étape qui les a remplacées.
+LEGACY = {'spec_lint': 'spec', 'spec_review': 'spec', 'red_data': 'red', 'red_presentation': 'red',
+          'tests_review': 'hg.tests', 'green_data': 'green', 'green_presentation': 'green',
+          'suggestions': 'hg.suggestions', 'polish': 'hg.polish'}
+
+
+def rank(key: str) -> int | None:
+    key = LEGACY.get(key, key)
+    return ORDER.index(key) if key in ORDER else None
+
+
 # Ce que l'étape et les suivantes produisent : absent au départ de la passe.
 PRODUCED = {
     'red': ['tests.md', 'tests_review.json', 'tests_review.md', 'history/tests_review_1.json'],
@@ -62,7 +102,8 @@ TOOLS = ('Read Edit Write MultiEdit Glob Grep TodoWrite Bash(fvm:*) Bash(dart:*)
          'Bash(git rev-parse:*) Bash(git ls-files:*) Bash(git grep:*) Bash(ls:*) Bash(cat:*) Bash(head:*) '
          'Bash(tail:*) Bash(wc:*) Bash(grep:*) Bash(rg:*) Bash(find:*) Bash(jq:*) Bash(sed -n:*) Bash(sort:*) '
          f'Bash({GAUNTLET}:*) Bash(~/.claude/scripts/gauntlet.sh:*) Bash(~/.claude/scripts/pipeline.sh:*) '
-         f'Bash(bash {GAUNTLET}:*)')
+         f'Bash(bash {GAUNTLET}:*) Bash({FIX_GAUNTLET}:*) Bash(~/.claude/scripts/fix_gauntlet.sh:*) '
+         f'Bash(bash {FIX_GAUNTLET}:*) Bash(rm:*)')
 DENIED = ('Bash(git push:*) Bash(git commit:*) Bash(git reset:*) Bash(git checkout:*) Bash(git switch:*) '
           'Bash(git rebase:*) Bash(git merge:*) Bash(git worktree:*) Bash(rtk git push:*) Bash(rtk git commit:*) '
           'Bash(glab:*) Bash(gh:*) Bash(rtk glab:*) Bash(rtk gh:*)')
@@ -121,16 +162,23 @@ def pub_get(app: Path) -> None:
         raise RuntimeError(f'pub get : {(got.stdout + got.stderr).strip()[-300:]}')
 
 
+def extract(repo: Path, wt: Path, ref: str, *paths: str) -> None:
+    """Pose dans le worktree les chemins tels qu'au commit `ref`."""
+    archive = subprocess.run(['git', '-C', str(repo), 'archive', ref, *paths], capture_output=True, check=True)
+    subprocess.run(['tar', '-x', '-C', str(wt)], input=archive.stdout, check=True)
+
+
 def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
+    if stage in FIX_STAGES:
+        return prepare_fix(repo, name, case, stage)
     step = case[stage]
     wt = Path(tempfile.mkdtemp(prefix=f'replay-{name[:20]}-{stage}-'))
     wt.rmdir()
     git(repo, 'worktree', 'add', '--detach', str(wt), step['start'])
     # Les fichiers de la feature à la fin, puis les règles actuelles du projet.
     feat = f'.claude/features/{name}'
-    for path, ref in ((feat, case['docs']), ('.claude/rules', 'develop')):
-        archive = subprocess.run(['git', '-C', str(repo), 'archive', ref, path], capture_output=True, check=True)
-        subprocess.run(['tar', '-x', '-C', str(wt)], input=archive.stdout, check=True)
+    extract(repo, wt, case['docs'], feat)
+    extract(repo, wt, 'develop', '.claude/rules')
     fdir = wt / feat
     for rel in PRODUCED[stage] + LATER:
         target = fdir / rel
@@ -141,10 +189,10 @@ def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
     pipe = json.loads((fdir / 'pipeline.json').read_text())
     at = ORDER.index(stage)
     for key in list(pipe.get('stages', {})):
-        if key in ORDER and ORDER.index(key) >= at or key not in ORDER:
+        if rank(key) is None or rank(key) >= at:
             pipe['stages'][key] = 'PENDING'
     for key in list(pipe.get('attempts', {})):
-        if key in ORDER and ORDER.index(key) >= at:
+        if rank(key) is not None and rank(key) >= at:
             pipe['attempts'][key] = 0
     if stage in ('red', 'green'):
         for key in ('red_data', 'red_presentation', 'green_data', 'green_presentation'):
@@ -167,7 +215,79 @@ def prepare(repo: Path, name: str, case: dict, stage: str) -> Path:
     return wt
 
 
+FIX_START = {'repro': 'base', 'fix': 'frozen', 'fix_review': 'impl'}
+FIX_KEEP = {'repro.json', 'diagnosis.md', 'input'}   # ce que Bastien laisse au gel (input : pièces du signalement)
+
+
+def prepare_fix(repo: Path, name: str, case: dict, stage: str) -> Path:
+    start = case[FIX_START[stage]]
+    wt = Path(tempfile.mkdtemp(prefix=f'replay-{name[:20]}-{stage}-'))
+    wt.rmdir()
+    git(repo, 'worktree', 'add', '--detach', str(wt), start)
+    extract(repo, wt, 'develop', '.claude/rules')
+    rel = f'.claude/fixes/{name}'
+    fdir = wt / rel
+    if stage == 'repro':
+        shutil.rmtree(fdir, ignore_errors=True)
+    else:
+        # Gelés avec les tests : tels qu'au commit de gel, même si la branche les a retirés depuis (mr.py untrack).
+        extract(repo, wt, case['frozen'], f'{rel}/repro.json', f'{rel}/diagnosis.md')
+        for child in fdir.iterdir():
+            if child.name not in FIX_KEEP:
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
+    fdir.mkdir(parents=True, exist_ok=True)
+    base, frozen = git(repo, 'rev-parse', case['base']).strip(), git(repo, 'rev-parse', case['frozen']).strip()
+    if stage in ('repro', 'fix'):
+        # Les règles d'aujourd'hui dans un commit du worktree : le gate compte ce qui a changé depuis base_sha
+        # (repro) ou freeze_sha (fix), et elles ne sont pas l'œuvre de l'agent.
+        git(wt, 'add', '-A', '--', '.claude/rules')
+        if sh(['git', '-C', str(wt), 'diff', '--cached', '--quiet']).returncode:
+            git(wt, '-c', 'user.name=replay', '-c', 'user.email=replay@localhost', 'commit', '-q', '--no-verify',
+                '-m', 'replay: règles du projet d\'aujourd\'hui')
+        head = git(wt, 'rev-parse', 'HEAD').strip()
+        base, frozen = (head, None) if stage == 'repro' else (base, head)
+    now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    passed = {'status': 'PASSED', 'at': now}
+    state = {
+        'fix': name, 'description': case['description'], 'branch': f'fix/{name}', 'base_branch': 'develop',
+        'base_sha': base, 'created': now, 'phase': {'repro': 'repro', 'fix': 'impl', 'fix_review': 'review'}[stage],
+        'max_attempts': 5, 'stages': {}, 'attempts': {}, 'freeze_sha': frozen, 'refreezes': [], 'suggestions': {},
+        'debt': [], 'loops': {}, 'human_gates': {}, 'arbitrations': [], 'agents': {}, 'accepted': [], 'issue': None,
+        'graphify': 'absent', 'graphify_graph': None,
+    }
+    if stage != 'repro':
+        state['stages']['red'] = passed
+        state['human_gates'] = {'plan': {'at': now, 'by': 'user', 'choice': 'proposed'}, 'repro': {'at': now, 'by': 'user'}}
+    if stage == 'fix_review':
+        state['stages']['green'] = passed
+    (fdir / 'fix.json').write_text(json.dumps(state, ensure_ascii=False, indent=2) + '\n')
+    (wt / '.claude' / 'fixes' / '.current').write_text(name + '\n')
+    submodules(repo, wt, 'HEAD')
+    pub_get(wt / case.get('app_dir', 'flutter_app'))
+    if stage == 'fix':
+        # last_red.log, que l'orchestrateur passe à Fanny.
+        sh(['bash', str(FIX_GAUNTLET), 'red', name], cwd=wt, timeout=5400)
+    return wt
+
+
+def fix_prompt(wt: Path, name: str, case: dict, stage: str) -> str:
+    rel = f'.claude/fixes/{name}'
+    rules = ('Règles projet : CLAUDE.md, .claude/rules/*, .claude/agents/* s\'il y en a. Réponses du dev : '
+             '~/.claude/pipeline/answers.md, .claude/rules/pipeline_answers.md s\'il existe.')
+    head = f'Fix : {name}. Racine : {wt}. Dossier du fix : {rel}/.\n'
+    if stage == 'repro':
+        return head + f'Description : {case["description"]}\n{rules}'
+    if stage == 'fix':
+        return head + (f'Diagnostic : {rel}/diagnosis.md. Repro : {rel}/repro.json (dont fix_plan, validé par le dev). '
+                       f'Sortie du gate red : {rel}/.gauntlet/last_red.log.\n{rules}')
+    state = json.loads((wt / rel / 'fix.json').read_text())
+    return head + (f'Diagnostic : {rel}/diagnosis.md. Repro : {rel}/repro.json (dont fix_plan). plan_deviations : aucun. '
+                   f'base_sha : {state["base_sha"]}. freeze_sha : {state["freeze_sha"]}.\n{rules}')
+
+
 def prompt(wt: Path, name: str, case: dict, stage: str) -> str:
+    if stage in FIX_STAGES:
+        return fix_prompt(wt, name, case, stage)
     feat = f'.claude/features/{name}'
     pkg = case['package']
     head = f'Racine : {wt}\nFeature : {name}. Package : {pkg}. Spec : {feat}/spec.md.\n'
@@ -193,10 +313,12 @@ def prompt(wt: Path, name: str, case: dict, stage: str) -> str:
         'visite guidée comprise.')
 
 
-def gate(wt: Path, name: str, profile: str) -> tuple[bool, str]:
-    run = sh(['bash', str(GAUNTLET), profile, name], cwd=wt, timeout=5400)
+def gate(wt: Path, name: str, profile: str, gauntlet: Path = GAUNTLET) -> tuple[bool, str]:
+    run = sh(['bash', str(gauntlet), profile, name], cwd=wt, timeout=5400)
     lines = [l for l in (run.stdout + run.stderr).splitlines() if l.strip()]
-    return run.returncode == 0, (lines[-1] if lines else '')[:160]
+    # La ligne des checks échoués d'abord : la dernière est souvent celle des non applicables.
+    failed = [l for l in lines if 'échoués' in l]
+    return run.returncode == 0, (failed or lines or [''])[-1].strip()[:160]
 
 
 def findings(path: Path) -> list[dict]:
@@ -216,7 +338,82 @@ def matches(a: dict, b: dict) -> bool:
     return same_file and close
 
 
+def is_test(path: str) -> bool:
+    return ('/test/' in path or path.startswith('test/') or '/integration_test/' in path or '/maestro/' in path
+            or path.endswith('_test.dart') or path.startswith('.claude/'))
+
+
+def recall(truth: list[dict], got: list[dict]) -> dict:
+    found = [t for t in truth if any(matches(t, g) for g in got)]
+    extra = [g for g in got if not any(matches(g, t) for t in truth)]
+    return {'found': found, 'extra': extra, 'recall': round(len(found) / len(truth), 2) if truth else None,
+            'missed': [f"{Path(str(t.get('file'))).name}:{t.get('line')} {str(t.get('summary', ''))[:80]}"
+                       for t in truth if t not in found]}
+
+
+def truth_of(repo: Path, case: dict, kind: str, name: str, path: str) -> list[dict]:
+    """La vraie revue : dans le commit `docs`, ou dans `docs_dir` (archive locale d'un fix, hors git)."""
+    if case.get('docs_dir'):
+        return findings(repo / case['docs_dir'] / path)
+    tmp = Path(tempfile.mktemp(suffix='.json'))
+    tmp.write_text(git(repo, 'show', f"{case['docs']}:.claude/{kind}/{name}/{path}"))
+    try:
+        return findings(tmp)
+    finally:
+        tmp.unlink()
+
+
+def judge_fix(repo: Path, wt: Path, name: str, case: dict, stage: str) -> dict:
+    fdir = wt / '.claude' / 'fixes' / name
+    state = json.loads((fdir / 'fix.json').read_text())
+    tries = (state.get('attempts') or {}).get(FIX_PROFILE[stage], 0)
+    written = [l for l in git(wt, 'status', '--porcelain').splitlines() if '.claude/' not in l]
+    out = {'attempts': tries, 'files_written': len(written)}
+    if stage == 'fix':
+        ok, detail = gate(wt, name, 'green', FIX_GAUNTLET)
+        return {**out, 'ok': ok, 'detail': f'green {"vert" if ok else "rouge"} · {detail}'}
+    if stage == 'repro':
+        red_ok, red_detail = gate(wt, name, 'red', FIX_GAUNTLET)
+        if not (fdir / 'repro.json').exists():
+            return {**out, 'ok': False, 'detail': f'red rouge · pas de repro.json ({red_detail})'}
+        code = [p for p in git(repo, 'diff', '--name-only', '--diff-filter=AMR', case['base'], case['impl']).splitlines()
+                if not is_test(p)]
+        if code:
+            git(wt, 'checkout', case['impl'], '--', *code)
+        if submodules(repo, wt, case['impl']) or any(p.endswith('pubspec.yaml') for p in code):
+            pub_get(wt / case.get('app_dir', 'flutter_app'))
+        green_ok, green_detail = gate(wt, name, 'target_green', FIX_GAUNTLET)
+        detail = (f'red {"vert" if red_ok else "rouge"} · cible sous la vraie correction : '
+                  f'{"verte" if green_ok else "rouge"}')
+        if not red_ok:
+            detail += f' ({red_detail})'
+        elif not green_ok:
+            detail += f' ({green_detail})'
+        return {**out, 'ok': red_ok and green_ok, 'detail': detail}
+    report_ok, report_detail = gate(wt, name, 'review_report', FIX_GAUNTLET)
+    truth = truth_of(repo, case, 'fixes', name, case['truth'])
+    try:
+        data = json.loads((fdir / 'review.json').read_text())
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    got = findings(fdir / 'review.json')
+    critical = len([f for f in data.get('critical') or [] if isinstance(f, dict)])
+    r = recall(truth, got)
+    if truth:
+        ok = report_ok and len(r['found']) == len(truth)
+        detail = f'vraie revue retrouvée : {len(r["found"])}/{len(truth)} · constats en plus : {len(r["extra"])}'
+    else:
+        ok = report_ok and critical == 0
+        detail = f'vraie revue sans constat · critiques : {critical} · constats en plus : {len(r["extra"])}'
+    if not report_ok:
+        detail += f' · review_report rouge ({report_detail})'
+    return {**out, 'ok': ok, 'detail': detail, 'recall': r['recall'], 'extra': len(r['extra']),
+            'reported': len(got), 'missed': r['missed']}
+
+
 def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: bool) -> dict:
+    if stage in FIX_STAGES:
+        return judge_fix(repo, wt, name, case, stage)
     fdir = wt / '.claude' / 'features' / name
     pipe = json.loads((fdir / 'pipeline.json').read_text())
     tries = (pipe.get('attempts') or {}).get(stage, 0)
@@ -247,18 +444,12 @@ def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: boo
             detail += ' · mutation ' + (f'{score:.0f} %' if score is not None else 'sans mutant' if trivial else '—')
         return {**out, 'ok': red_ok and green_ok, 'detail': detail if green_ok else f'{detail} ({green_detail})',
                 'mutation': score}
-    truth_path = Path(tempfile.mktemp(suffix='.json'))
-    truth_path.write_text(git(repo, 'show', f"{case['docs']}:.claude/features/{name}/{case['review']['truth']}"))
-    truth = findings(truth_path)
-    truth_path.unlink()
+    truth = truth_of(repo, case, 'features', name, case['review']['truth'])
     got = findings(fdir / 'review.json')
-    found = [t for t in truth if any(matches(t, g) for g in got)]
-    extra = [g for g in got if not any(matches(g, t) for t in truth)]
-    ok = bool(got) and len(found) == len(truth)
-    return {**out, 'ok': ok, 'detail': f'vraie revue retrouvée : {len(found)}/{len(truth)} · constats en plus : {len(extra)}',
-            'recall': round(len(found) / len(truth), 2) if truth else None, 'extra': len(extra),
-            'missed': [f"{Path(str(t.get('file'))).name}:{t.get('line')} {str(t.get('summary', ''))[:80]}"
-                       for t in truth if t not in found]}
+    r = recall(truth, got)
+    ok = bool(got) and len(r['found']) == len(truth)
+    return {**out, 'ok': ok, 'detail': f'vraie revue retrouvée : {len(r["found"])}/{len(truth)} · constats en plus : {len(r["extra"])}',
+            'recall': r['recall'], 'extra': len(r['extra']), 'reported': len(got), 'missed': r['missed']}
 
 
 def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
@@ -301,7 +492,7 @@ def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
 
 
 def table(rows: list[dict]) -> str:
-    head = ('| Feature | Étape | Modèle | Réussi | Juge | Tentatives | Fichiers | Tours | Durée | Équivalent API |\n'
+    head = ('| Cas | Étape | Modèle | Réussi | Juge | Tentatives | Fichiers | Tours | Durée | Équivalent API |\n'
             '|---|---|---|---|---|---|---|---|---|---|\n')
     return head + ''.join(
         f"| {r['feature']} | {r['stage']} | {r['model']} | {'oui' if r['ok'] else 'non'} | {r['detail']} "
@@ -314,8 +505,8 @@ def hollow(row: dict) -> bool:
     10 h de passes sans review.json ni test compilable)."""
     if row['detail'].startswith('passe cassée') or row.get('agent_error'):
         return True
-    if row['stage'] == 'review':
-        return row.get('recall') == 0 and row.get('extra') == 0
+    if row['stage'] in ('review', 'fix_review'):
+        return row.get('reported') == 0 and not row['ok']
     if ' · mutation —' in row['detail']:  # suite verte mais score introuvable : juge à revoir
         return True
     return row.get('files_written') == 0
@@ -325,7 +516,7 @@ def summary(rows: list[dict]) -> str:
     groups: dict[tuple, list] = {}
     for r in rows:
         groups.setdefault((r['stage'], r['model']), []).append(r)
-    lines = ['| Étape | Modèle | Réussites | Rappel moyen (review) | Mutation moyenne (red) | Équivalent API moyen |',
+    lines = ['| Étape | Modèle | Réussites | Rappel moyen (revues) | Mutation moyenne (red) | Équivalent API moyen |',
              '|---|---|---|---|---|---|']
     for (stage, model), rs in sorted(groups.items()):
         ok = sum(r['ok'] for r in rs)
@@ -340,8 +531,11 @@ def summary(rows: list[dict]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--feature', action='append', help='feature de cases.json (défaut : toutes)')
-    parser.add_argument('--stage', action='append', choices=list(AGENT), help='étape (défaut : toutes)')
+    parser.add_argument('--case', '--feature', dest='case', action='append',
+                        help='feature ou fix de cases.json (défaut : tous)')
+    parser.add_argument('--stage', action='append', choices=list(AGENT),
+                        help='étape (défaut : toutes celles du cas ; red/green/review pour une feature, '
+                             'repro/fix/fix_review pour un fix)')
     parser.add_argument('--model', action='append', help='modèle, répétable (défaut : sonnet)')
     parser.add_argument('--runs', type=int, default=1, help='passes par feature, étape et modèle')
     parser.add_argument('--mutation', action='store_true', help='red : score de mutation (long)')
@@ -362,13 +556,21 @@ def main() -> int:
     out = LOCAL / 'results' / f"replay-{datetime.datetime.now():%Y-%m-%d_%H%M}{'-' + args.label if args.label else ''}"
     out.parent.mkdir(parents=True, exist_ok=True)
     rows = []
-    for name in args.feature or list(cases['features']):
-        for stage in args.stage or list(AGENT):
+    known = {**{n: ('feature', c) for n, c in cases['features'].items()},
+             **{n: ('fix', c) for n, c in (cases.get('fixes') or {}).items()}}
+    unknown = [n for n in args.case or [] if n not in known]
+    if unknown:
+        print(f"cas inconnu(s) : {', '.join(unknown)} — cases.json : {', '.join(known)}")
+        return 2
+    for name in args.case or list(known):
+        kind, case = known[name]
+        own = FEATURE_STAGES if kind == 'feature' else FIX_STAGES
+        for stage in [s for s in args.stage or list(own) if s in own]:
             for model in (['—'] if args.dry else models):
                 for n in range(args.runs):
                     print(f'{name} · {stage} · {model} · passe {n + 1}/{args.runs} …', flush=True)
                     try:
-                        row = play(repo, name, cases['features'][name], stage, model, args.mutation, args.keep, args.dry)
+                        row = play(repo, name, case, stage, model, args.mutation, args.keep, args.dry)
                     except Exception as e:  # une passe cassée n'arrête pas la campagne
                         row = {'feature': name, 'stage': stage, 'model': model, 'ok': False,
                                'detail': f'passe cassée : {e}'[:200], 'wall_s': 0}
