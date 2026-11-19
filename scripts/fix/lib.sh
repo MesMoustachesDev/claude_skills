@@ -83,6 +83,12 @@ is_test_path() { # is_test_path <chemin relatif>
   return 1
 }
 
+# Probe (ADR 0001) : copie temporaire d'un test pour débugger, `zz_probe_*` dans un chemin de test. Ouvert à
+# l'implementer, jamais gelé ; le check no_probes de fix_gauntlet.sh rougit s'il en reste un.
+is_probe_path() { # is_probe_path <chemin relatif>
+  case "${1##*/}" in zz_probe_*) is_test_path "$1" ;; *) return 1 ;; esac
+}
+
 # Manifestes que le reproducer peut toucher pour brancher un runner de test absent : package.json et
 # pubspec.yaml partout, plus ceux du langage (stack.ini → manifests : build.gradle.kts, libs.versions.toml…).
 is_manifest_path() {

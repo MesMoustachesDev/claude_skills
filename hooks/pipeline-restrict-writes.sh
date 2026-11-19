@@ -8,8 +8,14 @@
 #
 # Bash : les fichiers que la commande écrit (redirection, sed -i, tee, cp…, cf. bash_write_targets.py)
 # passent par la même zone, sauf ceux hors du worktree (journaux dans /tmp). Cas réel : Hugo,
-# refactor_feature, un Edit refusé refait en `sed -i`. Le gauntlet (test_freeze_check) reste le
-# filet pour ce que l'extraction ne voit pas (python -c, scripts).
+# refactor_feature, un Edit refusé refait en `sed -i`. Les interpréteurs inline (python -c, heredoc
+# python, perl -pi…) que l'extraction ne voit pas sont refusés aux sous-agents par un hook à part
+# (ADR 0017) ; le gauntlet (test_freeze_check) reste le filet en fin d'étape.
+#
+# Probes (ADR 0001) : `<dossier de test>/zz_probe_*` (package de la feature et packages de writes.extra)
+# est ouvert aux agents qui écrivent du code (implementer et ses moitiés, cleaner, hardener) pour copier un
+# test gelé et y ajouter une trace. Jamais gelé ; un probe oublié fait rougir test_freeze_check. Pas aux
+# relecteurs : leur critique non prouvée part dans `to_verify` (ADR 0002).
 set -u
 set -f   # pas d'expansion des globs de config par le shell : ce sont des motifs pour `case`
 input="$(cat)"
@@ -117,6 +123,11 @@ for g in $extra; do
   esac
 done
 is_test_path() { match "$rel" $pkg_tests "*.feature" $extra_tests; }
+# Probes : `zz_probe_*` à la racine ou plus bas d'un dossier de test du package ou de writes.extra.
+probe_globs=""; for t in $pkg_tests $extra_tests; do probe_globs="$probe_globs ${t%/\*}/zz_probe_* ${t%/\*}/*/zz_probe_*"; done
+is_probe() { match "$rel" $probe_globs; }
+probe_ext="$(stack_list extensions | head -1)"
+probe_hint="Pour débugger, copie-le en \`${TEST_DIRS%% *}/zz_probe_<nom>_test${probe_ext:-.dart}\`, lance-le par son chemin et efface-le dans la même commande."
 # Couche data : stack.ini → layer.data, les dossiers sous un dossier de test d'un côté, les autres de l'autre.
 data_tests=""; data_libs=""; data_names=""; test_layer_root=""
 for l in $(stack_list layer.data | tr '\n' ' '); do
@@ -174,19 +185,22 @@ case "$agent" in
       || deny "test-writer présentation : tu n'écris que dans $(label $pkg_tests) hors $test_layer_root/{$data_names}${extra_tests:+, $extra_tests} (et $(label $MANIFESTS) pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
     ;;
   feature-implementer-data)
-    is_test_path && deny "implementer data : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel$via"
+    is_probe && return 0
+    is_test_path && deny "implementer data : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     match "$rel" $data_libs \
       || deny "implementer data : zone autorisée = $data_label (code). La présentation est à l'autre moitié ; une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
     ;;
   feature-implementer-presentation)
-    is_test_path && deny "implementer présentation : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel$via"
+    is_probe && return 0
+    is_test_path && deny "implementer présentation : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     match "$rel" $data_libs \
       && deny "implementer présentation : $data_label (code) est à la moitié data, qui écrit en même temps que toi. Tu ne dépends que des signatures des use cases. Refusé : $rel$via"
     match "$rel" $pkg_src $extra \
       || deny "implementer présentation : zone autorisée = $(label $pkg_src) hors {$data_names}${extra:+, $extra}. Une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
     ;;
   feature-implementer|feature-cleaner)
-    is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. Refusé : $rel$via"
+    is_probe && return 0
+    is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     # Nina retire une dépendance ou déplace un fichier : le README du package le dit (cas réel, par sed).
     # Elle ajoute aussi au vocabulaire des rôles le mot qu'aucun ne couvre (ADR 0016) ; Thibault le voit au point d'étape.
     readme=""; [ "$agent" = feature-cleaner ] && readme="$PKG_REL/README.md $(cfg roles.file .claude/rules/roles.md)"
@@ -194,8 +208,9 @@ case "$agent" in
       || deny "${agent#feature-} : zone autorisée = $(label $pkg_src), $(label $MANIFESTS)${readme:+, $readme}${extra:+, $extra}. Refusé : $rel$via"
     ;;
   feature-hardener)
+    is_probe && return 0
     if is_test_path; then
-      is_frozen && deny "hardener : $rel est un test gelé (gel $freeze_sha) : il ne se modifie pas. Tue le mutant dans un NOUVEAU fichier de test ($(label $pkg_tests), suffixe _mutation_test) ; ceux que tu as créés, tu les corriges avec Edit.$via"
+      is_frozen && deny "hardener : $rel est un test gelé (gel $freeze_sha) : il ne se modifie pas. Tue le mutant dans un NOUVEAU fichier de test ($(label $pkg_tests), suffixe _mutation_test) ; ceux que tu as créés, tu les corriges avec Edit. $probe_hint$via"
       return 0
     fi
     match "$rel" $pkg_src "$FEAT_REL/mutants.md" $extra_pubspecs \
@@ -203,7 +218,7 @@ case "$agent" in
     ;;
   feature-reviewer)
     match "$rel" "$FEAT_REL/review.md" "$FEAT_REL/review.json" \
-      || deny "reviewer : lecture seule. Tu n'écris que $FEAT_REL/review.md et review.json. Refusé : $rel$via"
+      || deny "reviewer : lecture seule. Tu n'écris que $FEAT_REL/review.md et review.json, ni test ni probe : une critique que tu ne prouves pas en lisant le code ou en rejouant un test existant va dans review.json → to_verify, avec ce qu'il faudrait lancer. Refusé : $rel$via"
     ;;
   feature-dedup)
     match "$rel" "$FEAT_REL/dedup.md" "$FEAT_REL/dedup.json" \
@@ -215,7 +230,7 @@ case "$agent" in
     ;;
   feature-test-reviewer)
     match "$rel" "$FEAT_REL/tests_review.md" "$FEAT_REL/tests_review.json" \
-      || deny "test-reviewer : lecture seule. Tu n'écris que $FEAT_REL/tests_review.md et tests_review.json — jamais un test. Refusé : $rel$via"
+      || deny "test-reviewer : lecture seule. Tu n'écris que $FEAT_REL/tests_review.md et tests_review.json — jamais un test ni un probe : ce que tu ne prouves pas en lisant ou en rejouant un test existant va dans tests_review.json → to_verify. Refusé : $rel$via"
     ;;
   feature-polisher)
     is_test_path && deny "polisher : les tests sont GELÉS, clés et Semantics comprises. Un test qui gêne le polish se signale dans polish.md. Refusé : $rel$via"

@@ -4,13 +4,15 @@
 #
 #   fix-reproducer  : tests, manifestes (package.json, pubspec.yaml et ceux du langage : stack.sh), .claude/fixes/<nom>/ ;
 #                     dans le code source, uniquement des lignes de log [DEBUG_ISSUE] (ajout ou retrait).
-#   fix-implementer : tout le projet SAUF les tests et .claude/fixes/<nom>/ (repro.json est gelé).
-#   fix-reviewer    : .claude/fixes/<nom>/review.{md,json} seulement.
+#   fix-implementer : tout le projet SAUF les tests et .claude/fixes/<nom>/ (repro.json est gelé) ; parmi les
+#                     tests, les probes `zz_probe_*` seulement (copie d'un test gelé pour débugger, ADR 0001).
+#   fix-reviewer    : .claude/fixes/<nom>/review.{md,json} seulement, ni test ni probe (ADR 0002 : `to_verify`).
 #
 # Bash : les fichiers que la commande écrit (redirection, sed -i, tee, cp…, cf.
 # gauntlet/bash_write_targets.py) passent par la même zone, sauf ceux hors du projet (journaux dans
-# /tmp). Ce que l'extraction ne voit pas (python -c, scripts), le gauntlet le ferme :
-# only_tests_changed pour le reproducer, freeze_check pour l'implementer.
+# /tmp). Les interpréteurs inline (python -c, heredoc python, perl -pi…) sont refusés aux sous-agents par
+# un hook à part (ADR 0017) ; le gauntlet reste le filet en fin d'étape : only_tests_changed pour le
+# reproducer, freeze_check pour l'implementer, no_probes pour un probe oublié.
 set -u
 input="$(cat)"
 agent="$(jq -r '.agent_type // empty' <<<"$input")"
@@ -83,12 +85,13 @@ check() {
       deny "reproducer : tu n'écris que des tests, $fix_rel/, et les manifestes ($(manifest_label)) pour brancher un runner. Dans le code source, seulement des lignes de log contenant $DEBUG_MARKER (une ligne par log, via Edit ; leur retrait aussi). La correction est le travail de l'implementer. Refusé : $rel"
       ;;
     fix-implementer)
-      is_test_path "$rel" && deny "implementer : les tests sont GELÉS. Si un test te semble faux, arrête-toi et dis-le dans ton rapport final (fichier:ligne, ce qu'il attend, pourquoi c'est faux) — le reproducer tranchera. Refusé : $rel"
+      is_probe_path "$rel" && return 0
+      is_test_path "$rel" && deny "implementer : les tests sont GELÉS. Si un test te semble faux, arrête-toi et dis-le dans ton rapport final (fichier:ligne, ce qu'il attend, pourquoi c'est faux) — le reproducer tranchera. Pour débugger, copie-le en \`test/zz_probe_<nom>_test.dart\` (même dossier de test, nom en zz_probe_ pour les autres langages), lance-le par son chemin et efface-le dans la même commande. Refusé : $rel"
       in_fix_dir && deny "implementer : $fix_rel/ appartient au reproducer et à l'orchestrateur (repro.json est gelé). Refusé : $rel"
       ;;
     fix-reviewer)
       case "$rel" in "$fix_rel/review.md"|"$fix_rel/review.json") return 0 ;; esac
-      deny "reviewer : lecture seule. Tu n'écris que $fix_rel/review.md et review.json. Refusé : $rel"
+      deny "reviewer : lecture seule. Tu n'écris que $fix_rel/review.md et review.json, ni test ni probe : une critique que tu ne prouves pas en lisant le code ou en rejouant un test existant va dans review.json → to_verify, avec ce qu'il faudrait lancer. Refusé : $rel"
       ;;
   esac
   return 0

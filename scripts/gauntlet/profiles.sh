@@ -84,7 +84,7 @@ Checks individuels :
   test_plan          tests_plan.json (étape 3a) : chaque item de la spec prouvé ou écarté, chaque test prouve un item
   test_plan_match    les tests écrits sont ceux de tests_plan.json, ni plus ni moins (gate red)
   test_dups          candidats doublons (même nom de test dans deux fichiers) → .gauntlet/test_dups.txt, tranchés par Gaëlle ; ne bloque pas
-  test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement
+  test_freeze_check  :strict = aucun changement dans test/ depuis le gel ; :additive = fichiers ajoutés seulement ; un probe zz_probe_* oublié est rouge dans les deux
   tests_added        enregistre les tests ajoutés depuis le gel (pipeline.json → hardening.tests_added, relatifs au package)
   metrics            dart_code_linter : complexité, lignes, imbrication, paramètres
   coverage           couverture des lignes ajoutées depuis base_branch, hors lignes seulement déplacées (git --color-moved)

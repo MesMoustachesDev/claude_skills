@@ -62,6 +62,8 @@ each_extra_package() {
 # test_freeze_check <strict|additive> — les tests gelés (SHA dans pipeline.json) sont intacts.
 #   strict   : aucun changement, aucun fichier nouveau dans test/
 #   additive : seuls des fichiers AJOUTÉS sont tolérés (hardener) ; aucune modification, aucune suppression
+# Dans les deux modes, un probe oublié (`zz_probe_*`, copie de debug d'un test, ADR 0001) est rouge : il ne fait
+# pas partie de la suite, il s'efface dans la commande qui l'a lancé.
 # Surveille test/ du package et celui de chaque package de writes.extra modifié (gelés avec lui, pipeline.sh freeze).
 check_test_freeze_check() {
   local mode="${1:-strict}" sha changes="" untracked="" rc=0 pkg
@@ -75,6 +77,16 @@ check_test_freeze_check() {
     done
   done
   changes="$(printf '%s' "$changes" | grep -v '^$')"; untracked="$(printf '%s' "$untracked" | grep -v '^$')"
+  # Probes left behind: red in every mode, and named as such (not « test/ a changé »).
+  local probes
+  probes="$({ printf '%s\n' "$changes" | awk -F'\t' '{ print $NF }'; printf '%s\n' "$untracked"; } | grep -E '(^|/)zz_probe_[^/]*$' | sort -u)"
+  if [ -n "$probes" ]; then
+    printf '%s\n' "$probes" | sed 's/^/  probe /'
+    ko "probe(s) zz_probe_* oublié(s) : efface-les (rm), ils ne font pas partie de la suite"
+    rc=1
+    changes="$(printf '%s\n' "$changes" | grep -vE '(^|/)zz_probe_[^/]*$' | grep -v '^$')"
+    untracked="$(printf '%s\n' "$untracked" | grep -vE '(^|/)zz_probe_[^/]*$' | grep -v '^$')"
+  fi
   # Hugo's additions (pipeline.json → hardening.tests_added, written by check_tests_added) are allowed after
   # the freeze, as long as they are new files: an untracked or added file only, never a modification.
   # `test/…` is relative to the package; a writes.extra package's file keeps its path from the root.
@@ -89,9 +101,10 @@ check_test_freeze_check() {
   fi
   case "$mode" in
     strict)
-      [ -n "$changes" ]   && { printf '%s\n' "$changes" | sed 's/^/  /'; rc=1; }
-      [ -n "$untracked" ] && { printf '%s\n' "$untracked" | sed 's/^/  ?? /'; rc=1; }
-      [ "$rc" = 1 ] && ko "test/ a changé depuis le gel ($sha)"
+      local frozen_rc=0
+      [ -n "$changes" ]   && { printf '%s\n' "$changes" | sed 's/^/  /'; frozen_rc=1; }
+      [ -n "$untracked" ] && { printf '%s\n' "$untracked" | sed 's/^/  ?? /'; frozen_rc=1; }
+      [ "$frozen_rc" = 1 ] && { ko "test/ a changé depuis le gel ($sha)"; rc=1; }
       ;;
     additive)
       local bad; bad="$(printf '%s\n' "$changes" | grep -vE '^A' | grep -v '^$')"
@@ -121,7 +134,8 @@ check_tests_added() {
       added="$added$(untracked "$pkg/$td" 2>/dev/null)"$'\n'
     done
   done
-  json="$(printf '%s' "$added" | grep -v '^$' | pkg_test_paths_to_rel | sort -u | jq -R . | jq -cs .)"
+  # Un probe (zz_probe_*) n'est pas un test de Hugo : test_freeze_check le signale, il ne s'enregistre pas.
+  json="$(printf '%s' "$added" | grep -v '^$' | grep -vE '(^|/)zz_probe_[^/]*$' | pkg_test_paths_to_rel | sort -u | jq -R . | jq -cs .)"
   (cd "$PROJECT_ROOT" && bash "$GAUNTLET_ROOT/../pipeline.sh" set "$FEATURE" hardening.tests_added "$json" >/dev/null) \
     || { ko "hardening.tests_added non enregistré ($json)"; return 1; }
   info "hardening.tests_added : $(jq -r 'length' <<<"$json") fichier(s) ajouté(s) depuis le gel $sha"

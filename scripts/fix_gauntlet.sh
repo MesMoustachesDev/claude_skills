@@ -24,9 +24,9 @@ source "$SCRIPTS/fix/lib.sh"
 
 profile_checks() {
   case "$1" in
-    red)            echo "repro_schema only_tests_changed no_debug_markers target_red" ;;
-    repro_report)   echo "repro_schema no_debug_markers" ;;
-    green)          echo "repro_schema freeze_check source_changed no_debug_markers target_green suite_green lint conventions server_fetch_redirect" ;;
+    red)            echo "repro_schema only_tests_changed no_debug_markers no_probes target_red" ;;
+    repro_report)   echo "repro_schema no_debug_markers no_probes" ;;
+    green)          echo "repro_schema freeze_check source_changed no_debug_markers no_probes target_green suite_green lint conventions server_fetch_redirect" ;;
     review_report)  echo "review_report" ;;
     review_verdict) echo "review_verdict" ;;
     *) echo "" ;;
@@ -51,6 +51,7 @@ Checks :
   repro_schema       repro.json : package, target_cmd, expected_failure, suite_cmd, test_files existants et reconnus comme tests, fix_plan
   only_tests_changed depuis base_sha : uniquement tests, manifestes (package.json, pubspec.yaml, ceux du langage) et .claude/fixes/<nom>/
   no_debug_markers   aucun [DEBUG_ISSUE] dans le repo
+  no_probes          aucun probe zz_probe_* (copie de debug d'un test) dans le repo, suivi ou non : il ne se gèle pas
   target_red         target_cmd échoue ET sa sortie contient expected_failure (rouge pour la bonne raison)
   freeze_check       depuis freeze_sha : aucun test ni repro.json modifié, aucun test ajouté
   source_changed     depuis freeze_sha : au moins un fichier hors tests a changé
@@ -150,6 +151,16 @@ check_no_debug_markers() {
   [ -z "$hits" ] && return 0
   printf '%s\n' "$hits" | sed 's/^/  /'
   ko "logs $DEBUG_MARKER encore présents — à retirer"
+  return 1
+}
+
+# Probe (ADR 0001) : copie de debug d'un test, permise à Fanny et à Bastien, effacée dans la commande qui l'a lancée.
+check_no_probes() {
+  local hits
+  hits="$(git -C "$PROJECT_ROOT" ls-files --cached --others --exclude-standard 2>/dev/null | grep -E '(^|/)zz_probe_[^/]*$' | head -20)"
+  [ -z "$hits" ] && return 0
+  printf '%s\n' "$hits" | sed 's/^/  /'
+  ko "probe(s) zz_probe_* oublié(s) : efface-les (rm), ils ne font pas partie de la suite et ne se gèlent pas"
   return 1
 }
 

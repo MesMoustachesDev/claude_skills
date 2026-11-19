@@ -1211,12 +1211,14 @@ def extra_packages(c):
 
 def frozen_test_files(c):
     """Tests à geler : test/ du package et de chaque package de writes_extra (la feature peut y écrire ses tests,
-    test_freeze_check les surveille), modifiés depuis HEAD. Un package où la feature n'a rien écrit n'apporte rien."""
+    test_freeze_check les surveille), modifiés depuis HEAD. Un package où la feature n'a rien écrit n'apporte rien.
+    Les probes `zz_probe_*` restent hors du gel."""
     files = []
     for pkg in [c.package] + extra_packages(c):
         for td in test_dirs(c, pkg):
             files += changed_files(c, f"{pkg}/{td}", "HEAD")
-    return files
+    # Un probe (zz_probe_*, copie de debug d'un test, ADR 0001) n'est jamais gelé.
+    return [f for f in files if not os.path.basename(f).startswith("zz_probe_")]
 
 
 def cmd_freeze(c, args):
