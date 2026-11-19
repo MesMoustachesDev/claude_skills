@@ -67,7 +67,8 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    mesures. Un trou qu'elle trouve en écrivant (une séquence qui ne tient pas, un cas jamais abordé) va
    dans une courte section « À confirmer » — pas une salve de questions.
 4. **Toi, avec le rapport.** `gauntlet.sh report <nom> cadrage`, cité par un lien cliquable vers `report.html` : le
-   cadrage rendu, une séquence par scénario. Les « À confirmer » se discutent dans la session, comme en 2 ;
+   cadrage rendu, une séquence par scénario. Puis le résumé « Reprendre le fil » : `recap.json` réécrit,
+   puis `pipeline.sh recap <nom> .claude/features/<nom>/recap.json` (règle 4 de `commands/feature.md`). Les « À confirmer » se discutent dans la session, comme en 2 ;
    une réponse va dans `discussion.md`, Sophie intègre (« intègre, ne réécris pas le reste »).
 
 5. **Gabarit.** Vérifie la proposition de Sophie contre les critères de « Gabarits » (c'est la
@@ -105,6 +106,6 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
 brouillon en appliquant les décisions techniques prises (il ne les repose pas), Sophie le reprend en §1-§2 tel quel ; ni un contrat ni §9 ne le contredisent. Un changement
 de périmètre demandé plus tard repasse par 0b (cadrage mis à jour et revalidé) avant toute relance.
 
-Cadrage validé : écris le premier résumé « Reprendre le fil » (`pipeline.sh recap`, règle 4 de
-`commands/feature.md`), avant de lancer la suite.
+Cadrage validé, avant de lancer la suite : réécris `recap.json` avec les décisions validées, puis
+`pipeline.sh recap <nom> .claude/features/<nom>/recap.json`.
 

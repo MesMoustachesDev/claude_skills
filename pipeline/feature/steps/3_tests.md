@@ -88,6 +88,8 @@ séquence validée au cadrage et la même redessinée par le script **depuis le 
 (le test généré par l'outil Gherkin du langage et le corps de chaque step : pump, tap/saisie, réponse
 du use case mocké, assertion, chacun avec `fichier:ligne`), et les écarts signalés (étape du
 cadrage absente du test, ou l'inverse). Puis les scénarios, la matrice §4 × `.feature`, l'inventaire.
+**Puis, avant toute question : le résumé « Reprendre le fil »** — réécris `recap.json`, puis
+`pipeline.sh recap <nom> .claude/features/<nom>/recap.json` (contenu : règle 4 de `commands/feature.md`).
 
 En 10 lignes max : les écarts, un par ligne avec le C<n> et le `fichier:ligne` du step concerné (ce
 sont des heuristiques : dis lesquels Gaëlle a déjà jugés justifiés), les scénarios absents des

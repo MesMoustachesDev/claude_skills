@@ -4,7 +4,8 @@ L'evidence dit que la feature est prouvée ; la visite fait que Thibault sait **
 Elle remplace les anciens arrêts mutants et captures : tout ce qu'il devait valider séparément est
 rattaché à l'endroit du code qu'il concerne.
 
-`gauntlet.sh report <nom> tour`, cité par un lien cliquable vers `report.html`, puis
+`gauntlet.sh report <nom> tour`, cité par un lien cliquable vers `report.html`, puis le résumé
+« Reprendre le fil » (`recap.json` réécrit, puis `pipeline.sh recap <nom> .claude/features/<nom>/recap.json`), puis
 `SendUserFile` des captures (`.claude/features/<nom>/qa/**/*.png`, un appel par plateforme). La section
 « Visite guidée » montre les étapes de `review.json → tour` (écrites par Romain), dans l'ordre du flux
 de données (vue → state holder → use case → repository → data source) : chacune avec `fichier:ligne`

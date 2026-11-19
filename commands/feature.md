@@ -62,7 +62,10 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 4. **Chaque point d'étape se pose dans la session.** Après `gauntlet.sh report <nom> <étape>`, écris
    d'abord le résumé « Reprendre le fil » (l'encart en tête du panneau pipeline-view, que Thibault relit
    en revenant d'une autre feature) : un JSON `{goal, decided, open, aside}` dans `recap.json` du dossier
-   de la feature (toujours ce nom, réécrit à chaque fois), puis `pipeline.sh recap <nom> <ce fichier>`. `goal` : le but en une ligne ; `decided` : les 5
+   de la feature (toujours ce nom, réécrit à chaque fois), puis
+   `pipeline.sh recap <nom> .claude/features/<nom>/recap.json`. Cinq points d'étape ont un rapport, et chaque fichier d'étape
+   cite cette ligne à sa place : cadrage (0b, et de nouveau une fois validé), scénarios (1), contrats (1e),
+   tests (3), visite guidée (8b). `goal` : le but en une ligne ; `decided` : les 5
    décisions les plus structurantes de `discussion.md` et du cadrage, une ligne chacune, pas tout le
    journal ; `open` : ce qui reste à trancher (3 au plus) ; `aside` : ce qui a été sorti du périmètre et
    où c'est parti (3 au plus). 80 caractères par ligne. Un refus : corrige le JSON, ne passe jamais par

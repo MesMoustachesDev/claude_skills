@@ -65,6 +65,8 @@ Vert → **Point d'étape « scénarios ».** `gauntlet.sh report <nom> spec`, c
 de chacun, §6, §7, §9, la spec. Si la section « Séquences » porte le badge « incohérence(s) » (un C<n>
 sans scénario, un titre absent de §4), relance Sophie avec la liste, sans montrer le rapport, puis 1b ;
 ce compteur partage `loops.spec`.
+**Puis, avant toute question : le résumé « Reprendre le fil »** — réécris `recap.json`, puis
+`pipeline.sh recap <nom> .claude/features/<nom>/recap.json` (contenu : règle 4 de `commands/feature.md`).
 
 **Thibault juge le comportement, pas encore la forme** : c'est le moment des questions produit (ce qui
 s'affiche, ce qui est gardé, ce qui part en erreur), pas des signatures. En 10 lignes max : objectif,

@@ -4,6 +4,8 @@
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les scénarios validés de §4 pour rappel : chaque
 contrat se lit en regard du scénario qui l'a fait naître.
+**Puis, avant toute question : le résumé « Reprendre le fil »** — réécris `recap.json`, puis
+`pipeline.sh recap <nom> .claude/features/<nom>/recap.json` (contenu : règle 4 de `commands/feature.md`).
 
 **Une relecture, pas une découverte.** Les choix structurants ont été tranchés dans la discussion de
 départ (0b) et Arthur les a appliqués : ne repose pas de question ouverte ici. Les `DÉCISION (Thibault)`
