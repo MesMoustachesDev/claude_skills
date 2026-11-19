@@ -27,8 +27,7 @@ le plus proche déjà en place et lis-le en entier : c'est l'étalon d'Alice et 
 **e. Les règles** — note les chemins qui existent : `.claude/rules/pr_rules.md`,
 `.claude/rules/create_feature_rules.md`, `CLAUDE.md` du projet.
 
-`context.md` contient, dans cet ordre et avec exactement ces titres (le cockpit les affiche en tête
-de la revue, sous « La MR ») :
+`context.md` contient, dans cet ordre et avec exactement ces titres :
 
 ```
 ## Pourquoi                      le besoin, l'objectif de la MR, le ticket — ou « description vide »

@@ -13,19 +13,15 @@
 #   review.sh gauntlet <slug> [--mutation]       pr_gauntlet.sh avec worktree conservé, chemin enregistré
 #   review.sh agent <slug> <archi|code|qa> <running|done|skipped|failed> ["<résumé>"]
 #   review.sh pass <slug> <étape>                étape passée (context, briefing, triage, posted, synthesis)
-#   review.sh say <slug> "<texte>" [--ask <id> --options "A|B"]            « en attente de toi » du cockpit
 #   review.sh qa <slug> [--all-platforms]        rejoue les flows Maestro de la revue sur l'app du worktree (iOS : simulateur de la revue)
 #   review.sh sim <slug>                         UDID du simulateur iOS de la revue, créé s'il le faut ; jamais ios.simulator (partagé)
 #   review.sh run-tests <slug> <package> <tests…> rejoue des tests existants du worktree (scénario déjà couvert)
 #   review.sh probe <slug> <package> [fichiers]  joue les tests jetables de <revue>/probes/ dans le worktree, puis les retire
 #   review.sh findings <slug>                    fusionne findings_<rôle>.json en findings.json (ids F1…), doublons fusionnés
 #   review.sh merge <slug> F2 F3 [F4…]           fusionne des doublons que seul le sens rapproche (mémorisé)
-#   review.sh set-cockpit <slug> <url>           URL de la page de cette revue (publiée au démarrage)
-#   review.sh cockpit-push <slug> <dossier> [--versions id=v,…] [--hub-version N]  page (writes) + ligne de l'accueil (hub_writes)
-#   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md
+#   review.sh triage <slug> <id> <comment|skip> ["<texte>"]  tri d'une remarque (texte vide : commentaire proposé), écrit comments.md
+#   review.sh triage <slug> F1=comment F2=skip …  tri de plusieurs remarques, commentaires proposés
 #   review.sh check-comments <slug>             vérifie les commentaires retenus contre ma voix (voix_revue.md)
 #   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie (diff_refs relus, lignes recalées sur la tête de la MR)
 #   review.sh cleanup <slug>                     supprime le worktree et le simulateur de la revue (garde rapports et captures)
-#   review.sh cockpit-page <slug> <dossier>      copie de la page du cockpit pour cette revue (à publier au démarrage)
-#   review.sh page-deleted <slug>                la page de la revue a été supprimée (carte gardée dans l'accueil)
 exec python3 "$(dirname "${BASH_SOURCE[0]}")/review/review.py" "$@"

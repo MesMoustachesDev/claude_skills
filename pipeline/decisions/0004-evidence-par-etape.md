@@ -1,8 +1,8 @@
 # 0004 — Chaque étape laisse ses preuves, l'evidence les rassemble
 
-Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25)
+Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-19 (cockpit retiré)
 Où elle vit : `.claude/features/<nom>/` (artefacts par étape, `.gauntlet/last_<profil>.log`,
-`history/`) · `scripts/gauntlet.sh report` · `pipeline/feature/steps/9_evidence.md` · `scripts/mr.py`
+`history/`) · `scripts/gauntlet.sh report` · `pipeline/feature/steps/9_evidence.md` · `scripts/mr.py` · `mods/pipeline-view`, `mods/pipeline-band`
 
 ## Contexte
 
@@ -15,8 +15,14 @@ une feature n'a pas non plus l'historique de la précédente.
 - Chaque étape écrit ses artefacts dans `.claude/features/<nom>/` : `cadrage.md`, `spec.md`,
   `archi.json`, `tests.md`, les `*_review.json`, `dedup.json`, `review.json`, `mutants.md`, `qa.md`,
   le log de chaque gate. `pipeline.sh loop` archive chaque verdict de boucle dans `history/`.
-- Chaque point d'étape commence par un rapport régénéré (`gauntlet.sh report`), affiché dans le
-  cockpit.
+- Chaque point d'étape commence par un rapport régénéré (`gauntlet.sh report`), cité par un lien
+  vers `report.html` dans la session.
+- Amendement (2026-11-19) : **le cockpit est retiré** (page Artifact par feature, par fix et par revue,
+  accueil commun, envois `ArtifactData`). Thibault ne s'en servait plus : il suit le pipeline dans les
+  mods pipeline-view et pipeline-band, qui lisent l'étape (`pipeline.sh next --json`,
+  `fix/steps.py next --json`), ce qui l'attend (`waiting`, posé par `ask`) et les documents à lire.
+  Les appels qui tenaient la page à jour coûtaient environ 1 600 tours d'orchestrateur par mois.
+  Le point d'étape se pose dans la session ; `SendUserFile` ne sert plus qu'aux captures.
 - À la fin, `evidence.md` rassemble tout : contrats, arbre du changement, visite guidée, étapes
   sautées, re-gels et leur cause, suggestions non appliquées, dette existante, acceptations,
   mutants, captures QA, impact graphify. C'est la page que Thibault lit à la place du code.

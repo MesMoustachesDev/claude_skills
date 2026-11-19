@@ -27,8 +27,8 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
      fait que monter : une complexité découverte en route (nouvelle I/O, deuxième écran, package),
      tu le dis et tu montes d'un cran ; tu ne redescends jamais en cours de discussion. Le gabarit
      retenu reste tranché en 5, par les critères.
-   - **Une question à la fois**, courte (une ou deux phrases). Pas d'`AskUserQuestion`, pas de rapport,
-     pas de cockpit : du texte, dans la session. Six lignes au plus par message.
+   - **Une question à la fois**, courte (une ou deux phrases). Pas d'`AskUserQuestion`, pas de rapport :
+     du texte, dans la session. Six lignes au plus par message.
    - **Tu rebondis sur ce qu'il dit** : tu reformules en une phrase ce que tu as compris, tu poses la
      question suivante qui en découle, tu pointes le cas qu'il n'a pas vu (vide, erreur, hors ligne,
      double appel, données existantes), tu proposes deux ou trois pistes avec celle que tu recommandes
@@ -66,7 +66,7 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    dépendances, les **décisions techniques prises** (avec leur raison), les règles, le gabarit et ses
    mesures. Un trou qu'elle trouve en écrivant (une séquence qui ne tient pas, un cas jamais abordé) va
    dans une courte section « À confirmer » — pas une salve de questions.
-4. **Toi, avec le rapport.** `gauntlet.sh report <nom> cadrage`, puis « Rafraîchir » (cockpit) : le
+4. **Toi, avec le rapport.** `gauntlet.sh report <nom> cadrage`, cité par un lien cliquable vers `report.html` : le
    cadrage rendu, une séquence par scénario. Les « À confirmer » se discutent dans la session, comme en 2 ;
    une réponse va dans `discussion.md`, Sophie intègre (« intègre, ne réécris pas le reste »).
 
@@ -93,8 +93,8 @@ contrats de Thibault, puis la spec, détaillent le *comment*.
    (`/feature <sous> --parent <nom> [--in <package>] "<description>"`, `epic.md`, « Lancer une
    sous-session ») ; au cadrage d'une sous-feature,
    Sophie reçoit en entrée le chemin absolu de son extrait (que `pipeline.sh init … --parent` imprime) et
-   ne repart pas de zéro. Le cockpit range chaque sous-feature sous sa parente (« 2/3 ») et montre, sur
-   la parente, l'avancement de toutes. Une sous-feature qui dépend
+   ne repart pas de zéro. `pipeline.sh next` sur la parente montre l'avancement de chaque sous-feature
+   (« 2/3 »). Une sous-feature qui dépend
    d'une autre attend son merge, ou part de sa branche (`base` dans son `pipeline.json`). Sors avec
    `ExitWorktree` `action: "keep"` : le dossier de la feature parente garde le découpage. Ensuite,
    c'est `/epic <nom>` qui suit l'avancement.

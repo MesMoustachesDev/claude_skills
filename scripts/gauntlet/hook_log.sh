@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # hook_log.sh — journal des décisions des hooks (ADR 0019). Sourcé par no-interpreter.sh, les trois
 # *-restrict-writes.sh et les gates pipeline-gate.sh et fix-gate.sh. Lu par scripts/hook_journal.py
-# (learn.py extract, cockpit, evidence).
+# (learn.py extract, rapport, evidence).
 #
 #   hook_log <dossier du run> <hook> <agent> <outil> <cible> <issue> <raison> [étape]
 #     Une ligne JSON ajoutée à <dossier du run>/.gauntlet/hooks.jsonl : at, hook, agent, tool, target

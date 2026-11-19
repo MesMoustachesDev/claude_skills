@@ -20,7 +20,6 @@ Argument : **$ARGUMENTS**
 /feature <sous> --parent <nom> [--in <package>] [description]   sous-feature d'une feature découpée (L)
 /feature <nom> status                          affiche l'état sans rien lancer
 /feature <nom> accept <étape> "<raison>"       accepte un verdict d'agent (dedup, review…) avec une raison
-/feature <nom> cockpit                         publie ou rafraîchit le cockpit de la feature
 /feature <nom> watchdog                        la feature est-elle bloquée ? relance la suite ou prévient Thibault (à la main ; le cron envoie un prompt court)
 ```
 
@@ -60,7 +59,7 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `commit-contracts`, `freeze`, `refreeze`. `pipeline.sh --help` les liste. `loop` sort en code 3
    quand le plafond de la boucle est dépassé (il dépend du gabarit) : plus de relance, Thibault
    tranche. Les hooks des agents continuent d'écrire `stages.<profil>` eux-mêmes.
-4. **Chaque point d'étape se lit dans le cockpit.** Après `gauntlet.sh report <nom> <étape>`, écris
+4. **Chaque point d'étape se pose dans la session.** Après `gauntlet.sh report <nom> <étape>`, écris
    d'abord le résumé « Reprendre le fil » (l'encart en tête du panneau pipeline-view, que Thibault relit
    en revenant d'une autre feature) : un JSON `{goal, decided, open, aside}` dans `recap.json` du dossier
    de la feature (toujours ce nom, réécrit à chaque fois), puis `pipeline.sh recap <nom> <ce fichier>`. `goal` : le but en une ligne ; `decided` : les 5
@@ -68,21 +67,16 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    journal ; `open` : ce qui reste à trancher (3 au plus) ; `aside` : ce qui a été sorti du périmètre et
    où c'est parti (3 au plus). 80 caractères par ligne. Un refus : corrige le JSON, ne passe jamais par
    `set`. Aucune question à Thibault. Ensuite :
-   `pipeline.sh say <nom> "<ce qu'on attend de Thibault, une ligne>" --report <étape>`, puis
-   « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) : le rapport s'affiche dans le cockpit,
-   sous le bandeau. **Un choix se pose toujours en `AskUserQuestion`**, qui se suffit à lui-même (« Une question se
-   suffit à elle-même », Règles de conduite) : Thibault ne répond plus depuis la page (2026-11-05, trop
-   contraignant). Partout où un fichier d'étape ou `~/.claude/pipeline/feature/cockpit.md` dit
-   « Répondre depuis la page », `--ask` ou « question en texte sans `AskUserQuestion` bloquant », c'est
-   l'`AskUserQuestion` qui s'applique ; `say` reste, c'est lui qui dit au watchdog qu'on attend Thibault.
-   Là où un fichier d'étape dit `SendUserFile` du `report.html`, donne à la place le
-   lien du cockpit (`#<clé>`) ; `SendUserFile` ne sert plus qu'aux captures QA, ou si le cockpit
-   échoue. Au retour de sa réponse, `pipeline.sh say <nom> ""`.
+   `pipeline.sh ask <nom> "<ce qu'on attend de Thibault, une ligne>"`, puis la question, dans la
+   session : **un choix se pose toujours en `AskUserQuestion`**, qui se suffit à lui-même (« Une question
+   se suffit à elle-même », Règles de conduite). Les mods pipeline-view et pipeline-band montrent l'étape,
+   ce qui attend Thibault (`ask`) et les documents à lire ; le rapport (`report.html`) reste dans le
+   dossier de la feature, cité par un lien cliquable. `SendUserFile` ne sert qu'aux captures QA. `gate`
+   efface l'attente ; une réponse qui ne pose pas de gate : `pipeline.sh ask <nom> ""`.
 5. Retour en 1.
 
 `/feature <nom> status` : `pipeline.sh status <nom>`, affiché tel quel, plus l'issue et le découpage
 s'il y en a. Rien d'autre.
-`/feature <nom> cockpit` : `~/.claude/pipeline/feature/cockpit.md`.
 `/feature <nom> watchdog` : voir « Watchdog » ci-dessous.
 `/feature help` : `~/.claude/pipeline/feature/help.md`. `/feature init` :
 `~/.claude/pipeline/feature/init.md` (`/feature init roles` : son étape 5d seule). Un symptôme déjà vu (gate qui lit 0 test, mutation lente, hook
@@ -101,13 +95,13 @@ Tous deux lisent le même verdict, déterministe : `pipeline.sh watchdog <nom>`.
 |---|---|---|
 | `working` | un hook joue un gate, ou un sous-agent de ce worktree a écrit depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
 | `idle` | calme depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
-| `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (agent fini sans suite, gate rejoué que personne n'a lu) | **reprends la boucle** (`pipeline.sh next`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Une ligne au cockpit (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
-| `waiting_thibault` | `cockpit.waiting` posé, une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` (plus de `watchdog.minutes`) → `PushNotification` d'une ligne : ce qu'on attend de lui (le texte de `cockpit.waiting`) et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
+| `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (agent fini sans suite, gate rejoué que personne n'a lu) | **reprends la boucle** (`pipeline.sh next`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Une ligne dans la session (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
+| `waiting_thibault` | `waiting` posé (`pipeline.sh ask`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` (plus de `watchdog.minutes`) → `PushNotification` d'une ligne : ce qu'on attend de lui (le texte de `waiting`) et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
 | `done` | pipeline terminé | `CronDelete` de `watchdog_cron` |
 
 Pour que le verdict soit juste : **un tour qui finit sur une question à Thibault pose toujours
-`pipeline.sh say`** (cadrage en discussion compris : « cadrage : à toi de répondre ») et le vide à sa
-réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
+`pipeline.sh ask`** (cadrage en discussion compris : « cadrage : à toi de répondre ») ; `gate` ou
+`ask <nom> ""` l'efface à sa réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
 
 ---
 
@@ -161,7 +155,6 @@ en S ou en M. Détail en « Gabarits ».
 
 | État (écritures) | `~/.claude/scripts/pipeline.sh` — jamais d'édition à la main de `pipeline.json` |
 | Étapes | `~/.claude/pipeline/feature/steps/` — une étape à la fois, celle que donne `pipeline.sh next` |
-| Cockpit | `~/.claude/pipeline/feature/cockpit.md` — une page par feature (surveillée par ta seule session) + l'accueil commun |
 
 **Gabarit** (S / M / L, choisi au cadrage, dans `pipeline.json → size`) : il allège le jugement
 (critique, dedup, mutation, QA), jamais la preuve (gates d'intégrité) ni la propriété du code (les six
@@ -247,7 +240,7 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   qu'il écrit). Le rapport d'un agent veut dire : `next --after` (ci-dessous), puis l'étape suivante,
   dans le même tour, même s'il ajoute « may notify more than once ». Rien qui tourne et aucune question
   posée : tu n'as pas le droit de t'arrêter ; vérifie l'état (`git diff`, `pipeline.sh next`, rejoue le
-  gate) et lance la suite. Un tour qui finit sur une question pose `pipeline.sh say` avant. Le watchdog
+  gate) et lance la suite. Un tour qui finit sur une question pose `pipeline.sh ask` avant. Le watchdog
   (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas cette règle.
 - **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
   vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
@@ -285,8 +278,8 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
     prévue ou la question. Pas de « il semble y avoir un souci ».
   - **Avant d'envoyer** : en ne lisant que ta première et ta dernière ligne, sait-il ce qui vient de se
     passer et ce qu'il doit faire ? Sinon, réécris-les.
-- **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>` puis `SendUserFile`
-  `display: render`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
+- **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>`, cité par un lien
+  cliquable vers `report.html`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
   Les points imprévus aussi : le dev décide mieux avec les séquences et le code sous les yeux.
 - **L'architecture appartient au dev, et elle est dans son code.** Les fichiers de `contracts.files`
   (à `contracts.sha`) sont la référence : aucun agent ne change une signature, un découpage ou une

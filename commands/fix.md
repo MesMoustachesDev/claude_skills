@@ -55,7 +55,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 | Learn (récurrences → règles) | `~/.claude/pipeline/learn.md` · `~/.claude/scripts/learn.py` |
 | État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
 | Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` |
-| Cockpit | `~/.claude/pipeline/fix/cockpit.md` — une page par fix (surveillée par ta seule session) + sa carte dans l'Accueil. Les choix de Thibault (plan, test, écart, captures…) se posent toujours en `AskUserQuestion`, qui se suffit à lui-même (Règles de conduite) : il ne répond plus depuis la page (2026-11-05, trop contraignant). Là où `cockpit.md` dit « Répondre depuis la page » ou `--ask`, c'est l'`AskUserQuestion` qui s'applique |
+| Étape courante, attente | `python3 ~/.claude/scripts/fix/steps.py next <nom>` (étape) · `ask <nom> "<question>"` (ce qu'on attend de Thibault). Les mods pipeline-view et pipeline-band les montrent. Les choix de Thibault (plan, test, écart, captures…) se posent toujours en `AskUserQuestion`, dans la session, qui se suffit à lui-même (Règles de conduite) |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|
@@ -115,11 +115,9 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
     "arbitrations": [], "agents": {}, "accepted": [], "issue": null,
     "graphify": "<ok|stale|absent|failed>", "graphify_graph": "<valeur de graph= ou null>" }
   ```
-- **Cockpit** : crée la page du fix (`~/.claude/pipeline/fix/cockpit.md`, « Créer la page ») ; en
-  reprise, réarme-la pour cette session (même section, point 4). Puis « Rafraîchir » avec `say <nom>
-  ""` : la carte apparaît dans l'Accueil. `say` ne porte jamais un statut (« Bastien reproduit le bug ») : le
-  watchdog lit tout texte de `say` comme une question qui attend le dev (`waiting_thibault`) et ne verrait
-  plus un fix bloqué (cas réel, premier /fix Kotlin).
+- **Attente** : `ask` ne porte jamais un statut (« Bastien reproduit le bug ») : le watchdog lit tout
+  texte de `ask` comme une question qui attend le dev (`waiting_thibault`) et ne verrait plus un fix
+  bloqué (cas réel, premier /fix Kotlin).
 - **Watchdog** (création comme reprise, une fois par session) :
   1. `CronCreate` récurrent, `cron` = toutes les 1,5 × `watchdog.minutes` de
      `.claude/rules/feature_pipeline.md`, arrondi à un diviseur de 60 (défaut 20 → 30 :
@@ -161,10 +159,9 @@ phase `arbitrate` ; Règles de conduite, « Au rapport d'un agent »), puis :
 - `stages.red` `PASSED` → point d'étape.
 
 **Point d'étape — diagnostic, test rouge et plan de correction.** D'abord
-`fix_gauntlet.sh report <nom> repro`, puis « Rafraîchir » (`~/.claude/pipeline/fix/cockpit.md`) avec
-`say <nom> "Valide le diagnostic, le test rouge et le plan" --report repro` : la page du fix montre le
-rapport (cause, plan avec son schéma, diff du test), la cause racine, le plan et le diagnostic. Donne le
-lien de la page ; `SendUserFile` du `report.html` seulement si le cockpit échoue. Puis, court :
+`fix_gauntlet.sh report <nom> repro` (cause, plan avec son schéma, diff du test), cité par un lien
+cliquable vers `report.html`, puis `python3 ~/.claude/scripts/fix/steps.py ask <nom> "Valide le diagnostic, le test rouge et le plan"` :
+l'encart « à lire » de pipeline-view montre le diagnostic et le plan. Puis, court :
 - Cause racine (`root_cause` + `root_cause_location`) et la preuve, en 3 lignes tirées de `diagnosis.md`.
 - Pourquoi les tests l'ont raté : `miss_reason` + la phrase du diagnostic.
 - Le test : `git diff <base_sha> -- <test_files>` (le diff entier s'il fait moins de 60 lignes, sinon les
@@ -211,7 +208,7 @@ Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles pr
 
 Au rapport de Fanny, dans le même tour : `fix_gauntlet.sh after green <nom>`, puis :
 - **Écart au plan** dans le rapport → **point imprévu** : `fix_gauntlet.sh report <nom> repro`,
-  « Rafraîchir » avec `say <nom> "Écart au plan de Fanny à trancher" --report repro`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
+  `python3 ~/.claude/scripts/fix/steps.py ask <nom> "Écart au plan de Fanny à trancher"`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
   ajoute `{at, files, reason}` à `fix.json → plan_deviations` (Victor le lit ; `repro.json` reste
   gelé) et `SendMessage` à Fanny « écart accepté, continue ». Refusé → `SendMessage` avec la
   consigne du dev.
@@ -293,10 +290,10 @@ crées ni n'éteins le modèle toi-même.
 `shots/green/` contient alors les captures après correction. Regarde-les
 (`Read`) avant de les montrer — une capture qui ne montre pas l'état attendu est un défaut, pas un
 succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction vs plan), puis
-`SendUserFile` du rapport et des paires avant/après, un appel, `display: render`, légende « avant | après ».
+lien cliquable vers `report.html`, et `SendUserFile` des paires avant/après, un appel, `display: render`, légende « avant | après ».
 `AskUserQuestion` : « Valider » / « Défaut visible : … » (→ `SendMessage` à Fanny, puis 2→3→4 ;
-`loops.ui` max 2). Validation → `human_gates.ui`. Avant la question : « Rafraîchir » avec `say <nom>
-"Regarde les captures avant / après" --report ui`.
+`loops.ui` max 2). Validation → `human_gates.ui`. Avant la question : `python3 ~/.claude/scripts/fix/steps.py ask <nom>
+"Regarde les captures avant / après"`.
 
 ### 5. Evidence, commits
 
@@ -359,12 +356,7 @@ mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge
 dossier du fix, non suivi, est archivé : d'où `--force` ; le simulateur du fix part avec) :
 `~/.claude/scripts/sim.sh remove fix-<nom>; git worktree remove --force .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
 
-**Fin : la page du fix.** Après `stages.evidence = PASSED` : « Rafraîchir » avec `say <nom> ""` — la
-carte de l'Accueil passe dans « Terminées », avec la cause racine. Puis un seul `AskUserQuestion` :
-« Supprimer la page de ce fix ? » — « Garder » / « Supprimer ». **Supprimer** → `Artifact` `delete` de
-`fix.json → cockpit.url` (l'outil lui demande confirmation ; c'est définitif), `fix_cockpit.py
-page-deleted <nom>`, puis `push` et le seul `batch` de `hub_writes` sur l'Accueil : la carte reste, marquée
-« Page supprimée ». Ne supprime jamais la page sans cette question, ni l'Accueil, jamais.
+**Fin.** Après `stages.evidence = PASSED` : `python3 ~/.claude/scripts/fix/steps.py ask <nom> ""`.
 
 Termine par 6 lignes : cause, pourquoi raté, test, correction, learn (règles ajoutées ou « aucune
 récurrence »), chemin de l'evidence. Si la cause
@@ -383,11 +375,11 @@ que `/feature` (ADR 0005), lu par la veille hors session (`watchdog.sh scan`, no
 | `working` | un hook joue un gate, ou un sous-agent de ce worktree a écrit depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
 | `idle` | calme depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
 | `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (gate green passé et Victor jamais lancé, gate rejoué que personne n'a lu) | **reprends à l'étape qu'il nomme** (la première non `PASSED` de `fix.json`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Dis-le en une ligne (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
-| `waiting_thibault` | `cockpit.waiting` posé (`say`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` → `PushNotification` d'une ligne : ce qu'on attend de lui et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
+| `waiting_thibault` | `waiting` posé (`ask`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` → `PushNotification` d'une ligne : ce qu'on attend de lui et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
 | `done` | `stages.evidence` `PASSED` | `CronDelete` de `watchdog_cron` |
 
-Pour que le verdict soit juste : **toute question au dev passe d'abord par « Rafraîchir » avec `say <nom>
-"<ce qu'on attend de lui>"`**, vidé (`say <nom> ""`) à sa réponse. Sans ça, le watchdog prend son silence
+Pour que le verdict soit juste : **toute question au dev passe d'abord par `python3 ~/.claude/scripts/fix/steps.py ask <nom>
+"<ce qu'on attend de lui>"`**, vidé (`ask <nom> ""`) à sa réponse. Sans ça, le watchdog prend son silence
 pour un blocage et relance.
 
 ---
@@ -463,7 +455,7 @@ pour un blocage et relance.
   `python3 ~/.claude/scripts/rule_add.py ~/.claude/pipeline/answers.md "<ligne>" --after "<dernière puce de la
   section>"`, qui l'insère et la commite aussitôt.
 - **Le rapport d'abord.** Tout point d'étape, prévu ou hors plan, commence par `fix_gauntlet.sh report
-  <nom> <étape>` et `SendUserFile` `display: render`. Régénéré à chaque fois, jamais réutilisé.
+  <nom> <étape>`, cité par un lien cliquable vers `report.html`. Régénéré à chaque fois, jamais réutilisé.
 - **Le plan appartient au dev.** Couche, approche et fichiers de la correction sont validés avant
   le gel. Aucun agent ne s'en écarte sans que le dev l'ait accepté.
 - **`status`** : tableau de `fix.json` (phase, étapes, tentatives, boucles, arbitrages, gel, issue) et rien d'autre.

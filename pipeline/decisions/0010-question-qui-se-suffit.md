@@ -1,9 +1,9 @@
 # 0010 — Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même
 
-Statut : acceptée (2026-11-05)
+Statut : acceptée (2026-11-05), amendée le 2026-11-19 (cockpit retiré)
 Où elle vit : `commands/feature.md`, `commands/fix.md`, `commands/epic.md`, `commands/reviewPR.md`
 (« Une question se suffit à elle-même ») · `pipeline/suggestions.md` (« Ce que l'orchestrateur montre
-au dev ») · `pipeline/{feature,fix,review}/cockpit.md` (« Répondre depuis la page », retirée)
+au dev »)
 
 ## Contexte
 
@@ -19,7 +19,9 @@ s'en sert plus : trop contraignant.
 
 - Tout choix demandé à Thibault se pose en `AskUserQuestion`, dans `/feature`, `/fix`, `/epic` et
   `/reviewPR`. « Répondre depuis la page » et `--ask` sont retirés ; `say` reste (il dit au watchdog
-  qu'on attend Thibault).
+  qu'on attend Thibault). Amendement (2026-11-19) : le cockpit est retiré en entier (0004) ; `say`
+  devient `ask` (0005), et le tri de `/reviewPR` se pose aussi en `AskUserQuestion`, enregistré par
+  `review.sh triage`.
 - La question contient tout ce qu'il faut pour trancher : de quoi on parle (`fichier:ligne`, ce que
   fait le code ou ce que dit la spec), ce qu'on demande, et pour chaque option ce qu'elle change.
 - Jamais un identifiant seul (`S1`, `K3`, « le point 2 ») sans ce qu'il désigne. Les suggestions :
@@ -31,10 +33,9 @@ C'est une consigne d'orchestrateur : aucun script ne relit les questions.
 ## Conséquences
 
 - Des questions plus longues, une question par lot de 4 suggestions au plus.
-- Un `AskUserQuestion` bloque : une réponse ne peut plus venir de la page du cockpit. Le cockpit
-  reste une page de lecture (rapports, avancement).
+- Un `AskUserQuestion` bloque : une réponse ne peut plus venir d'une page.
 
 ## Hors champ
 
 - Les questions ouvertes (une discussion, « comment tu le ferais ? ») restent du texte dans la session.
-- Le contenu des rapports et des pages du cockpit ne change pas.
+- Le contenu des rapports ne change pas.

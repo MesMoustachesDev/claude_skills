@@ -36,9 +36,8 @@ contrats que tu écris toi-même, spec, tests avec leurs séquences réelles, su
 guidée du code), chacun avec un rapport HTML ; le gabarit S / M / L choisi au cadrage, qui allège les
 étapes de jugement d'une petite feature et impose le découpage d'une grosse ; que rien
 n'est pushé sans `create_mr`, et que `~/.claude/scripts/gauntlet.sh list` détaille chaque check.
-Ajoute une ligne : chaque feature a sa page de cockpit (l'état, ce qu'on attend de lui, ses décisions,
-ses contrats éditables, « Prévenir Claude »), et l'accueil https://claude.ai/artifact/TiXbjaUnp6yVay81XBKQ8R
-les liste toutes.
+Ajoute une ligne : les mods pipeline-view (panneau) et pipeline-band (bandeau) montrent l'étape, ce
+qu'on attend de lui et les documents à lire.
 Ajoute enfin trois lignes : au lancement, le worktree reçoit les fichiers non versionnés du checkout
 principal (`.env`, configs Firebase… jamais un keystore) et une question fixe l'appareil QA (cloner un
 neuf, cloner et préparer, réutiliser) ; les fichiers générés (`generated.exclude`) ne sont jugés par

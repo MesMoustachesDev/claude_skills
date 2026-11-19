@@ -172,7 +172,7 @@ export type PendingView = {
   key: string
   /** « 1 — Scénarios, critique, point d'étape « scénarios » ». */
   title: string
-  /** cockpit.waiting : ce que l'orchestrateur attend de Thibault, vide sinon. */
+  /** `waiting` (posé par `ask`) : ce que l'orchestrateur attend de Thibault, vide sinon. */
   waiting: string
   docs: PendingDoc[]
 }
@@ -199,7 +199,7 @@ export type RecapView = {
   owner: string
   /** « 7/15 » : étapes passées sur étapes non sautées. */
   progress: string
-  /** cockpit.waiting, vide sinon. */
+  /** `waiting`, vide sinon. */
   waiting: string
   /** Ce qui a bougé depuis le dernier passage de Thibault. */
   since: string[]

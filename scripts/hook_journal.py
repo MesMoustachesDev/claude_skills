@@ -2,7 +2,7 @@
 """hook_journal.py — lit le journal des décisions des hooks d'un run (ADR 0019).
 
 Écrit par scripts/gauntlet/hook_log.sh dans <run>/.gauntlet/hooks.jsonl (<run> = .claude/features/<nom> ou
-.claude/fixes/<nom>) ; lu ici, et seulement ici, par learn.py extract, le cockpit (report.py) et l'evidence.
+.claude/fixes/<nom>) ; lu ici, et seulement ici, par learn.py extract, le rapport (report.py) et l'evidence.
 
     hook_journal.py summary <dossier du run>     Markdown pour l'evidence ; rien si le journal est vide
 

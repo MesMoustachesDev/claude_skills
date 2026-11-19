@@ -26,8 +26,8 @@ Argument : **$ARGUMENTS**
 **Un epic est une feature parente en L.** Son état est celui de `/feature` : le worktree
 `.claude/worktrees/feature-<nom>/`, `.claude/features/<nom>/pipeline.json` avec `size: L`, `split`
 (les sous-features), `issue` (le ticket de l'epic), `discussion.md`, `cadrage.md`,
-`split/<sous>.md`. Rien de neuf à inventer : `pipeline.sh next` sait déjà afficher le découpage, le
-cockpit range les sous-features sous leur parente (« 2/3 »), `pipeline.sh init --parent` relie une
+`split/<sous>.md`. Rien de neuf à inventer : `pipeline.sh next` sait déjà afficher le découpage et
+l'avancement des sous-features (« 2/3 »), `pipeline.sh init --parent` relie une
 sous-feature à son epic. `/epic` ajoute les tickets, le statut réel et la prochaine étape.
 
 Chaque entrée de `split` : `{name, package, mode, size, depends_on, deliverable, tool, session,
@@ -45,7 +45,6 @@ status, ticket, branch, mr}` — `tool` ∈ `feature | fix` (le pipeline qui por
 | Préconditions, worktree, graphe | `~/.claude/pipeline/feature/steps/00_preconditions.md` |
 | Discussion et cadrage | `~/.claude/pipeline/feature/steps/0b_cadrage.md` |
 | Gabarits | `~/.claude/pipeline/feature/gabarits.md` |
-| Cockpit | `~/.claude/pipeline/feature/cockpit.md` |
 | État | `~/.claude/scripts/pipeline.sh` (`next`, `status`, `set`, `size`, `gate`, `pass`) |
 
 ## `/epic help`
@@ -79,7 +78,7 @@ vu et validé le contenu exact.
 ## `/epic <nom> "<description>"` — nouvel epic
 
 1. **Préconditions** : `00_preconditions.md` en entier (worktree `feature-<nom>`, graphe, doctor,
-   `pipeline.sh init <nom> …`, page du cockpit), avec deux différences : `pipeline.sh size <nom> L
+   `pipeline.sh init <nom> …`), avec deux différences : `pipeline.sh size <nom> L
    "epic"` juste après `init`, et la partie A d'`issue.md` porte sur le ticket **de l'epic**.
    Déjà un `pipeline.json` pour ce nom → c'est une reprise (plus bas).
 2. **Discussion, puis cadrage** : `0b_cadrage.md`, points 1 à 4 tels quels — **la discussion du tac au
@@ -153,9 +152,6 @@ Un `pipeline.json` en `M` ou `S` → ce n'est pas un epic : dis-le.
    revient : `/feature … --parent` s'en charge (préconditions, `pipeline.sh init`). Un `/fix` part de
    la base du projet.
 4. Toutes `mergé` ou `abandonné` → propose de clore l'epic (`sync`, dernier point).
-
-Mets à jour la carte du cockpit de l'epic (« Rafraîchir », `cockpit.md`) : elle montre déjà
-l'avancement des sous-features.
 
 ## Le plan de l'epic
 
@@ -241,7 +237,7 @@ Les `pipeline.json` de `size: L` avec un `split`, dans le repo et ses worktrees 
 ## Règles de conduite
 
 - **Une écriture dans le tracker = contenu exact montré + validation**, en lot (`tracker.md`, Règles).
-  La validation se demande en `AskUserQuestion`, pas depuis la page du cockpit (2026-11-05).
+  La validation se demande en `AskUserQuestion`.
 - **Une question se suffit à elle-même.** Thibault répond souvent depuis Remote Control, où il ne voit
   que l'`AskUserQuestion`, pas le texte au-dessus. Le texte de la question dit de quoi on parle (la
   sous-feature par son nom et ce qu'elle livre, l'écriture exacte dans le tracker, la dépendance en

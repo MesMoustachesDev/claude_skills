@@ -1,6 +1,6 @@
 ### 1e. Point d'étape « contrats » : Thibault les écrit
 
-`gauntlet.sh report <nom> contracts` puis `SendUserFile` du `report.html` (`display: render`) : les
+`gauntlet.sh report <nom> contracts`, cité par un lien cliquable vers `report.html` : les
 fichiers de `contracts.files`, les `DÉCISION (Thibault)` encore ouvertes avec `fichier:ligne`, les
 déclarations qui existent déjà ailleurs (Denis), les scénarios validés de §4 pour rappel : chaque
 contrat se lit en regard du scénario qui l'a fait naître.
@@ -14,10 +14,9 @@ cadrage avant qu'il édite.
 du rapport d'Arthur : ce sont ses ajouts, pas des décisions de Thibault. Chaque ligne est
 contestable ; une ligne qu'il ne comprend pas s'explique avant qu'il édite.
 
-**Cockpit d'abord.** `pipeline.sh say <nom> "Écris tes contrats : <n> fichiers, <n> DÉCISION"`, puis
-« Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) et donne-lui le lien : il y lit chaque fichier
-en diff (brouillon d'Arthur → état actuel), avec les `DÉCISION` surlignées, et peut éditer et
-enregistrer là, depuis son téléphone aussi. L'IDE reste ouvert pour les éditions lourdes : il choisit.
+**L'attente d'abord.** `pipeline.sh ask <nom> "Écris tes contrats : <n> fichiers, <n> DÉCISION"` : l'encart
+« à lire » de pipeline-view montre chaque fichier en diff (avant la feature → état actuel). Il édite dans
+l'IDE.
 
 **Ouvre les fichiers pour lui.** Si l'outil `open_in_editor` est disponible (`mcp__ccd_host__open_in_editor`,
 à charger par `ToolSearch` s'il est différé), ouvre chaque fichier de `contracts.files`, en commençant
@@ -33,9 +32,7 @@ stubbées, imports, README) sans toucher à mes signatures » / « J'ai une ques
 
 - **Question** → réponds avec l'extrait de code (`fichier:ligne`) et ce qui existe ailleurs dans le
   repo, puis repose la même question. Une question n'est jamais un « j'ai fini ».
-- **« J'ai fini »** → d'abord « Rapatrier » (`cockpit.md`) : ses éditions du cockpit sont écrites dans
-  les fichiers ; un conflit (fichier modifié dans l'IDE entre-temps) se montre avec les deux versions
-  et il choisit. Puis `grep -rn "DÉCISION (Thibault)" <package>/lib`. Il en reste : liste-les et pose
+- **« J'ai fini »** → `grep -rn "DÉCISION (Thibault)" <package>/lib`. Il en reste : liste-les et pose
   une question par commentaire (« garder la proposition d'Arthur (Recommandé) » / « l'alternative » /
   « je l'édite »), par paquets de 4. Les « garder » / « alternative » et le mécanique demandé sont
   appliqués par Arthur en **mode application** (« applique ces choix, efface ces commentaires,
@@ -70,7 +67,7 @@ Thibault édite, puis tu joues `gauntlet.sh contracts <nom>` (avant l'étape 2) 
 `pipeline.sh commit-contracts <nom> reedit "<quoi>" <fichiers qu'il a édités>` : commit
 `feat(<nom>): contracts (by Thibault) — <quoi>` des **seuls fichiers qu'il a édités** (jamais `-A` :
 le travail en cours d'un agent ne doit pas y entrer), `contracts.sha` et `contracts.files` mis à jour.
-Édités dans le cockpit : `cockpit.md`, « Rapatrier », avant le gauntlet. Si un test gelé dépend du contrat changé :
+Si un test gelé dépend du contrat changé :
 re-gel, cause `contrat`.
 
 **Gabarit S :** identique — c'est le moment où la feature devient la sienne. **En L :** n'a pas lieu.

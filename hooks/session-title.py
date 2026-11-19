@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 STATE = Path.home() / '.claude' / 'state' / 'session-titles'
-SUBCOMMANDS = {'status', 'cockpit', 'watchdog', 'accept'}
+SUBCOMMANDS = {'status', 'watchdog', 'accept'}
 OPTIONS_WITH_VALUE = {'--in', '--parent'}
 
 

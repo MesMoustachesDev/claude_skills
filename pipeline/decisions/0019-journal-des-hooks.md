@@ -5,7 +5,7 @@ Où elle vit : `scripts/gauntlet/hook_log.sh` (`hook_log`, `hook_run_dir` : la s
 `hooks/no-interpreter.sh`, `pipeline-restrict-writes.sh`, `fix-restrict-writes.sh`, `review-restrict-writes.sh`,
 `pipeline-gate.sh`, `fix-gate.sh` · `scripts/hook_journal.py` (la seule lecture) · `scripts/learn.py extract`
 (signaux `hook_bypass`, `hook_denied_repeat`, `gate_failed`) et `pipeline/learn.md` · `scripts/report/report.py`
-(page Gauntlet du cockpit) · evidence de /feature (`pipeline/feature/steps/9_evidence.md`) et de /fix
+(section Gauntlet du rapport) · evidence de /feature (`pipeline/feature/steps/9_evidence.md`) et de /fix
 (`commands/fix.md`) · `scripts/gauntlet/tests/test_hook_journal.sh`, `test_realign.sh`
 
 ## Contexte
@@ -32,7 +32,7 @@ Idée reprise de crewAI : un événement à chaque passage dans un hook, avec so
 - Une seule lecture, `scripts/hook_journal.py` : refus par agent et par étape (gates compris), contournements
   (un refus sur un fichier, puis le même fichier écrit par un autre outil, ou un fichier du même nom écrit
   ailleurs), refus répétés (même agent, même zone, au moins deux fois). `learn.py extract` en tire des
-  signaux qui suivent le chemin des autres (`record`, `candidates`) ; le cockpit et l'evidence en montrent le
+  signaux qui suivent le chemin des autres (`record`, `candidates`) ; le rapport et l'evidence en montrent le
   tableau.
 
 ## Conséquences

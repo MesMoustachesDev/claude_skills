@@ -5,7 +5,7 @@
 #   sous-agent tourne ou quand on attend le dev, et watchdog.sh doit suivre le fix hors session.
 source "$(dirname "$0")/fixture.sh"
 FG="$TESTS_DIR/../../fix_gauntlet.sh"; WD="$TESTS_DIR/../../watchdog.sh"
-CK="$TESTS_DIR/../../fix_cockpit.py"
+CK="$TESTS_DIR/../../fix/steps.py"
 export HOME="$TMP_ROOT/home" NOTIFY_DRY=1; mkdir -p "$HOME/.claude/activity"
 R="$TMP_ROOT/repo"; mkdir -p "$R/.claude/fixes/crash/.gauntlet"; git -C "$R" init -q -b develop
 echo x > "$R/a"; git -C "$R" add -A && git -C "$R" -c user.email=t@t -c user.name=t commit -q -m init
@@ -15,7 +15,7 @@ old() { touch -t "$(date -v-"$1"M '+%Y%m%d%H%M.%S')" "${@:2}"; }   # mtime à -N
 run_w() { OUT="$(cd "$R" && bash "$FG" watchdog crash "$@" 2>&1)"; RC=$?; }
 cat > "$S" <<'EOF'
 {"fix":"crash","stages":{"red":{"status":"PASSED"},"green":{"status":"PASSED","at":"2026-11-05T14:02:00Z"}},
- "human_gates":{"repro":{"at":"2026-11-05T13:40:00Z"}},"cockpit":{"waiting":null}}
+ "human_gates":{"repro":{"at":"2026-11-05T13:40:00Z"}},"waiting":null}
 EOF
 echo '{"ok":true}' > "$D/.gauntlet/last_green.json"
 old 90 "$S" "$D/.gauntlet/last_green.json"
@@ -38,12 +38,17 @@ expect_out "verdict   : working" "Victor tourne : working"
 rm -rf "$HOME/.claude/projects/x" "$HOME/.claude/activity/$SID.json"
 
 echo "question au dev : waiting_thibault"
-(cd "$R" && python3 "$CK" say crash "Valide le diagnostic, le test rouge et le plan" >/dev/null)
-expect_file_has "$S" '"at"' "say note depuis quand on attend"
+(cd "$R" && python3 "$CK" ask crash "Valide le diagnostic, le test rouge et le plan" >/dev/null)
+expect_file_has "$S" '"waiting_at"' "ask note depuis quand on attend"
 run_w
 expect_out "verdict   : waiting_thibault" "question en attente : pas un blocage"
 expect_out "Valide le diagnostic" "ce qu'on attend du dev est repris"
-(cd "$R" && python3 "$CK" say crash "" >/dev/null); old 90 "$S"
+(cd "$R" && python3 "$CK" ask crash "" >/dev/null); old 90 "$S"
+
+echo "next --json : l'étape et l'attente, pour le mod pipeline-view"
+OUT="$(cd "$R" && python3 "$CK" next crash --json 2>&1)"
+expect_out '"key": "review"' "étape courante : la revue"
+expect_out '"waiting": null' "question effacée"
 
 echo "veille hors session : watchdog.sh suit le fix"
 mkdir -p "$HOME/.claude/state"; printf '%s\t%s\n' "/nulle/part" "ancienne_feature" > "$HOME/.claude/state/feature_watchdog.tsv"

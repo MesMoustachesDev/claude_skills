@@ -18,7 +18,7 @@ pipeline "$R" demo "{\"feature\":\"demo\",\"mode\":\"create\",\"size\":\"M\",
              \"spec\":{\"status\":\"PASSED\"},\"contracts\":{\"status\":\"PASSED\",\"at\":\"2026-11-04T18:34:06Z\"},
              \"red\":{\"status\":\"PASSED\",\"at\":\"$AT11H\"}},
   \"human_gates\":{\"contracts\":{\"at\":\"2026-11-04T17:00:00Z\"},\"spec\":{\"at\":\"2026-11-04T18:21:47Z\"}},
-  \"cockpit\":{\"waiting\":null,\"at\":\"$AT11H\"}}"
+  \"waiting\":null,\"waiting_at\":null}"
 mkdir -p "$F/.gauntlet"; echo '{"ok":true}' > "$F/.gauntlet/last_red.json"
 old 660 "$F/pipeline.json" "$F/.gauntlet/last_red.json"
 
@@ -46,16 +46,19 @@ expect_out "verdict   : working" "sous-agent actif : working"
 rm -rf "$HOME/.claude/projects/x" "$HOME/.claude/activity/$SID.json"
 
 echo "question à Thibault : waiting_thibault, alerte après le délai"
-run_p say demo "Valide les tests (3b)" --report tests
+run_p ask demo "Valide les tests (3b)"
 old 660 "$F/pipeline.json"
 python3 - "$F/pipeline.json" "$AT11H" <<'PY'
-import json, sys; p = json.load(open(sys.argv[1])); p["cockpit"]["at"] = sys.argv[2]; json.dump(p, open(sys.argv[1], "w"))
+import json, sys; p = json.load(open(sys.argv[1])); p["waiting_at"] = sys.argv[2]; json.dump(p, open(sys.argv[1], "w"))
 PY
 old 660 "$F/pipeline.json"
 run_p watchdog demo --json
 expect_out '"verdict": "waiting_thibault"' "question en attente : waiting_thibault"
 expect_out '"alert": true' "attente de plus de 20 min : alerte"
 expect_out "Valide les tests" "ce qu'on attend de lui est repris"
+run_p gate demo tests
+run_p watchdog demo --json
+expect_no_out "waiting_thibault" "gate posé : la question n'attend plus"
 
 echo "next --after : au rapport d'un agent, attend son hook (cas réel : import_cancel_sync, tours finis sur « j'attends la notification »)"
 # Le hook démarre 3 s après le rapport, joue 2 s, écrit stages.clean = PASSED.

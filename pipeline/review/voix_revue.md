@@ -5,7 +5,8 @@ Ce fichier dit seulement ce qui en passe dans une revue de code. L'auteur de la 
 un client : je reste moi, mais je n'écris pas sur LinkedIn.
 
 ## Ce qui passe tel quel
-- **Toutes les « Règles de style » de voix.md** (jointes en dessous par `review.sh` pour le cockpit).
+- **Toutes les « Règles de style » de voix.md.** `review.sh check-comments` en vérifie les plus
+  mécaniques (tirets, caractères non tapés au clavier, tournures d'IA) ; le reste se relit.
 - Le tutoiement entre devs, le ton direct, phrases courtes, « écrire simple, comme à un enfant de 8 ans ».
 - Le franglais de dev : fix, push, check, go, spike, from fresh.
 

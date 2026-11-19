@@ -1,4 +1,4 @@
-### 5. Fusion, briefing, cockpit
+### 5. Fusion, briefing
 
 **1. Fusion.** `review.sh findings <slug>` : il fusionne les trois fichiers en `findings.json` (F1, F2…,
 critiques en tête) et signale les remarques incomplètes. Les doublons évidents (même fichier, lignes
@@ -49,7 +49,5 @@ remarque** — du contexte. Il comprend :
 
 Puis `review.sh pass <slug> briefing`.
 
-**3. Le cockpit.** `review.sh say <slug> "Trie les <n> remarques : commenter ou écarter, et retouche
-le texte si besoin"`, puis « Rafraîchir » (`~/.claude/pipeline/review/cockpit.md`). Dans la session :
-le lien du cockpit (`#<clé>`), les 7 points du briefing résumés en 8 lignes maximum, et l'annonce du
-tri.
+**3. Dans la session.** Les 7 points du briefing résumés en 8 lignes maximum, le chemin de
+`briefing.md` pour le détail, puis l'annonce du tri : « <n> remarques à trier, critiques d'abord ».

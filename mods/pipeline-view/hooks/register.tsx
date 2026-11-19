@@ -35,7 +35,7 @@ import {
 import { type Scenario, type Step, cadrageGherkin, parseScenarios, specGherkin } from './gherkin'
 import { ago, discussionFallback, parseRecap, progress, sinceLines } from './recap'
 import { isThibaultPrompt, parseSeen, seenFile } from './seen'
-import { contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
+import { contractFiles, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from './pending'
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from './evidence'
 import { activityOf, busyIn, describeActivity, parseActivity, pipelineTarget } from './activity'
 import { AREA_LABEL, AREA_ORDER, attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTranscript } from './attribution'
@@ -410,21 +410,26 @@ const refreshThumbs = async ($: EngineInterface): Promise<void> => {
   }
 }
 
-// L'étape d'une feature ne change qu'avec pipeline.json : `pipeline.sh next --json` n'est relancé qu'alors.
+// L'étape ne change qu'avec pipeline.json (fix.json et repro.json pour un fix) : le script n'est relancé qu'alors.
 let stepCache = { text: '', step: { key: '', title: '' } }
 
-/** L'étape courante d'une feature, d'après `pipeline.sh next <nom> --json` (sans --after : lecture seule). */
-const featureStep = async ($: EngineInterface, name: string, text: string): Promise<{ key: string; title: string }> => {
+/** `pipeline.sh next <nom> --json` (feature) ou `fix/steps.py next <nom> --json` (fix) : lecture seule. */
+const STEP_COMMAND = {
+  feature: 'exec bash "$HOME/.claude/scripts/pipeline.sh" next "$1" --json',
+  fix: 'exec python3 "$HOME/.claude/scripts/fix/steps.py" next "$1" --json',
+}
+
+/** L'étape courante, d'après le script d'état du pipeline. */
+const currentStep = async ($: EngineInterface, kind: 'feature' | 'fix', name: string, text: string): Promise<{ key: string; title: string }> => {
   if (text === stepCache.text) return stepCache.step
-  const run = await $.process
-    .run(['/bin/sh', '-c', 'exec bash "$HOME/.claude/scripts/pipeline.sh" next "$1" --json', 'sh', name], { cwd: root, timeoutMs: 15000 })
-    .catch(() => undefined)
+  const run = await $.process.run(['/bin/sh', '-c', STEP_COMMAND[kind], 'sh', name], { cwd: root, timeoutMs: 15000 }).catch(() => undefined)
   let step = { key: '', title: '' }
   try {
     const n = JSON.parse(run?.stdout ?? '') as { key?: unknown; step?: unknown; title?: unknown }
-    step = { key: typeof n.key === 'string' ? n.key : '', title: `${String(n.step ?? '')} — ${String(n.title ?? '')}` }
+    const key = typeof n.key === 'string' ? n.key : ''
+    step = { key, title: kind === 'feature' ? `${String(n.step ?? '')} — ${String(n.title ?? '')}` : String(n.title ?? '') }
   } catch {
-    // pipeline.sh absent ou en erreur : l'encart montre la spec.
+    // script absent ou en erreur : l'encart montre la spec (feature) ou le diagnostic (fix).
   }
   stepCache = { text, step }
 
@@ -442,10 +447,7 @@ const loadPending = async (
 ): Promise<PendingView | null> => {
   if (!text) return null
   const repro = kind === 'fix' ? await readText($, `${dir}/repro.json`) : ''
-  const step =
-    kind === 'feature'
-      ? await featureStep($, name, text)
-      : fixNextStep(text, /"kind"\s*:\s*"ui"/.test(repro))
+  const step = await currentStep($, kind, name, kind + text + repro)
   const rel = (path: string) => shortPath(path, root)
   const docs: PendingDoc[] = []
   for (const [source, label] of sourcesFor(kind, step.key)) {

@@ -5,7 +5,7 @@ import { attribute, parseNameStatus, parsePorcelain, parseWrites, sessionOfTrans
 import { commonPrefix, latestRun, parseMaestroReport, parseTestReport, shotLabel, testStateOf } from '../hooks/evidence'
 import { cadrageGherkin, specGherkin } from '../hooks/gherkin'
 import { parseState } from '../hooks/model'
-import { MAX_DOC, contractFiles, fixNextStep, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
+import { MAX_DOC, contractFiles, fixPlanMarkdown, sourcesFor, toDoc, waitingOf } from '../hooks/pending'
 import { ago, discussionFallback, parseRecap, progress, sinceLines } from '../hooks/recap'
 import { isThibaultPrompt, parseSeen, seenFile } from '../hooks/seen'
 
@@ -597,7 +597,7 @@ test('la reprise d’un /feature qu’une autre session fait tourner est arrêt�
 // ---------------------------------------------------------------------------
 
 const SPEC_DIR = `${ROOT}/.claude/features/two_factor_login`
-const WAITING = JSON.stringify({ ...JSON.parse(PIPELINE), cockpit: { waiting: 'Valide la spec' } })
+const WAITING = JSON.stringify({ ...JSON.parse(PIPELINE), waiting: 'Valide la spec' })
 const NEXT = JSON.stringify({ key: 'spec', step: '1', title: 'Spec, critique, point d’étape « spec »' })
 
 // `opens` : les commandes `open` lancées ; `open <chemin>` seul échoue, comme pour un .dart sans app par défaut.
@@ -654,19 +654,48 @@ test('à lire : documents par étape, étape d’un fix, plan de correction', ()
   expect(sourcesFor('feature', 'hg.contracts')[0]?.[0]).toBe('@contracts')
   expect(sourcesFor('feature', 'inconnue')).toEqual([['spec.md', 'spec']])
   const fix = (o: object) => JSON.stringify(o)
-  expect(fixNextStep(fix({ stages: {} }), false).key).toBe('red')
-  expect(fixNextStep(fix({ stages: { red: { status: 'PASSED' } } }), false).key).toBe('hg.repro')
-  const reviewed = { stages: { red: { status: 'PASSED' }, green: 'PASSED', review: { status: 'PASSED' } }, human_gates: { repro: { at: 'x' } } }
-  expect(fixNextStep(fix(reviewed), false).key).toBe('evidence')
-  expect(fixNextStep(fix(reviewed), true).key).toBe('hg.ui')
-  expect(fixNextStep('pas du json', false).key).toBe('')
   const plan = fixPlanMarkdown(fix({ fix_plan: { layer: 'data', approach: 'remonter l’erreur', files: ['lib/a.dart'], rejected: 'try/catch dans la vue' } }))
   expect(plan).toBe('**Couche** : data\n\n**Approche** : remonter l’erreur\n\n**Fichiers**\n\n- `lib/a.dart`\n\n**Alternative écartée** : try/catch dans la vue')
   expect(waitingOf(WAITING)).toBe('Valide la spec')
+  expect(waitingOf(fix({ cockpit: { waiting: 'ancienne clé' } }))).toBe('')
   expect(contractFiles(fix({ contracts: { files: ['a.dart', 3] } }))).toEqual(['a.dart'])
   const long = toDoc('spec', 'x/spec.md', 'a'.repeat(MAX_DOC + 10))
   expect([long.format, long.text.length, long.cut]).toEqual(['markdown', MAX_DOC, MAX_DOC + 10])
   expect(toDoc('a.dart', 'lib/a.dart', 'x').language).toBe('dart')
+})
+
+test('à lire : l’étape d’un fix vient de fix/steps.py next --json', async ($, on) => {
+  const dir = `${ROOT}/.claude/fixes/crash`
+  const runs: string[] = []
+  on('command.register', () => ({ value: { command: 'pipeline' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('process.run', (_, e) => {
+    const argv = e.argv.join(' ')
+    if (argv.includes('steps.py')) runs.push(argv)
+    const out = argv.includes('steps.py')
+      ? JSON.stringify({ key: 'hg.repro', step: '1', title: 'Ton arrêt : diagnostic, test rouge, plan', waiting: 'Valide le plan' })
+      : argv.includes('rev-parse')
+        ? ROOT
+        : argv.includes('branch')
+          ? 'fix/crash'
+          : ''
+
+    return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  const files: Record<string, string> = {
+    [`${dir}/fix.json`]: JSON.stringify({ stages: { red: { status: 'PASSED' } }, waiting: 'Valide le plan' }),
+    [`${dir}/diagnosis.md`]: '# Diagnostic\n\nLe cache n’est pas vidé.',
+  }
+  on('fs.read', (_, e) => (e.path in files ? { value: files[e.path] } : { deny: 'ENOENT' }))
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(runs.length).toBeGreaterThan(0)
+  expect(JSON.stringify(await ui.find({ type: 'Text', text: /^À toi/ }))).toContain('Valide le plan')
+  expect((await ui.find({ type: 'Button', key: `doc-.claude/fixes/crash/diagnosis.md` }))?.props.label).toBe('diagnostic')
+  await ui.unmount()
 })
 
 const SMALL_DIFF = 'diff --git a/lib/a.dart b/lib/a.dart\n@@ -1,1 +1,2 @@\n class A {}\n+abstract class Login {}\n'

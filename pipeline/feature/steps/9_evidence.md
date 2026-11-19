@@ -142,11 +142,5 @@ commande. Android `fresh` ou `prepared` : ajoute `adb -s $(cat .claude/features/
 (instance jetable, rien à supprimer de l'AVD).
 Termine par un résumé de 5 lignes (la dernière : learn, règles ajoutées ou « aucune récurrence »), le chemin de l'evidence et l'URL de la MR.
 
-**Fin : la page de la feature.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh say <nom> ""`
-puis « Rafraîchir » (`~/.claude/pipeline/feature/cockpit.md`) — la carte de l'accueil passe dans
-« Terminées ». Puis un seul `AskUserQuestion` : « Supprimer la page de cette feature ? » — « Garder (son
-historique : décisions, contrats, rapports) » / « Supprimer ». **Supprimer** → `Artifact` `delete` avec
-`cockpit.url` (l'outil lui demande confirmation ; c'est définitif), puis `pipeline.sh page-deleted
-<nom>`, puis `pipeline.sh cockpit-push` et le seul `batch` de `hub_writes` sur l'accueil : la carte reste,
-marquée « Page supprimée ». Ne supprime jamais la page sans cette question, ni l'accueil, jamais.
+**Fin.** Après `pipeline.sh pass <nom> evidence` : `pipeline.sh ask <nom> ""`.
 

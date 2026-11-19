@@ -27,9 +27,8 @@ Chaque prompt tient en 10 lignes, avec des chemins et des faits, jamais ton hist
 - « écris `findings_<rôle>.json` au format de `~/.claude/pipeline/review/findings_format.md`, puis
   rends ton rapport en trois lignes ».
 
-**Pendant qu'ils tournent**, n'en fais pas le travail. `review.sh say <slug> "Relecture en cours :
-Alice, Corentin, Maëlle"` puis « Rafraîchir » : Thibault voit l'avancement dans le cockpit. Les
-notifications arrivent seules ; ne les sonde pas.
+**Pendant qu'ils tournent**, n'en fais pas le travail : dis à Thibault en une ligne que la relecture
+est lancée (Alice, Corentin, Maëlle). Les notifications arrivent seules ; ne les sonde pas.
 
 **À chaque retour** : `review.sh agent <slug> <rôle> done "<sa première ligne de rapport>"` (ou
 `skipped` pour Maëlle si son fichier dit `"skipped"`, avec la raison). Le script repasse un `done` en

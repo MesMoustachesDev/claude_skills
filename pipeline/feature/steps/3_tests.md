@@ -83,8 +83,7 @@ alors `outcome: "proved"|"dismissed"` et `note` sur l'entrée de `tests_review.j
 qu'une entrée n'a pas d'`outcome`. Tout écarté et aucun bloquant → rejoue `tests_review_verdict`, sans relancer Gaëlle.
 **Gabarit S :** identique, gel compris. **En L :** n'a pas lieu.
 
-Vert → **Point d'étape « tests ».** `gauntlet.sh report <nom> tests`, `SendUserFile` du `report.html`
-(`display: render`) : la section « Séquences » s'ouvre en premier. Pour chaque C<n>, côte à côte, la
+Vert → **Point d'étape « tests ».** `gauntlet.sh report <nom> tests`, cité par un lien cliquable vers `report.html` : la section « Séquences » s'ouvre en premier. Pour chaque C<n>, côte à côte, la
 séquence validée au cadrage et la même redessinée par le script **depuis le test d'acceptation réel**
 (le test généré par l'outil Gherkin du langage et le corps de chaque step : pump, tap/saisie, réponse
 du use case mocké, assertion, chacun avec `fichier:ligne`), et les écarts signalés (étape du

@@ -78,8 +78,6 @@
   le code et les tests de la passe précédente ne sont plus « non-stub » ni « tout vert » à tort. Les
   gates d'intégrité gardent le périmètre de la feature. `pipeline.sh set <nom> pass_base null` une fois
   le rejeu vert.
-  Puis **crée la page de la feature** (`~/.claude/pipeline/feature/cockpit.md`, « Créer la page ») ;
-  en reprise, réarme-la pour cette session (même section, point 4).
 - **Watchdog** (création comme reprise, une fois par session). Le pipeline ne reste jamais des heures
   sans avancer : sur `import_cancel_sync`, `red` a été joint à 21 h 54, et 3b n'a été lancée qu'à 9 h.
   1. `CronCreate` récurrent, `cron` = toutes les 1,5 × `watchdog.minutes` de la config, arrondi à un

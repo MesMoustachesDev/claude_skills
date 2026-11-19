@@ -61,8 +61,7 @@ le dev est le relecteur. Les bloquants encore ouverts sont listés au point d'é
 ou accepte (`accept`). Si Camille note « la feature est peut-être à découper » ou que la spec dépasse
 un critère de S : reclassement (voir « Gabarits »). **En L :** l'étape n'a pas lieu.
 
-Vert → **Point d'étape « scénarios ».** `gauntlet.sh report <nom> spec`, `SendUserFile` du
-`report.html` (`display: render`) : les scénarios avec leur phrase en français, la séquence du cadrage
+Vert → **Point d'étape « scénarios ».** `gauntlet.sh report <nom> spec`, cité par un lien cliquable vers `report.html` : les scénarios avec leur phrase en français, la séquence du cadrage
 de chacun, §6, §7, §9, la spec. Si la section « Séquences » porte le badge « incohérence(s) » (un C<n>
 sans scénario, un titre absent de §4), relance Sophie avec la liste, sans montrer le rapport, puis 1b ;
 ce compteur partage `loops.spec`.

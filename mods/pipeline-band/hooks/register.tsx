@@ -10,7 +10,7 @@ type Stage = { status?: string; at?: string }
 type Pipeline = {
   feature?: string
   stages?: Record<string, Stage>
-  cockpit?: { waiting?: string }
+  waiting?: string | null
 }
 
 // /feature runs live in <main checkout>/.claude/worktrees; the common git dir
@@ -49,7 +49,7 @@ async function latestPipeline($: Engine): Promise<PipelineSnapshot | null> {
   return {
     feature: pipeline.feature ?? '?',
     step: key ? `${key} ${stage?.status ?? ''}`.trim() : 'cadrage',
-    waiting: pipeline.cockpit?.waiting ?? '',
+    waiting: pipeline.waiting ?? '',
   }
 }
 

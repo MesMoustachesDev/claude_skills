@@ -52,8 +52,7 @@ La vérité est locale (`pipeline.json`, git, MR) ; le tracker en est le miroir.
 
 ## Règles
 
-- **Toute écriture est montrée telle qu'elle partira, puis validée** (`AskUserQuestion`, ou un bouton
-  du cockpit). Les écritures d'un même moment partent **en un seul lot**, validé une fois. Un triage
+- **Toute écriture est montrée telle qu'elle partira, puis validée** (`AskUserQuestion`). Les écritures d'un même moment partent **en un seul lot**, validé une fois. Un triage
   (« crée-les ») n'est pas une validation du contenu.
 - Une écriture qui échoue n'est **jamais** relancée sans nouvelle validation.
 - **Le tracker ne bloque jamais un pipeline.** `reachable()` faux → une ligne à Thibault, on continue

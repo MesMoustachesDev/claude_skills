@@ -3,8 +3,8 @@
 
   fix_gauntlet.sh watchdog <nom> [--json] [--notify]     (depuis le worktree du fix)
 
-done | working | waiting_thibault | stalled | idle. L'étape vient de fix_cockpit.py → steps() ; l'attente
-de Thibault de fix.json → cockpit.waiting (posé par `fix_cockpit.py say`) ; « ça tourne » des hooks de
+done | working | waiting_thibault | stalled | idle. L'étape vient de fix/steps.py → steps() ; l'attente
+de Thibault de fix.json → waiting (posé par `fix/steps.py ask`) ; « ça tourne » des hooks de
 .gauntlet/hook_*.running et des sous-agents des sessions de ce worktree. Seuil watchdog.minutes de
 .claude/rules/feature_pipeline.md (défaut 20). --notify : notify.sh, au plus une fois par verdict et par
 watchdog.renotify_minutes, état dans .watchdog.json ; un blocage n'est signalé qu'après deux délais.
@@ -18,8 +18,8 @@ import sys
 import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path[:0] = [os.path.join(HERE, ".."), os.path.join(HERE, "..", "pipeline")]
-import fix_cockpit  # noqa: E402
+sys.path[:0] = [HERE, os.path.join(HERE, "..", "pipeline")]
+import steps as fix_steps  # noqa: E402
 import pipeline as pl  # noqa: E402
 
 
@@ -27,7 +27,7 @@ def verdict(fx):
     cfg = types.SimpleNamespace(cfg_file=os.path.join(fx.root, ".claude", "rules", "feature_pipeline.md"))
     minutes = int(pl.Ctx.cfg(cfg, "watchdog.minutes", "20") or 20)
     t = pl.time_now()
-    _, n = fix_cockpit.steps(fx)
+    _, n = fix_steps.steps(fx)
     v = {"fix": fx.name, "minutes": minutes, "step": n["step"], "title": n["title"], "now": pl._iso(t)}
     if n["key"] == "done":
         return {**v, "verdict": "done", "detail": n["title"]}
@@ -54,11 +54,10 @@ def verdict(fx):
     if hooks or agents:
         what = (["gate en cours : " + ", ".join(hooks)] if hooks else []) + ([f"{len(agents)} sous-agent(s) actif(s)"] if agents else [])
         return {**v, "verdict": "working", "detail": " · ".join(what)}
-    ck = fx.f.get("cockpit") or {}
-    waiting = ck.get("waiting")
+    waiting = fx.f.get("waiting")
     perm = [s for s in sessions if s.get("state") == "waiting"]
     if waiting or perm or n["status"] == "FAILED":
-        since = pl._parse_at(ck.get("at")) if waiting else (min(x.get("at", 0) for x in perm) / 1000 if perm else last_ts)
+        since = pl._parse_at(fx.f.get("waiting_at")) if waiting else (min(x.get("at", 0) for x in perm) / 1000 if perm else last_ts)
         detail = waiting or (f"la session attend : {perm[0].get('waitingOn') or 'une réponse'}" if perm
                              else f"étape {n['step']} FAILED : le dev décide")
         wm = int((t - (since or last_ts)) / 60)
@@ -84,7 +83,7 @@ def main(args):
     if not args or args[0] in ("-h", "--help"):
         print(__doc__)
         sys.exit(0 if args else 2)
-    fx = fix_cockpit.Fix(args[0])
+    fx = fix_steps.Fix(args[0])
     v = verdict(fx)
     if "--notify" in args and v.get("alert"):
         cfg = types.SimpleNamespace(cfg_file=os.path.join(fx.root, ".claude", "rules", "feature_pipeline.md"))

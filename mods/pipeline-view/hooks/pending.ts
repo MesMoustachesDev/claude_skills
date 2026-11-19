@@ -1,8 +1,8 @@
 import type { PendingDoc } from '../types'
 
 // L'encart « à lire » : selon l'étape courante, les documents que Thibault lit pour valider (spec,
-// contrats, revue…). L'étape d'une feature vient de `pipeline.sh next --json` ; celle d'un fix est
-// calculée ici, comme `steps()` de ~/.claude/scripts/fix_cockpit.py.
+// contrats, revue…). L'étape vient de `pipeline.sh next --json` pour une feature, de
+// `fix/steps.py next --json` pour un fix : le mod ne recalcule aucune étape.
 
 /** `@contracts` : les fichiers de contrats ; `@fix_plan` : repro.json → fix_plan. Sinon un fichier du dossier. */
 type Source = [source: string, label: string]
@@ -46,46 +46,10 @@ const FIX_DOCS: Record<string, Source[]> = {
 export const sourcesFor = (kind: 'feature' | 'fix', key: string): Source[] =>
   kind === 'feature' ? (FEATURE_DOCS[key] ?? [['spec.md', 'spec']]) : (FIX_DOCS[key] ?? [['diagnosis.md', 'diagnostic']])
 
-type FixRaw = {
-  kind?: unknown
-  stages?: Record<string, { status?: unknown } | string>
-  human_gates?: Record<string, unknown>
-}
-
-const FIX_STEPS: [key: string, title: string][] = [
-  ['red', 'Reproduction (Bastien)'],
-  ['hg.repro', 'Ton arrêt : diagnostic, test rouge, plan'],
-  ['green', 'Correction (Fanny)'],
-  ['review', 'Revue (Victor)'],
-  ['hg.ui', 'Captures avant / après'],
-  ['evidence', 'Evidence, commits'],
-]
-
-/** La première étape d'un fix ni passée ni sautée. `isUi` : repro.json → kind vaut `ui`. */
-export const fixNextStep = (text: string, isUi: boolean): { key: string; title: string } => {
-  let raw: FixRaw
-  try {
-    raw = JSON.parse(text) as FixRaw
-  } catch {
-    return { key: '', title: '' }
-  }
-  const ui = isUi || raw.kind === 'ui'
-  const passed = (key: string): boolean => {
-    if (key.startsWith('hg.')) return Boolean(raw.human_gates?.[key.slice(3)])
-    const st = raw.stages?.[key]
-    const status = typeof st === 'object' && st !== null ? st.status : st
-
-    return status === 'PASSED' || status === 'SKIPPED'
-  }
-  const found = FIX_STEPS.filter(([key]) => key !== 'hg.ui' || ui).find(([key]) => !passed(key))
-
-  return found ? { key: found[0], title: found[1] } : { key: 'done', title: 'Fix terminé' }
-}
-
-/** cockpit.waiting de pipeline.json ou fix.json : ce que l'orchestrateur attend de Thibault. */
+/** `waiting` de pipeline.json ou fix.json (posé par `ask`) : ce que l'orchestrateur attend de Thibault. */
 export const waitingOf = (text: string): string => {
   try {
-    const waiting = (JSON.parse(text) as { cockpit?: { waiting?: unknown } }).cockpit?.waiting
+    const waiting = (JSON.parse(text) as { waiting?: unknown }).waiting
 
     return typeof waiting === 'string' ? waiting : ''
   } catch {

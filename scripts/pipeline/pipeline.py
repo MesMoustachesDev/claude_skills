@@ -2,12 +2,11 @@
 """pipeline.py — état et comptabilité du feature pipeline. Usage : voir ../pipeline.sh.
 
 Tout ce qui est déterministe dans /feature (ordre de reprise, étapes sautées, compteurs de boucles,
-commits de contrats et de gel, documents du cockpit) vit ici, pas dans le prompt de l'orchestrateur.
+commits de contrats et de gel, ce qui attend Thibault) vit ici, pas dans le prompt de l'orchestrateur.
 """
 import datetime
 import fnmatch
 import glob
-import hashlib
 import json
 import os
 import re
@@ -52,11 +51,6 @@ LOOP_MAX = {"spec": {"S": 0, "M": 2, "L": 0}, "test_plan": 2, "tests": 2, "revie
 # Verdict archivé dans history/ à chaque boucle (lu par learn.py).
 LOOP_VERDICT = {"spec": "spec_review.json", "test_plan": "tests_review.json", "tests": "tests_review.json", "review": "review.json", "dedup_clean": "dedup.json"}
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
-GATE_LABELS = {
-    "cadrage": "Cadrage validé", "contracts": "Contrats écrits", "spec": "Scénarios validés",
-    "tests": "Tests validés et gelés", "suggestions": "Suggestions de revue tranchées", "tour": "Visite guidée validée",
-    "polish": "Polish visuel tranché",
-}
 
 
 def die(msg, code=2):
@@ -402,9 +396,8 @@ def cmd_next(c, args):
     for k, v in info["inputs"].items():
         v = ", ".join(v) if isinstance(v, list) else v
         print(f"entrée    : {k} = {v}")
-    note = (c.p.get("cockpit") or {}).get("waiting")
-    if note:
-        print(f"cockpit   : en attente — {note}")
+    if c.p.get("waiting"):
+        print(f"attente   : {c.p['waiting']} (depuis {c.p.get('waiting_at')})")
 
 
 def cmd_status(c, args):
@@ -558,6 +551,7 @@ def parse_kv(items):
 def cmd_gate(c, args):
     gate = args[0]
     c.p.setdefault("human_gates", {})[gate] = {"at": now(), "by": "user", **parse_kv(args[1:])}
+    clear_waiting(c.p)   # le point d'étape est tranché : la question n'attend plus
     c.save()
     print(f"human_gates.{gate} posé")
 
@@ -666,17 +660,23 @@ def cmd_extra(c, args):
         print(f"{g}  (feature)")
 
 
-def cmd_say(c, args):
-    args, ask = parse_ask(args)
-    c.p.setdefault("cockpit", {})["ask"] = ask
-    if "--report" in args:
-        i = args.index("--report")
-        c.p.setdefault("cockpit", {})["report_step"] = args[i + 1]
-        args = args[:i] + args[i + 2:]
-    c.p.setdefault("cockpit", {})["waiting"] = args[0] if args and args[0] else None
-    c.p["cockpit"]["at"] = now()
+def clear_waiting(p):
+    p.pop("cockpit", None)   # ancienne clé, avant le retrait du cockpit (2026-11-19)
+    p["waiting"] = None
+    p["waiting_at"] = None
+
+
+def cmd_ask(c, args):
+    """`ask <nom> "<question>"` : ce qu'on attend de Thibault, posé juste avant la question ("" l'efface ; `gate`
+    l'efface aussi). Lu par le watchdog (waiting_thibault) et par les mods pipeline-view et pipeline-band."""
+    text = (args[0] if args else "").strip()
+    if "\n" in text or len(text) > 200:
+        die("ask : une ligne, 200 caractères au plus")
+    clear_waiting(c.p)
+    if text:
+        c.p["waiting"], c.p["waiting_at"] = text, now()
     c.save()
-    print("message du cockpit écrit")
+    print(f"attente : {text}" if text else "attente effacée")
 
 
 # Le résumé « Reprendre le fil » du panneau pipeline-view : une ligne par chaîne, de quoi le lire d'un coup d'œil.
@@ -887,12 +887,11 @@ def watchdog_verdict(c):
     if hooks or agents:
         what = (["gate en cours : " + ", ".join(hooks)] if hooks else []) + ([f"{len(agents)} sous-agent(s) actif(s)"] if agents else [])
         return {**v, "verdict": "working", "detail": " · ".join(what)}
-    # Question posée à Thibault : depuis cockpit.at ; permission ou question en attente dans la session.
-    ck = c.p.get("cockpit") or {}
-    waiting = ck.get("waiting")
+    # Question posée à Thibault : depuis waiting_at ; permission ou question en attente dans la session.
+    waiting = c.p.get("waiting")
     perm = [s for s in sessions if s.get("state") == "waiting"]
     if waiting or perm or n["status"] == "FAILED":
-        since = _parse_at(ck.get("at")) if waiting else (min(x.get("at", 0) for x in perm) / 1000 if perm else last_ts)
+        since = _parse_at(c.p.get("waiting_at")) if waiting else (min(x.get("at", 0) for x in perm) / 1000 if perm else last_ts)
         detail = waiting or (f"la session attend : {perm[0].get('waitingOn') or 'une réponse'}" if perm
                              else f"étape {n['step']} FAILED : Thibault décide")
         wm = int((t - since) / 60)
@@ -1014,23 +1013,6 @@ def cmd_replay(c, args):
     log = os.path.relpath(os.path.join(c.dir, ".gauntlet", f"last_{profile}.log"), c.root)
     print(f"stages.{profile} = {'PASSED' if ok else 'RED'} (était {prev}, gate rejoué) — log : {log}")
     sys.exit(0 if ok else 1)
-
-
-def parse_ask(args):
-    """`--ask <id> --options "A|B|C"` : la question du point d'étape, avec ses réponses, pour la page."""
-    if "--ask" not in args:
-        return args, None
-    i = args.index("--ask")
-    ask_id = args[i + 1]
-    rest = args[:i] + args[i + 2:]
-    opts = []
-    if "--options" in rest:
-        j = rest.index("--options")
-        opts = [o.strip() for o in rest[j + 1].split("|") if o.strip()]
-        rest = rest[:j] + rest[j + 2:]
-    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}", ask_id) or not opts:
-        die("--ask <id> (lettres, chiffres, _ . -) --options \"Réponse 1|Réponse 2\"")
-    return rest, {"id": ask_id, "options": opts, "at": now()}
 
 
 # ---------------------------------------------------------------------------
@@ -1251,303 +1233,12 @@ def cmd_refreeze(c, args):
     print(f"re-gel : {sha[:10]} · cause {cause} · {len(files)} fichiers")
 
 
-# ---------------------------------------------------------------------------
-# Cockpit (artifact partagé, documents écrits via ArtifactData file_path)
-# ---------------------------------------------------------------------------
-def doc_id(s):
-    return re.sub(r"[^A-Za-z0-9_\-.~:@+]", "-", s.replace("/", "~"))[:200]
-
-
-def sha1(text):
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()
-
-
-def read_text(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-    except OSError:
-        return None
-
-
-def show(c, rev, path):
-    top, pre = repo_of(c, os.path.dirname(path) or ".")
-    r = subprocess.run(["git", "show", f"{rev}:{path[len(pre):]}"], cwd=top, capture_output=True, text=True)
-    return r.stdout if r.returncode == 0 else None
-
-
-def decisions_log(c):
-    p, out = c.p, []
-    for gate, label in GATE_LABELS.items():
-        g = (p.get("human_gates") or {}).get(gate)
-        if not g:
-            continue
-        detail = []
-        if gate == "cadrage":
-            detail = [f"gabarit {g.get('size') or p.get('size') or '?'}", f"package {g.get('package') or p.get('package')}"]
-        if g.get("sha"):
-            detail.append(f"commit {str(g['sha'])[:8]}")
-        if g.get("returned"):
-            detail.append(f"étapes renvoyées : {', '.join(map(str, g['returned']))}")
-        out.append({"at": g.get("at"), "kind": "gate", "text": label + (f" ({', '.join(detail)})" if detail else "")})
-    if p.get("size_reason"):
-        out.append({"at": p.get("created"), "kind": "size", "text": f"Gabarit {p.get('size')} : {p['size_reason']}"})
-    for ch in p.get("size_changes") or []:
-        out.append({"at": ch.get("at"), "kind": "size", "text": f"Reclassement {ch.get('from')} → {ch.get('to')} : {ch.get('reason')}"})
-    for sid, s in (p.get("suggestions") or {}).items():
-        if s.get("decision") in ("applied", "skipped"):
-            verb = "retenue" if s["decision"] == "applied" else "écartée"
-            out.append({"at": s.get("at"), "kind": "suggestion", "text": f"Suggestion {sid} {verb}" + (f" : {s['note']}" if s.get("note") else "")})
-    for a in p.get("accepted") or []:
-        out.append({"at": a.get("at"), "kind": "accept", "text": f"Accepté à l'étape {a.get('stage')} : {a.get('reason')}"})
-    for r in (p.get("contracts") or {}).get("reedits") or []:
-        out.append({"at": r.get("at"), "kind": "contract", "text": f"Contrat modifié : {r.get('what')}"})
-    top, _ = repo_of(c, c.package)
-    # Seulement les commits de CETTE feature (« feat(<nom>): contracts (by Thibault) … »), pas ceux du dépôt.
-    log = git("log", "--format=%H%x1f%cI%x1f%s", "--fixed-strings", f"--grep=({c.name}): contracts (by Thibault)", "-n", "20", cwd=top, check=False)
-    gate_shas = {str(g.get("sha")) for g in (p.get("human_gates") or {}).values() if isinstance(g, dict) and g.get("sha")}
-    gate_shas |= {str(r.get("sha")) for r in (p.get("contracts") or {}).get("reedits") or []}
-    for line in log.splitlines():
-        h, at, subject = (line.split("\x1f") + ["", ""])[:3]
-        if subject and h not in gate_shas:
-            out.append({"at": at, "kind": "commit", "text": subject})
-    return sorted(out, key=lambda e: e.get("at") or "")
-
-
-REPORT_CHUNK = 90_000  # caractères par document (un document db fait au plus 256 Ko une fois sérialisé)
-IMG_RE = re.compile(r"<img\b[^>]*\bsrc=\"([^\"]*)\"[^>]*>", re.I)
-
-
-def report_docs(c, key, out_dir):
-    """Le dernier report.html de la feature, découpé en morceaux. Les ids portent l'empreinte du
-    rapport : un nouveau rapport crée de nouveaux documents, jamais d'écrasement (pas de version à lire)."""
-    path = os.path.join(c.dir, "report.html")
-    html = read_text(path)
-    if html is None:
-        return None, []
-    # Les captures sont des fichiers locaux : illisibles depuis l'artifact, remplacées par leur chemin.
-    html = IMG_RE.sub(lambda m: f'<span class="ck-img">capture : {m.group(1)} (dans la session)</span>', html)
-    h = sha1(html)[:12]
-    parts = [html[i:i + REPORT_CHUNK] for i in range(0, len(html), REPORT_CHUNK)] or [""]
-    os.makedirs(os.path.join(out_dir, "report"), exist_ok=True)
-    writes = []
-    for i, part in enumerate(parts):
-        fp = os.path.join(out_dir, "report", f"{h}-{i}.json")
-        with open(fp, "w", encoding="utf-8") as fh:
-            json.dump({"hash": h, "i": i, "html": part}, fh, ensure_ascii=False)
-        writes.append({"op": "set", "collection": f"features/{key}/report", "doc_id": f"r-{h}-{i}", "file_path": fp})
-    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path), datetime.timezone.utc).replace(microsecond=0)
-    meta = {"hash": h, "n": len(parts), "generated_at": mtime.isoformat().replace("+00:00", "Z"),
-            "step": (c.p.get("cockpit") or {}).get("report_step")}
-    return meta, writes
-
-
-TREE_MAX = 3000
-
-
-def package_tree(c):
-    """Fichiers du package (suivis et nouveaux, hors ignorés), relatifs à c.root : l'arbre du cockpit."""
-    top, pre = repo_of(c, c.package)
-    inner = c.package[len(pre):] if pre else c.package
-    names = git("ls-files", "-co", "--exclude-standard", "--", inner or ".", cwd=top).splitlines()
-    files = sorted({pre + n for n in names if n})
-    return files[:TREE_MAX]
-
-
-def cmd_cockpit_push(c, args):
-    if not args:
-        die("usage : cockpit-push <nom> <dossier>")
-    out_dir = os.path.abspath(args[0])
-    versions = {}
-    if "--versions" in args:
-        raw = args[args.index("--versions") + 1]
-        for pair in filter(None, (x.strip() for x in raw.split(","))):
-            k, _, v = pair.partition("=")
-            versions[k.strip().replace("@", "~")] = int(v)
-    key = doc_id(f"{c.project()}--{c.name}")
-    os.makedirs(os.path.join(out_dir, "contracts"), exist_ok=True)
-    con = c.p.get("contracts") or {}
-    files = con.get("files") or []
-    draft_rev = con.get("draft_sha")
-    entries, writes = [], []
-    mb = merge_base(c, repo_of(c, c.package)[0]) if files else None
-    for f in files:
-        current = read_text(os.path.join(c.root, f))
-        if current is None:
-            continue
-        draft = show(c, draft_rev, f) if draft_rev else None
-        # Le fichier AVANT la feature (merge-base avec la base) : vide pour un fichier créé par la feature.
-        # C'est la comparaison par défaut du cockpit : ce que la feature change au contrat.
-        before = show(c, mb, f) if mb else None
-        decisions = [{"line": i + 1, "text": l.strip()} for i, l in enumerate(current.splitlines()) if "DÉCISION (Thibault" in l]
-        fid = doc_id(f)
-        doc = {"path": f, "draft": draft if draft is not None else "", "has_draft": draft is not None,
-               "base": before or "", "is_new": before is None,
-               "current": current, "current_hash": sha1(current), "decisions": decisions, "updated_at": now()}
-        fp = os.path.join(out_dir, "contracts", fid + ".json")
-        with open(fp, "w", encoding="utf-8") as fh:
-            json.dump(doc, fh, ensure_ascii=False)
-        entries.append({"id": fid, "path": f, "decisions": len(decisions),
-                        "changed": draft is not None and draft != current})
-        writes.append({"op": "set", "collection": f"features/{key}/contracts", "doc_id": fid, "file_path": fp})
-    stages = []
-    for k, step, title, _, _ in ORDER:
-        st = (c.p.get("stages") or {}).get(k) if not k.startswith("hg.") else None
-        stages.append({"key": k, "step": step, "title": title, "status": state_of(c.p, k) or "TODO",
-                       "reason": st.get("reason") if isinstance(st, dict) else None})
-    tree = package_tree(c)
-    report, report_writes = report_docs(c, key, out_dir)
-    writes += report_writes
-    n = next_step(c.p)
-    feature = {
-        "project": c.project(), "feature": c.name, "key": key, "branch": c.p.get("branch"),
-        "size": c.size, "size_reason": c.p.get("size_reason"), "mode": c.p.get("mode"), "package": c.package,
-        "step": {"step": n["step"], "title": n["title"], "status": n["status"]},
-        "waiting": (c.p.get("cockpit") or {}).get("waiting"),
-        "ask": (c.p.get("cockpit") or {}).get("ask") if (c.p.get("cockpit") or {}).get("waiting") else None,
-        "stages": stages, "decisions": decisions_log(c),
-        "contracts": {"draft_sha": draft_rev, "sha": con.get("sha"), "files": entries},
-        "tree": tree,
-        "report": report,
-        "split": None,
-        "parent": None,
-        "updated_at": now(),
-    }
-    project = c.project()
-    if c.p.get("split"):
-        subs = split_status(c)
-        for s_ in subs:
-            s_["key"] = doc_id(f"{project}--{s_['name']}")
-        feature["split"] = subs
-    if c.p.get("parent"):
-        pp, _ = find_pipeline(c, c.p["parent"])
-        names = [x.get("name") for x in (pp or {}).get("split") or []]
-        feature["parent"] = {"name": c.p["parent"], "key": doc_id(f"{project}--{c.p['parent']}"),
-                             "index": names.index(c.name) + 1 if c.name in names else None, "total": len(names)}
-    fp = os.path.join(out_dir, "feature.json")
-    with open(fp, "w", encoding="utf-8") as fh:
-        json.dump(feature, fh, ensure_ascii=False)
-    writes.insert(0, {"op": "set", "collection": "features", "doc_id": key, "file_path": fp})
-    # Ligne de l'accueil (artifact commun, sans « Prévenir Claude ») : de quoi voir l'état et ouvrir la page.
-    cockpit = c.p.get("cockpit") or {}
-    done = n["key"] == "done"
-    ev = ((c.p.get("stages") or {}).get("evidence") or {})
-    issue = c.p.get("issue") or {}
-    index = {"kind": "feature", "key": key, "project": c.project(), "title": c.name,
-             "url": None if cockpit.get("deleted") else cockpit.get("url"), "page_deleted": bool(cockpit.get("deleted")),
-             "step": feature["step"], "waiting": None if done else feature["waiting"], "size": c.size,
-             "parent": (feature.get("parent") or {}).get("name"), "done": done, "done_at": ev.get("at") if done else None,
-             "outcome": (f"evidence prête, MR via create_mr" + (f" · issue #{issue.get('iid')}" if issue.get("iid") else "")) if done else None,
-             "updated_at": now()}
-    ip = os.path.join(out_dir, "index.json")
-    with open(ip, "w", encoding="utf-8") as fh:
-        json.dump(index, fh, ensure_ascii=False)
-    hub_write = {"op": "set", "collection": "index", "doc_id": key, "file_path": ip}
-    if "--hub-version" in args:
-        hub_write["if_version"] = int(args[args.index("--hub-version") + 1])
-    for w in writes:
-        if w["doc_id"] in versions:
-            w["if_version"] = versions[w["doc_id"]]
-    manifest = {"key": key, "page": cockpit.get("url"), "writes": writes, "hub_writes": [hub_write]}
-    with open(os.path.join(out_dir, "writes.json"), "w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, ensure_ascii=False, indent=2)
-    print(json.dumps(manifest, ensure_ascii=False, indent=2))
-
-
-def _edit_fields(doc):
-    """Un document lu via ArtifactData out_dir : les champs sont à la racine ou sous data/fields."""
-    for k in ("data", "fields", "document"):
-        if isinstance(doc.get(k), dict) and "content" in doc[k]:
-            return doc[k], doc.get("version")
-    return doc, doc.get("version") or doc.get("_version")
-
-
-def cmd_cockpit_pull(c, args):
-    if not args:
-        die("usage : cockpit-pull <nom> <dossier lu par ArtifactData out_dir>")
-    in_dir = os.path.abspath(args[0])
-    key = doc_id(f"{c.project()}--{c.name}")
-    edits_dir = os.path.join(in_dir, "features", key, "edits")
-    allowed = set((c.p.get("contracts") or {}).get("files") or [])
-    applied, conflicts, ignored, writes = [], [], [], []
-    out_dir = os.path.join(in_dir, "_applied")
-    os.makedirs(out_dir, exist_ok=True)
-    for fn in sorted(os.listdir(edits_dir)) if os.path.isdir(edits_dir) else []:
-        if not fn.endswith(".json"):
-            continue
-        with open(os.path.join(edits_dir, fn), encoding="utf-8") as fh:
-            raw = json.load(fh)
-        e, version = _edit_fields(raw)
-        if e.get("status") != "pending":
-            continue
-        path = e.get("path", "")
-        if path not in allowed:
-            ignored.append(f"{path} : pas un fichier de contracts.files")
-            continue
-        target = os.path.join(c.root, path)
-        current = read_text(target) or ""
-        if e.get("base_hash") and e["base_hash"] != sha1(current):
-            conflicts.append(f"{path} : le fichier a changé sur disque depuis l'ouverture dans le cockpit")
-            status = "conflict"
-        else:
-            with open(target, "w", encoding="utf-8") as fh:
-                fh.write(e.get("content", ""))
-            applied.append(path)
-            status = "applied"
-        fid = doc_id(path)  # le nom du fichier lu épelle « ~ » en « @ » : l'id vient du chemin
-        fp = os.path.join(out_dir, fid + ".json")
-        with open(fp, "w", encoding="utf-8") as fh:
-            json.dump({"status": status, "resolved_at": now()}, fh)
-        w = {"op": "update", "collection": f"features/{key}/edits", "doc_id": fid, "file_path": fp}
-        if version:
-            w["if_version"] = version
-        else:
-            w["if_version"] = "<version donnée par la lecture ArtifactData>"
-        writes.append(w)
-    print(json.dumps({"applied": applied, "conflicts": conflicts, "ignored": ignored, "writes": writes},
-                     ensure_ascii=False, indent=2))
-
-
-
-
-COCKPIT_SRC = os.path.join(os.path.expanduser('~'), ".claude", "scripts", "cockpit", "cockpit.html")
-
-
-def write_page(dest_dir, title):
-    """Copie de la page du cockpit pour UN élément, avec son propre titre (la galerie les distingue)."""
-    html = read_text(COCKPIT_SRC)
-    if html is None:
-        die(f"page source introuvable : {COCKPIT_SRC}")
-    os.makedirs(dest_dir, exist_ok=True)
-    safe = re.sub(r"[<>&]", "", title)
-    html = re.sub(r"<title>.*?</title>", f'<title>{safe}</title>\n<meta name="cockpit-role" content="item">', html, count=1)
-    path = os.path.join(os.path.abspath(dest_dir), "cockpit-" + re.sub(r"[^A-Za-z0-9_.-]", "-", title) + ".html")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(path)
-
-
-def cmd_page_deleted(c, args):
-    """Thibault a fait supprimer la page de cette feature : l'accueil garde la carte, sans lien."""
-    c.p.setdefault("cockpit", {})["deleted"] = True
-    c.p["cockpit"]["deleted_at"] = now()
-    c.save()
-    print("page marquée supprimée : rafraîchis seulement l'accueil (hub_writes)")
-
-
-def cmd_cockpit_page(c, args):
-    if not args:
-        die("usage : cockpit-page <nom> <dossier>  (puis Artifact publish de ce fichier, capabilities db + comments + sample)")
-    write_page(args[0], f"Cockpit {c.name}")
-
-
 COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
-    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "say": cmd_say, "recap": cmd_recap,
+    "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "ask": cmd_ask, "recap": cmd_recap,
     "devices": cmd_devices, "watchdog": cmd_watchdog,
     "after-architect": cmd_after_architect, "reached": cmd_reached, "replay": cmd_replay, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
-    "cockpit-push": cmd_cockpit_push, "cockpit-pull": cmd_cockpit_pull, "cockpit-page": cmd_cockpit_page, "page-deleted": cmd_page_deleted,
 }
 
 
