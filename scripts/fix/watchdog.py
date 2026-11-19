@@ -37,7 +37,7 @@ def verdict(fx):
         if "/history" in d:
             continue
         for f in files:
-            if not f.startswith(".watchdog"):
+            if not (f.startswith(".watchdog") or f.endswith(".lock")):   # verrou de statefile : pas une activité
                 events.append((pl._mtime(os.path.join(d, f)), os.path.relpath(os.path.join(d, f), fx.dir)))
     sessions = pl._worktree_sessions(fx.root)
     agents = []

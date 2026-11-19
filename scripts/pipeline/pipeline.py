@@ -863,7 +863,7 @@ def watchdog_verdict(c):
         if "/history" in d:
             continue
         for f in files:
-            if f.startswith(".watchdog"):
+            if f.startswith(".watchdog") or f.endswith(".lock"):   # verrou de statefile : pas une activité
                 continue
             events.append((_mtime(os.path.join(d, f)), os.path.relpath(os.path.join(d, f), c.dir)))
     sessions = _worktree_sessions(c.root)
