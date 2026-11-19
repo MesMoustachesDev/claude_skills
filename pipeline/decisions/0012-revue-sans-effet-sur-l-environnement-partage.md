@@ -1,6 +1,7 @@
 # 0012 — Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé
 
-Statut : acceptée (2026-11-10), amendée (2026-11-12 : config du simulateur lue dans le checkout principal, cleanup par suffixe)
+Statut : acceptée (2026-11-10), amendée (2026-11-12 : config du simulateur lue dans le checkout principal, cleanup par suffixe ;
+2026-11-19 : seule Maëlle écrit un test, jetable et hors du repo)
 Où elle vit : `scripts/review/review.py` (`project_root`, `cmd_preflight`, `sim_config`, `review_sim`, `cmd_qa`, `cmd_sim`,
 `cmd_cleanup`, `remove_review_sims`, contrôle après `cmd_gauntlet`) · `scripts/sim.sh` (`--like`, `base_name`) · `scripts/gauntlet/checks_qa.sh`
 (`GAUNTLET_SIM_UDID`) · `scripts/pr_gauntlet.sh` et `scripts/worktree_untracked.sh` (`--patterns`) ·
@@ -47,6 +48,11 @@ téléchargé ») et le clone du modèle, refait à la main, n'était pas connu 
   `worktree_untracked.sh` : jamais un secret de signature, jamais un écrasement), puis `pr.copy_untracked`.
   Après le gauntlet, un requis absent du worktree est signalé et noté dans `untracked_missing`. Seuls les
   noms de fichiers sont affichés, jamais leur contenu.
+
+Amendement (2026-11-19, avec 0002) : seule Maëlle écrit un test pendant une revue, jetable, dans le dossier
+de la revue, copié le temps du run puis retiré du worktree par `review.sh probe`. Alice et Corentin n'en
+écrivent aucun : ce qu'ils ne prouvent pas en lisant ou en rejouant un test existant devient une remarque
+`to_verify` (avec `how`), que l'orchestrateur passe à Maëlle et que `review.sh` ne poste jamais.
 
 ## Conséquences
 

@@ -1,11 +1,14 @@
 # 0001 — Les tests sont écrits et gelés avant l'implémentation
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-05
-(tests sobres, plus bas), le 2026-11-16 (rouge pour la bonne raison) ; amendée par 0009 (liste des
-tests avant l'écriture)
+(tests sobres, plus bas), le 2026-11-16 (rouge pour la bonne raison), le 2026-11-19 (probes de debug) ;
+amendée par 0009 (liste des tests avant l'écriture)
+Amendée par 0017 (pas d'interpréteur pour les sous-agents)
 Où elle vit : `commands/feature.md` (étapes 3, 3b, 4) · `pipeline/feature/steps/3_tests.md` (gel,
-re-gel) · `hooks/pipeline-restrict-writes.sh` · `scripts/gauntlet/checks_test.sh`
-(`red_check`, `test_freeze_check`) · `scripts/pipeline.sh freeze|refreeze`
+re-gel) · `hooks/pipeline-restrict-writes.sh` et `hooks/fix-restrict-writes.sh` (zone `zz_probe_*`) ·
+`scripts/gauntlet/checks_test.sh` (`red_check`, `test_freeze_check`, `tests_added`) ·
+`scripts/pipeline.sh freeze|refreeze` · `scripts/fix_gauntlet.sh` (`no_probes`) · corps des agents
+qui écrivent du code (« Débugger un test gelé : le probe »)
 
 ## Contexte
 
@@ -64,6 +67,32 @@ une assertion. Un finder qui ne trouve pas sa clé compte comme une assertion : 
 feature complète, c'est le rouge attendu. La stack donne la cause (`test_results` → `cause`) ; un fichier
 accepté par Thibault va dans `pipeline.json → red_accept_error`, avec sa raison, comme `red_accept_green`.
 Mesure à faire : combien de gates `red` ce contrôle refuse, et combien de re-gels `technique` il évite.
+
+## Amendement du 2026-11-19 : les probes de debug
+
+Un test gelé ne se modifie pas, même le temps d'y glisser une trace. Les transcripts montrent l'effet de
+cette règle sans soupape : un implementer et un fix-implementer copiaient le test gelé dans
+`test/zz_debug_test.dart` par python pour y ajouter un `debugDumpApp()` ou un `print`, le lançaient et
+l'effaçaient ; refusé sur `test/zz_tmp_landscape_test.dart`, un autre refaisait la copie par `cp` puis
+`sed -i` à la racine du package. Désormais :
+
+- `<dossier de test>/zz_probe_*` (package de la feature et packages de `writes.extra` ; dans `/fix`, tout
+  chemin de test) est ouvert à l'implementer et à ses deux moitiés, au cleaner, au hardener, au
+  fix-implementer et au fix-reproducer. Pas aux relecteurs (0002) ni au polisher.
+- **Un probe n'est pas un test de la suite.** Il se lance par son chemin et s'efface dans la même
+  commande. `pipeline.sh freeze|refreeze` ne le gèle jamais ; `tests_added` ne l'enregistre pas comme un
+  test de Hugo.
+- Le filet reste le gauntlet : un probe oublié rougit `test_freeze_check` en `strict` comme en
+  `additive`, et `no_probes` dans les gates `red`, `repro_report` et `green` de `/fix`.
+- Les refus « tests GELÉS » donnent le chemin : « copie-le en `test/zz_probe_<nom>_test.dart`, lance-le
+  par son chemin et efface-le dans la même commande ».
+
+Risque gardé en tête : avec les deux moitiés d'Ivan en parallèle, un lancement de toute la suite par l'une
+peut ramasser le probe de l'autre. La consigne (lancer par le chemin, effacer dans la même commande) réduit
+la fenêtre ; elle ne la ferme pas.
+
+0017 ferme en amont le chemin qu'empruntaient ces copies (python, perl ou node inline chez les
+sous-agents) ; le gauntlet reste le filet en fin d'étape.
 
 ## Hors champ
 

@@ -10,8 +10,8 @@ se supprime pas.
 
 | # | Décision | Statut |
 |---|---|---|
-| [0001](0001-tests-geles-avant-implementation.md) | Les tests sont écrits et gelés avant l'implémentation | amendée par 0009 |
-| [0002](0002-revue-en-lecture-seule.md) | La revue est en lecture seule | acceptée |
+| [0001](0001-tests-geles-avant-implementation.md) | Les tests sont écrits et gelés avant l'implémentation | amendée par 0009, 0017 ; probes de debug (2026-11-19) |
+| [0002](0002-revue-en-lecture-seule.md) | La revue est en lecture seule | amendée (2026-11-19 : « à vérifier ») |
 | [0003](0003-gauntlet-seul-juge.md) | Le gauntlet est le seul juge d'une étape | acceptée |
 | [0004](0004-evidence-par-etape.md) | Chaque étape laisse ses preuves, l'evidence les rassemble | acceptée |
 | [0005](0005-pas-d-arret-sans-thibault.md) | Le pipeline ne s'arrête que pour attendre Thibault (watchdog /feature et /fix, attente bloquante) | amendée |
@@ -21,7 +21,7 @@ se supprime pas.
 | [0009](0009-liste-des-tests-avant-ecriture.md) | La liste des tests se décide avant d'en écrire un | acceptée |
 | [0010](0010-question-qui-se-suffit.md) | Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même | acceptée |
 | [0011](0011-un-dossier-par-langage.md) | Ce qui est propre à un langage vit dans son dossier et ne se charge que pour ce langage | acceptée |
-| [0012](0012-revue-sans-effet-sur-l-environnement-partage.md) | Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé | acceptée |
+| [0012](0012-revue-sans-effet-sur-l-environnement-partage.md) | Une revue lit la config à la racine du repo, prépare son worktree et n'installe rien sur le simulateur partagé | amendée (2026-11-19) |
 | [0013](0013-epic-lance-les-sous-sessions.md) | /epic orchestre les /feature et les /fix et lance lui-même leurs sessions | acceptée |
 | [0014](0014-un-epic-a-son-plan.md) | Un epic a son plan dans `.claude/plans/`, écrit avant tout lancement | acceptée |
 | [0015](0015-scenarios-avant-contrats.md) | Les scénarios Gherkin s'écrivent avant les contrats, et les contrats en sortent | acceptée, amendée |
