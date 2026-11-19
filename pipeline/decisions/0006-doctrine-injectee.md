@@ -2,7 +2,8 @@
 
 Statut : remplacée par 0008 (2026-11-05) : au-delà de 10 Ko, Claude Code range la sortie d'un hook dans un
 fichier et n'en donne qu'un aperçu ; 14 agents sur 16 ne recevaient que le début de leur doctrine.
-Où elle vit : `hooks/doctrine.py` et `hooks/doctrine.json` (hook `SubagentStart` de `settings.json`)
+Où elle vivait : `hooks/doctrine.py` et `hooks/doctrine.json` (hook `SubagentStart` de `settings.json`), retirés
+par `060a1bf` (doctrine préchargée en skills, `skills:` du frontmatter des agents : voir 0008)
 
 ## Contexte
 

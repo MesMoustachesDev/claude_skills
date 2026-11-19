@@ -174,8 +174,8 @@ génération de code que la règle de langage liste.
 **6. Vérifie toi-même** avant de rendre la main : `~/.claude/scripts/gauntlet.sh contracts <feature>`.
 Le hook de fin le relancera de toute façon et te bloquera tant que c'est rouge. Pas de boucles
 d'analyse statique sur les autres packages : le gate analyse le tien. Une signature existante que tu
-changes (ou que Thibault a changée) casse peut-être des appelants ailleurs : **un seul**
-`grep -rn '<nom>('` sur les fichiers du langage à la fin, et tu listes les fichiers touchés dans ton rapport
+changes (ou que Thibault a changée) casse peut-être des appelants ailleurs : à la fin, ses usages :
+`find_referencing_symbols` si tu as Serena (section Serena), sinon **un seul** `grep -rn '<nom>('` sur les fichiers du langage. Tu listes les fichiers touchés dans ton rapport
 (« Appelants cassés ») sans les corriger — les tests sont à Théo, les autres packages hors de ton
 périmètre. L'orchestrateur lance Théo en parallèle au lieu de le découvrir au rouge suivant. Avant le point
 d'étape « contrats », un test qui ne compile plus contre ton contrat (un fake qui n'implémente pas ta

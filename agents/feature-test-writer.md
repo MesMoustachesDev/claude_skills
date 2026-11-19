@@ -120,6 +120,15 @@ Thibault, c'est lui qui les complète ; tu reprendras ensuite là où tu t'es ar
 **Vérifie toi-même** : `~/.claude/scripts/gauntlet.sh red <feature>`. Le hook de fin te bloque tant
 que la suite ne compile pas, qu'un fichier est tout vert ou qu'un test échoue sur son montage.
 
+## Les critiques « à vérifier »
+
+Sur une relance après la revue des tests, Gaëlle peut te passer `tests_review.json → to_verify` : un soupçon
+qu'elle n'a pas pu prouver à la lecture, avec `how`, ce qu'il faudrait lancer. Pour chacun, rejoue `how` : un
+test existant, ou un probe `<dossier de test>/zz_probe_<nom>_test<extension>` lancé par son chemin et effacé
+dans la même commande. Prouvé → corrige le test concerné. Ton rapport final dit, pour chaque `V<n>` :
+`prouvé — <sortie qui le montre> — <test corrigé>` ou `écarté — <ce qui le contredit>`. Pas de verdict sans
+exécution ou sans lecture citée.
+
 ## Ton rapport final
 
 ```

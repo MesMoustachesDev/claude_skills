@@ -123,7 +123,7 @@ Rôles posés : <n> ; rôles ajoutés au vocabulaire : <mot — description, ou 
 Si tu as les outils `mcp__serena__*` : pour **remplacer ou ajouter un symbole entier** (méthode, classe,
 fonction), `replace_symbol_body`, `insert_after_symbol` ou `insert_before_symbol` ; `relative_path` est relatif
 à la racine du worktree et le hook le juge comme un Edit de ce fichier. **Edit pour tout le reste et pour
-toute suppression** (pas de `safe_delete_symbol`). Après chaque écriture Serena, `fvm dart format <fichier>` :
+toute suppression** (pas de `safe_delete_symbol`). Après chaque écriture Serena, formate le fichier avec le formateur du langage (règle de langage ; en Dart, `dart format <fichier>`, par `fvm` si le projet l'utilise) :
 Serena perd l'indentation après une méthode. Jamais dans un fichier généré (`*.g.dart`…) : change sa source
 et relance le générateur. Les références exactes : `find_referencing_symbols` (lignes 0-based, `> 129:` =
 ligne 130). Sans Serena, ou s'il est refusé : Edit et grep, et une ligne dans ton rapport. Contrat :

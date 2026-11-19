@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pipeline-restrict-writes.sh — PreToolUse (Edit|Write|MultiEdit|NotebookEdit|Bash) déclaré dans le
+# pipeline-restrict-writes.sh — PreToolUse (Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__serena__.*) déclaré dans le
 # frontmatter des agents feature-*. Chaque agent n'écrit que dans sa zone. Tout le reste est refusé
 # avec une raison lisible par l'agent.
 #

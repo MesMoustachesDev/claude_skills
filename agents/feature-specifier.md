@@ -54,8 +54,9 @@ discussion : ce temps est gratuit, celui de la spec est sur le chemin critique. 
 (paquet tiers, plugin, plateforme) que la feature touchera, réponds aux questions dont la spec aura besoin en
 §6 et §7 : ce qu'elle lève et quand (exception, `Error`, valeur nulle, flux qui se ferme), ses cas limites
 (entrée vide, invalide, énorme), son comportement asynchrone (cache, ordre, annulation). Lis ses sources
-(où les trouver, à la version résolue : règle de langage), et, si la lecture ne
-suffit pas, une sonde jetable dans ton scratchpad, jamais dans le repo. Écris-les dans une section
+(où les trouver, à la version résolue : règle de langage). Si la lecture ne suffit pas, ne sonde pas : tu
+n'écris que dans le dossier de la feature, et un script écrit pendant la session est refusé (ADR 0017) ;
+mets la question dans `## Inconnues ouvertes`, avec le test qui la tranchera. Écris-les dans une section
 `## Inconnues techniques levées` d'`exploration.md` : une ligne par fait, avec `fichier:ligne` dans les
 sources du paquet. Ce qui reste ouvert après ça : `## Inconnues ouvertes`, une ligne chacune.
 

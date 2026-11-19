@@ -61,7 +61,7 @@ Ont Serena en écriture (`serena.sh serve --ecriture`) : feature-implementer, se
   suppression**. Pas de `safe_delete_symbol` (il casse une variable ou un champ, et refuse de supprimer une
   classe inutilisée qui a un constructeur), pas de `rename_symbol` (il réécrit des fichiers que le hook ne
   voit pas, dont les tests gelés) : le hook les refuse.
-- Après chaque écriture Serena : `fvm dart format <fichier>`. Serena perd l'indentation après une méthode.
+- Après chaque écriture Serena : le formateur du langage sur ce fichier (règle de langage ; en Dart, `dart format <fichier>`, par `fvm` si le projet l'utilise). Serena perd l'indentation après une méthode.
 - Le hook juge `relative_path` (relatif à la racine du worktree) comme un Edit de ce fichier : même zone, tests
   gelés refusés. Il refuse en plus les fichiers générés (`*.g.dart`, `*.freezed.dart`, l10n générée…), où
   Serena écrirait sans broncher : on change la source et on relance le générateur.

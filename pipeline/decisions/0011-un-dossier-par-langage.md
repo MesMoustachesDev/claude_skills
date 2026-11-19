@@ -3,7 +3,7 @@
 Statut : acceptée (2026-11-06), amendée le 2026-11-06 (check non applicable ; outil absent du projet, rapport et evidence)
 Où elle vit : `scripts/stack.sh` (détection, valeurs) · `stacks/<langage>/` (`stack.ini`, `checks.sh`,
 `templates/`) · `rules/stacks/<langage>*.md` (doctrine, frontmatter `paths:`) · `stacks/README.md` ·
-`scripts/gauntlet/tests/test_stack.sh` · plan `.claude/plans/langages.md`
+`scripts/gauntlet/tests/test_stack.sh`
 
 ## Contexte
 

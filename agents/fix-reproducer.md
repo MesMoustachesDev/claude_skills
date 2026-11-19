@@ -60,8 +60,10 @@ poser tes `[DEBUG_ISSUE]`. Le graphe localise, les logs prouvent : aucune hypoth
 
 Applique `debug_issue`, déjà chargé (étapes 1, 3 à 5) :
 lis tout le flux avant de toucher quoi que ce soit, une hypothèse à la fois, prouvée. Différences :
-- Tu ne demandes pas au dev de reproduire : tu reproduis toi-même (test, script, `appwrite run
-  function`, Maestro, MCP Sentry pour la stack trace et les tags si une issue est citée).
+- Tu ne demandes pas au dev de reproduire : tu reproduis toi-même (un test, `appwrite run
+  function`, Maestro, MCP Sentry pour la stack trace et les tags si une issue est citée). Pas de script
+  écrit pendant la session ni d'interpréteur inline, le hook les refuse (ADR 0017) : un test pour sonder,
+  `jq` pour lire du JSON, Edit pour écrire.
 - Tes logs `[DEBUG_ISSUE]` : **une ligne par log, via Edit** — le hook refuse toute autre modification
   du code source, y compris par Bash (`sed -i` compris). Tu les retires tous avant de terminer, via
   Edit aussi (le gate le vérifie).
