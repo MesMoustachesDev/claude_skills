@@ -149,7 +149,8 @@ def resolve(root, target):
             info.update(kind="gitlab", source=j.get("source_branch"), base=j.get("target_branch"),
                         title=j.get("title"), description=j.get("description") or "",
                         author=(j.get("author") or {}).get("username"), url=j.get("web_url"),
-                        labels=j.get("labels") or [], diff_refs=j.get("diff_refs") or {})
+                        labels=j.get("labels") or [], diff_refs=j.get("diff_refs") or {},
+                        head_sha=(j.get("diff_refs") or {}).get("head_sha") or j.get("sha"))
             return info
     if num and shutil.which("gh"):
         r = run(["gh", "pr", "view", num, "--json", "headRefName,baseRefName,title,body,author,url,labels,headRefOid"],
@@ -181,6 +182,9 @@ def cmd_init(args):
             old = json.load(f)
         if old.get("project_root") == root and not stage_done(old, "synthesis"):
             print(f"reprise : revue {slug} déjà en cours (étape suivante : review.sh next {slug})")
+            rv = Review(slug)
+            refresh_refs(rv)
+            warn_moved(rv.s)
             print(json.dumps({"slug": slug, "dir": d, "key": old.get("key")}, ensure_ascii=False))
             return
     project = project_name(root)
@@ -200,17 +204,163 @@ def cmd_init(args):
 
 
 # ---------------------------------------------------------------------------
+# Tête de la MR : relue sur la forge, jamais supposée stable (une MR se rebase pendant la revue)
+# ---------------------------------------------------------------------------
+def forge_refs(s):
+    """{head_sha, diff_refs} de la MR/PR, relus sur la forge ; None si elle ne répond pas."""
+    cmd = None
+    if s.get("kind") == "gitlab" and shutil.which("glab"):
+        cmd = ["glab", "mr", "view", str(s["number"]), "--output", "json"]
+    elif s.get("kind") == "github" and shutil.which("gh"):
+        cmd = ["gh", "pr", "view", str(s["number"]), "--json", "headRefOid,baseRefOid"]
+    if not cmd:
+        return None
+    try:
+        p = subprocess.run(cmd, cwd=s["project_root"], capture_output=True, text=True, timeout=30)
+        j = json.loads(p.stdout) if p.returncode == 0 and p.stdout.strip() else None
+    except (subprocess.TimeoutExpired, json.JSONDecodeError):
+        j = None
+    if not isinstance(j, dict):
+        return None
+    if s["kind"] == "gitlab":
+        refs = {k: v for k, v in (j.get("diff_refs") or {}).items() if k in ("base_sha", "start_sha", "head_sha")}
+        head = refs.get("head_sha") or j.get("sha")
+    else:
+        head = j.get("headRefOid")
+        refs = {"head_sha": head, "base_sha": j.get("baseRefOid")}
+    if not (isinstance(head, str) and re.fullmatch(r"[0-9a-f]{40}", head)):
+        return None
+    return {"head_sha": head, "diff_refs": refs}
+
+
+def refresh_refs(r):
+    """Relit la tête et les diff_refs de la MR et les écrit dans l'état. Renvoie la tête, ou None (forge muette :
+    l'état garde les anciens, et le dit)."""
+    s = r.s
+    if s.get("kind") not in ("gitlab", "github"):
+        return None
+    got = forge_refs(s)
+    if not got:
+        print(f"[WARN] {s['kind']} ne répond pas : tête de la MR non relue, l'état garde {short(s.get('head_sha'))}")
+        return None
+    old = s.get("head_sha") or (s.get("diff_refs") or {}).get("head_sha")
+    if old and got["head_sha"] != old:
+        s.setdefault("heads_seen", []).append({"head_sha": old, "replaced_at": now()})
+        print(f"la MR a bougé : {short(old)} → {short(got['head_sha'])} (rebase ou nouveaux commits)")
+    s["head_sha"], s["diff_refs"], s["refs_at"] = got["head_sha"], got["diff_refs"], now()
+    r.save()
+    return got["head_sha"]
+
+
+def short(sha):
+    return (sha or "?")[:8]
+
+
+def moved_heads(s):
+    """[(qui, tête relue)] pour le gauntlet et chaque agent qui ont relu une autre tête que celle de la MR."""
+    cur = s.get("head_sha")
+    if not cur:
+        return []
+    out = [("gauntlet", s["gauntlet_head"])] if s.get("gauntlet_head") and s["gauntlet_head"] != cur else []
+    for role in ROLES:
+        h = ((s.get("agents") or {}).get(role) or {}).get("head")
+        if h and h != cur:
+            out.append((role, h))
+    return out
+
+
+def warn_moved(s):
+    moved = moved_heads(s)
+    if moved:
+        print(f"[WARN] la MR est à {short(s['head_sha'])}, mais "
+              + ", ".join(f"{who} a relu {short(h)}" for who, h in moved)
+              + " : relance le gauntlet (et les agents si le code relu a changé) ; post recale les lignes sur la tête de la MR")
+    return moved
+
+
+def reviewed_head(s, role=None):
+    """La tête que l'auteur d'une remarque a relue : celle de son agent, sinon celle du gauntlet, sinon (état d'avant
+    ce suivi) la première tête vue à l'init."""
+    return (((s.get("agents") or {}).get(role) or {}).get("head") or s.get("gauntlet_head")
+            or ((s.get("heads_seen") or [{}])[0]).get("head_sha"))
+
+
+def has_commit(cwd, sha):
+    return bool(sha) and run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=cwd, check=False).returncode == 0
+
+
+def ensure_commit(s, sha):
+    """Le commit `sha` présent localement (fetch de la branche, puis du SHA lui-même) ; False s'il reste introuvable."""
+    root = s["project_root"]
+    if has_commit(root, sha):
+        return True
+    fetches = [[s["remote"], f"+refs/heads/{s['source']}:refs/remotes/{s['remote']}/{s['source']}"]]
+    if s.get("base"):
+        fetches.append([s["remote"], f"+refs/heads/{s['base']}:refs/remotes/{s['remote']}/{s['base']}"])
+    fetches.append([s["remote"], sha])
+    for f in fetches:
+        try:
+            run(["git", "fetch", "-q", *f], cwd=root, check=False, timeout=120)
+        except subprocess.TimeoutExpired:
+            continue
+        if has_commit(root, sha):
+            return True
+    return False
+
+
+HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+def map_line(cwd, old, new, path, line):
+    """Le numéro qu'a, dans `new`, la ligne `line` de `path` dans `old` ; None si elle a été modifiée ou supprimée
+    entre les deux (ou si le diff est impossible)."""
+    p = run(["git", "diff", "-U0", "--no-color", old, new, "--", path], cwd=cwd, check=False)
+    if p.returncode != 0:
+        return None
+    off = 0
+    for l in p.stdout.splitlines():
+        m = HUNK.match(l)
+        if not m:
+            continue
+        a, b = int(m.group(1)), int(m.group(2) if m.group(2) is not None else 1)
+        d = int(m.group(4) if m.group(4) is not None else 1)
+        if b == 0:          # insertion après la ligne a
+            if a >= line:
+                break
+            off += d
+        else:
+            if line < a:
+                break
+            if line < a + b:
+                return None
+            off += d - b
+    return line + off
+
+
+# ---------------------------------------------------------------------------
 # next / status / bookkeeping
 # ---------------------------------------------------------------------------
 def cmd_next(r, args):
     n = next_step(r.s)
     s = r.s
+    if n["key"] != "done" and s.get("kind") in ("gitlab", "github"):
+        if "--json" in args:
+            with open(os.devnull, "w") as null:   # le JSON reste seul sur stdout
+                old, sys.stdout = sys.stdout, null
+                try:
+                    refresh_refs(r)
+                finally:
+                    sys.stdout = old
+        else:
+            refresh_refs(r)
     info = {"slug": r.slug, "key": s["key"], **n, "step_file": os.path.join(STEPS_DIR, n["file"]) if n["file"] else None,
             "dir": r.dir, "gauntlet_report": os.path.join(s["gauntlet_out"], "report.md"), "worktree": s.get("worktree"),
-            "agents": {k: v.get("status") for k, v in (s.get("agents") or {}).items()}}
+            "agents": {k: v.get("status") for k, v in (s.get("agents") or {}).items()},
+            "head_sha": s.get("head_sha"), "head_moved": {who: h for who, h in moved_heads(s)}}
     if "--json" in args:
         print(json.dumps(info, ensure_ascii=False, indent=2))
         return
+    warn_moved(s)
     print(f"étape     : {n['step']} — {n['title']}")
     if info["step_file"]:
         print(f"lis       : {info['step_file']}")
@@ -295,6 +445,9 @@ def cmd_agent(r, args):
         die("usage : agent <slug> <archi|code|qa> <running|done|skipped|failed> [\"<résumé>\"]")
     a = r.s.setdefault("agents", {}).setdefault(args[0], {})
     a.update({"status": args[1], "at": now()})
+    # La tête que l'agent relit : celle du worktree du gauntlet, notée à son départ (post recale ses lignes dessus).
+    if r.s.get("gauntlet_head") and (args[1] == "running" or not a.get("head")):
+        a["head"] = r.s["gauntlet_head"]
     if len(args) > 2:
         a["summary"] = args[2]
     if args[1] == "done" and not os.path.isfile(r.file(f"findings_{args[0]}.json")):
@@ -312,6 +465,7 @@ def cmd_gauntlet(r, args):
     old = remove_worktree(s)  # un nouveau run sort un nouveau worktree : l'ancien ne doit pas traîner
     if old:
         print(f"ancien worktree supprimé : {old}")
+    refresh_refs(r)  # la MR a pu être rebasée depuis l'init : diff_refs relus avant de sortir la branche
     cmd = [PR_GAUNTLET, s["target"], "--keep", "--out", s["gauntlet_out"]]
     if s.get("base"):
         cmd += ["--base", s["base"]]
@@ -324,6 +478,11 @@ def cmd_gauntlet(r, args):
     m = re.search(r"worktree conservé : (\S.*)$", out, re.M)
     if m:
         s["worktree"] = m.group(1).strip()
+    if s.get("worktree") and os.path.isdir(s["worktree"]):
+        s["gauntlet_head"] = git("rev-parse", "HEAD", cwd=s["worktree"], check=False) or None
+        if s.get("head_sha") and s["gauntlet_head"] and s["gauntlet_head"] != s["head_sha"]:
+            print(f"[WARN] le gauntlet a sorti {short(s['gauntlet_head'])}, la forge annonce {short(s['head_sha'])} : "
+                  "la branche a bougé pendant le run, relance-le")
     report = read_text(os.path.join(s["gauntlet_out"], "report.md")) or ""
     m = re.search(r"^# Gauntlet PR — `[^`]+` → `([^`]+)`", report, re.M)
     if m and not s.get("base"):
@@ -903,9 +1062,21 @@ def write_comments(r, f, triage):
 # ---------------------------------------------------------------------------
 # Publication
 # ---------------------------------------------------------------------------
-def diff_range(r):
-    """(dossier où lancer git, merge-base, tête de la MR) : le worktree s'il existe, sinon le repo du projet."""
+def diff_range(r, head_sha=None):
+    """(dossier où lancer git, merge-base, tête de la MR) : le worktree s'il existe, sinon le repo du projet.
+    Avec `head_sha` (la tête relue sur la forge, présente localement) : ce commit, dans le repo du projet, et la
+    base des diff_refs de la forge quand elle est là (c'est contre elle que la forge place un commentaire)."""
     s = r.s
+    if head_sha:
+        cwd = s["project_root"]
+        base_sha = (s.get("diff_refs") or {}).get("base_sha")
+        if (s.get("diff_refs") or {}).get("head_sha") == head_sha and has_commit(cwd, base_sha):
+            return cwd, base_sha, head_sha
+        for ref in ((f"{s['remote']}/{s['base']}", s["base"]) if s.get("base") else ()):
+            mb = git("merge-base", head_sha, ref, cwd=cwd, check=False)
+            if mb:
+                return cwd, mb, head_sha
+        return cwd, "", head_sha
     wt = s.get("worktree")
     base = s.get("base")
     cwd = wt if wt and os.path.isdir(wt) else s["project_root"]
@@ -957,9 +1128,9 @@ def diff_snippet(r, path, line, radius=None):
     return None
 
 
-def diff_lines(r):
+def diff_lines(r, head_sha=None):
     """Lignes ajoutées ou modifiées par la MR, par fichier (côté nouvelle version) : où un commentaire en ligne est accepté."""
-    cwd, mb, head = diff_range(r)
+    cwd, mb, head = diff_range(r, head_sha)
     if not mb:
         return {}
     out, cur, ln = {}, None, 0
@@ -975,10 +1146,29 @@ def diff_lines(r):
     return out
 
 
+def relocate(r, x, head):
+    """(ligne dans `head`, tête relue, motif) pour la remarque `x`, écrite sur la tête qu'a relue son agent.
+    Ligne None : elle a changé (ou disparu) entre la tête relue et `head`, ou la tête relue est introuvable."""
+    s, line = r.s, int(x["line"])
+    seen = reviewed_head(s, x.get("role"))
+    if not head or not seen or seen == head:
+        return line, seen, None
+    if not ensure_commit(s, seen):
+        return None, seen, f"tête relue {short(seen)} introuvable localement"
+    new = map_line(s["project_root"], seen, head, x["file"], line)
+    return new, seen, (None if new is not None else f"ligne {line} modifiée entre {short(seen)} et {short(head)}")
+
+
 def post_calls(r):
+    """Les appels de publication, calculés sur la tête de la MR telle que la forge l'annonce MAINTENANT : diff_refs
+    relus, lignes des remarques recalées de la tête relue par l'agent vers cette tête, en ligne seulement si la ligne
+    recalée est dans le diff de cette tête."""
     s, f = r.s, load_findings(r)
     triage = s.get("triage") or {}
-    in_diff = diff_lines(r)
+    head = refresh_refs(r) or s.get("head_sha")
+    if head and not ensure_commit(s, head):
+        die(f"tête de la MR {short(head)} introuvable localement, même après fetch : rien ne peut être placé en ligne")
+    in_diff = diff_lines(r, head)
     done = {p["id"] for p in s.get("posted") or []}
     calls = []
     for x in f["findings"]:
@@ -988,7 +1178,16 @@ def post_calls(r):
         if x["severity"] == "to_verify":   # non prouvée : jamais postée, même cochée « commenter »
             continue
         body = t["text"]
-        inline = x.get("file") and x.get("line") and int(x["line"]) in in_diff.get(x["file"], set())
+        line, seen, why = (relocate(r, x, head) if x.get("file") and x.get("line") else (None, None, None))
+        inline = bool(line) and line in in_diff.get(x["file"], set())
+        if line:
+            where = f"`{x['file']}:{line}` — "
+        elif x.get("file") and x.get("line"):
+            where = f"`{x['file']}:{x['line']}` (au commit {short(seen)}) — "
+        else:
+            where = f"`{x['file']}` — " if x.get("file") else ""
+        moved = {"from": int(x["line"]), "to": line, "seen": seen, "why": why} \
+            if x.get("line") and (why or (line and line != int(x["line"]))) else None
         if s["kind"] == "gitlab":
             if inline:
                 refs = s.get("diff_refs") or {}
@@ -996,26 +1195,23 @@ def post_calls(r):
                 payload = {"body": body, "position": {
                     "position_type": "text", "base_sha": refs.get("base_sha"), "start_sha": refs.get("start_sha"),
                     "head_sha": refs.get("head_sha"), "new_path": x["file"], "old_path": x["file"],
-                    "new_line": int(x["line"])}}
+                    "new_line": line}}
                 cmd = ["glab", "api", "--method", "POST", f"projects/:id/merge_requests/{s['number']}/discussions",
                        "-H", "Content-Type: application/json", "--input", "-"]
-                calls.append({"id": x["id"], "inline": True, "cmd": cmd,
+                calls.append({"id": x["id"], "inline": True, "cmd": cmd, "line": line, "head": head, "moved": moved,
                               "stdin": json.dumps(payload, ensure_ascii=False)})
                 continue
-            else:
-                where = f"`{x['file']}:{x['line']}` — " if x.get("file") and x.get("line") else (f"`{x['file']}` — " if x.get("file") else "")
-                cmd = ["glab", "mr", "note", str(s["number"]), "-m", where + body]
+            cmd = ["glab", "mr", "note", str(s["number"]), "-m", where + body]
         elif s["kind"] == "github":
             if inline:
                 cmd = ["gh", "api", "--method", "POST", f"repos/{{owner}}/{{repo}}/pulls/{s['number']}/comments",
-                       "-f", f"body={body}", "-f", f"commit_id={s.get('head_sha')}", "-f", f"path={x['file']}",
-                       "-F", f"line={int(x['line'])}", "-f", "side=RIGHT"]
+                       "-f", f"body={body}", "-f", f"commit_id={head}", "-f", f"path={x['file']}",
+                       "-F", f"line={line}", "-f", "side=RIGHT"]
             else:
-                where = f"`{x['file']}:{x['line']}` — " if x.get("file") and x.get("line") else ""
                 cmd = ["gh", "pr", "comment", str(s["number"]), "--body", where + body]
         else:
             continue
-        calls.append({"id": x["id"], "inline": bool(inline), "cmd": cmd})
+        calls.append({"id": x["id"], "inline": inline, "cmd": cmd, "line": line, "head": head, "moved": moved})
     return calls
 
 
@@ -1029,8 +1225,19 @@ def cmd_post(r, args):
         return
     if "--go" not in args:
         print("APERÇU — rien n'est envoyé. Montre ce texte à Thibault ; --go seulement après son « go » explicite.")
+        head = next((c["head"] for c in calls if c.get("head")), None)
+        if head:
+            print(f"tête de la MR (relue sur la forge) : {head}")
+        warn_moved(s)
         for c in calls:
-            print(f"\n{c['id']} ({'en ligne' if c['inline'] else 'commentaire général'}) :")
+            print(f"\n{c['id']} ({'en ligne' if c['inline'] else 'commentaire général'}"
+                  + (f", ligne {c['line']}" if c.get("line") else "") + ") :")
+            mv = c.get("moved")
+            if mv and mv.get("to"):
+                print(f"  recalée : ligne {mv['from']} relue sur {short(mv['seen'])} → ligne {mv['to']} sur {short(c['head'])}"
+                      " (les numéros cités dans le texte ne sont pas recalés : relis-le)")
+            elif mv:
+                print(f"  non recalable ({mv['why']}) : part en commentaire général, citée au commit relu")
             print("  " + " ".join(json.dumps(a, ensure_ascii=False) if " " in a or "\n" in a else a for a in c["cmd"]))
             if c.get("stdin"):
                 print("  stdin : " + c["stdin"])
@@ -1039,7 +1246,8 @@ def cmd_post(r, args):
     for c in calls:
         p = subprocess.run(c["cmd"], cwd=s["project_root"], capture_output=True, text=True, input=c.get("stdin"))
         if p.returncode == 0:
-            s.setdefault("posted", []).append({"id": c["id"], "inline": c["inline"], "at": now()})
+            s.setdefault("posted", []).append({"id": c["id"], "inline": c["inline"], "at": now(),
+                                               "line": c.get("line"), "head_sha": c.get("head")})
             r.save()
             print(f"{c['id']} : publié")
         else:

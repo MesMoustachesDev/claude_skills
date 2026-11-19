@@ -6,7 +6,10 @@ compilation et les tests de chaque package touché prennent plusieurs minutes. L
 temporaire (l'arbre de travail de Thibault n'est pas touché), chaque package touché passe le profil
 `pr` **en mode extend** (périmètre = diff vs la cible de la MR : la dette préexistante ne compte pas),
 `dedup_candidates.json` est produit par package, et `report.md` est écrit. Le chemin du worktree est
-enregistré dans l'état.
+enregistré dans l'état, avec la tête qu'il a sortie (`gauntlet_head`) ; les `diff_refs` de la MR sont
+relus sur la forge juste avant. `review.sh agent <slug> <rôle> running` note cette tête pour chaque agent.
+`review.sh next` relit la tête de la MR à chaque appel et affiche `[WARN] la MR est à …, mais code a relu …`
+quand elle a bougé (rebase) : dis-le à Thibault, relance le gauntlet, et les agents si le code relu a changé.
 
 Puis **lis `report.md` en entier**. Il contient :
 - les checks PR (taille, commits, lock, tests touchés) et, par package, les `[OK]` / `[WARN]` /

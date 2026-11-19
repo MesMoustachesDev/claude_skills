@@ -8,7 +8,7 @@
 #   review.sh init <branche | !N | #N | URL>     résout la cible, crée l'état, imprime slug et dossiers
 #   review.sh preflight <slug>                   vérifie outillage, QA, graphe, auth de la forge AVANT le gauntlet
 #   review.sh decide <slug> <domaine> "<décision>"  trace ce que Thibault a tranché au préflight
-#   review.sh next <slug> [--json]               étape suivante et fichier d'étape à lire
+#   review.sh next <slug> [--json]               étape suivante, fichier d'étape à lire ; relit la tête de la MR et signale un rebase
 #   review.sh status <slug>                      état de la revue
 #   review.sh gauntlet <slug> [--mutation]       pr_gauntlet.sh avec worktree conservé, chemin enregistré
 #   review.sh agent <slug> <archi|code|qa> <running|done|skipped|failed> ["<résumé>"]
@@ -24,7 +24,7 @@
 #   review.sh cockpit-push <slug> <dossier> [--versions id=v,…] [--hub-version N]  page (writes) + ligne de l'accueil (hub_writes)
 #   review.sh triage-pull <slug> <dossier>       applique le tri fait dans le cockpit, écrit comments.md
 #   review.sh check-comments <slug>             vérifie les commentaires retenus contre ma voix (voix_revue.md)
-#   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie
+#   review.sh post <slug> [--go]                 sans --go : les appels exacts ; avec --go : les publie (diff_refs relus, lignes recalées sur la tête de la MR)
 #   review.sh cleanup <slug>                     supprime le worktree et le simulateur de la revue (garde rapports et captures)
 #   review.sh cockpit-page <slug> <dossier>      copie de la page du cockpit pour cette revue (à publier au démarrage)
 #   review.sh page-deleted <slug>                la page de la revue a été supprimée (carte gardée dans l'accueil)

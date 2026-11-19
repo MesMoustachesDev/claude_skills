@@ -4,7 +4,11 @@ Une revue de branche sans MR/PR : rien à publier, `review.sh pass <slug> posted
 
 1. `review.sh post <slug>` (sans `--go`) : l'aperçu, rien n'est envoyé. Pour chaque remarque retenue,
    le commentaire tel qu'il partira, et s'il sera **en ligne** (ligne modifiée par la MR) ou
-   **général** (ailleurs : il est préfixé de `fichier:ligne`).
+   **général** (ailleurs : il est préfixé de `fichier:ligne`). `post` relit d'abord la tête et les `diff_refs`
+   de la MR sur la forge (aperçu compris) : si la MR a été rebasée ou a reçu des commits depuis la relecture,
+   chaque ligne est recalée de la tête relue par l'agent vers la tête actuelle (`recalée : ligne 5 … → ligne 8`),
+   et une ligne modifiée entre-temps part en général, citée au commit relu. Les numéros de ligne écrits **dans
+   le texte** d'un commentaire ne sont pas recalés : relis-les quand l'aperçu annonce un recalage.
 2. `review.sh check-comments <slug>` : chaque commentaire retenu contre sa voix (tirets cadratins,
    caractères non tapés au clavier, tournures d'IA, « nous », formules creuses, piques hors revue). Un
    commentaire signalé : corrige-le en gardant le sens (dans le cockpit par `ArtifactData` `set` sur
