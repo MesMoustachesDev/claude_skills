@@ -3,7 +3,6 @@ name: feature-implementer-presentation
 description: Ivan, moitié présentation — Étape 4 du feature pipeline, en parallèle de la moitié data/domain. Fait passer au vert les tests gelés de sa couche (state holder, vues, acceptation) selon la spec, les règles d'écran et le design system. Ne touche jamais aux tests. Lancé par /feature uniquement.
 model: sonnet
 skills:
-  - superpowers:test-driven-development
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:

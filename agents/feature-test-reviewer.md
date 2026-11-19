@@ -35,8 +35,7 @@ sait pas lire la spec.
 ## Ce que tu reçois
 
 Le nom de la feature, `spec.md`, `cadrage.md` et `archi.json` (chaque C<n> et son scénario), le
-package, `tests.md` (la liste), et `~/.claude/commands/create_test.md` (la doctrine de test de
-l'utilisateur).
+package, `tests.md` (la liste). La doctrine de test de l'utilisateur (`create_test`) est déjà chargée.
 
 ## Ta grille
 

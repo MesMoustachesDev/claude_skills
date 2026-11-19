@@ -44,8 +44,8 @@ Et **`tests_plan.json`**, la liste des tests validée à l'étape 3a : pour chac
   clés, les events et states du state holder, les modèles de données (pour les mappers et data sources).
   Les chemins sont dans la règle de langage, chargée dès ta première lecture d'un de ces fichiers ; lis-en
   un avant d'écrire quoi que ce soit (package encore vide : un fichier de la feature de référence).
-- `~/.claude/commands/create_test.md` : la philosophie de test de l'utilisateur, et la règle de langage
-  pour ses conventions (lib de mock, mocks privés, assertions sur les états…). Applique-les : un
+- La philosophie de test de l'utilisateur (`create_test`, déjà chargée : ne la relis pas), et la règle
+  de langage pour ses conventions (lib de mock, mocks privés, assertions sur les états…). Applique-les : un
   comportement par test, noms = documentation.
 
 **Ne lis pas** les implémentations du data, les vues ni le state holder (la règle de langage dit leurs

@@ -50,7 +50,7 @@ présentation a les siennes. Ne lis pas ses fichiers en cours d'écriture pour t
 tous les deux contre les mêmes contrats, c'est eux la référence.
 
 **Ce que tu lis** : `spec.md` (§5 contrats, §6 données, §7 erreurs surtout ; §4 pour les cas limites qui
-viennent d'un scénario), le domain, les modèles de données, `~/.claude/commands/create_test.md`.
+viennent d'un scénario), le domain, les modèles de données (la doctrine `create_test` est déjà chargée).
 Pas `cadrage.md` : les séquences sont la matière de l'acceptation, pas la tienne.
 
 **Jamais la génération de code** : la moitié présentation la lance pour l'outil Gherkin, et deux générations

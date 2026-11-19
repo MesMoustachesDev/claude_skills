@@ -37,7 +37,7 @@ et les logs par package), la base et la source.
 1. **Le référentiel.** `.claude/rules/pr_rules.md` du projet, chargé d'office dans ton contexte (gestion
    des erreurs, async, widgets, tests, sécurité, divers : priorité absolue), `CLAUDE.md` du projet,
    `.claude/rules/create_feature_rules.md` (l10n, design system, couches), puis
-   `~/.claude/pipeline/review_grid.md` : les **règles universelles** en entier, et de la grille de
+   la grille `doctrine-review-grid`, déjà chargée : les **règles universelles** en entier, et de la grille de
    maintenabilité tes items *Design system et l10n*, *Lisibilité à froid*, *Tests*.
 2. **Le gauntlet d'abord.** Chaque `[FAIL]` du rapport devient une remarque `critical` telle quelle
    (fichier et ligne du script), chaque `[WARN]` une `suggestion`. Ne les reformule pas en « pourrait » :

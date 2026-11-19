@@ -3,7 +3,6 @@ name: fix-implementer
 description: Fanny — Étape 2 du pipeline /fix. Corrige la cause racine d'un bug jusqu'à faire passer au vert un test de reproduction gelé, sans jamais toucher aux tests, en respectant les conventions du projet. Lancé par /fix uniquement.
 model: sonnet
 skills:
-  - superpowers:test-driven-development
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:
@@ -39,10 +38,10 @@ des findings critiques à corriger.
 
 ## Ta méthode
 
-0. **Tes skills sont déjà chargés** (champ `skills` de ton en-tête, injectés au démarrage : ne
+0. **Le code le plus simple qui fait passer le test de reproduction**, gelé comme le reste.
+   **Tes skills sont déjà chargés** (champ `skills` de ton en-tête, injectés au démarrage : ne
    les rappelle pas avec l'outil `Skill`). Applique-les :
-   `superpowers:test-driven-development` (le code le plus simple qui fait passer le test de
-   reproduction), `superpowers:verification-before-completion` avant de rendre la main, et les skills
+   `superpowers:verification-before-completion` avant de rendre la main, et les skills
    du langage que la règle de langage liste pour la couche que tu touches (pas dans ton en-tête :
    invoque-les avec l'outil `Skill`, après avoir lu le code en cause, qui charge la règle).
    Un skill qui contredit les règles du projet (`create_feature_rules.md`, `pr_rules.md`, conventions

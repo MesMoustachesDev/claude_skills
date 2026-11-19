@@ -232,9 +232,10 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
 - **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
   désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
-  Le prompt de lancement tient en 15 lignes. Celui de Sophie, Camille, Arthur et Romain inclut les
-  chemins des règles tirées des réponses du dev (`~/.claude/pipeline/answers.md`, et
-  `.claude/rules/pipeline_answers.md` s'il existe) : un choix qu'elles tranchent n'est pas proposé.
+  Le prompt de lancement tient en 15 lignes. Celui de Sophie, Camille, Arthur et Romain inclut le
+  chemin des règles du projet tirées des réponses du dev (`.claude/rules/pipeline_answers.md` s'il
+  existe ; celles de tous les projets sont leur skill `doctrine-answers`, déjà chargé) : un choix
+  qu'elles tranchent n'est pas proposé.
   **Chaque prompt commence par `Racine : <chemin absolu du worktree>`.** Les hooks y retrouvent le
   worktree quand le cwd hérité de ta session n'est pas le bon (checkout principal, reprise) ; sans
   elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par

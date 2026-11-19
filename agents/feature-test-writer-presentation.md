@@ -51,7 +51,7 @@ mêmes contrats, c'est eux la référence.
 
 **Ce que tu lis** : `spec.md` (§3 états, §4 scénarios, §5 contrats, §7 erreurs), `cadrage.md` et
 `archi.json` (chaque C<n> et son scénario), le domain (entités, signatures des use cases, erreur typée),
-le fichier de clés, les events et states, `~/.claude/commands/create_test.md`. Pas la couche data : rien de
+le fichier de clés, les events et states (la doctrine `create_test` est déjà chargée). Pas la couche data : rien de
 ta moitié n'en dépend.
 
 **Toi seul lances la génération de code** de l'outil Gherkin, et seulement quand ton `.feature` change.

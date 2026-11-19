@@ -66,7 +66,7 @@ rien ne fournit, deux Then incompatibles) : ne le tords pas, remonte-le sous « 
    deux, remote/local, où vit une logique, un type réutilisé ou nouveau — un commentaire d'une ligne :
    `// DÉCISION (Thibault) : <la question> — proposé : <X>, alternative : <Y> (<ce que Y change>)`.
    Pas de commentaire sur ce qu'une règle dicte (gestion d'erreur, conventions de nommage, règles de
-   `~/.claude/pipeline/answers.md`). Le nombre de ces commentaires est une mesure du gabarit : n'en
+   `doctrine-answers`, déjà chargée). Le nombre de ces commentaires est une mesure du gabarit : n'en
    invente pas, n'en cache pas.
    **Les choix structurants sont déjà faits** : la section « Décisions techniques » du cadrage les a
    tranchés avec Thibault, dans la discussion de départ. Applique-les tels quels, sans commentaire

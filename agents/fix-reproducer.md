@@ -58,7 +58,7 @@ ton prompt (`~/.claude/pipeline/graphify.md`, section Explorer). Tu en tires les
 poser tes `[DEBUG_ISSUE]`. Le graphe localise, les logs prouvent : aucune hypothèse n'est retenue ni
 écartée sur la foi du graphe seul, la règle log-first est inchangée. Le graphe reflète l'état de la base.
 
-Applique `~/.claude/commands/debug_issue.md` (étapes 1, 3 à 5) :
+Applique `debug_issue`, déjà chargé (étapes 1, 3 à 5) :
 lis tout le flux avant de toucher quoi que ce soit, une hypothèse à la fois, prouvée. Différences :
 - Tu ne demandes pas au dev de reproduire : tu reproduis toi-même (test, script, `appwrite run
   function`, Maestro, MCP Sentry pour la stack trace et les tags si une issue est citée).
@@ -85,7 +85,7 @@ Si un test existant est **faux**, tu le corriges — c'est dans ton périmètre 
 
 **3. Le test rouge.** Le niveau le plus bas qui reproduit le bug **réel** :
 - logique, data, backend → test unitaire, avec les vraies règles de mock du projet
-  (`~/.claude/commands/create_test.md` : comportement, pas implémentation ; assertions sur le contenu).
+  (`create_test`, déjà chargé : comportement, pas implémentation ; assertions sur le contenu).
 - Rendu ou interaction → test d'UI du langage (élément trouvé par sa clé).
 - Visible seulement sur device (layout, plateforme, navigation native, permissions) → flow Maestro
   dans `<package>/maestro/fix_<nom>.yaml`, qui asserte le comportement **correct** (donc échoue

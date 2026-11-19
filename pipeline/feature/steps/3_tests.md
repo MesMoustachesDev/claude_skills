@@ -27,7 +27,7 @@ zone d'écriture (hook) et son gate de couche :
 | présentation | `feature-test-writer-presentation` | le reste des tests, `.feature`, steps, manifeste | `red_presentation` |
 
 Prompt commun (15 lignes max) : nom, `spec.md`, `tests_plan.json` (« tu écris les tests de la liste dont
-le fichier est dans ta zone, ni plus ni moins »), package, `~/.claude/commands/create_test.md`, et « tu
+le fichier est dans ta zone, ni plus ni moins »), package, et « tu
 écris en parallèle de l'autre moitié ; ton fichier d'agent dit ce que tu lis et où tu écris ». En plus,
 pour la présentation : `cadrage.md` et `archi.json` (« chaque séquence C<n> est un scénario d'acceptation,
 relié à son titre de §4 par `archi.json → sequences` : chaque action, réponse du use case mocké et
@@ -66,7 +66,7 @@ et le parallèle ne coûte pas de temps. **En L :** n'a pas lieu.
 
 ### 3b. Revue des tests — Gaëlle (`feature-test-reviewer`)
 
-Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, `cadrage.md`, `archi.json`, package, `tests.md`, `create_test.md`).
+Lance Gaëlle (`feature-test-reviewer`, prompt : nom, `spec.md`, `cadrage.md`, `archi.json`, package, `tests.md` ; `create_test` est déjà dans ses skills).
 La liste a déjà tranché quels tests existent (3a) et le gate `red` a vérifié que la suite est la liste :
 Gaëlle juge ici **comment** ils sont écrits (assertions, couplage, séquences). Un test qu'elle veut ajouter
 passe d'abord par la liste : Théo-liste l'y ajoute, puis Théo l'écrit.

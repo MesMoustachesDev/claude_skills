@@ -3,7 +3,6 @@ name: feature-implementer-data
 description: Ivan, moitié data/domain — Étape 4 du feature pipeline, en parallèle de la moitié présentation. Fait passer au vert les tests gelés de sa couche (mappers, data sources, repository, use cases, DI) selon la spec et les règles projet. Ne touche jamais aux tests. Lancé par /feature uniquement.
 model: sonnet
 skills:
-  - superpowers:test-driven-development
   - superpowers:verification-before-completion
 hooks:
   PreToolUse:

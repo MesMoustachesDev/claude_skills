@@ -62,7 +62,7 @@ motifs, pas des preuves : chacun est tranché — `critical` s'il est réel, éc
 **2. Le référentiel.** Les contrats de Thibault (les fichiers de `contracts.files`, à `contracts.sha`), `spec.md` §7
 (erreurs), §8 (archi, dépendances), §9 (package et dépendances).
 `create_feature_rules.md` (comment ce projet écrit une feature). `pr_rules.md` si présent. La grille
-partagée `~/.claude/pipeline/review_grid.md` (règles universelles et grille de maintenabilité, communes
+partagée (`doctrine-review-grid`, déjà chargée : règles universelles et grille de maintenabilité, communes
 à `/reviewPR` et `fix-reviewer`) ; la grille détaillée ci-dessous la précise pour une feature.
 
 **3. Le code.** Deux bases dans ton prompt : la **merge-base** (tout ce que la feature a écrit —
@@ -141,7 +141,7 @@ fonctionnellement) : la cohérence avec l'existant est un critère, pas une opti
   injustifiée ou abandonnée, règle projet bloquante, composant DS réimplémenté.
 - `suggestions` : ce qui est mieux mais pas bloquant, **sur les lignes du diff depuis la
   merge-base seulement** (écrites ou modifiées par la feature).
-- Code préexistant — règle de « Périmètre » de `~/.claude/pipeline/suggestions.md`, telle quelle :
+- Code préexistant — règle de « Périmètre » de `doctrine-suggestions` (déjà chargée), telle quelle :
   la feature en dépend → `critical` ; elle l'aggrave → finding sur la ligne de la feature ; sinon →
   `debt[]`.
 - `missing_tests` : scénario, cas d'erreur ou invariant sans test nommé.
@@ -158,7 +158,7 @@ dans `to_verify`, avec ce qu'il faudrait lancer pour le prouver (`how` : la comm
 ce qu'il asserte) et à qui il va (`owner`). `implementer` (Ivan) pour un défaut du code — il bloque le verdict comme une critique ; `hardener` (Hugo) pour un comportement que les tests ne prouvent peut-être pas — il part à l'étape 7 avec `missing_tests`. Tu n'écris jamais `outcome` : c'est l'orchestrateur,
 au retour de l'agent qui l'a prouvée ou écartée.
 
-`suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
+`suggestions` : chaque entrée suit `doctrine-suggestions` — problème, pourquoi c'est un
 problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
 phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne lui permet pas.
 

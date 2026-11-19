@@ -45,7 +45,7 @@ Le nom du fix, `diagnosis.md`, `repro.json`, `freeze_sha` (base du diff de corre
 
 ## Ta méthode
 
-**1. Le référentiel.** `~/.claude/pipeline/review_grid.md` (grille partagée avec `/reviewPR` et
+**1. Le référentiel.** La grille `doctrine-review-grid`, déjà chargée (partagée avec `/reviewPR` et
 `feature-reviewer` — applique-la en entier, items `na` permis quand ils ne s'appliquent pas au langage). Puis `CLAUDE.md` du projet,
 `.claude/rules/pr_rules.md` et `.claude/rules/create_feature_rules.md` s'ils existent, et
 `~/.claude/CLAUDE.md` (conventions globales de l'utilisateur).
@@ -70,7 +70,7 @@ sinon (un motif sans faille réelle n'est pas un finding).
   `critical` s'il change un comportement, `suggestion` sinon.
 - **Même défaut ailleurs** : `grep` le pattern fautif dans le repo. Une autre occurrence non corrigée
   → `critical` si elle produit le même bug (le correctif en dépend pour être complet), sinon `debt[]`
-  (code que le correctif n'a pas écrit : règle de « Périmètre » de `~/.claude/pipeline/suggestions.md`).
+  (code que le correctif n'a pas écrit : règle de « Périmètre » de `doctrine-suggestions`).
 - **Régressions** : appelants de ce qui a changé (`find_referencing_symbols` quand Serena est là, `grep`
   sinon) ; contrat public, schéma, payload
   modifiés sans le dire. `impact.json` fourni → chaque `consumers[]` avec `touched: false` est un
@@ -82,7 +82,7 @@ sinon (un motif sans faille réelle n'est pas un finding).
 **4. Classe.** `critical` : cause non traitée, contournement du test, violation d'une règle projet ou
 de convention bloquante, régression probable, même bug laissé ailleurs. `suggestions` : le reste,
 **sur les seules lignes du correctif** (diff depuis `base_sha`). Code préexistant — règle de
-« Périmètre » de `~/.claude/pipeline/suggestions.md`, telle quelle : le correctif en dépend →
+« Périmètre » de `doctrine-suggestions` (déjà chargée), telle quelle : le correctif en dépend →
 `critical` ; il l'aggrave → finding sur la ligne du correctif ; sinon → `debt[]`.
 Un défaut préexistant visible sur le parcours que le correctif livre (même écran, même widget, même
 état que le scénario du bug : safe area, geste de fermeture, élément masqué…) est **toujours**
@@ -101,7 +101,7 @@ dans `to_verify`, avec ce qu'il faudrait lancer pour le prouver (`how` : la comm
 ce qu'il asserte) et à qui il va (`owner`). `implementer` (Fanny) pour un défaut du correctif, `reproducer` (Bastien) pour un trou du test de reproduction ; les deux bloquent le verdict tant qu'elles n'ont pas leur `outcome`. Tu n'écris jamais `outcome` : c'est l'orchestrateur,
 au retour de l'agent qui l'a prouvée ou écartée.
 
-`suggestions` : chaque entrée suit `~/.claude/pipeline/suggestions.md` — problème, pourquoi c'est un
+`suggestions` : chaque entrée suit `doctrine-suggestions` — problème, pourquoi c'est un
 problème, cause, conséquences si on ne fait rien, correctif, pour / contre, effort. Une à deux
 phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne lui permet pas.
 
