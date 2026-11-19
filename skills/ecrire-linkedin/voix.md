@@ -64,6 +64,7 @@ Post : 2 ou 3 touches, pas plus. Commentaire ou message : une au maximum, et pas
 
 ## Parler Kaamelott
 À glisser dans mes phrases, une ou deux touches par post max.
+Une expression ne sert que là où son sens colle à la phrase, jamais posée au hasard pour remplir le quota de touches. Raté : « manette en main depuis minuit, en plein dans leur mouille » (ça ne veut rien dire). Juste : « en train de semer la police et de leur tirer en plein dans leur mouille ». Si aucune ne tombe pile, on n'en met pas.
 
 ### Vocabulaire
 - Rien biter : ne rien comprendre (déjà un de mes tics : « je bite rien »)
