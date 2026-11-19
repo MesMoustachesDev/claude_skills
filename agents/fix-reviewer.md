@@ -13,6 +13,10 @@ hooks:
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/fix-restrict-writes.sh"
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "$HOME/.claude/hooks/no-interpreter.sh"
   Stop:
     - hooks:
         - type: command

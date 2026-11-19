@@ -57,4 +57,39 @@ expect_no_out deny "heredoc vers review.json : permis"
 hook fix-reviewer Bash "sed -i '' 's/1/2/' lib/a.dart"
 expect_out "reviewer : lecture seule" "sed -i dans lib/ : refusé"
 
+# Les voisins de python (plan interpreteurs-serena, point 2) : une fois python fermé (ADR 0017), les mêmes
+# écritures passeraient par git apply, patch, git checkout/restore, install, dd ou rsync.
+echo "Fanny — écritures par patch, git, install, dd, rsync"
+printf -- '--- a/test/a_test.dart\n+++ b/test/a_test.dart\n@@ -1 +1 @@\n-void main() {}\n+void main() { print(1); }\n' > "$TMP_ROOT/t.patch"
+hook fix-implementer Bash "git apply $TMP_ROOT/t.patch"
+expect_out "GELÉS" "git apply d'un patch qui touche un test : refusé"
+hook fix-implementer Bash "cd lib && git apply <<'EOF2'
+--- a/test/a_test.dart
++++ b/test/a_test.dart
+@@ -1 +1 @@
+-void main() {}
++void main() { print('x'); }
+EOF2"
+expect_out "GELÉS" "git apply d'un heredoc, depuis un sous-dossier (chemins depuis la racine) : refusé"
+hook fix-implementer Bash "git apply --check $TMP_ROOT/t.patch"
+expect_no_out deny "git apply --check : n'écrit rien, permis"
+hook fix-implementer Bash "patch -p1 < $TMP_ROOT/t.patch"
+expect_out "GELÉS" "patch -p1 < f : refusé"
+hook fix-implementer Bash "patch test/a_test.dart $TMP_ROOT/t.patch"
+expect_out "GELÉS" "patch <fichier> <patch> : refusé"
+hook fix-implementer Bash "git checkout develop -- test/a_test.dart"
+expect_out "GELÉS" "git checkout <rev> -- <test> : refusé"
+hook fix-implementer Bash "git restore --source=develop test/a_test.dart"
+expect_out "GELÉS" "git restore d'un test : refusé"
+hook fix-implementer Bash "git restore --staged test/a_test.dart"
+expect_no_out deny "git restore --staged : l'index seul, permis"
+hook fix-implementer Bash "install -m 644 /tmp/x test/a_test.dart"
+expect_out "GELÉS" "install -m 644 vers un test : refusé"
+hook fix-implementer Bash "dd if=/tmp/x of=test/a_test.dart"
+expect_out "GELÉS" "dd of=<test> : refusé"
+hook fix-implementer Bash "rsync -a /tmp/x_test.dart test/"
+expect_out "GELÉS" "rsync vers test/ : refusé"
+hook fix-implementer Bash "git apply $TMP_ROOT/lib.patch 2>/dev/null; rsync -a lib/ /tmp/backup/; git checkout -- lib/a.dart"
+expect_no_out deny "code source, sauvegarde hors du projet : permis"
+
 finish
