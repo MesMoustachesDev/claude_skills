@@ -9,12 +9,15 @@ n'écrit dans fix.json que `waiting` et `waiting_at` (la question posée à Thib
 
 Lus par le watchdog du fix (fix/watchdog.py) et par le mod pipeline-view (`next --json`).
 """
-import datetime
 import json
 import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import statefile  # noqa: E402  (scripts/statefile.py : lecture, écriture sous verrou)
+from statefile import die, now  # noqa: E402
 
 # (clé, étape, titre). Une clé « hg.x » est un point d'étape (human_gates.x) ; hg.ui seulement pour un bug d'écran.
 ORDER = [
@@ -26,15 +29,6 @@ ORDER = [
     ("evidence", "5", "Evidence, commits"),
 ]
 DONE = {"key": "done", "step": "—", "title": "Fix terminé", "status": "DONE"}
-
-
-def die(msg, code=2):
-    print(f"[ABORT] {msg}", file=sys.stderr)
-    sys.exit(code)
-
-
-def now():
-    return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def git(*args, cwd=None):
@@ -52,21 +46,19 @@ class Fix:
         self.path = os.path.join(self.dir, "fix.json")
         if not os.path.isfile(self.path):
             die(f"fix.json absent : {self.path}")
-        with open(self.path, encoding="utf-8") as f:
-            self.f = json.load(f)
+        self.f = statefile.load(self.path)
+        self._base = json.loads(json.dumps(self.f))
 
     def save(self):
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(self.f, fh, ensure_ascii=False, indent=2)
-            fh.write("\n")
-        os.replace(tmp, self.path)
+        """Sous verrou (statefile) : seul ce que cette commande a changé est réécrit sur fix.json relu ;
+        ce que l'orchestrateur ou fix-gate.sh y a écrit entre-temps est gardé."""
+        self.f = statefile.save_changes(self.path, self._base, self.f)
+        self._base = json.loads(json.dumps(self.f))
 
     def repro(self):
         try:
-            with open(os.path.join(self.dir, "repro.json"), encoding="utf-8") as fh:
-                return json.load(fh)
-        except (OSError, json.JSONDecodeError):
+            return json.loads(statefile.read_text(os.path.join(self.dir, "repro.json")) or "{}")
+        except json.JSONDecodeError:
             return {}
 
 

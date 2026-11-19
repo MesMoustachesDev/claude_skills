@@ -28,11 +28,9 @@ current_fix() {
 
 state_get() { [ -f "$STATE" ] && jq -r "$1 // empty" "$STATE"; }
 repro_get() { [ -f "$REPRO" ] && jq -r "$1 // empty" "$REPRO"; }
-state_set() { # state_set <filtre jq> [--arg k v]...
+state_set() { # state_set <filtre jq> [--arg k v]... — sous le verrou de statefile.py (fix.json.lock)
   local f="$1"; shift
-  [ -f "$STATE" ] || echo '{}' > "$STATE"
-  local tmp; tmp="$(mktemp)"
-  jq "$@" "$f" "$STATE" > "$tmp" && mv "$tmp" "$STATE"
+  python3 "$(dirname "${BASH_SOURCE[0]}")/../statefile.py" jq "$STATE" "$@" "$f"
 }
 
 # --- Langage du package (scripts/stack.sh, ADR 0011) ----------------------------------------------------

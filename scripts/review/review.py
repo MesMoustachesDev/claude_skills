@@ -4,7 +4,6 @@
 La cible, le worktree, l'état des trois agents, la fusion des remarques, le tri de Thibault et la
 publication sur la MR vivent ici, pas dans le prompt de l'orchestrateur.
 """
-import datetime
 import difflib
 import fnmatch
 import json
@@ -16,6 +15,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import stacklib  # noqa: E402  (scripts/stacklib.py : le langage d'un package et ses valeurs, ADR 0011)
+import statefile  # noqa: E402  (scripts/statefile.py : lecture, écriture sous verrou)
+from statefile import die, now, read_text  # noqa: E402
 
 HOME = os.path.expanduser("~")
 STATE_ROOT = os.path.join(HOME, ".cache", "gauntlet", "review")
@@ -41,15 +42,6 @@ ORDER = [
     ("posted", "7", "Publication validée sur la MR", "7_publication.md"),
     ("synthesis", "8", "Synthèse finale et suppression du worktree", "8_synthese.md"),
 ]
-
-
-def die(msg, code=2):
-    print(f"[ABORT] {msg}", file=sys.stderr)
-    sys.exit(code)
-
-
-def now():
-    return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def run(cmd, cwd=None, check=True, **kw):
@@ -104,15 +96,13 @@ class Review:
         self.path = os.path.join(self.dir, "review.json")
         if not os.path.isfile(self.path):
             die(f"revue inconnue : {slug} (review.sh init d'abord)")
-        with open(self.path, encoding="utf-8") as f:
-            self.s = json.load(f)
+        self.s = statefile.load(self.path)
+        self._base = json.loads(json.dumps(self.s))
 
     def save(self):
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.s, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-        os.replace(tmp, self.path)
+        """Sous verrou (statefile) : seul ce que cette commande a changé est réécrit sur l'état relu."""
+        self.s = statefile.save_changes(self.path, self._base, self.s)
+        self._base = json.loads(json.dumps(self.s))
 
     def file(self, name):
         return os.path.join(self.dir, name)
@@ -178,8 +168,7 @@ def cmd_init(args):
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "review.json")
     if os.path.isfile(path):
-        with open(path, encoding="utf-8") as f:
-            old = json.load(f)
+        old = statefile.load(path)
         if old.get("project_root") == root and not stage_done(old, "synthesis"):
             print(f"reprise : revue {slug} déjà en cours (étape suivante : review.sh next {slug})")
             rv = Review(slug)
@@ -195,8 +184,7 @@ def cmd_init(args):
         "worktree": None, "stages": {}, "agents": {r: {"status": "pending"} for r in ROLES},
         "triage": {}, "posted": [],
     }
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(s, f, ensure_ascii=False, indent=2)
+    statefile.update(path, lambda _old: s)
     print(f"revue {slug} : {info.get('source')} → {info.get('base') or '(base de la config)'}"
           + (f" · « {info['title']} » par {info['author']}" if info.get("title") else ""))
     print(f"racine du repo : {root}")
@@ -830,17 +818,6 @@ def load_findings(r):
 # ---------------------------------------------------------------------------
 # Tri et commentaires
 # ---------------------------------------------------------------------------
-def read_text(path, limit=None):
-    try:
-        with open(path, encoding="utf-8") as f:
-            t = f.read()
-    except OSError:
-        return None
-    if limit and len(t) > limit:
-        t = t[:limit] + f"\n\n… (tronqué, {len(t)} caractères : fichier complet {path})"
-    return t
-
-
 # Vérification mécanique d'un commentaire (même esprit que skills/ecrire-linkedin/verifier.py, adapté à la revue)
 CHECK_ERRORS = [
     (r"—|–", "tiret cadratin ou demi-cadratin"), (r"’", "apostrophe typographique"), (r"…", "points de suspension en un caractère"),

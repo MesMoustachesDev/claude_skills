@@ -16,6 +16,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import stacklib  # noqa: E402  (scripts/stacklib.py : le langage d'un package et ses valeurs, ADR 0011)
+import statefile  # noqa: E402  (scripts/statefile.py : lecture, écriture sous verrou)
+from statefile import die, now  # noqa: E402,F401
 
 STEPS_DIR = os.path.expanduser("~/.claude/pipeline/feature/steps")
 
@@ -53,15 +55,6 @@ LOOP_VERDICT = {"spec": "spec_review.json", "test_plan": "tests_review.json", "t
 REFREEZE_CAUSES = {"hygiene", "technique", "contrat", "spec", "interne"}
 
 
-def die(msg, code=2):
-    print(f"[ABORT] {msg}", file=sys.stderr)
-    sys.exit(code)
-
-
-def now():
-    return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def git(*args, cwd=None, check=True):
     r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
     if check and r.returncode != 0:
@@ -83,19 +76,21 @@ class Ctx:
         self.cfg_file = os.path.join(self.root, ".claude", "rules", "feature_pipeline.md")
         if must_exist and not os.path.isfile(self.path):
             die(f"pipeline.json absent : {self.path} (nouvelle feature : étape 0, puis pipeline.sh init)")
-        self.p = self._load() if os.path.isfile(self.path) else {}
+        self.reload()
 
     def _load(self):
-        with open(self.path, encoding="utf-8") as f:
-            return json.load(f)
+        return statefile.load(self.path)
+
+    def reload(self):
+        """Relit pipeline.json : c.p, et la base à laquelle save() compare ce que la commande a changé."""
+        self.p = self._load()
+        self._base = json.loads(json.dumps(self.p))
 
     def save(self):
-        os.makedirs(self.dir, exist_ok=True)
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.p, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-        os.replace(tmp, self.path)
+        """Sous verrou (statefile) : seul ce que cette commande a changé est réécrit sur l'état relu ; une clé
+        écrite entre-temps par un hook (stages.red_data) ou une autre commande est gardée."""
+        self.p = statefile.save_changes(self.path, self._base, self.p)
+        self._base = json.loads(json.dumps(self.p))
 
     def cfg(self, key, default=""):
         try:
@@ -300,7 +295,7 @@ def wait_hooks(c, after=None):
     if subprocess.run(["bash", w, gdir, str(remaining())]).returncode != 0:
         die("un hook de fin d'agent joue encore son gate : relance la même commande, dans ce tour ; "
             "ne relance pas l'agent", code=3 if not after else 4)
-    c.p = c._load()
+    c.reload()
     return seen
 
 
@@ -333,7 +328,7 @@ def wait_agents(c, profiles, missing_too=False):
                 code=4)
         subprocess.run(["sleep", "2"])
     subprocess.run(["bash", w, gdir, str(remaining())])
-    c.p = c._load()
+    c.reload()
 
 
 def cmd_next(c, args):
@@ -519,7 +514,7 @@ def cmd_join(c, args):
         die(f"moitié(s) pas encore verte(s) : {', '.join(pending)} — relance-la ; rien n'est joint", code=1)
     gauntlet = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gauntlet.sh")
     r = subprocess.run(["bash", gauntlet, profile, c.name], cwd=c.root, capture_output=True, text=True)
-    c.p = c._load()
+    c.reload()
     ok = r.returncode == 0
     c.p.setdefault("stages", {})[profile] = {"status": "PASSED" if ok else "RED", "at": now(), "joined": halves}
     c.save()
@@ -1002,7 +997,7 @@ def cmd_replay(c, args):
     wait_hooks(c)
     gauntlet = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gauntlet.sh")
     r = subprocess.run(["bash", gauntlet, profile, c.name], cwd=c.root, capture_output=True, text=True)
-    c.p = c._load()
+    c.reload()
     ok = r.returncode == 0
     prev = _status((c.p.get("stages") or {}).get(profile)) or "—"
     c.p.setdefault("stages", {})[profile] = {"status": "PASSED" if ok else "RED", "at": now(), "replayed": True}

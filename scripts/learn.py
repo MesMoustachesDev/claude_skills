@@ -14,7 +14,6 @@ l'orchestrateur.
   learn.py reject <slug> "<raison>"          refusé ; reproposé seulement après 2 runs de plus
   learn.py scan <racine>...                  runs terminés (evidence.md) pas encore passés par learn
 """
-import datetime
 import glob
 import json
 import os
@@ -22,6 +21,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hook_journal  # noqa: E402  (journal des hooks, ADR 0019)
+import statefile  # noqa: E402  (scripts/statefile.py : écriture sous verrou)
+from statefile import now  # noqa: E402
 
 HOME = os.environ.get("LEARN_HOME") or os.path.expanduser("~/.claude/pipeline/lessons")
 LEDGER = os.path.join(HOME, "ledger.jsonl")
@@ -35,10 +36,6 @@ def die(msg):
     sys.exit(2)
 
 
-def now():
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def load_json(path, default=None):
     try:
         with open(path, encoding="utf-8") as f:
@@ -48,12 +45,8 @@ def load_json(path, default=None):
 
 
 def save_json(path, data):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.replace(tmp, path)
+    """Remplace le fichier en entier, sous verrou (statefile) : jamais un fichier à moitié écrit."""
+    statefile.update(path, lambda _old: data)
 
 
 def ledger():
@@ -204,8 +197,9 @@ def cmd_record(args):
     if not isinstance(data, dict) or "labels" not in data or "run" not in data:
         die('format attendu : {"run": clé, "patterns": {slug: desc}, "labels": [{"id": …, "pattern": slug|"noise"}]}')
     patterns = load_json(PATTERNS, {}) or {}
-    for slug, desc in (data.get("patterns") or {}).items():
-        patterns.setdefault(slug, {"desc": desc, "status": "open", "created": now()})
+    new = {slug: {"desc": desc, "status": "open", "created": now()}
+           for slug, desc in (data.get("patterns") or {}).items() if slug not in patterns}
+    patterns.update(new)
     pending = {}
     for path in glob.glob(os.path.join(PENDING, "*.json")):
         for s in load_json(path, []) or []:
@@ -230,7 +224,8 @@ def cmd_record(args):
     with open(LEDGER, "a", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    save_json(PATTERNS, patterns)
+    # Sous verrou, sur patterns.json relu : un promote ou un reject concurrent n'est pas effacé.
+    statefile.update(PATTERNS, lambda cur: {**new, **cur})
     recorded = {r["id"] for r in ledger()}
     for path in touched:
         left = [s for s in load_json(path, []) or [] if s["id"] not in recorded]
@@ -283,12 +278,12 @@ def cmd_examples(args):
 
 
 def set_status(slug, status, payload):
-    patterns = load_json(PATTERNS, {}) or {}
-    if slug not in patterns:
-        die(f"pattern inconnu : {slug}")
-    patterns[slug]["status"] = status
-    patterns[slug][status] = payload
-    save_json(PATTERNS, patterns)
+    def apply(patterns):
+        if slug not in patterns:
+            die(f"pattern inconnu : {slug}")
+        patterns[slug]["status"] = status
+        patterns[slug][status] = payload
+    statefile.update(PATTERNS, apply)
     print(f"{slug} : {status}")
 
 

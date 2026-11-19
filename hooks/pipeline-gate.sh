@@ -84,14 +84,12 @@ if [ "${profile%%_*}" = red ] && ! bash "$GAUNTLET_ROOT/../pipeline.sh" reached 
   } >&2
   exit 2
 fi
-# pipe_set <statut> <tentatives> — sous verrou : les deux moitiés des étapes 3 et 4 finissent parfois
-# ensemble, et deux jq > tmp && mv simultanés perdent l'écriture de l'une.
+# pipe_set <statut> <tentatives> — sous le verrou de statefile.py (flock sur pipeline.json.lock), le même que
+# pipeline.sh : les deux moitiés des étapes 3 et 4 finissent parfois ensemble, et un `pipeline.sh debt` peut
+# tomber au même moment ; aucune écriture n'efface l'autre.
 pipe_set() {
-  local lock="$PIPE.lock" i=0 tmp
-  until mkdir "$lock" 2>/dev/null; do i=$((i+1)); [ "$i" -ge 100 ] && break; sleep 0.1; done
-  tmp="$(mktemp)"
-  jq --arg p "$profile" --arg s "$1" --argjson a "$2" '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}' "$PIPE" > "$tmp" && mv "$tmp" "$PIPE"
-  rmdir "$lock" 2>/dev/null
+  python3 "$GAUNTLET_ROOT/../statefile.py" jq "$PIPE" --arg p "$profile" --arg s "$1" --argjson a "$2" \
+    '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}'
 }
 # Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook ;
 # pipeline.sh next/join et gauntlet.sh attendent qu'il disparaisse (hook_wait.sh).

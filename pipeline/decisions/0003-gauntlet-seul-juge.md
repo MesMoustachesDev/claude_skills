@@ -1,9 +1,11 @@
 # 0003 — Le gauntlet est le seul juge d'une étape
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-10
-(trous du gauntlet, plus bas) et le 2026-11-17 (checks d'avertissement, plus bas)
+(trous du gauntlet, plus bas), le 2026-11-17 (checks d'avertissement, plus bas) et le 2026-11-19 (verrou de l'état)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
-(gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`) · `commands/feature.md`
+(gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`, sous le verrou de
+`scripts/statefile.py`, comme `pipe_set` du gate, `review.py`, `fix/steps.py`, `state_set` de `fix/lib.sh`
+et `learn.py`) · `commands/feature.md`
 (« Le script décide, pas l'agent, pas toi »)
 
 ## Contexte
