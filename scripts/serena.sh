@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# serena.sh — Serena (serveur MCP adossé au LSP Dart) pour le pipeline, en lecture seule (ADR 0018).
+# serena.sh — Serena (serveur MCP adossé au LSP Dart) pour le pipeline (ADR 0018).
 #
-#   serena.sh prepare <worktree>   prépare le worktree et retient que c'est lui que Serena doit servir.
+# Deux modes. Lecture (défaut) : six outils, read_only, pour les agents qui explorent et relisent.
+# Écriture (`--ecriture`) : les mêmes plus replace_symbol_body, insert_after_symbol, insert_before_symbol,
+# read_only: false, pour l'implementer, ses deux moitiés et le cleaner. Jamais safe_delete_symbol ni
+# rename_symbol. Serena lit sa config au démarrage : un serveur lancé dans un mode ne change pas de mode
+# quand un autre réécrit project.yml ensuite. Les hooks restent la barrière (zone de Edit).
+#
+#   serena.sh prepare [--ecriture] <worktree>   prépare le worktree et retient que c'est lui que Serena doit servir.
 #                                  Sort toujours en 0 ; la dernière ligne de stdout donne l'état :
 #                                  `serena: ok <worktree> dart=<version>`, `serena: absent <raison>`,
 #                                  `serena: échec <raison>`. Lancé par /feature, /fix et /reviewPR.
-#   serena.sh serve [<worktree>]   le serveur MCP des sous-agents (mcpServers de leur frontmatter) : retrouve
+#   serena.sh serve [--ecriture] [<worktree>]   le serveur MCP des sous-agents (mcpServers de leur frontmatter) : retrouve
 #                                  le worktree (`which`), le prépare, puis lance Serena. Sans worktree ou
 #                                  sans Serena : message sur stderr et sortie 0, l'agent travaille sans.
 #   serena.sh which <dossier>      le worktree que `serve` servirait depuis ce dossier (le cwd du serveur) :
@@ -15,7 +21,8 @@
 #                                  worktree de l'agent.
 #
 # Ce que prepare tient, à chaque appel (Serena lit sa config au démarrage, un agent ne doit pas la changer) :
-#   - une home Serena à part ($SERENA_PIPELINE_HOME, défaut ~/.claude-local/serena), jamais ~/.serena :
+#   - une home Serena à part par mode ($SERENA_PIPELINE_HOME, défaut ~/.claude-local/serena, et
+#     <home>-ecriture), jamais ~/.serena :
 #     serena_config.yml réécrit (interface `tools`, pas de tableau de bord, outils en liste fermée,
 #     projets « trusted » : le project.yml ci-dessous n'est appliqué qu'à un projet trusted) ;
 #   - le SDK Dart de fvm (.fvmrc) servi à Serena par un lien sous
@@ -25,13 +32,24 @@
 #     fermée, pas d'activation_command) et project.local.yml vidé : ils l'emportent sur la ligne de
 #     commande (piège 2 de la note d'essai) ;
 #   - `.serena/` dans .git/info/exclude.
-# Absent (pipeline sans Serena, comme graphify) : Serena non installé, pas de pubspec.yaml ni de .fvmrc
+# Absent (pipeline sans Serena, comme graphify) : SERENA_PIPELINE_OFF=1 (banc de rejeu, mesure sans Serena), Serena non installé, pas de pubspec.yaml ni de .fvmrc
 # (projet non Dart : rien pour Kotlin), package_config.json absent (`flutter pub get` pas fait).
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONTEXT="$here/../serena/contexts/pipeline-lecture.yml"
-SHOME="${SERENA_PIPELINE_HOME:-$HOME/.claude-local/serena}"
-FIXED_TOOLS="[find_symbol, get_symbols_overview, find_referencing_symbols, find_implementations, find_declaration, get_diagnostics_for_file]"
+SHOME="${SERENA_PIPELINE_HOME:-$HOME/.claude-local/serena}"   # home du mode lecture, et les pointeurs
+READ_TOOLS="find_symbol, get_symbols_overview, find_referencing_symbols, find_implementations, find_declaration, get_diagnostics_for_file"
+WRITE_TOOLS="replace_symbol_body, insert_after_symbol, insert_before_symbol"
+# set_mode lecture|ecriture — contexte, home Serena, liste fermée et read_only du mode
+set_mode() {
+  MODE="$1"
+  case "$MODE" in
+    lecture)  CONTEXT="$here/../serena/contexts/pipeline-lecture.yml"; MHOME="$SHOME"
+              FIXED_TOOLS="[$READ_TOOLS]"; READ_ONLY=true ;;
+    ecriture) CONTEXT="$here/../serena/contexts/pipeline-ecriture.yml"; MHOME="$SHOME-ecriture"
+              FIXED_TOOLS="[$READ_TOOLS, $WRITE_TOOLS]"; READ_ONLY=false ;;
+  esac
+}
+set_mode lecture
 
 serena_bin() { command -v serena 2>/dev/null || { [ -x "$HOME/.local/bin/serena" ] && echo "$HOME/.local/bin/serena"; }; }
 
@@ -74,7 +92,7 @@ atomic() { local t; t="$(mktemp "$1.XXXXXX")" && cat > "$t" && mv -f "$t" "$1"; 
 
 write_home_config() {
   local tpl
-  mkdir -p "$SHOME/pointers" || return 1
+  mkdir -p "$SHOME/pointers" "$MHOME" || return 1
   tpl="${SERENA_CONFIG_TEMPLATE:-}"                     # surcharge : tests du lanceur
   if [ -z "$tpl" ]; then
     tpl="$(dirname "$(dirname "$(readlink -f "$(serena_bin)")")")"
@@ -88,7 +106,7 @@ write_home_config() {
     -e 's/^web_dashboard_open_on_launch:.*/web_dashboard_open_on_launch: False/' \
     -e "s/^fixed_tools:.*/fixed_tools: $FIXED_TOOLS/" \
     -e 's/^trusted_project_path_patterns:.*/trusted_project_path_patterns: ["**"]/' \
-    "$tpl" | atomic "$SHOME/serena_config.yml"
+    "$tpl" | atomic "$MHOME/serena_config.yml"
 }
 
 # prepare <worktree> — imprime « ok <wt> dart=<v> », « absent <raison> » ou « échec <raison> »
@@ -96,6 +114,7 @@ prepare() {
   local w="$1" app flutter sdk dv link common k
   [ -d "$w" ] || { echo "échec worktree introuvable : $w"; return; }
   w="$(cd "$w" && pwd -P)"
+  [ -z "${SERENA_PIPELINE_OFF:-}" ] || { echo "absent coupé (SERENA_PIPELINE_OFF)"; return; }   # mesure avant/après
   [ -n "$(serena_bin)" ] || { echo "absent serena non installé"; return; }
   app="$(app_root "$w")" || { echo "absent pas de .fvmrc (projet non Dart, ou SDK non épinglé)"; return; }
   [ -f "$app/pubspec.yaml" ] || { echo "absent pas de pubspec.yaml dans ${app#$w/}"; return; }
@@ -107,7 +126,7 @@ prepare() {
   dv="$(cat "$sdk/version" 2>/dev/null)"
   [ -n "$dv" ] || { echo "échec SDK fvm $flutter absent ($sdk ; fvm install $flutter)"; return; }
   write_home_config || { echo "échec config Serena (gabarit introuvable)"; return; }
-  link="$SHOME/language_servers/static/DartLanguageServer/dart-sdk-$dv/dart-sdk"
+  link="$MHOME/language_servers/static/DartLanguageServer/dart-sdk-$dv/dart-sdk"
   if [ ! -e "$link" ] || { [ -L "$link" ] && [ "$(readlink "$link")" != "$sdk" ]; }; then
     mkdir -p "$(dirname "$link")" && ln -sfn "$sdk" "$link" || { echo "échec lien du SDK : $link"; return; }
   fi
@@ -124,7 +143,7 @@ ls_specific_settings: {dart: {dart_sdk_version: "$dv"}}
 ls_workspace_folders: ["."]
 ls_additional_workspace_folders: []
 ignored_paths: []
-read_only: true
+read_only: $READ_ONLY
 excluded_tools: []
 included_optional_tools: []
 fixed_tools: $FIXED_TOOLS
@@ -141,25 +160,26 @@ EOF
     grep -qxF '.serena/' "$common/info/exclude" 2>/dev/null || echo '.serena/' >> "$common/info/exclude"
   fi
   k="$(repo_key "$w")" && printf '%s\n' "$w" | atomic "$SHOME/pointers/$k"
-  echo "ok $w dart=$dv"
+  echo "ok $w dart=$dv mode=$MODE"
 }
 
-cmd="${1:-}"
+cmd="${1:-}"; shift 2>/dev/null
+[ "${1:-}" = --ecriture ] && { set_mode ecriture; shift; }
 case "$cmd" in
   prepare)
-    [ -n "${2:-}" ] || { echo "usage : serena.sh prepare <worktree>" >&2; exit 2; }
-    echo "serena: $(prepare "$2")"
+    [ -n "${1:-}" ] || { echo "usage : serena.sh prepare [--ecriture] <worktree>" >&2; exit 2; }
+    echo "serena: $(prepare "$1")"
     exit 0 ;;
   which)
-    which_wt "${2:-$PWD}" ;;
+    which_wt "${1:-$PWD}" ;;
   serve)
-    w="${2:-}"; [ -n "$w" ] || w="$(which_wt "$PWD")" \
+    w="${1:-}"; [ -n "$w" ] || w="$(which_wt "$PWD")" \
       || { echo "serena: absent pas de worktree feature/fix ni de prepare pour $PWD" >&2; exit 0; }
     st="$(prepare "$w")"
     case "$st" in ok*) ;; *) echo "serena: $st" >&2; exit 0 ;; esac
     w="$(cd "$w" && pwd -P)"
-    export SERENA_HOME="$SHOME"
+    export SERENA_HOME="$MHOME"
     exec "$(serena_bin)" start-mcp-server --context "$CONTEXT" --agent-interface tools --project "$w" \
       --enable-web-dashboard false --open-web-dashboard false --enable-gui-log-window false ;;
-  *) echo "usage : serena.sh prepare <worktree> | serve [<worktree>] | which <dossier>" >&2; exit 2 ;;
+  *) echo "usage : serena.sh prepare [--ecriture] <worktree> | serve [--ecriture] [<worktree>] | which <dossier>" >&2; exit 2 ;;
 esac

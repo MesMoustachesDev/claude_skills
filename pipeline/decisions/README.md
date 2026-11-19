@@ -27,4 +27,4 @@ se supprime pas.
 | [0015](0015-scenarios-avant-contrats.md) | Les scénarios Gherkin s'écrivent avant les contrats, et les contrats en sortent | acceptée, amendée |
 | [0016](0016-roles-des-declarations.md) | Chaque déclaration réutilisable porte un rôle d'un vocabulaire fermé, l'index des rôles est lu avant d'écrire | acceptée |
 | [0017](0017-pas-d-interpreteur-pour-les-sous-agents.md) | Les sous-agents de /feature et /fix ne lancent pas d'interpréteur avec du code inline | acceptée |
-| [0018](0018-serena-en-lecture.md) | Serena donne les références exactes aux agents qui explorent et relisent, en lecture seule | acceptée |
+| [0018](0018-serena-en-lecture.md) | Serena donne les références exactes aux agents qui explorent et relisent ; l'implementer et le cleaner écrivent un symbole entier par lui | acceptée, amendée |

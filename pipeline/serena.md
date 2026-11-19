@@ -24,7 +24,7 @@ de lecture du diff) ; Serena est la boussole des usages.
 
 ## Les agents
 
-Ont Serena (serveur `serena` dans leur frontmatter) : fix-reproducer, feature-specifier, feature-architect,
+Ont Serena en lecture (serveur `serena` dans leur frontmatter) : fix-reproducer, feature-specifier, feature-architect,
 feature-dedup, feature-reviewer, fix-reviewer, review-architect, review-code. Lecture seule, six outils :
 
 | Outil | Pour |
@@ -45,3 +45,24 @@ feature-dedup, feature-reviewer, fix-reviewer, review-architect, review-code. Le
 - Pas d'outil Serena dans la liste (ou outil refusé par le hook, ou « Serena sert … pas ton worktree ») :
   travaille avec grep et dis-le en une ligne dans ton rapport. Un refus se rapporte, il ne se contourne pas.
 - Personne n'écrit sous `.serena/` : c'est la config de Serena, réécrite par `serena.sh` à chaque démarrage.
+
+## L'écriture
+
+Ont Serena en écriture (`serena.sh serve --ecriture`) : feature-implementer, ses deux moitiés (-data,
+-presentation) et feature-cleaner. Les six outils de lecture, plus :
+
+| Outil | Pour |
+|---|---|
+| `replace_symbol_body` | remplacer un symbole entier (`name_path`, `relative_path`, `body`) |
+| `insert_after_symbol` | ajouter un symbole après un autre |
+| `insert_before_symbol` | ajouter un symbole avant un autre (import, constante de haut niveau) |
+
+- Ces outils pour **remplacer ou ajouter un symbole entier** ; Edit pour le reste et pour **toute
+  suppression**. Pas de `safe_delete_symbol` (il casse une variable ou un champ, et refuse de supprimer une
+  classe inutilisée qui a un constructeur), pas de `rename_symbol` (il réécrit des fichiers que le hook ne
+  voit pas, dont les tests gelés) : le hook les refuse.
+- Après chaque écriture Serena : `fvm dart format <fichier>`. Serena perd l'indentation après une méthode.
+- Le hook juge `relative_path` (relatif à la racine du worktree) comme un Edit de ce fichier : même zone, tests
+  gelés refusés. Il refuse en plus les fichiers générés (`*.g.dart`, `*.freezed.dart`, l10n générée…), où
+  Serena écrirait sans broncher : on change la source et on relance le générateur.
+- Le LSP voit le nouveau contenu tout de suite (références et diagnostics à jour, sans relance).

@@ -91,6 +91,7 @@ check() {
   local file="$1" abs
   abs="$(normalize "$file")"
   in_serena_dir "$abs" && deny "fix : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
+  [ "$skind" = write ] && serena_generated "$abs" && deny "fix : $file est un fichier généré : Serena n'y écrit pas, la prochaine génération l'écraserait. Change sa source et relance le générateur (build_runner, gen-l10n)."
   [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0
   if [[ "$abs" != "$PROJECT_ROOT"/* ]]; then
     [ "$tool" = Bash ] && return 0                       # journaux, /tmp : hors du projet, libre

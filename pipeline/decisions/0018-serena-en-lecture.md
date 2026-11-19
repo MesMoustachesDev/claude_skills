@@ -1,11 +1,11 @@
 # 0018 — Serena donne les références exactes aux agents qui explorent et relisent, en lecture seule
 
-Statut : acceptée (2026-11-19)
+Statut : acceptée (2026-11-19), amendée le 2026-11-19 (écriture, plus bas)
 Où elle vit : `scripts/serena.sh` (prepare, serve, which) · `serena/contexts/pipeline-lecture.yml` ·
 `scripts/gauntlet/serena_guard.sh` et les hooks `pipeline-restrict-writes.sh`, `fix-restrict-writes.sh`,
 `review-restrict-writes.sh` · `mcpServers` du frontmatter de fix-reproducer, feature-specifier,
 feature-architect, feature-dedup, feature-reviewer, fix-reviewer, review-architect, review-code ·
-`pipeline/serena.md` (contrat) · `pipeline/graphify.md` · `scripts/gauntlet/tests/test_serena.sh`
+`pipeline/serena.md` (contrat) · `serena/contexts/pipeline-ecriture.yml`, `mcpServers` de feature-implementer, ses deux moitiés et feature-cleaner (écriture) · `pipeline/graphify.md` · `scripts/gauntlet/tests/test_serena.sh`
 
 ## Contexte
 
@@ -79,7 +79,34 @@ L'essai a aussi trouvé des pièges, qui fondent la plupart des choix ci-dessous
 ## Hors champ
 
 - Kotlin : son serveur de langage ne rend que les références du fichier même. Serena n'est pas proposé.
-- L'écriture par Serena (point 9 du plan) : préparée dans les hooks, donnée à personne. La donner demande
-  un contexte d'écriture et une mesure sur le banc de rejeu.
+- L'écriture par Serena : voir l'amendement ci-dessous.
 - L'installation de Serena (`uv tool install -p 3.13 serena-agent`) reste une décision de Thibault par
   machine ; sans elle, rien ne change.
+
+## Amendement du 2026-11-19 : l'écriture
+
+Un essai d'écriture sur le même projet (contexte d'écriture, tout annulé ensuite) : `replace_symbol_body` est
+exact, les insertions sont justes, et le LSP voit le nouveau contenu sans relance ; seul défaut,
+`insert_after_symbol` après une méthode perd l'indentation. Mais `safe_delete_symbol` casse le code sur une
+variable ou un champ (il reste `const ;`, `final int ;` : la plage LSP ne couvre pas le mot-clé) et refuse
+de supprimer une classe inutilisée qui a un constructeur (le sien compte comme une référence). Et Serena
+écrit sans broncher dans un `*.g.dart` ou un test gelé : seul le hook l'arrête.
+
+- feature-implementer, ses deux moitiés et feature-cleaner ont Serena en écriture : `serena.sh serve
+  --ecriture`, contexte `serena/contexts/pipeline-ecriture.yml`, home Serena à part
+  (`~/.claude-local/serena-ecriture`), `project.yml` avec `read_only: false`. Liste fermée : les six outils
+  de lecture plus `replace_symbol_body`, `insert_after_symbol`, `insert_before_symbol`. Les relecteurs et
+  les explorateurs restent en lecture.
+- `safe_delete_symbol` et `rename_symbol` sont refusés par les hooks comme tout outil inconnu ; les
+  suppressions passent par Edit.
+- Les hooks jugent `relative_path` comme un Edit de ce fichier (zone de l'agent, tests gelés) et refusent
+  en plus les fichiers générés aux outils d'écriture Serena (motifs `generated.exclude`).
+- Consigne : ces outils pour remplacer ou ajouter un symbole entier, Edit pour le reste ; `fvm dart format
+  <fichier>` après chaque écriture Serena.
+- Serena lit sa config au démarrage : un relecteur lancé après un implementer réécrit `project.yml` en
+  lecture sans changer le serveur déjà lancé, et inversement. Si deux démarrages se croisent, un serveur
+  peut prendre la liste de l'autre mode : le hook reste la barrière (zone de Edit de l'agent).
+- Correction du même jour : `serena/` manquait à la liste blanche de `.gitignore` de `~/.claude`, et le
+  contexte de lecture n'avait pas été versionné ; `test_serena.sh` vérifie maintenant que les deux contextes
+  sont suivis par git.
+- À mesurer sur le banc de rejeu : tours et tokens par étape (implementer, cleaner), avant et après.

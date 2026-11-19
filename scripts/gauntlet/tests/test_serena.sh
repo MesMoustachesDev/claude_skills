@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Repro — Serena en lecture pour le pipeline (ADR 0018) : lanceur scripts/serena.sh et garde des hooks.
+# Repro — Serena pour le pipeline, lecture et écriture (ADR 0018) : lanceur scripts/serena.sh et garde des hooks.
 # Pièges de l'essai : `.serena/project.yml` l'emporte sur la ligne de commande (agent_interface: REPL rouvre
 # serena_repl, du python) et project.local.yml l'emporte sur project.yml ; `activation_command` lance une
 # commande shell ; Serena télécharge son propre SDK Dart si on ne lui sert pas celui de fvm.
@@ -20,7 +20,7 @@ unset SERENA_PROJECT
 
 # Serena factice (le vrai n'est pas requis) : un exécutable sur le PATH et un gabarit de config.
 mkdir -p "$TMP_ROOT/bin" "$TMP_ROOT/fvm/versions/9.9.9/bin/cache/dart-sdk"
-printf '#!/bin/sh\necho "serena $*"\n' > "$TMP_ROOT/bin/serena"; chmod +x "$TMP_ROOT/bin/serena"
+printf '#!/bin/sh\necho "SERENA_HOME=$SERENA_HOME serena $*"\n' > "$TMP_ROOT/bin/serena"; chmod +x "$TMP_ROOT/bin/serena"
 export PATH="$TMP_ROOT/bin:$PATH" FVM_CACHE_PATH="$TMP_ROOT/fvm"
 echo "3.99.0" > "$TMP_ROOT/fvm/versions/9.9.9/bin/cache/dart-sdk/version"
 printf 'agent_interface: REPL\nweb_dashboard: True\nweb_dashboard_open_on_launch:\nfixed_tools: []\ntrusted_project_path_patterns: []\n' > "$TMP_ROOT/tpl.yml"
@@ -45,7 +45,7 @@ mkdir -p "$W/.dart_tool" "$W/.serena"; echo '{}' > "$W/.dart_tool/package_config
 printf 'agent_interface: REPL\nactivation_command: "touch %s/pwned"\n' "$TMP_ROOT" > "$W/.serena/project.yml"
 printf 'agent_interface: REPL\nfixed_tools: [serena_repl]\n' > "$W/.serena/project.local.yml"
 OUT="$(bash "$SERENA" prepare "$W" | tail -1)"
-expect_out "serena: ok $W dart=3.99.0" "ok, avec la version de Dart du SDK fvm"
+expect_out "serena: ok $W dart=3.99.0 mode=lecture" "ok, avec la version de Dart du SDK fvm"
 OUT="$(cat "$W/.serena/project.yml")"
 expect_out "agent_interface: tools" "project.yml réécrit : interface tools (piège 2)"
 expect_no_out "REPL" "project.yml réécrit : plus de REPL"
@@ -69,6 +69,44 @@ expect_out "serena: échec worktree introuvable" "worktree introuvable : échec"
 mkdir -p "$TMP_ROOT/kt" && git -C "$TMP_ROOT/kt" init -q
 OUT="$(bash "$SERENA" prepare "$TMP_ROOT/kt" | tail -1)"
 expect_out "serena: absent pas de .fvmrc" "projet non Dart (Kotlin) : absent"
+
+echo "serena.sh — mode écriture"
+OUT="$(bash "$SERENA" prepare --ecriture "$W" | tail -1)"
+expect_out "serena: ok $W dart=3.99.0 mode=ecriture" "prepare --ecriture : ok"
+OUT="$(cat "$W/.serena/project.yml")"
+expect_out "read_only: false" "écriture : read_only: false"
+expect_out "get_diagnostics_for_file, replace_symbol_body, insert_after_symbol, insert_before_symbol]" "écriture : lecture + trois outils d'écriture"
+expect_no_out "safe_delete_symbol" "écriture : pas de safe_delete_symbol"
+expect_no_out "rename_symbol" "écriture : pas de rename_symbol"
+OUT="$(grep '^fixed_tools' "$SERENA_PIPELINE_HOME-ecriture/serena_config.yml")"
+expect_out "insert_before_symbol]" "home du mode écriture : même liste fermée"
+OUT="$(grep '^fixed_tools' "$SERENA_PIPELINE_HOME/serena_config.yml")"
+expect_no_out "replace_symbol_body" "home du mode lecture : inchangée, sans outil d'écriture"
+[ -L "$SERENA_PIPELINE_HOME-ecriture/language_servers/static/DartLanguageServer/dart-sdk-3.99.0/dart-sdk" ] \
+  && _pass "home du mode écriture : SDK fvm servi par un lien" || _fail "home du mode écriture : lien du SDK absent"
+OUT="$(cd "$W" && bash "$SERENA" serve --ecriture 2>/dev/null)"
+expect_out "pipeline-ecriture.yml" "serve --ecriture : contexte d'écriture"
+expect_out "SERENA_HOME=$SERENA_PIPELINE_HOME-ecriture " "serve --ecriture : home du mode écriture"
+OUT="$(bash "$SERENA" prepare "$W" | tail -1)"; OUT="$OUT $(grep -E '^(read_only|fixed_tools)' "$W/.serena/project.yml")"
+expect_out "read_only: true" "un prepare en lecture après l'écriture remet read_only: true"
+expect_no_out "replace_symbol_body" "… et la liste de lecture"
+CTX="$TESTS_DIR/../../../serena/contexts"
+for c in lecture ecriture; do
+  git -C "$CTX" ls-files --error-unmatch "pipeline-$c.yml" >/dev/null 2>&1 \
+    && _pass "contexte pipeline-$c.yml suivi par git (la liste blanche de .gitignore l'oublierait)" \
+    || _fail "contexte pipeline-$c.yml absent ou non suivi par git"
+done
+OUT="$(sed -n '/^fixed_tools:/,/^[a-z]/p' "$CTX/pipeline-ecriture.yml" | grep -c '^  - ')"
+expect_out "9" "contexte d'écriture : 9 outils"
+OUT="$(cat "$CTX/pipeline-ecriture.yml" "$CTX/pipeline-lecture.yml" | grep '^  - ')"
+expect_no_out "safe_delete_symbol" "aucun contexte ne donne safe_delete_symbol"
+OUT="$(sed -n '/^fixed_tools:/,/^[a-z]/p' "$CTX/pipeline-lecture.yml" | grep -c '^  - ')"
+expect_out "6" "contexte de lecture : 6 outils"
+
+OUT="$(SERENA_PIPELINE_OFF=1 bash "$SERENA" prepare --ecriture "$W" | tail -1)"
+expect_out "serena: absent coupé" "SERENA_PIPELINE_OFF=1 : absent (mesure sans Serena)"
+OUT="$(cd "$W" && SERENA_PIPELINE_OFF=1 bash "$SERENA" serve --ecriture 2>&1)"
+expect_no_out "start-mcp-server" "SERENA_PIPELINE_OFF=1 : serve ne lance rien"
 
 echo "serena.sh which / serve"
 OUT="$(bash "$SERENA" which "$W/lib")"; expect_out "$W" "which depuis le worktree fix/* : le worktree"
@@ -97,15 +135,19 @@ sp() { jq -n --arg r "$1" '{relative_path:$r, name_path:"a", body:"x"}'; }
 echo "fix-restrict-writes — Serena"
 hook fix-restrict-writes.sh fix-reviewer mcp__serena__find_referencing_symbols "$(sp lib/a.dart)"
 expect_no_out deny "reviewer : find_referencing_symbols sur son worktree : permis"
-for t in serena_repl execute_shell_command rename_symbol create_text_file replace_content write_memory activate_project; do
+for t in serena_repl execute_shell_command rename_symbol safe_delete_symbol create_text_file replace_content write_memory activate_project; do
   hook fix-restrict-writes.sh fix-reviewer "mcp__serena__$t" '{}'
   expect_out "outil Serena hors liste" "$t : refusé (liste fermée)"
 done
 hook fix-restrict-writes.sh fix-implementer mcp__serena__replace_symbol_body "$(sp test/a_test.dart)"
 expect_out "GELÉS" "implementer : replace_symbol_body sur un test : zone de Edit, refusé"
 hook fix-restrict-writes.sh fix-implementer mcp__serena__insert_after_symbol "$(sp lib/a.dart)"
-expect_no_out deny "implementer : insert_after_symbol dans lib/ : zone de Edit, permis (outil donné à personne)"
-hook fix-restrict-writes.sh fix-implementer mcp__serena__safe_delete_symbol "$(sp lib/../test/a_test.dart)"
+expect_no_out deny "implementer : insert_after_symbol dans lib/ : zone de Edit, permis"
+hook fix-restrict-writes.sh fix-implementer mcp__serena__replace_symbol_body "$(sp lib/a.g.dart)"
+expect_out "fichier généré" "implementer : replace_symbol_body dans un *.g.dart : refusé"
+hook fix-restrict-writes.sh fix-implementer mcp__serena__insert_after_symbol "$(sp lib/l10n/generated/app_fr.dart)"
+expect_out "fichier généré" "implementer : insert_after_symbol dans la l10n générée : refusé"
+hook fix-restrict-writes.sh fix-implementer mcp__serena__insert_before_symbol "$(sp lib/../test/a_test.dart)"
 expect_out "GELÉS" "relative_path avec .. : normalisé, refusé"
 hook fix-restrict-writes.sh fix-implementer mcp__serena__replace_symbol_body "$(sp ../../etc/x.dart)"
 expect_out "hors du projet" "relative_path qui sort du worktree : refusé"
@@ -153,6 +195,16 @@ if command -v fvm >/dev/null && [ -n "${FVM_FLUTTER_VERSION:-}" ]; then
   expect_out "GELÉS" "implementer : replace_symbol_body sur un test gelé : refusé"
   hook pipeline-restrict-writes.sh feature-implementer mcp__serena__replace_symbol_body "$(sp "$P/lib/src/data/b.dart")" "$F"
   expect_no_out deny "implementer : replace_symbol_body dans lib/ : zone de Edit, permis"
+  for a in feature-implementer-data feature-cleaner; do
+    hook pipeline-restrict-writes.sh "$a" mcp__serena__insert_after_symbol "$(sp "$P/lib/src/data/b.dart")" "$F"
+    expect_no_out deny "$a : insert_after_symbol dans la couche data : permis"
+  done
+  hook pipeline-restrict-writes.sh feature-implementer-presentation mcp__serena__replace_symbol_body "$(sp "$P/lib/src/data/b.dart")" "$F"
+  expect_out "moitié data" "implementer présentation : écriture Serena dans la couche data : refusée"
+  hook pipeline-restrict-writes.sh feature-implementer mcp__serena__replace_symbol_body "$(sp "$P/lib/src/data/b.g.dart")" "$F"
+  expect_out "fichier généré" "implementer : replace_symbol_body dans un *.g.dart : refusé"
+  hook pipeline-restrict-writes.sh feature-cleaner mcp__serena__safe_delete_symbol "$(sp "$P/lib/src/data/b.dart")" "$F"
+  expect_out "outil Serena hors liste" "cleaner : safe_delete_symbol refusé (les suppressions passent par Edit)"
   SERENA_PROJECT="$W" hook pipeline-restrict-writes.sh feature-reviewer mcp__serena__find_symbol '{}' "$F"
   expect_out "pas ton worktree" "Serena qui sert un autre worktree : refusé"
   hook pipeline-restrict-writes.sh feature-implementer Write "$(fp "$F/.serena/project.yml")" "$F"
