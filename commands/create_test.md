@@ -54,6 +54,7 @@ Résous le chemin et lis le code cible. Identifie :
 - La **couche** : domain (use case, entity), data (repository impl, data source, mapper), presentation (state holder, page)
 - Les **dépendances** à mocker
 - L'**interface publique** (méthodes, inputs, outputs)
+- Quand le code fautif vit dans un package sans aucun test (vendorisé, natif, tiers), la reproduction pose le harnais de test de ce package (cible native, test Dart du package) plutôt qu'un test voisin qui ne monte pas le composant (learn 2026-11-19, package_without_tests, 4 runs)
 
 ---
 
