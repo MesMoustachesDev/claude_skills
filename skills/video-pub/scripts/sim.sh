@@ -5,6 +5,8 @@
 #   sim.sh rec-start <udid> <fichier.mov>                            lance l'enregistrement d'écran en fond
 #   sim.sh rec-stop <fichier.mov>                                    l'arrête proprement (le .mov est écrit à l'arrêt)
 #   sim.sh off <udid>                                                éteint le simulateur
+#   sim.sh watch <udid iPhone> [langue] [type de montre]              crée une Apple Watch, l'appaire à cet iPhone
+#                                                                    (le tien, créé par `new`), attend la connexion ; affiche l'UDID
 #
 # Ne clone que depuis un simulateur éteint (Shutdown) : on ne démarre ni ne modifie jamais un
 # simulateur qu'une autre session utilise.
@@ -39,6 +41,29 @@ case "$cmd" in
     ;;
   off)
     xcrun simctl shutdown "${2:?udid}"; echo "éteint"
+    ;;
+  watch)
+    phone="${2:?udid de ton iPhone}"; lang="${3:-fr}"; wtype="${4:-Apple Watch Series 12 (46mm)}"
+    xcrun simctl list devices | grep -F "$phone" | grep -q 'video-pub' \
+      || { echo "refusé : $phone n'est pas un simulateur créé par sim.sh new (nom en « · video-pub-… »)."; exit 1; }
+    dt=$(xcrun simctl list devicetypes | grep -F "$wtype" | head -1 | sed -E 's/.*\((com\.apple[^)]*)\).*/\1/')
+    rt=$(xcrun simctl list runtimes | grep -i watchos | tail -1 | sed -E 's/.* - (com\.apple[^ ]*).*/\1/')
+    [ -n "$dt" ] && [ -n "$rt" ] || { echo "type de montre ou runtime watchOS introuvable ($wtype)"; exit 1; }
+    watch=$(xcrun simctl create "$wtype · video-pub-$(date +%H%M)" "$dt" "$rt")
+    pair=$(xcrun simctl pair "$watch" "$phone")
+    xcrun simctl boot "$watch"
+    xcrun simctl spawn "$watch" defaults write -g AppleLanguages -array "$lang"
+    loc=$(echo "$lang" | tr '[:lower:]' '[:upper:]'); xcrun simctl spawn "$watch" defaults write -g AppleLocale "${lang}_${loc}"
+    # Juste après l'appairage, la paire reste « disconnected » : il faut éteindre les deux, puis
+    # démarrer l'iPhone avant la montre. La connexion arrive ensuite en une demi-minute environ.
+    xcrun simctl shutdown "$watch"; xcrun simctl shutdown "$phone" 2>/dev/null || true
+    xcrun simctl boot "$phone"; sleep 8; xcrun simctl boot "$watch"
+    statusbar "$phone"
+    for _ in $(seq 1 20); do
+      xcrun simctl list pairs | grep -F "$pair" | grep -q ', connected' && { echo "$watch"; exit 0; }
+      sleep 6
+    done
+    echo "montre créée ($watch) mais la paire n'est pas connectée après 2 min : relance l'iPhone puis la montre." >&2; exit 1
     ;;
   *) sed -n 2,9p "$0"; exit 2 ;;
 esac

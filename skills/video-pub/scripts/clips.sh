@@ -3,6 +3,8 @@
 #
 #   clips.sh sheet <video> <début s> <durée s> <images/s> <sortie.jpg>   planche horodatée (temps absolus dans la vidéo)
 #   clips.sh cut <video> <début s> <durée s> <sortie.mp4>                un plan, 30 i/s, 600 px de large, une image clé par image
+#   clips.sh cutc <video> <début s> <durée s> <recadrage w:h:x:y> <sortie.mp4>
+#                                                                        un plan recadré, à sa taille (écran de montre sans l'heure)
 #   clips.sh join <sortie.mp4> <plan1.mp4> <plan2.mp4> [...]             met des plans bout à bout
 #   clips.sh still <video> <temps s> <recadrage w:h:x:y|-> <sortie.jpg>  une image fixe, recadrée ou non
 #
@@ -23,6 +25,10 @@ case "$cmd" in
   cut)
     "$FF" -y -loglevel error -ss "$3" -i "$2" -t "$4" -vf "fps=30,scale=600:-2" -c:v libx264 -crf 16 -g 1 -pix_fmt yuv420p -an "$5"
     echo "$5"
+    ;;
+  cutc)
+    "$FF" -y -loglevel error -ss "$3" -i "$2" -t "$4" -vf "crop=$5,fps=30" -c:v libx264 -crf 14 -g 1 -pix_fmt yuv420p -an "$6"
+    echo "$6"
     ;;
   join)
     out="$2"; shift 2; lst=$(mktemp -t clipsjoin); for f in "$@"; do echo "file '$(cd "$(dirname "$f")" && pwd)/$(basename "$f")'" >> "$lst"; done

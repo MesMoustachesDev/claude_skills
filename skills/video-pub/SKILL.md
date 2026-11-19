@@ -61,6 +61,28 @@ Montre le storyboard à Thibault et attends son accord avant de filmer.
 L'app installée parle au vrai serveur : un compte invité, une extraction ou une donnée créée pendant le
 tournage existe en production. Dis-le à Thibault dans le compte rendu.
 
+### Avec une Apple Watch
+
+Quand le parcours passe par la montre, filme-la aussi au lieu de la dessiner.
+1. `scripts/sim.sh watch <udid iPhone> fr` : crée la montre, l'appaire à ton iPhone et attend que la paire
+   soit `connected`. Sans le redémarrage dans l'ordre (iPhone puis montre) que fait le script, la paire
+   reste `disconnected` et l'app iPhone ne voit pas la montre.
+2. Installe l'app montre directement : `xcrun simctl install <udid montre> <Runner.app>/Watch/<app montre>.app`,
+   puis lance-la (`xcrun simctl launch <udid montre> <bundle id montre>`) avant d'ouvrir l'écran de l'iPhone
+   qui en dépend. Si l'iPhone dit encore « montre non installée », réinstalle l'app iPhone, puis relance les deux.
+3. Le panneau du simulateur pilote aussi la montre (`device` = son UDID). Sur une pile de pages verticales,
+   seul un balayage rapide change de page (0,15 s, du bas vers le haut de l'écran) ; un balayage lent ne fait rien.
+4. Enregistre les deux écrans en même temps (`rec-start` sur chacun) ; leurs durées diffèrent (le
+   simulateur n'écrit une image que quand l'écran change) : repère chaque moment sur sa propre planche.
+   Pour la même raison, une coupe d'une seconde sur un écran immobile peut sortir vide : coupe au moins 2 s.
+5. La barre d'état de la montre ne se règle pas (`status_bar` n'y marche pas) : elle montre l'heure réelle.
+   Coupe le haut de l'écran au découpage (`clips.sh cutc … 416:424:0:72` pour une 46 mm) et dessine l'heure
+   de l'iPhone (9:41) dans le boîtier.
+6. La montre se met dans un boîtier dessiné, posé sur un poignet dessiné : l'écran filmé à l'intérieur, le reste en dessin.
+
+Une fonction réservée aux comptes connectés (souvent le cas de la montre) ne se filme pas en invité : la
+config du projet le dit ; sinon, vérifie la condition d'affichage du bouton dans le code avant de tourner.
+
 ## 3. Choisir et couper les plans
 
 - `scripts/clips.sh sheet <rec.mov> 0 <durée> 1 planche.jpg` : une image par seconde, horodatée.
