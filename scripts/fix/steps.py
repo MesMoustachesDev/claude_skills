@@ -2,7 +2,8 @@
 """fix/steps.py — l'étape courante d'un /fix, et ce qu'il attend de Thibault.
 
 À lancer depuis le worktree du fix. L'état vient de .claude/fixes/<nom>/fix.json et repro.json. Ce script
-n'écrit dans fix.json que `waiting` et `waiting_at` (la question posée à Thibault).
+n'écrit dans fix.json que `waiting` et `waiting_at` (la question posée à Thibault) ; tout le reste de l'état
+passe par fix/fix.py, qui s'appuie sur la classe Fix d'ici.
 
   fix/steps.py next <nom> [--json]     étape courante (première ni passée ni sautée), étapes, attente
   fix/steps.py ask <nom> "<question>"  ce qu'on attend de Thibault, posé avant la question ("" pour effacer)
@@ -12,12 +13,13 @@ Lus par le watchdog du fix (fix/watchdog.py) et par le mod pipeline-view (`next 
 import json
 import os
 import re
-import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [os.path.dirname(HERE), os.path.join(os.path.dirname(HERE), "pipeline")]
 import statefile  # noqa: E402  (scripts/statefile.py : lecture, écriture sous verrou)
-from statefile import die, now  # noqa: E402
+import pipeline as pl  # noqa: E402  (état partagé avec /feature : Ctx, commandes génériques, attente des hooks)
+from statefile import die  # noqa: E402
 
 # (clé, étape, titre). Une clé « hg.x » est un point d'étape (human_gates.x) ; hg.ui seulement pour un bug d'écran.
 ORDER = [
@@ -29,31 +31,42 @@ ORDER = [
     ("evidence", "5", "Evidence, commits"),
 ]
 DONE = {"key": "done", "step": "—", "title": "Fix terminé", "status": "DONE"}
+LOOP_MAX = {"review": 2, "arbitrate": 2, "ui": 2}
 
 
-def git(*args, cwd=None):
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else ""
+class Fix(pl.Ctx):
+    """fix.json d'un /fix, avec l'interface de pipeline.Ctx : les commandes de pipeline.py (pass, gate, loop,
+    debt, accept, ask, recap, set…) et l'attente des hooks (wait_hooks, wait_agents) s'y appliquent telles
+    quelles. `save` : sous verrou (statefile), seul ce que la commande a changé est réécrit sur fix.json relu ;
+    ce que fix-gate.sh y a écrit entre-temps est gardé."""
 
-
-class Fix:
-    def __init__(self, name):
+    def __init__(self, name, must_exist=True):
         if not re.fullmatch(r"[a-z][a-z0-9_]*", name or ""):
             die(f"nom de fix invalide : {name!r}")
         self.name = name
-        self.root = git("rev-parse", "--show-toplevel") or die("pas dans un repo git")
+        self.root = pl.git("rev-parse", "--show-toplevel", check=False) or die("pas dans un repo git")
         self.dir = os.path.join(self.root, ".claude", "fixes", name)
         self.path = os.path.join(self.dir, "fix.json")
-        if not os.path.isfile(self.path):
+        self.cfg_file = os.path.join(self.root, ".claude", "rules", "feature_pipeline.md")
+        if must_exist and not os.path.isfile(self.path):
             die(f"fix.json absent : {self.path}")
-        self.f = statefile.load(self.path)
-        self._base = json.loads(json.dumps(self.f))
+        self.reload()
 
-    def save(self):
-        """Sous verrou (statefile) : seul ce que cette commande a changé est réécrit sur fix.json relu ;
-        ce que l'orchestrateur ou fix-gate.sh y a écrit entre-temps est gardé."""
-        self.f = statefile.save_changes(self.path, self._base, self.f)
-        self._base = json.loads(json.dumps(self.f))
+    @property
+    def f(self):
+        return self.p
+
+    def step_key(self):
+        return steps(self)[1]["key"]
+
+    def gate_cmd(self, profile):
+        return f"fix_gauntlet.sh {profile} {self.name}"
+
+    def loop_max(self, name):
+        return LOOP_MAX.get(name, 2)
+
+    def loop_verdict(self, name):
+        return "review.json" if name == "review" else None
 
     def repro(self):
         try:
@@ -97,14 +110,7 @@ def cmd_next(fx, args):
 
 
 def cmd_ask(fx, args):
-    text = (args[0] if args else "").strip()
-    if "\n" in text or len(text) > 200:
-        die("ask : une ligne, 200 caractères au plus")
-    fx.f.pop("cockpit", None)   # ancienne clé, avant le retrait du cockpit (2026-11-19)
-    fx.f["waiting"] = text or None
-    fx.f["waiting_at"] = now() if text else None
-    fx.save()
-    print(f"attente : {text}" if text else "attente effacée")
+    pl.cmd_ask(fx, args)
 
 
 COMMANDS = {"next": cmd_next, "ask": cmd_ask}

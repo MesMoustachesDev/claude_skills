@@ -1,11 +1,11 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`), amendée le 2026-11-19 (`after` de /fix en Python)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
 `commands/feature.md` et `commands/fix.md` (« Un tour ne finit que sur une question… », « Au rapport d'un agent ») ·
-`scripts/fix_gauntlet.sh after` · `pipeline.py` → `wait_agents` · `scripts/fix_gauntlet.sh watchdog`
+`scripts/fix/fix.py after` (alias `fix_gauntlet.sh after`) · `pipeline.py` → `wait_hooks`, `wait_agents` · `scripts/fix_gauntlet.sh watchdog`
 (`scripts/fix/watchdog.py`, étape et attente : `scripts/fix/steps.py`) · `commands/fix.md` (« Watchdog », étape 0) · `feature_pipeline.md` →
 `watchdog.minutes`, `watchdog.renotify_minutes`
 
@@ -72,6 +72,14 @@ personne ne l'a vu.
   racine de `pipeline.json` et `fix.json` (avant : `cockpit.waiting`, `cockpit.at`). `pipeline.sh gate`
   l'efface ; sinon `ask <nom> ""`. Le watchdog n'a jamais lu que ces deux valeurs : son verdict ne
   change pas. Les mods pipeline-view et pipeline-band lisent la même clé `waiting`.
+- Amendement 6 (2026-11-19) : **une seule attente bloquante pour /feature et /fix**. `fix_after`, réécriture en
+  shell de `wait_hooks` et `wait_agents` (`fix_gauntlet.sh`), disparaît : `fix/fix.py after <nom> <profil>`
+  appelle ces deux fonctions de `pipeline.py` sur `fix.json`, avec les mêmes constantes (30 s pour voir le hook
+  démarrer, `stages.<profil>.at` récent de 120 s, budget de 540 s, exit 4 au-delà). Les réglages de test passent
+  par `PIPELINE_AFTER_WAIT` et `PIPELINE_WAIT_MAX` (avant : `FIX_AFTER_WAIT`, `FIX_WAIT_MAX`).
+  `fix_gauntlet.sh after <profil> <nom>` reste un alias, pour un /fix repris avec l'ancien `fix.md` en tête.
+  `fix/fix.py ask` est le `ask` du fix dans `commands/fix.md` ; `fix/steps.py ask`, même fonction, reste pour
+  les appels existants.
 
 ## Conséquences
 

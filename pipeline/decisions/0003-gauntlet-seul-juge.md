@@ -1,11 +1,12 @@
 # 0003 — Le gauntlet est le seul juge d'une étape
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-10
-(trous du gauntlet, plus bas), le 2026-11-17 (checks d'avertissement, plus bas) et le 2026-11-19 (verrou de l'état)
+(trous du gauntlet, plus bas), le 2026-11-17 (checks d'avertissement, plus bas), le 2026-11-19 (verrou de l'état)
+et le 2026-11-19 (`fix.json` écrit par script, plus bas)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
 (gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`, sous le verrou de
 `scripts/statefile.py`, comme `pipe_set` du gate, `review.py`, `fix/steps.py`, `state_set` de `fix/lib.sh`
-et `learn.py`) · `commands/feature.md`
+et `learn.py`) · `scripts/fix/fix.py` (seul à écrire `fix.json` avec `hooks/fix-gate.sh`) · `commands/feature.md`
 (« Le script décide, pas l'agent, pas toi »)
 
 ## Contexte
@@ -63,3 +64,21 @@ change aucun verdict ; il met le cas sous les yeux du reviewer, qui tranche. Pre
 `server_fetch_redirect` (`scripts/gauntlet/checks_security.sh`, `fix_gauntlet.sh`), dans les profils `green`
 de `/feature` et `/fix` : `fetch()` serveur sur une URL non constante qui suit les redirections (SSRF).
 Comme tout check, il sort en `[N/A]` quand il n'a rien à lire (aucun fichier JS/TS), jamais en vert.
+
+## Amendement du 2026-11-19 : `fix.json` écrit par script
+
+« Seul à écrire » couvrait `pipeline.json`, pas `fix.json` : `commands/fix.md` demandait à l'orchestrateur d'écrire
+l'état du fix à la main, en 19 passages (gabarit de création, `phase`, `freeze_sha`, `refreezes`, `human_gates`,
+`loops.review += 1` compté par le modèle, copie de `review.json` dans `history/`), et `stages.review = PASSED`
+était un verdict de gate écrit par le modèle lui-même. Désormais :
+
+- `fix.json` ne s'écrit que par `scripts/fix/fix.py` (l'orchestrateur) et `hooks/fix-gate.sh` (`stages`,
+  `attempts`), sous le verrou de `statefile.py`. Jamais d'`Edit` ni de `Write`.
+- `fix.py` réutilise les commandes de `pipeline.py` (`gate`, `loop` et son archive `history/`, `debt`, `accept`,
+  `ask`, `recap`, `set`, le re-gel, l'attente des hooks) par la classe `Fix` de `fix/steps.py`, une
+  `pipeline.Ctx` sur `fix.json`. Il ajoute ce qui est propre au fix : `init`, `agent`, `phase`, `freeze`,
+  `refreeze` (causes du fix), `arbitrate`, `deviation`, `review-pass`.
+- Un verdict de gate ne s'écrit que par un script : `red` et `green` par le hook, `review` par
+  `fix.py review-pass`, qui joue `fix_gauntlet.sh review_verdict`. `fix.py pass` et `skip` refusent ces clés.
+- `set` n'accepte qu'une liste fermée (`suggestions.<id>` avec une décision bornée, `issue`, `watchdog_cron`) :
+  le modèle donne la valeur, le script la décode et refuse ce qui sort du schéma.

@@ -136,6 +136,24 @@ class Ctx:
     def base(self):
         return self.p.get("base") or self.cfg("base_branch", "develop")
 
+    # Points d'extension : scripts/fix/steps.py → Fix les redéfinit, et fix/fix.py réutilise les commandes d'ici
+    # sur fix.json (point 6 du plan de refacto).
+    def step_key(self):
+        """Clé de l'étape courante (lue par recap)."""
+        return next_step(self.p)["key"]
+
+    def gate_cmd(self, profile):
+        """La commande qui rejoue un gate, pour les messages."""
+        return f"gauntlet.sh {profile} {self.name}"
+
+    def loop_max(self, name):
+        mx = LOOP_MAX.get(name, 2)
+        return mx.get(self.size, 2) if isinstance(mx, dict) else mx
+
+    def loop_verdict(self, name):
+        """Le verdict archivé dans history/ à chaque boucle (lu par learn.py), ou None."""
+        return LOOP_VERDICT.get(name)
+
     def project(self):
         common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=self.root)
         name = os.path.basename(os.path.dirname(common.rstrip("/")))
@@ -255,7 +273,7 @@ def inputs(c):
     return out
 
 
-AFTER_WAIT = 30   # secondes laissées au hook de fin d'un agent pour démarrer après son rapport
+AFTER_WAIT = int(os.environ.get("PIPELINE_AFTER_WAIT", "30"))   # secondes laissées au hook de fin d'un agent pour démarrer après son rapport
 # Budget d'un appel `--after` : il tient dans un appel Bash (timeout 600 s). Au-delà, exit 4 et l'orchestrateur
 # relance la même commande, dans le même tour.
 WAIT_MAX = int(os.environ.get("PIPELINE_WAIT_MAX", "540"))
@@ -296,7 +314,7 @@ def wait_hooks(c, after=None):
                 break
             if time_now() - t0 > AFTER_WAIT:
                 print(f"attention : aucun hook de fin vu pour {after} en {AFTER_WAIT} s — rejoue le gate "
-                      f"(gauntlet.sh {after} {c.name}) et dis-le", file=sys.stderr)
+                      f"({c.gate_cmd(after)}) et dis-le", file=sys.stderr)
                 break
             subprocess.run(["sleep", "1"])
     w = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_wait.sh")
@@ -561,14 +579,12 @@ def cmd_gate(c, args):
 
 def cmd_loop(c, args):
     name = args[0]
-    mx = LOOP_MAX.get(name, 2)
-    if isinstance(mx, dict):
-        mx = mx.get(c.size, 2)
+    mx = c.loop_max(name)
     loops = c.p.setdefault("loops", {})
     loops[name] = loops.get(name, 0) + 1
     c.save()
     # Le verdict qui déclenche la boucle sera écrasé par la passe suivante : on le garde pour learn.py.
-    verdict = LOOP_VERDICT.get(name)
+    verdict = c.loop_verdict(name)
     if verdict and os.path.isfile(os.path.join(c.dir, verdict)):
         hist = os.path.join(c.dir, "history")
         os.makedirs(hist, exist_ok=True)
@@ -735,7 +751,7 @@ def cmd_recap(c, args):
     if errs:
         die("recap refusé : " + " ; ".join(errs))
     c.p["recap"] = {"goal": raw["goal"], **{k: raw.get(k, []) for k in RECAP_LISTS},
-                    "at": now(), "stage": next_step(c.p)["key"]}
+                    "at": now(), "stage": c.step_key()}
     c.save()
     print("recap écrit")
 
@@ -1229,11 +1245,18 @@ def cmd_refreeze(c, args):
     files = frozen_test_files(c)
     if not files:
         die("aucun test modifié : rien à re-geler")
+    record_refreeze(c, "tests_freeze_sha", files, cause, stage, what)
+
+
+def record_refreeze(c, sha_key, files, cause, stage, what):
+    """Commit de re-gel des seuls fichiers donnés, nouveau SHA de gel dans <sha_key>, trace dans refreezes (la mesure
+    suivie d'un run à l'autre). Partagé par /feature (tests_freeze_sha) et /fix (freeze_sha)."""
     sha = commit(c, files, f"test({c.name}): {what} (refrozen)")
-    c.p["tests_freeze_sha"] = sha
+    c.p[sha_key] = sha
     c.p.setdefault("refreezes", []).append({"at": now(), "sha": sha, "cause": cause, "files": files, "stage": stage})
     c.save()
     print(f"re-gel : {sha[:10]} · cause {cause} · {len(files)} fichiers")
+    return sha
 
 
 COMMANDS = {

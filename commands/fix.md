@@ -53,9 +53,9 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 | Hooks | `~/.claude/hooks/fix-restrict-writes.sh`, `~/.claude/hooks/fix-gate.sh` |
 | Grille de revue partagée | `~/.claude/pipeline/review_grid.md` |
 | Learn (récurrences → règles) | `~/.claude/pipeline/learn.md` · `~/.claude/scripts/learn.py` |
-| État | `.claude/fixes/<nom>/fix.json` (toi + hooks) · `repro.json` (Bastien, gelé) |
-| Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` |
-| Étape courante, attente | `python3 ~/.claude/scripts/fix/steps.py next <nom>` (étape) · `ask <nom> "<question>"` (ce qu'on attend de Thibault). Les mods pipeline-view et pipeline-band les montrent. Les choix de Thibault (plan, test, écart, captures…) se posent toujours en `AskUserQuestion`, dans la session, qui se suffit à lui-même (Règles de conduite) |
+| État | `.claude/fixes/<nom>/fix.json`, écrit **seulement** par `python3 ~/.claude/scripts/fix/fix.py` (toi) et `fix-gate.sh` (hooks), jamais par `Edit`/`Write` · `repro.json` (Bastien, gelé) |
+| Ticket (tracker du projet) | `~/.claude/pipeline/issue.md` (existant ou créé après le gel) · backends : `~/.claude/pipeline/tracker.md` · l'état `issue` : `fix.py set <nom> issue '<référence stockée>'` |
+| Étape courante, attente | `python3 ~/.claude/scripts/fix/steps.py next <nom>` (étape) · `python3 ~/.claude/scripts/fix/fix.py ask <nom> "<question>"` (ce qu'on attend de Thibault). Les mods pipeline-view et pipeline-band les montrent. Les choix de Thibault (plan, test, écart, captures…) se posent toujours en `AskUserQuestion`, dans la session, qui se suffit à lui-même (Règles de conduite) |
 
 | # | Étape | Prénom | Agent (`subagent_type`) | Gate | Point d'étape |
 |---|---|---|---|---|---|
@@ -93,9 +93,8 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
     d'un paquet, jamais de bump.
   - **Carte graphify** : `bash ~/.claude/scripts/graphify.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout et garde-la : le mot après
-    `graphify: ` (`ok`, `stale`, `absent`, `échec`) ira dans `fix.json → graphify` (`échec` s'écrit
-    `failed`) et, sur `ok`, la valeur de `graph=` dans `fix.json → graphify_graph`, à la création de
-    `fix.json` ci-dessous. `absent` → ne parle pas de graphify et continue ; `stale` ou `échec` → note
+    `graphify: ` (`ok`, `stale`, `absent`, `échec`) se passe tel quel à `fix.py init --graphify` ci-dessous
+    et, sur `ok`, la valeur de `graph=` à `--graph`. `absent` → ne parle pas de graphify et continue ; `stale` ou `échec` → note
     la ligne et continue sans carte.
   - **Serena** : `bash ~/.claude/scripts/serena.sh prepare <worktree>` (contrat :
     `~/.claude/pipeline/serena.md`), à la création comme à la reprise. Lis la dernière ligne de stdout :
@@ -107,13 +106,9 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
 - `.gitignore` : ajoute `.claude/worktrees/`, `.claude/fixes/*/.gauntlet/`, `.claude/fixes/*/fix.json`, `.claude/fixes/*/report.html`
   et `.claude/fixes/.current` s'ils n'y sont pas (commit séparé `chore: ignore fix pipeline scratch`,
   dans le worktree).
-- Écris `<nom>` dans `.claude/fixes/.current`, puis `fix.json` :
-  ```json
-  { "fix": "<nom>", "description": "<texte brut>", "branch": "fix/<nom>", "base_branch": "<branche>",
-    "base_sha": "<HEAD>", "created": "<iso>", "phase": "repro", "max_attempts": 5,
-    "stages": {}, "attempts": {}, "freeze_sha": null, "refreezes": [], "suggestions": {}, "debt": [], "loops": {}, "human_gates": {},
-    "arbitrations": [], "agents": {}, "accepted": [], "issue": null,
-    "graphify": "<ok|stale|absent|failed>", "graphify_graph": "<valeur de graph= ou null>" }
+- Crée l'état depuis le worktree, nouveau fix seulement (il écrit aussi `.claude/fixes/.current`) :
+  ```bash
+  python3 ~/.claude/scripts/fix/fix.py init <nom> "<description brute>" --base-branch <branche du checkout principal> --graphify <mot de graphify> [--graph <valeur de graph=>]
   ```
 - **Attente** : `ask` ne porte jamais un statut (« Bastien reproduit le bug ») : le watchdog lit tout
   texte de `ask` comme une question qui attend le dev (`waiting_thibault`) et ne verrait plus un fix
@@ -130,7 +125,7 @@ rapport HTML, plus les captures avant/après du parcours signalé rejoué sur de
      PushNotification d'une ligne, au plus une fois par watchdog.renotify_minutes. done → CronDelete
      de watchdog_cron. Détail : fix.md, « Watchdog ».
      ```
-     Garde l'id dans `fix.json → watchdog_cron`. Il ne se déclenche que session inactive. Il expire au
+     Garde l'id : `python3 ~/.claude/scripts/fix/fix.py set <nom> watchdog_cron <id>`. Il ne se déclenche que session inactive. Il expire au
      bout de 7 jours : en reprise, recrée-le (`CronList` d'abord, pas de doublon). Un cron de ce fix dont
      le prompt est encore `/fix <nom> watchdog` (ancien format) : `CronDelete`, puis recrée-le.
   2. `bash ~/.claude/scripts/watchdog.sh register <worktree> <nom> --fix` : la veille hors session suit
@@ -148,10 +143,11 @@ une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
 « Une issue Sentry est citée : utilise le MCP Sentry pour la stack et les tags » si c'est le cas.
 Si `fix.json → graphify` vaut `ok` : « graphe : `<fix.json → graphify_graph>` (relatif à la racine,
 passe-le en `--graph`), voir `~/.claude/pipeline/graphify.md` ».
-**Note l'`agentId` retourné dans `fix.json → agents.reproducer`** : tu en auras besoin pour l'arbitrage.
+**Note l'`agentId` retourné** : `python3 ~/.claude/scripts/fix/fix.py agent <nom> reproducer <agentId>` ; tu en
+auras besoin pour l'arbitrage.
 
-Au rapport de Bastien, dans le même tour : `fix_gauntlet.sh after red <nom>` (`after repro_report` en
-phase `arbitrate` ; Règles de conduite, « Au rapport d'un agent »), puis :
+Au rapport de Bastien, dans le même tour : `python3 ~/.claude/scripts/fix/fix.py after <nom> red`
+(`after <nom> repro_report` en phase `arbitrate` ; Règles de conduite, « Au rapport d'un agent »), puis :
 - `Besoin du dev : …` dans le rapport → pose la question au dev (`AskUserQuestion`), puis
   `SendMessage` à Bastien avec la réponse. Ne relance pas un agent neuf.
 - `stages.red` `FAILED` → point imprévu : rapport de l'agent, 40 dernières lignes de
@@ -160,7 +156,7 @@ phase `arbitrate` ; Règles de conduite, « Au rapport d'un agent »), puis :
 
 **Point d'étape — diagnostic, test rouge et plan de correction.** D'abord
 `fix_gauntlet.sh report <nom> repro` (cause, plan avec son schéma, diff du test), cité par un lien
-cliquable vers `report.html`, puis `python3 ~/.claude/scripts/fix/steps.py ask <nom> "Valide le diagnostic, le test rouge et le plan"` :
+cliquable vers `report.html`, puis `python3 ~/.claude/scripts/fix/fix.py ask <nom> "Valide le diagnostic, le test rouge et le plan"` :
 l'encart « à lire » de pipeline-view montre le diagnostic et le plan. Puis, court :
 - Cause racine (`root_cause` + `root_cause_location`) et la preuve, en 3 lignes tirées de `diagnosis.md`.
 - Pourquoi les tests l'ont raté : `miss_reason` + la phrase du diagnostic.
@@ -180,22 +176,26 @@ l'encart « à lire » de pipeline-view montre le diagnostic et le plan. Puis, c
 
 Plan changé ou test à revoir → `SendMessage` à Bastien avec le retour (« mets `fix_plan` à jour
 avec le choix du dev » ; le gate red revalide `repro.json`), puis cet arrêt à nouveau.
-`human_gates.plan = {at, by: "user", choice: "proposed" | "alternative" | "other"}`.
+Plan tranché : `python3 ~/.claude/scripts/fix/fix.py gate <nom> plan proposed|alternative|other`.
 
-Validation → **gel** :
+Validation → **gel**, après ce `gate <nom> plan` :
 ```bash
-git add <test_files> <manifestes touchés> .claude/fixes/<nom>/repro.json .claude/fixes/<nom>/diagnosis.md
-git commit -m "test(<nom>): reproduce <bug en une phrase> (frozen)"
+python3 ~/.claude/scripts/fix/fix.py freeze <nom> "<bug en une phrase, en anglais>"
 ```
-(+ le flow `maestro/fix_<nom>.yaml` et `shots/red/`, + tout test existant corrigé par Bastien ; jamais un `zz_probe_*`,
-le gate `red` le refuse). `freeze_sha` = ce
-commit, `human_gates.repro = {at, by: "user"}`, `phase = "impl"`. Le plan est gelé avec `repro.json`.
+Il commite les tests modifiés (le flow `maestro/fix_<nom>.yaml` et tout test existant corrigé par Bastien
+compris, jamais un `zz_probe_*`), les manifestes touchés, `repro.json`, `diagnosis.md` et `shots/red/`, puis
+écrit `freeze_sha`, `human_gates.repro` et `phase = "impl"`. Il refuse sans `stages.red` `PASSED` ou sans le
+plan tranché. Le plan est gelé avec `repro.json`.
 
 **Tout re-gel** (arbitrage, second passage de Bastien sur un diagnostic incomplet ou des
-`missing_tests`) : commit `test(<nom>): <ce qui change> (refrozen)`, nouveau `freeze_sha`, et ajoute à
-`fix.json → refreezes` `{at, sha, cause, files}` où `cause` est l'une de : `hygiene` (format, lint,
-fixture), `technique` (test faux techniquement : async, pump, harness), `diagnostic` (cause racine
-incomplète, second défaut trouvé), `couverture` (tests ajoutés sur un cas déjà corrigé). C'est la
+`missing_tests`) :
+```bash
+python3 ~/.claude/scripts/fix/fix.py refreeze <nom> hygiene|technique|diagnostic|couverture "<ce qui change, en anglais>"
+```
+Il commite les seuls tests modifiés (et `repro.json`, `diagnosis.md` s'ils ont bougé), jamais le code de
+Fanny, écrit le nouveau `freeze_sha` et trace `{at, sha, cause, files, stage}` dans `refreezes`. La cause :
+`hygiene` (format, lint, fixture), `technique` (test faux techniquement : async, pump, harness), `diagnostic`
+(cause racine incomplète, second défaut trouvé), `couverture` (tests ajoutés sur un cas déjà corrigé). C'est la
 mesure qu'on suit d'un fix à l'autre pour savoir où le pipeline perd du temps.
 
 **Ticket.** `issue.status == "to_create"` → `~/.claude/pipeline/issue.md`, partie B, gabarit fix
@@ -203,24 +203,27 @@ mesure qu'on suit d'un fix à l'autre pour savoir où le pipeline perd du temps.
 
 ### 2. Correction — Fanny (`fix-implementer`)
 
-Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles projet. Note son `agentId`
-(`agents.implementer`).
+Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles projet. Note son `agentId` :
+`python3 ~/.claude/scripts/fix/fix.py agent <nom> implementer <agentId>`.
 
-Au rapport de Fanny, dans le même tour : `fix_gauntlet.sh after green <nom>`, puis :
+Au rapport de Fanny, dans le même tour : `python3 ~/.claude/scripts/fix/fix.py after <nom> green`, puis :
 - **Écart au plan** dans le rapport → **point imprévu** : `fix_gauntlet.sh report <nom> repro`,
-  `python3 ~/.claude/scripts/fix/steps.py ask <nom> "Écart au plan de Fanny à trancher"`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
-  ajoute `{at, files, reason}` à `fix.json → plan_deviations` (Victor le lit ; `repro.json` reste
-  gelé) et `SendMessage` à Fanny « écart accepté, continue ». Refusé → `SendMessage` avec la
+  `python3 ~/.claude/scripts/fix/fix.py ask <nom> "Écart au plan de Fanny à trancher"`, puis `AskUserQuestion` « Accepter l'écart » / « Tenir le plan : … ». Accepté →
+  `python3 ~/.claude/scripts/fix/fix.py deviation <nom> "<raison>" <fichiers…>` (Victor le lit ; `repro.json`
+  reste gelé) et `SendMessage` à Fanny « écart accepté, continue ». Refusé → `SendMessage` avec la
   consigne du dev.
 - **Contestation de test** dans le rapport → **arbitrage**, quel que soit le gate :
-  1. `phase = "arbitrate"`, ajoute `{at, test, claim}` à `arbitrations`.
+  1. `python3 ~/.claude/scripts/fix/fix.py arbitrate <nom> open "<test>" "<contestation de Fanny>"` : phase
+     `arbitrate`, contestation tracée, `loops.arbitrate` compté. Exit 3 (plus de 2 arbitrages) → point imprévu
+     avec les deux positions, sans `SendMessage`.
   2. `SendMessage` à Bastien : la contestation telle quelle, et « tranche : test juste ou test faux ».
-  3. Verdict **test juste** → `phase = "impl"`, `SendMessage` à Fanny avec l'explication de Bastien.
+  3. Verdict **test juste** → `python3 ~/.claude/scripts/fix/fix.py arbitrate <nom> close juste`, puis
+     `SendMessage` à Fanny avec l'explication de Bastien.
      Verdict **test corrigé** → montre le diff du test au dev (`git diff <freeze_sha> -- <test_files>`)
-     et `AskUserQuestion` « Valider la correction du test » / « Refuser ». Validé → re-gel (nouveau commit
-     `test(<nom>): <ce qui change> (refrozen)`, nouveau `freeze_sha`), `phase = "impl"`, `SendMessage` à
+     et `AskUserQuestion` « Valider la correction du test » / « Refuser ». Validé →
+     `python3 ~/.claude/scripts/fix/fix.py refreeze <nom> <cause> "<ce qui change, en anglais>"` (causes
+     ci-dessus), puis `python3 ~/.claude/scripts/fix/fix.py arbitrate <nom> close corrige`, et `SendMessage` à
      Fanny : « le test a été corrigé, reprends ». Refusé → `SendMessage` à Bastien avec la raison.
-  4. `loops.arbitrate` max 2, puis point imprévu avec les deux positions.
 - `stages.green` `FAILED` → point imprévu : rapport, 40 dernières lignes de `last_green.log`,
   options (consigne à Fanny / revoir le diagnostic → retour à 1 avec Bastien).
 - `stages.green` `PASSED` → étape 3.
@@ -241,25 +244,29 @@ chemin de `impact.json` va dans le prompt de Victor ; `échec` → note la ligne
 Prompt de `fix-reviewer` : nom, `diagnosis.md`, `repro.json` (dont `fix_plan`), `fix.json →
 plan_deviations`, `freeze_sha`, `base_sha`, règles projet, et le chemin de `impact.json` s'il a été calculé.
 
-Au rapport de Victor, dans le même tour : `fix_gauntlet.sh after review_report <nom>`, puis
-`fix_gauntlet.sh review_verdict <nom>`. Les problèmes **bloquants** d'un reviewer projet (sa
-propre classification : critique, bloquant, erreur) comptent comme des critiques.
-- Dans tous les cas, d'abord : chaque entrée de `review.json → debt` va dans `fix.json → debt`
-  (`{source: "review", file, line, issue}`), sans être montrée au dev ; une suggestion qui porte sur
-  du code hors du diff depuis `base_sha` aussi, notée `suggestions.<id> = {"decision": "debt"}`.
-- Aucun critique → `stages.review = PASSED`, puis les **suggestions** (celles de Victor et les
+Au rapport de Victor, dans le même tour : `python3 ~/.claude/scripts/fix/fix.py after <nom> review_report`,
+puis `python3 ~/.claude/scripts/fix/fix.py review-pass <nom>` : il reporte `review.json → debt` dans
+`fix.json → debt` (sans le montrer au dev), joue le gauntlet `review_verdict` et, vert, écrit lui-même
+`stages.review = PASSED` (exit 0) ; rouge, exit 1. Les problèmes **bloquants** d'un reviewer projet (sa
+propre classification : critique, bloquant, erreur) comptent comme des critiques, même si `review-pass` est
+vert : boucle comme ci-dessous.
+- Une suggestion qui porte sur du code hors du diff depuis `base_sha`, sans la montrer :
+  `python3 ~/.claude/scripts/fix/fix.py debt <nom> review <fichier> "<problème>" [--line N]` puis
+  `python3 ~/.claude/scripts/fix/fix.py set <nom> suggestions.<id> '{"decision":"debt"}'`.
+- `review-pass` vert et aucun bloquant projet → les **suggestions** (celles de Victor et les
   non-bloquants des reviewers projet, dans le diff) : montre-les au dev au format de
   `~/.claude/pipeline/suggestions.md` et fais-le choisir en `AskUserQuestion` multiSelect (même
-  fichier). Note chaque choix dans `fix.json → suggestions` (`{"S1": {"decision":
-  "applied|skipped", "note": "…"}}`). Des retenues → ajoute-les à `plan_deviations`
-  (`{at, files, reason: "suggestion S1 retenue par le dev"}` : le plan validé ne les couvrait pas),
-  `SendMessage` à Fanny avec leur bloc complet et la nuance du dev, puis gate green, puis revue à
-  nouveau (`loops.review += 1`). Une suggestion déjà tranchée ne se repose pas.
-- Critiques → copie d'abord `review.json` en `.claude/fixes/<nom>/history/review_<n>.json` (`n` = la
-  valeur de `loops.review` après incrément) : la passe suivante l'écrase, et learn en a besoin.
-  `loops.review += 1`. Si ≤ 2 : `SendMessage` à Fanny (ou un neuf si injoignable)
-  avec la liste `critical` et leurs `fix`, puis gate green, puis revue à nouveau. Au-delà : point d'étape
-  hors plan avec les critiques persistantes.
+  fichier). Note chaque choix : `python3 ~/.claude/scripts/fix/fix.py set <nom> suggestions.<id>
+  '{"decision":"applied|skipped","note":"…"}'`. Des retenues →
+  `python3 ~/.claude/scripts/fix/fix.py deviation <nom> "suggestion <id> retenue par le dev" <fichiers…>` (le plan
+  validé ne les couvrait pas), `python3 ~/.claude/scripts/fix/fix.py loop <nom> review`, `SendMessage` à Fanny
+  avec leur bloc complet et la nuance du dev, puis `fix.py after <nom> green`, puis revue à nouveau. Une
+  suggestion déjà tranchée ne se repose pas.
+- `review-pass` rouge (critiques) → `python3 ~/.claude/scripts/fix/fix.py loop <nom> review` : il archive
+  `review.json` dans `history/review_<n>.json` (la passe suivante l'écrase, et learn en a besoin) et compte la
+  boucle. Exit 0 : `SendMessage` à Fanny (ou un neuf si injoignable) avec la liste `critical` et leurs `fix`,
+  puis `fix.py after <nom> green`, puis revue à nouveau. Exit 3 (plafond de 2 dépassé) : point d'étape hors
+  plan avec les critiques persistantes.
 - `plan_respected` ≠ `yes` sans critique `fix: plan` (Victor l'a jugé acceptable) : tu le
   signales au dev dans l'evidence, avec les fichiers hors plan du rapport.
 - `missing_tests` de Victor : **ne relance personne**. Ils vont dans l'evidence ; le dev décidera
@@ -270,8 +277,9 @@ propre classification : critique, bloquant, erreur) comptent comme des critiques
   probe `zz_probe_*` et la corrige, ou l'écarte. `owner: "reproducer"` → `SendMessage` à Bastien : prouvée,
   il écrit le vrai test, tu re-gèles (`cause` selon la liste ci-dessus) et Fanny reprend ; écartée, rien ne
   bouge. Au rapport, note sur l'entrée de `review.json` `outcome: "proved"|"dismissed"` et `note` (la preuve
-  en une ligne), puis rejoue `review_verdict`. Tout écarté et aucune critique → vert sans relancer Victor ;
-  sinon gate green puis revue à nouveau, comme pour une critique (`loops.review += 1`). Les `outcome` vont
+  en une ligne), puis rejoue `python3 ~/.claude/scripts/fix/fix.py review-pass <nom>`. Tout écarté et aucune
+  critique → vert sans relancer Victor ; sinon `fix.py loop <nom> review`, gate green puis revue à nouveau,
+  comme pour une critique. Les `outcome` vont
   dans l'evidence (« Revue »).
 
 ### 4. Captures — dès que `device_repro.cmd` existe
@@ -291,9 +299,10 @@ crées ni n'éteins le modèle toi-même.
 (`Read`) avant de les montrer — une capture qui ne montre pas l'état attendu est un défaut, pas un
 succès. `fix_gauntlet.sh report <nom> ui` (captures red | green et correction vs plan), puis
 lien cliquable vers `report.html`, et `SendUserFile` des paires avant/après, un appel, `display: render`, légende « avant | après ».
-`AskUserQuestion` : « Valider » / « Défaut visible : … » (→ `SendMessage` à Fanny, puis 2→3→4 ;
-`loops.ui` max 2). Validation → `human_gates.ui`. Avant la question : `python3 ~/.claude/scripts/fix/steps.py ask <nom>
-"Regarde les captures avant / après"`.
+`AskUserQuestion` : « Valider » / « Défaut visible : … » (→ `python3 ~/.claude/scripts/fix/fix.py loop <nom> ui` ;
+exit 3 au-delà de 2 : point imprévu ; sinon `SendMessage` à Fanny, puis 2→3→4). Validation →
+`python3 ~/.claude/scripts/fix/fix.py gate <nom> ui`. Avant la question :
+`python3 ~/.claude/scripts/fix/fix.py ask <nom> "Regarde les captures avant / après"`.
 
 ### 5. Evidence, commits
 
@@ -348,15 +357,14 @@ dans cet ordre :
    (`issue.md`, partie C) ; elle appliquera ses propres validations. MR créée → relance
    `mr.py archive fix <nom> <base_branch>` (l'archive prend `mr.md`).
 
-`stages.evidence = PASSED`, supprime `.claude/fixes/.current`, `CronDelete` de `fix.json → watchdog_cron` et
+`python3 ~/.claude/scripts/fix/fix.py pass <nom> evidence` (il efface l'attente et retire
+`.claude/fixes/.current`), `CronDelete` de `fix.json → watchdog_cron` et
 `bash ~/.claude/scripts/watchdog.sh unregister <nom>`.
 
 Sors du worktree avec `ExitWorktree` `action: "keep"` : la branche `fix/<nom>` reste, prête à être
 mergée par le dev. Donne-lui la commande de nettoyage à lancer après le merge, sans l'exécuter (le
 dossier du fix, non suivi, est archivé : d'où `--force` ; le simulateur du fix part avec) :
 `~/.claude/scripts/sim.sh remove fix-<nom>; git worktree remove --force .claude/worktrees/fix-<nom> && git branch -d fix/<nom>`.
-
-**Fin.** Après `stages.evidence = PASSED` : `python3 ~/.claude/scripts/fix/steps.py ask <nom> ""`.
 
 Termine par 6 lignes : cause, pourquoi raté, test, correction, learn (règles ajoutées ou « aucune
 récurrence »), chemin de l'evidence. Si la cause
@@ -378,7 +386,7 @@ que `/feature` (ADR 0005), lu par la veille hors session (`watchdog.sh scan`, no
 | `waiting_thibault` | `waiting` posé (`ask`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` → `PushNotification` d'une ligne : ce qu'on attend de lui et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
 | `done` | `stages.evidence` `PASSED` | `CronDelete` de `watchdog_cron` |
 
-Pour que le verdict soit juste : **toute question au dev passe d'abord par `python3 ~/.claude/scripts/fix/steps.py ask <nom>
+Pour que le verdict soit juste : **toute question au dev passe d'abord par `python3 ~/.claude/scripts/fix/fix.py ask <nom>
 "<ce qu'on attend de lui>"`**, vidé (`ask <nom> ""`) à sa réponse. Sans ça, le watchdog prend son silence
 pour un blocage et relance.
 
@@ -392,7 +400,9 @@ pour un blocage et relance.
   Exception voulue : Bastien et Fanny sont **repris** par `SendMessage` pour l'arbitrage
   et les boucles — leur contexte vaut cher, ne le jette pas en relançant un agent neuf.
 - **Le script décide.** Un gate est passé quand `fix.json → stages.<profil>` vaut `PASSED`, écrit par
-  le hook. Le rapport d'un agent n'en fait pas foi.
+  le hook (`red`, `green`) ou par `fix.py review-pass` (`review`). Le rapport d'un agent n'en fait pas foi.
+- **`fix.json` ne s'écrit que par `fix.py`** (ADR 0003) : jamais d'`Edit` ni de `Write` dessus, même d'une clé.
+  Une écriture qui n'a pas sa commande est une question au dev, pas un `Edit`.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
 - **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
@@ -406,7 +416,7 @@ pour un blocage et relance.
 - **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
   Son rapport arrive avant que son hook de fin ait joué le gate (plus d'une minute pour `red` ou
   `green`), et un gate rouge le remet au travail après ce rapport. C'est le script qui attend, pas toi :
-  `fix_gauntlet.sh after <profil> <nom>`, en Bash au premier plan avec `timeout: 600000`, attend que le
+  `python3 ~/.claude/scripts/fix/fix.py after <nom> <profil>`, en Bash au premier plan avec `timeout: 600000`, attend que le
   hook de ce gate ait démarré puis fini ; gate rouge, il attend aussi que l'agent renvoyé au travail se
   soit arrêté de nouveau et que son hook ait rejugé. Puis il dit ce qu'il a lu dans `fix.json →
   stages.<profil>` :
@@ -459,6 +469,7 @@ pour un blocage et relance.
 - **Le plan appartient au dev.** Couche, approche et fichiers de la correction sont validés avant
   le gel. Aucun agent ne s'en écarte sans que le dev l'ait accepté.
 - **`status`** : tableau de `fix.json` (phase, étapes, tentatives, boucles, arbitrages, gel, issue) et rien d'autre.
-- **`accept review "<raison>"`** : sur instruction explicite seulement — `"accepted": true` et la raison
-  sur chaque critique restante de `review.json`, `{stage, at, reason}` dans `accepted`, relance du
-  verdict. Apparaît dans l'evidence.
+- **`accept review "<raison>"`** : sur instruction explicite seulement —
+  `python3 ~/.claude/scripts/fix/fix.py accept <nom> review "<raison>"` (`accepted: true` et la raison sur
+  chaque critique restante de `review.json`, trace dans `accepted`), puis
+  `python3 ~/.claude/scripts/fix/fix.py review-pass <nom>`. Apparaît dans l'evidence.

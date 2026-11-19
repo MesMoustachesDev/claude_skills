@@ -12,7 +12,7 @@ se supprime pas.
 |---|---|---|
 | [0001](0001-tests-geles-avant-implementation.md) | Les tests sont écrits et gelés avant l'implémentation | amendée par 0009, 0017 ; probes de debug (2026-11-19) |
 | [0002](0002-revue-en-lecture-seule.md) | La revue est en lecture seule | amendée (2026-11-19 : « à vérifier ») |
-| [0003](0003-gauntlet-seul-juge.md) | Le gauntlet est le seul juge d'une étape | acceptée |
+| [0003](0003-gauntlet-seul-juge.md) | Le gauntlet est le seul juge d'une étape | amendée (2026-11-19 : `fix.json` écrit par script) |
 | [0004](0004-evidence-par-etape.md) | Chaque étape laisse ses preuves, l'evidence les rassemble | acceptée |
 | [0005](0005-pas-d-arret-sans-thibault.md) | Le pipeline ne s'arrête que pour attendre Thibault (watchdog /feature et /fix, attente bloquante) | amendée |
 | [0006](0006-doctrine-injectee.md) | La doctrine d'un agent est injectée dans son contexte, pas demandée | remplacée par 0008 |
