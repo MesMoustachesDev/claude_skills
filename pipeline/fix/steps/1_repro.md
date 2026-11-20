@@ -1,7 +1,12 @@
 # /fix — étape 1 : reproduction, Bastien (`fix-reproducer`)
 
-Prompt (15 lignes max) : nom, description brute, le ticket existant entre `<issue>` s'il y en a
-une (`issue.md`, partie A), racine, dossier du fix, chemins des règles projet
+**Chaque prompt d'agent du fix (Bastien, Fanny, Victor, et un agent neuf qui en reprend un) commence par
+`Racine : <chemin absolu du worktree>`.** Les hooks y retrouvent le worktree quand le cwd hérité de ta
+session n'est pas le bon (checkout principal, reprise) ; sans elle, la zone d'écriture et le gate se jouent
+sur le mauvais dossier.
+
+Prompt (15 lignes max) : `Racine : <worktree>`, nom, description brute, le ticket existant entre `<issue>` s'il y en a
+une (`issue.md`, partie A), dossier du fix, chemins des règles projet
 (`CLAUDE.md`, `.claude/rules/*`, `.claude/agents/*` s'il y en a — ils portent des invariants), et :
 « Une issue Sentry est citée : utilise le MCP Sentry pour la stack et les tags » si c'est le cas.
 Si `fix.json → graphify` vaut `ok` : « graphe : `<fix.json → graphify_graph>` (relatif à la racine,

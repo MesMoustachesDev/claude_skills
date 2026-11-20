@@ -11,6 +11,8 @@ puis `bash ~/.claude/scripts/graphify.sh impact <worktree> <base_sha> --out .cla
 (contrat : `~/.claude/pipeline/graphify.md`). Lis la dernière ligne de stdout : `ok` ou `stale` → le
 chemin de `impact.json` va dans le prompt de Victor ; `échec` → note la ligne et continue sans.
 
+Le prompt de Victor commence par `Racine : <worktree>` (voir l'étape 1).
+
 Prompt de `fix-reviewer` : nom, `diagnosis.md`, `repro.json` (dont `fix_plan`), `fix.json →
 plan_deviations`, `freeze_sha`, `base_sha`, règles projet, et le chemin de `impact.json` s'il a été calculé.
 

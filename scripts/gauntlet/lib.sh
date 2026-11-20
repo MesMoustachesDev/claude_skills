@@ -25,7 +25,7 @@ export PATH; unset _sdk
 # Un sous-agent hérite du cwd de la session de l'orchestrateur, qui n'est pas toujours le worktree de la
 # feature ou du fix (session ouverte sur le checkout principal, reprise, cwd remis à zéro). Les hooks ne s'y fient
 # donc pas seuls : ils cherchent le worktree dans le fichier écrit, le cwd, puis le prompt de l'agent
-# (l'orchestrateur de /feature y met toujours « Racine : <worktree> » ; celui de /fix cite le worktree).
+# (les orchestrateurs de /feature et de /fix y mettent toujours « Racine : <worktree> »).
 
 # run_root_from <préfixe de branche> <chemin> — racine git de <chemin> (ou de son premier parent existant) si
 # elle est sur une branche <préfixe>* (feature/, fix/), rien sinon

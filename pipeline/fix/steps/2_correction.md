@@ -1,6 +1,6 @@
 # /fix — étape 2 : correction, Fanny (`fix-implementer`)
 
-Prompt : nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles projet. Note son `agentId` :
+Prompt : `Racine : <worktree>` en première ligne (voir l'étape 1), nom, `diagnosis.md`, `repro.json`, `.gauntlet/last_red.log`, règles projet. Note son `agentId` :
 `python3 ~/.claude/scripts/fix/fix.py agent <nom> implementer <agentId>`.
 
 Au rapport de Fanny, dans le même tour : `python3 ~/.claude/scripts/fix/fix.py after <nom> green`, puis :
