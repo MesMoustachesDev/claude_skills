@@ -1,12 +1,12 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`), amendée le 2026-11-19 (`after` de /fix en Python)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`), amendée le 2026-11-19 (`after` de /fix en Python), amendée le 2026-11-20 (consignes communes dans `pipeline/conduite.md`)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
-`commands/feature.md` et `commands/fix.md` (« Un tour ne finit que sur une question… », « Au rapport d'un agent ») ·
+`pipeline/conduite.md`, lu par `commands/feature.md` et `commands/fix.md` (« Un tour ne finit que sur une question… », « Au rapport d'un agent », « Watchdog ») ·
 `scripts/fix/fix.py after` (alias `fix_gauntlet.sh after`) · `pipeline.py` → `wait_hooks`, `wait_agents` · `scripts/fix_gauntlet.sh watchdog`
-(`scripts/fix/watchdog.py`, étape et attente : `scripts/fix/steps.py`) · `commands/fix.md` (« Watchdog », étape 0) · `feature_pipeline.md` →
+(`scripts/fix/watchdog.py`, étape et attente : `scripts/fix/steps.py`) · `pipeline/fix/steps/0_preconditions.md` (« Watchdog ») · `feature_pipeline.md` →
 `watchdog.minutes`, `watchdog.renotify_minutes`
 
 ## Contexte
@@ -80,6 +80,13 @@ personne ne l'a vu.
   `fix_gauntlet.sh after <profil> <nom>` reste un alias, pour un /fix repris avec l'ancien `fix.md` en tête.
   `fix/fix.py ask` est le `ask` du fix dans `commands/fix.md` ; `fix/steps.py ask`, même fonction, reste pour
   les appels existants.
+- Amendement 7 (2026-11-20) : **rien ne change sur le fond, les consignes changent de fichier.** « Un tour
+  ne finit que sur une question… », « Au rapport d'un agent », le tableau des verdicts du watchdog et la règle
+  `ask`, écrits deux fois (`commands/feature.md`, `commands/fix.md`), sont dans `pipeline/conduite.md`, lu
+  par les deux orchestrateurs ; ce qui diffère (commande d'attente, verdict `done`) y est marqué /feature ou
+  /fix. `commands/fix.md` est découpé en étapes (`pipeline/fix/steps/`) : la pose du cron de /fix est dans
+  `0_preconditions.md`. Le prompt court du cron ne change pas : « Détail : fix.md, « Watchdog » » mène à un
+  renvoi vers `conduite.md`, comme celui de /feature.
 
 ## Conséquences
 

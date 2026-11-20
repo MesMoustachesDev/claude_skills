@@ -41,7 +41,7 @@ des projets qui ne l'utilisent pas.
   jamais vert. Un check ne rend jamais 0 pour « je n'ai rien pu vérifier ».
 - **Le rapport HTML et l'evidence listent les `[N/A]`** : colonne « non applicables » et liste « Non vérifiés »
   dans la section Gauntlet de `report.py` (/feature et /fix) ; section « Non vérifiés » de l'evidence
-  (`pipeline/feature/steps/9_evidence.md`, `commands/fix.md`), jamais omise. `fix_gauntlet.sh` écrit aussi
+  (`pipeline/feature/steps/9_evidence.md`, `pipeline/fix/steps/5_evidence.md`), jamais omise. `fix_gauntlet.sh` écrit aussi
   `not_applicable` (conventions sans version pour le langage, ou outil absent).
 
 ## Conséquences

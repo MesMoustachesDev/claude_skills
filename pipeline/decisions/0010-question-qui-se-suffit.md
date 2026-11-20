@@ -1,7 +1,7 @@
 # 0010 — Une question à Thibault se pose en AskUserQuestion et se suffit à elle-même
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-19 (cockpit de /feature et /fix retiré)
-Où elle vit : `commands/feature.md`, `commands/fix.md`, `commands/epic.md`, `commands/reviewPR.md`
+Statut : acceptée (2026-11-05), amendée le 2026-11-19 (cockpit de /feature et /fix retiré), amendée le 2026-11-20 (règle commune dans `pipeline/conduite.md`)
+Où elle vit : `pipeline/conduite.md` (lu par `/feature` et `/fix`), `commands/epic.md`, `commands/reviewPR.md`
 (« Une question se suffit à elle-même ») · `pipeline/suggestions.md` (« Ce que l'orchestrateur montre
 au dev ») · `pipeline/review/cockpit.md` (« Répondre depuis la page », retirée)
 
@@ -28,6 +28,9 @@ s'en sert plus : trop contraignant.
 - Le message au-dessus peut porter le détail long ; la question ne s'y réfère pas.
 
 C'est une consigne d'orchestrateur : aucun script ne relit les questions.
+- Amendement (2026-11-20) : le texte de la règle, écrit deux fois dans `commands/feature.md` et
+  `commands/fix.md`, est dans `pipeline/conduite.md`, lu par les deux. Les précisions qui n'étaient que dans
+  l'un y restent marquées /feature ou /fix ; rien ne change sur le fond.
 
 ## Conséquences
 

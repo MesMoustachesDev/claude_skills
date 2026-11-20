@@ -38,7 +38,8 @@ branche `feature/<nom>` = un dossier de travail `.claude/features/<nom>/` = un p
 
 ## Comment tu avances : la boucle
 
-Ce fichier ne contient que ce qui vaut à toutes les étapes. Le détail de chaque étape vit dans
+Ce fichier ne contient que ce qui vaut à toutes les étapes. Avec lui, lis en entier
+`~/.claude/pipeline/conduite.md` : les règles de conduite et le watchdog communs avec `/fix`. Le détail de chaque étape vit dans
 `~/.claude/pipeline/feature/steps/`, et **tu ne lis que celui de l'étape en cours**. L'état et la
 comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
 
@@ -72,7 +73,7 @@ comptabilité de `pipeline.json` sont tenus par un script, pas par toi.
    `set`. Aucune question à Thibault. Ensuite :
    `pipeline.sh ask <nom> "<ce qu'on attend de Thibault, une ligne>"`, puis la question, dans la
    session : **un choix se pose toujours en `AskUserQuestion`**, qui se suffit à lui-même (« Une question
-   se suffit à elle-même », Règles de conduite). Les mods pipeline-view et pipeline-band montrent l'étape,
+   se suffit à elle-même », `~/.claude/pipeline/conduite.md`). Les mods pipeline-view et pipeline-band montrent l'étape,
    ce qui attend Thibault (`ask`) et les documents à lire ; le rapport (`report.html`) reste dans le
    dossier de la feature, cité par un lien cliquable. `SendUserFile` ne sert qu'aux captures QA. `gate`
    efface l'attente ; une réponse qui ne pose pas de gate : `pipeline.sh ask <nom> ""`.
@@ -87,24 +88,8 @@ qui refuse un fichier…) : `~/.claude/pipeline/feature/depannage.md` avant de c
 
 ### Watchdog
 
-Le pipeline n'attend jamais en silence. Deux veilleurs, posés à l'étape 0 (`00_preconditions.md`,
-« Watchdog ») : un `CronCreate` dans ta session, qui t'envoie un prompt court (pas la commande slash :
-elle recopierait tout ce fichier à chaque réveil) toutes les 1,5 × `watchdog.minutes` quand la session
-est inactive, et `watchdog.sh scan` hors session (LaunchAgent), qui
-prévient Thibault par une notification macOS si la session est fermée ou bloquée sur une permission.
-Tous deux lisent le même verdict, déterministe : `pipeline.sh watchdog <nom>`.
-
-| Verdict | Ce que c'est | Ce que tu fais |
-|---|---|---|
-| `working` | un hook joue un gate, ou un sous-agent de ce worktree a écrit depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
-| `idle` | calme depuis moins de `watchdog.minutes` | rien : fin du tour, sans message |
-| `stalled` | rien ne tourne, aucune question n'attend Thibault, plus rien n'a bougé depuis `watchdog.minutes` (agent fini sans suite, gate rejoué que personne n'a lu) | **reprends la boucle** (`pipeline.sh next`) et lance la suite dans ce même tour : elle ne dépend pas de lui. Une ligne dans la session (bloc « ce que tu tranches sans lui » : arrêt constaté depuis quand, ce qui a été relancé) |
-| `waiting_thibault` | `waiting` posé (`pipeline.sh ask`), une permission ou une question en attente dans la session, ou une étape `FAILED` | `alert: true` (plus de `watchdog.minutes`) → `PushNotification` d'une ligne : ce qu'on attend de lui (le texte de `waiting`) et depuis quand, au plus une fois par `watchdog.renotify_minutes` ; sinon rien. Jamais de décision à sa place |
-| `done` | pipeline terminé | `CronDelete` de `watchdog_cron` |
-
-Pour que le verdict soit juste : **un tour qui finit sur une question à Thibault pose toujours
-`pipeline.sh ask`** (cadrage en discussion compris : « cadrage : à toi de répondre ») ; `gate` ou
-`ask <nom> ""` l'efface à sa réponse. Sans ça, le watchdog prend son silence pour un blocage et relance.
+Le verdict, son traitement et la règle `ask` : `~/.claude/pipeline/conduite.md`, « Watchdog ». La
+pose du cron et de la veille hors session : `00_preconditions.md`, « Watchdog ».
 
 ---
 
@@ -168,6 +153,10 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
 
 ## Règles de conduite
 
+Celles communes avec `/fix` sont dans `~/.claude/pipeline/conduite.md` (prénoms, le script
+décide, `FAILED`, fin de tour, au rapport d'un agent, messages au dev, question qui se suffit, rapport
+d'abord). Ici, celles propres à `/feature`.
+
 - **Gestion d'erreur (règle de base, non négociable)** : un `try/catch` n'existe que dans la couche data, autour de l'I/O (réseau, fichiers, stockage, galerie, canal plateforme, plugin natif). La couche data la convertit en type résultat (erreur typée ou valeur). Domain (use cases, entités, services de domaine), presentation et injection ne contiennent **aucun** `try/catch` : ils composent des résultats et seul le state holder les déplie. La règle de langage chargée dit le type résultat, ses opérateurs et ce qu'il faut attraper. Une décision §9 ne peut pas y déroger. Le gauntlet le vérifie (check `error_handling`). Un agent qui propose ou accepte un écart est renvoyé ; ne pose jamais cette règle comme question au dev.
 - **Filtre avant toute question imprévue.** Une question coûte l'attention du dev et souvent une
   boucle d'agents. Avant de la poser, dans l'ordre :
@@ -206,27 +195,12 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   1c et en complétion : data sources, mappers, providers ; Sophie dans la spec ; Ivan ou Nina : une
   classe, un helper, un découpage) est montré au prochain arrêt dans un tableau `Détail | Proposition |
   Pourquoi c'est utile`, séparé de ses décisions. Les agents le listent dans leur rapport sous ce titre.
-- **Une question se suffit à elle-même.** Thibault répond souvent depuis Remote Control, où il ne voit
-  que l'`AskUserQuestion`, pas le texte au-dessus. Tout ce qu'il faut pour trancher est donc **dans
-  l'`AskUserQuestion`** — cadrage, contrats, spec, plan, écart, suggestion, point imprévu, visite :
-  - le texte de la question dit de quoi on parle et ce qui existe aujourd'hui (le `fichier:ligne`, ce que
-    fait ce code ou ce que dit la spec, en une ou deux phrases), puis ce qu'on lui demande ;
-  - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code, sans jargon que la question
-    n'explique pas ;
-  - jamais un identifiant seul (`S1`, `K3`, « le point 2 », « l'option B ») : il est toujours suivi de ce
-    qu'il désigne (« S1 — `foo_mapper:42` : le mapper avale l'erreur réseau → la remonter en
-    `NetworkError` »).
-  Le message au-dessus peut porter l'extrait long (3 à 8 lignes, lien cliquable) ; la question ne s'y
-  réfère pas (« voir ci-dessus »). Relue seule, elle doit permettre de répondre sans cocher
-  « Recommandé » au hasard.
 - **Une incompréhension n'est jamais une réponse.** Si le dev répond par une question ou une
   incompréhension (« ?? », « c'est quoi », « pas compris », « je vois pas », une réponse qui finit
   par « ? »), tu n'en tires aucune décision et tu ne relances aucun agent : tu expliques (l'extrait,
   ce qu'il fait, ce que chaque option changerait, un exemple concret), puis tu reposes **la même
   question**, mêmes options. Une réponse « Other » qui mélange une décision et une question : traite
   d'abord la question, puis fais confirmer la décision.
-- **Les agents ont un prénom.** Dans tes messages au dev, tes rapports et tes prompts de lancement,
-  désigne chaque agent par son prénom (tableau des étapes) ; le slug `feature-*` ne sert qu'au `subagent_type`.
 - **Un agent par étape, contexte vierge.** Tu passes des chemins et des faits, jamais ton historique.
   Le prompt de lancement tient en 15 lignes. Celui de Sophie, Camille, Arthur et Romain inclut le
   chemin des règles du projet tirées des réponses du dev (`.claude/rules/pipeline_answers.md` s'il
@@ -237,59 +211,15 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par
   « GATE NON JOUÉ » : rejoue toi-même `gauntlet.sh <profil> <nom>` depuis le worktree avant de
   continuer, et corrige ton prompt.
-- **Un tour ne finit que sur une question à Thibault ou sur la fin du pipeline.** Jamais sur une
-  attente d'agent, de hook ou de notification : ni le rapport d'un agent ni sa notification `completed`
-  ne relancent un tour à coup sûr (elle peut arriver avec le message suivant de Thibault, ou pendant
-  qu'il écrit). Le rapport d'un agent veut dire : `next --after` (ci-dessous), puis l'étape suivante,
-  dans le même tour, même s'il ajoute « may notify more than once ». Rien qui tourne et aucune question
-  posée : tu n'as pas le droit de t'arrêter ; vérifie l'état (`git diff`, `pipeline.sh next`, rejoue le
-  gate) et lance la suite. Un tour qui finit sur une question pose `pipeline.sh ask` avant. Le watchdog
-  (« Watchdog ») rattrape un oubli après `watchdog.minutes`, il ne remplace pas cette règle.
-- **Le script décide, pas l'agent, pas toi.** Un gate est passé quand `pipeline.json → stages.<profil>`
-  vaut `PASSED`, écrit par le hook. Ne te fie pas au rapport de l'agent pour ça.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule
   exception : l'issue GitLab de 1g, dont le dev valide le contenu exact avant l'envoi.
-- **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
-  Son hook de fin joue encore le gate (plus d'une minute pour `contracts` ou `red`) : c'est le script qui
-  attend, pas toi. `pipeline.sh next <nom> --after <profil>` (ou `join <nom> red|green --after <moitié>`),
-  en Bash au premier plan avec `timeout: 600000`, attend que le hook de ce gate ait démarré puis fini ;
-  gate rouge, il attend aussi que l'agent renvoyé au travail se soit arrêté de nouveau et que son hook ait
-  rejugé (`join` attend de même l'autre moitié). Puis il dit ce qu'il a lu :
-  - `PASSED` → lance la suite, dans ce tour ;
-  - `FAILED` → point imprévu, Thibault décide (`AskUserQuestion`) ;
-  - exit 4 (« relance la même commande ») → l'agent travaille encore après 540 s : relance la même
-    commande, dans ce tour ; ne relance pas l'agent, ne rejoue pas le gate ;
-  - « aucun hook de fin vu » → le hook n'a pas tourné : rejoue le gate et dis-le avec le bloc « ce que
-    tu tranches sans lui ».
-  La notification de fin (`<task-notification>`) ne déclenche rien de plus que le rapport : si tu as déjà
-  joué `next --after`, ignore-la. Cas réels : `import_cancel_sync` (quatre relances à la main), et un
-  `/fix` dont le gate green était passé sans que Victor soit lancé.
-- **Messages au dev : ce qu'on attend de lui d'abord, le contexte ensuite.** Il suit le pipeline par
-  intermittence, sans ton historique : une ligne nue ne lui suffit pas.
-  - **Première ligne d'un point d'étape : ce qu'on attend de lui** (la décision à prendre, ou
-    « rien à décider, pour info »). Puis ce qui existe aujourd'hui, les faits qui comptent, la question.
-    Pas de récit de ce que les agents ont fait.
-  - **Ce que tu tranches sans lui se dit en un bloc, jamais en une ligne nue** (règle appliquée, action
-    réversible, gabarit, chemins ouverts, base de branche…) :
-    1. ce qui a été fait, avec le `fichier:ligne` cliquable s'il y en a un ; 2. pourquoi : la règle
-    citée telle qu'écrite, avec sa date, ou la mesure qui a tranché ; 3. ce que ça change pour lui, et
-    où revenir dessus s'il n'est pas d'accord. Deux à quatre lignes. Un fichier d'étape qui dit
-    d'annoncer un choix fait sans lui renvoie à ce bloc.
-  - **Une erreur se dit à plat** : où (`fichier:ligne`, check ou étape), la cause, puis la correction
-    prévue ou la question. Pas de « il semble y avoir un souci ».
-  - **Avant d'envoyer** : en ne lisant que ta première et ta dernière ligne, sait-il ce qui vient de se
-    passer et ce qu'il doit faire ? Sinon, réécris-les.
-- **Chaque point d'étape commence par le rapport.** `gauntlet.sh report <nom> <étape>`, cité par un lien
-  cliquable vers `report.html`, avant le texte et la question. Il est régénéré à chaque arrêt, jamais réutilisé.
-  Les points imprévus aussi : le dev décide mieux avec les séquences et le code sous les yeux.
 - **L'architecture appartient au dev, et elle est dans son code.** Les fichiers de `contracts.files`
   (à `contracts.sha`) sont la référence : aucun agent ne change une signature, un découpage ou une
   dépendance qu'ils fixent. Un agent qui rencontre une décision structurante nouvelle la remonte ; tu
   la poses au dev avec l'extrait du fichier concerné, et s'il modifie son contrat, nouveau commit
   `contracts (by Thibault) — <quoi>`.
-- **Une étape `FAILED` n'est jamais rejouée en silence.** Le dev décide.
 - **`status`** : `pipeline.sh status <nom>` tel quel (tableau, `SKIPPED` avec sa raison, issue,
   découpage en L). En L, ajoute l'état de chaque sous-feature. Rien d'autre.
 - **`accept <étape> "<raison>"`** : pose `"accepted": true` et la raison sur les entrées bloquantes
@@ -297,4 +227,3 @@ reclassement : `~/.claude/pipeline/feature/gabarits.md`.
   `pipeline.sh accept <nom> <étape> "<raison>"`, relance le verdict. Toujours sur
   instruction explicite du dev, jamais de ta propre initiative ; chaque acceptation apparaît
   dans l'evidence.
-

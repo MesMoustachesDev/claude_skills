@@ -7,7 +7,7 @@ au même format ; en cas de conflit, la règle du projet gagne.
 Lu par les orchestrateurs avant toute question (étape 1 du filtre), et transmis aux agents qui
 proposent des choix (Sophie, Camille, Arthur, Romain, Victor, Bastien). Une règle s'applique sans
 redemander ; l'orchestrateur dit laquelle il a appliquée, citée, et ce qu'elle change ici (bloc
-« ce que tu tranches sans lui » de `feature.md` et `fix.md`). Elle prime sur une question
+« ce que tu tranches sans lui » de `pipeline/conduite.md`). Elle prime sur une question
 que `feature.md` ou `fix.md` prévoirait au même endroit.
 
 Format : une ligne par règle, à l'impératif, puis entre parenthèses la date et la question d'origine.

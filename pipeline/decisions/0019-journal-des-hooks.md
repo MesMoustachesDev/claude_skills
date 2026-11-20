@@ -6,7 +6,7 @@ Où elle vit : `scripts/gauntlet/hook_log.sh` (`hook_log`, `hook_run_dir` : la s
 `pipeline-gate.sh`, `fix-gate.sh` · `scripts/hook_journal.py` (la seule lecture) · `scripts/learn.py extract`
 (signaux `hook_bypass`, `hook_denied_repeat`, `gate_failed`) et `pipeline/learn.md` · `scripts/report/report.py`
 (section Gauntlet du rapport) · evidence de /feature (`pipeline/feature/steps/9_evidence.md`) et de /fix
-(`commands/fix.md`) · `scripts/gauntlet/tests/test_hook_journal.sh`, `test_realign.sh`
+(`pipeline/fix/steps/5_evidence.md`) · `scripts/gauntlet/tests/test_hook_journal.sh`, `test_realign.sh`
 
 ## Contexte
 

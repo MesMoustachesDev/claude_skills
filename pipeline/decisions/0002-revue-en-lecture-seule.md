@@ -8,7 +8,7 @@ règle pour Camille, Gaëlle, Denis, Victor (`/fix`) et les relecteurs de `/revi
 `scripts/gauntlet/checks_review.sh` (`review_report`, `review_verdict`, `tests_review_*`) ·
 `scripts/fix_gauntlet.sh` · `scripts/review/review.py` (severity `to_verify`) ·
 `pipeline/suggestions.md` · `pipeline/review/findings_format.md` · `pipeline/feature/steps/3_tests.md`,
-`7_harden.md` · `commands/fix.md` (étape 3) · `pipeline/review/steps/5_briefing.md` · Serena en lecture seule, outils d'écriture refusés aux relecteurs par les mêmes hooks (0018)
+`7_harden.md` · `pipeline/fix/steps/3_revue.md` · `pipeline/review/steps/5_briefing.md` · Serena en lecture seule, outils d'écriture refusés aux relecteurs par les mêmes hooks (0018)
 
 ## Contexte
 

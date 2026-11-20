@@ -11,7 +11,7 @@
     `origin/feature/<epic>`) — la sous-feature en part, sa MR y revient, et c'est la base du diff des
     gates. Seule exception : `/epic` a proposé de partir de la branche d'une dépendance encore en MR
     (`feature/<dep>`). Annonce la base avant de créer le worktree, avec le bloc « ce que tu
-    tranches sans lui » (`feature.md`) : quelle branche, pourquoi, ce que ça change pour la MR.
+    tranches sans lui » (`pipeline/conduite.md`) : quelle branche, pourquoi, ce que ça change pour la MR.
   - Sinon : `git fetch origin <base>` (ignore l'échec hors ligne), puis
     `git worktree add .claude/worktrees/feature-<nom> -b feature/<nom> <base>` (si la branche existe
     sans worktree : `git worktree add .claude/worktrees/feature-<nom> feature/<nom>`), puis
@@ -35,7 +35,7 @@
     (`worktree.copy_untracked` de la config ; défaut dans l'en-tête du script). Il n'écrase jamais un
     fichier déjà là et ne copie jamais un keystore ni un secret de signature (`*.jks`, `key.properties`,
     `*.p8`, `*.p12`…), même s'ils sont demandés. Pas de question : dis-le avec le bloc « ce que tu
-    tranches sans lui » (`feature.md`) — les fichiers copiés (lignes `copié`), la ligne `résumé`, les
+    tranches sans lui » (`pipeline/conduite.md`) — les fichiers copiés (lignes `copié`), la ligne `résumé`, les
     `refusé` s'il y en a, et que la liste se règle dans `worktree.copy_untracked`. Rien de copié : une
     ligne suffit, dans le même bloc que la base de branche.
   - Dépendances non versionnées : la commande d'installation du langage du package (`stack.sh detect`
@@ -101,7 +101,7 @@
      (LaunchAgent, voir `init.md`) suit la feature même session fermée ou bloquée sur une permission.
      S'il répond « LaunchAgent absent », dis-le une fois avec le bloc « ce que tu tranches sans lui » :
      seule la veille dans la session tourne.
-  Le traitement d'un réveil est dans `feature.md` (« Watchdog »).
+  Le traitement d'un réveil est dans `~/.claude/pipeline/conduite.md` (« Watchdog »).
 - **Preflight QA** (nouveau run, ou reprise sans `qa_devices`) : `qa.platforms` vide → rien. Sinon,
   pour chaque plateforme, comment Quentin obtient son appareil à l'étape 8. Un simulateur par worktree,
   jamais le simulateur partagé (`ios.simulator`) ni le modèle (`ios.simulator_base`) : `pipeline.sh
