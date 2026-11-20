@@ -20,6 +20,7 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 - Des blocs d'1 ou 2 lignes, une ligne vide entre chaque.
 - Les nombres en chiffres. Un montant garde la devise du fait réel (des tokens facturés en $ restent en $).
 - Pas de tournures IA : pas de « Le problème n'est pas… », « Ce qui fait la différence… », « Pas X. Mais Y. », « X, c'est A. Y, c'est B. », pas de « c'est comme », pas de maxime de mug, pas d'enchaînement de petites phrases-constats. Écrire simple, comme à un enfant de 8 ans. Un storytelling en phrases courtes, ça va.
+- Chaque phrase fait avancer le sujet du post. Avant de rendre, relis chaque bloc et demande-toi : si je l'enlève, le lecteur perd-il un pas du raisonnement ? Sinon, il sort. Un tic (=>, citation de mes messages à Claude, Bah oui) ne justifie jamais une phrase à lui seul, et un fait vrai mais d'une autre histoire que celle du post (un autre bug, un chiffre qui ne mène pas à la conclusion) sort aussi. (20/11/2026, post sur les liens Gemini)
 - Autres tournures qui font IA, interdites aussi :
   - une phrase courte suivie d'un fragment (« X coûte moins cher. Et ça produit plus. »)
   - une question rhétorique suivie d'une réponse courte (« Et honnêtement ? Je le comprends. »)
