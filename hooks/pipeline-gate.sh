@@ -7,9 +7,9 @@
 # Entrée (stdin, JSON) : agent_type, cwd
 # Sortie : exit 0 = peut s'arrêter ; exit 2 + stderr = continue, la raison est montrée à l'agent
 set -u
-input="$(cat)"
-agent="$(jq -r '.agent_type // empty' <<<"$input")"
-cwd="$(jq -r '.cwd // empty' <<<"$input")"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+hook_input
+HOOK_NAME=pipeline-gate
 
 case "$agent" in
   feature-architect)   profile=contracts ;;
@@ -32,16 +32,15 @@ case "$agent" in
   *) exit 0 ;;
 esac
 
-GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
-GAUNTLET="$GAUNTLET_ROOT/../gauntlet.sh"
+GAUNTLET="$HOOK_SCRIPTS/gauntlet.sh"
 # shellcheck source=../scripts/gauntlet/lib.sh
 source "$GAUNTLET_ROOT/lib.sh"
 # Le worktree de la feature, pas le cwd hérité de la session (voir hook_feature_root).
-root="$(hook_feature_root "$cwd" "" "$(hook_agent_transcript "$input")")" && cwd="$root"
+hook_run_root feature "$cwd" "" "$(hook_agent_transcript "$input")"
+cwd="$HOOK_ROOT"
 cd "$cwd" 2>/dev/null || exit 0
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
-[ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
+feature="$HOOK_RUN"
 if [ -z "$feature" ]; then
   # Jamais « gate ignoré » en silence : l'agent le dit en tête de son rapport, l'orchestrateur rejoue le
   # gate lui-même. Une seule fois (stop_hook_active), sinon l'agent tournerait sans fin.
@@ -52,12 +51,6 @@ fi
 case "$profile" in *_data|*_presentation) export GAUNTLET_LAYER="${profile##*_}" ;; esac   # sorties de la couche (log)
 init_project_context "$feature" 2>/dev/null || { echo "pipeline-gate : contexte projet illisible, gate ignoré" >&2; exit 0; }
 
-# Journal (ADR 0019) : gate rouge et FAILED, une ligne dans .gauntlet/hooks.jsonl ; jamais bloquant.
-source "$GAUNTLET_ROOT/hook_log.sh"
-gate_log() {   # gate_log <issue> <raison> [étape]
-  local failed; failed="$(jq -r '(.failed // []) | join(" ")' "$GAUNTLET_OUT/last_${3:-$profile}.json" 2>/dev/null)"
-  hook_log "$FEATURE_DIR" pipeline-gate "$agent" Stop "" "$1" "$2${failed:+ : $failed}" "${3:-$profile}"
-}
 PIPE="$FEATURE_DIR/pipeline.json"
 [ -f "$PIPE" ] || echo '{}' > "$PIPE"
 max="$(cfg pipeline.max_attempts 5)"
@@ -84,50 +77,18 @@ if [ "${profile%%_*}" = red ] && ! bash "$GAUNTLET_ROOT/../pipeline.sh" reached 
   } >&2
   exit 2
 fi
-# pipe_set <statut> <tentatives> — sous le verrou de statefile.py (flock sur pipeline.json.lock), le même que
-# pipeline.sh : les deux moitiés des étapes 3 et 4 finissent parfois ensemble, et un `pipeline.sh debt` peut
+# gate_set <statut> <tentatives> (appelé par gate_run) — sous le verrou de statefile.py (flock sur
+# pipeline.json.lock), le même que pipeline.sh : les deux moitiés des étapes 3 et 4 finissent parfois ensemble, et un `pipeline.sh debt` peut
 # tomber au même moment ; aucune écriture n'efface l'autre.
-pipe_set() {
+gate_set() {
   python3 "$GAUNTLET_ROOT/../statefile.py" jq "$PIPE" --arg p "$profile" --arg s "$1" --argjson a "$2" \
     '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}'
 }
-# Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook ;
-# pipeline.sh next/join et gauntlet.sh attendent qu'il disparaisse (hook_wait.sh).
-mkdir -p "$FEATURE_DIR/.gauntlet"
-running="$FEATURE_DIR/.gauntlet/hook_${profile}.running"
-echo "$$ $(date +%s) $agent" > "$running"
-trap 'rm -f "$running"' EXIT
-export PIPELINE_GATE_HOOK=1
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 
 # QA: a run that already finished on the same state (commit + uncommitted changes) is not replayed, its
 # verdict is reused. Flows can be single-use (they change server state) and the agent usually ran them itself.
 [ "$profile" = qa ] && export GAUNTLET_QA_REUSE=1
-if "$GAUNTLET" "$profile" "$feature" >/dev/null 2>&1; then
-  pipe_set PASSED 0
-  exit 0
-fi
-
-attempts=$((attempts+1))
-log="$GAUNTLET_OUT/last_${profile}.log"
-if [ "$attempts" -ge "$max" ]; then
-  pipe_set FAILED "$attempts"
-  gate_log failed "gate $profile rouge après $attempts tentatives, étape FAILED"
-  {
-    echo "pipeline-gate : gate '$profile' toujours rouge après $attempts tentatives. Étape marquée FAILED."
-    echo "Arrête-toi et rends un rapport : ce qui bloque, ce que tu as essayé, ce que tu recommandes (spec ? test faux ? contrat ?)."
-  } >&2
-  exit 0
-fi
-
-pipe_set RED "$attempts"
-gate_log red "gate $profile rouge (tentative $attempts/$max)"
-{
-  echo "GATE '$profile' ROUGE (tentative $attempts/$max) — tu ne peux pas t'arrêter tant que ce n'est pas vert."
-  echo "Sortie du gauntlet (${log#$PROJECT_ROOT/}) :"
-  echo "----------------------------------------------------------------"
-  grep -vE '^\s*$' "$log" | tail -60
-  echo "----------------------------------------------------------------"
-  echo "Corrige, puis termine à nouveau : le gate se relancera automatiquement."
-} >&2
-exit 2
+GATE_DIR="$FEATURE_DIR"; GATE_OUT="$GAUNTLET_OUT"
+GATE_LOG_LABEL="Sortie du gauntlet"; GATE_FAILED_HINT=" (spec ? test faux ? contrat ?)"
+gate_run "$GAUNTLET" "$profile" "$feature"

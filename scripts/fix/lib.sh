@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# fix/lib.sh — contexte partagé par fix_gauntlet.sh et les hooks fix-*. Sourcé, pas exécuté.
+# fix/lib.sh — contexte partagé par fix_gauntlet.sh et les hooks fix-*. Sourcé, pas exécuté. Le fix courant
+# d'un hook : hook_run_root fix (hooks/lib.sh).
 #
 # Un fix = une branche fix/<nom> = un dossier .claude/fixes/<nom>/ :
 #   fix.json    état, écrit par l'orchestrateur et les hooks (phase, base_sha, freeze_sha, stages…)
@@ -16,14 +17,6 @@ fix_context() {
   FIX_OUT="$FIX_DIR/.gauntlet"
   REPRO="$FIX_DIR/repro.json"
   STATE="$FIX_DIR/fix.json"
-}
-
-# current_fix — nom du fix courant : branche fix/<nom>, sinon .claude/fixes/.current
-current_fix() {
-  local n
-  n="$(git branch --show-current 2>/dev/null | sed -n 's#^fix/##p')"
-  [ -n "$n" ] || n="$(cat "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/fixes/.current" 2>/dev/null)"
-  printf '%s' "$n"
 }
 
 state_get() { [ -f "$STATE" ] && jq -r "$1 // empty" "$STATE"; }

@@ -11,14 +11,15 @@
 #
 # Sortie : exit 0 = peut s'arrêter ; exit 2 + stderr = continue, la raison est montrée à l'agent.
 set -u
-input="$(cat)"
-agent="$(jq -r '.agent_type // empty' <<<"$input")"
-cwd="$(jq -r '.cwd // empty' <<<"$input")"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+hook_input
+HOOK_NAME=fix-gate
 [[ "$agent" == fix-* ]] || exit 0
 
-source "$HOME/.claude/scripts/fix/lib.sh"
-cd "$cwd" 2>/dev/null || exit 0
-name="$(current_fix)"
+source "$HOOK_SCRIPTS/fix/lib.sh"
+hook_run_root fix "$cwd"
+cd "$HOOK_ROOT" 2>/dev/null || exit 0
+name="$HOOK_RUN"
 [ -n "$name" ] || { echo "fix-gate : fix courant inconnu, gate ignoré" >&2; exit 0; }
 fix_context "$name" || exit 0
 [ -d "$FIX_DIR" ] || exit 0
@@ -30,48 +31,11 @@ case "$agent" in
   *) exit 0 ;;
 esac
 
-GAUNTLET="$HOME/.claude/scripts/fix_gauntlet.sh"
-# Journal (ADR 0019) : gate rouge et FAILED, une ligne dans .gauntlet/hooks.jsonl ; jamais bloquant.
-source "${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}/hook_log.sh"
-gate_log() {   # gate_log <issue> <raison>
-  local failed; failed="$(jq -r '(.failed // []) | join(" ")' "$FIX_OUT/last_${profile}.json" 2>/dev/null)"
-  hook_log "$FIX_DIR" fix-gate "$agent" Stop "" "$1" "$2${failed:+ : $failed}" "$profile"
-}
-# Marqueur « gate en cours » : le rapport de l'agent arrive à l'orchestrateur avant la fin de ce hook
-# (hook_wait.sh, appelé par fix_gauntlet.sh).
-mkdir -p "$FIX_OUT"
-running="$FIX_OUT/hook_${profile}.running"
-echo "$$ $(date +%s) $agent" > "$running"
-trap 'rm -f "$running"' EXIT
-export PIPELINE_GATE_HOOK=1
 max="$(state_get .max_attempts)"; max="${max:-5}"
 attempts="$(state_get ".attempts[\"$profile\"]")"; attempts="${attempts:-0}"
-
-if "$GAUNTLET" "$profile" "$name" >/dev/null 2>&1; then
-  state_set '.attempts[$p]=0 | .stages[$p]={status:"PASSED", at:(now|todate)}' --arg p "$profile"
-  exit 0
-fi
-
-attempts=$((attempts+1))
-log="$FIX_OUT/last_${profile}.log"
-if [ "$attempts" -ge "$max" ]; then
-  state_set '.attempts[$p]=$a | .stages[$p]={status:"FAILED", at:(now|todate)}' --arg p "$profile" --argjson a "$attempts"
-  gate_log failed "gate $profile rouge après $attempts tentatives, étape FAILED"
-  {
-    echo "fix-gate : gate '$profile' toujours rouge après $attempts tentatives. Étape marquée FAILED."
-    echo "Arrête-toi et rends un rapport : ce qui bloque, ce que tu as essayé, ce que tu recommandes."
-  } >&2
-  exit 0
-fi
-
-state_set '.attempts[$p]=$a | .stages[$p]={status:"RED", at:(now|todate)}' --arg p "$profile" --argjson a "$attempts"
-gate_log red "gate $profile rouge (tentative $attempts/$max)"
-{
-  echo "GATE '$profile' ROUGE (tentative $attempts/$max) — tu ne peux pas t'arrêter tant que ce n'est pas vert."
-  echo "Sortie (${log#$PROJECT_ROOT/}) :"
-  echo "----------------------------------------------------------------"
-  grep -vE '^\s*$' "$log" | tail -60
-  echo "----------------------------------------------------------------"
-  echo "Corrige, puis termine à nouveau : le gate se relancera automatiquement."
-} >&2
-exit 2
+# gate_set <statut> <tentatives> (appelé par gate_run) — sous le verrou de statefile.py (fix.json.lock).
+gate_set() {
+  state_set '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}' --arg p "$profile" --arg s "$1" --argjson a "$2"
+}
+GATE_DIR="$FIX_DIR"; GATE_OUT="$FIX_OUT"
+gate_run "$HOOK_SCRIPTS/fix_gauntlet.sh" "$profile" "$name"

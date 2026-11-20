@@ -6,22 +6,16 @@
 # passent. Le détail de ce qui est reconnu : scripts/gauntlet/interpreter_check.py.
 # L'orchestrateur n'est pas concerné (agent_type vide ou autre) : on voit ce qu'il fait.
 set -u
-input="$(cat)"
-agent="$(jq -r '.agent_type // empty' <<<"$input")"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+hook_input
 [[ "$agent" == feature-* || "$agent" == fix-* ]] || exit 0
-[ "$(jq -r '.tool_name // empty' <<<"$input")" = Bash ] || exit 0
+[ "$tool" = Bash ] || exit 0
+HOOK_NAME=no-interpreter
 
-cwd="$(jq -r '.cwd // empty' <<<"$input")"
-scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
-GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"
-why="$(jq -r '.tool_input.command // empty' <<<"$input" \
-  | python3 -I "$GAUNTLET_ROOT/interpreter_check.py" "${cwd:-$PWD}" "$scratch" 2>&1)"
+why="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 -I "$GAUNTLET_ROOT/interpreter_check.py" "${cwd:-$PWD}" "$scratch" 2>&1)"
 [ -n "$why" ] || exit 0
 
-# Journal (ADR 0019) : le refus s'écrit dans le dossier du run, s'il est connu ; jamais bloquant.
-source "$GAUNTLET_ROOT/hook_log.sh"
-hook_log "$(hook_run_dir "$agent" "${cwd:-$PWD}" "$input")" no-interpreter "$agent" Bash \
-  "$(jq -r '.tool_input.command // empty' <<<"$input")" deny "$why"
-msg="$agent : interpréteur refusé — $why. Pour écrire un fichier : Edit ou MultiEdit (Write pour en créer un). Pour lire du JSON : jq. Pour une recherche : grep, rg, sed -n. Les scripts du pipeline (python3 -I ~/.claude/scripts/…) restent permis. Un refus se rapporte, il ne se contourne pas : s'il te manque un outil, arrête-toi et dis-le dans ton rapport final (ADR 0017)."
-jq -n --arg r "$msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
-exit 0
+# Journal (ADR 0019) : le refus s'écrit dans le dossier du run, s'il est connu ; la raison courte (why) au journal,
+# le message complet à l'agent. La commande est la cible ; elle n'est pas répétée dans la raison.
+LOG_TARGET="$log_cmd"; log_cmd=""
+hook_deny "$agent : interpréteur refusé — $why. Pour écrire un fichier : Edit ou MultiEdit (Write pour en créer un). Pour lire du JSON : jq. Pour une recherche : grep, rg, sed -n. Les scripts du pipeline (python3 -I ~/.claude/scripts/…) restent permis. Un refus se rapporte, il ne se contourne pas : s'il te manque un outil, arrête-toi et dis-le dans ton rapport final (ADR 0017)." "$why"

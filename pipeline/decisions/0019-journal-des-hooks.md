@@ -3,7 +3,8 @@
 Statut : acceptée (2026-11-19)
 Où elle vit : `scripts/gauntlet/hook_log.sh` (`hook_log`, `hook_run_dir` : la seule écriture) · appelée par
 `hooks/no-interpreter.sh`, `pipeline-restrict-writes.sh`, `fix-restrict-writes.sh`, `review-restrict-writes.sh`,
-`pipeline-gate.sh`, `fix-gate.sh` · `scripts/hook_journal.py` (la seule lecture) · `scripts/learn.py extract`
+`pipeline-gate.sh`, `fix-gate.sh`, la plupart par `hooks/lib.sh` (`hook_deny`, `hook_log_decision`, `gate_log`) ·
+`scripts/hook_journal.py` (la seule lecture) · `scripts/learn.py extract`
 (signaux `hook_bypass`, `hook_denied_repeat`, `gate_failed`) et `pipeline/learn.md` · `scripts/report/report.py`
 (section Gauntlet du rapport) · evidence de /feature (`pipeline/feature/steps/9_evidence.md`) et de /fix
 (`pipeline/fix/steps/5_evidence.md`) · `scripts/gauntlet/tests/test_hook_journal.sh`, `test_realign.sh`

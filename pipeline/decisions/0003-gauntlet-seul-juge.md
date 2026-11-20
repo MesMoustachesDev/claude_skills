@@ -5,8 +5,8 @@ Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25),
 et le 2026-11-19 (`fix.json` écrit par script, plus bas)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
 (gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`, sous le verrou de
-`scripts/statefile.py`, comme `pipe_set` du gate, `review.py`, `fix/steps.py`, `state_set` de `fix/lib.sh`
-et `learn.py`) · `scripts/fix/fix.py` (seul à écrire `fix.json` avec `hooks/fix-gate.sh`) · `pipeline/conduite.md`
+`scripts/statefile.py`, comme `gate_set` des deux gates (`gate_run` de `hooks/lib.sh`), `review.py`,
+`fix/steps.py`, `state_set` de `fix/lib.sh` et `learn.py`) · `scripts/fix/fix.py` (seul à écrire `fix.json` avec `hooks/fix-gate.sh`) · `pipeline/conduite.md`
 (« Le script décide, pas l'agent, pas toi »)
 
 ## Contexte

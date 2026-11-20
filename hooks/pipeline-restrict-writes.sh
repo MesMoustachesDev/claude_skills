@@ -18,51 +18,12 @@
 # relecteurs : leur critique non prouvée part dans `to_verify` (ADR 0002).
 set -u
 set -f   # pas d'expansion des globs de config par le shell : ce sont des motifs pour `case`
-input="$(cat)"
-agent="$(jq -r '.agent_type // empty' <<<"$input")"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+hook_input
 [[ "$agent" == feature-* ]] || exit 0            # hors pipeline : pas de décision
+HOOK_NAME=pipeline-restrict-writes; HOOK_LABEL=pipeline
 
-cwd="$(jq -r '.cwd // empty' <<<"$input")"
-scratch="$(jq -r '.scratchpad_dir // empty' <<<"$input")"
-tool="$(jq -r '.tool_name // empty' <<<"$input")"
-GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/gauntlet" && pwd)}"   # surcharge : tests du hook ; défaut : le gauntlet de ce checkout
-# Journal (ADR 0019) : une ligne par décision dans <dossier du run>/.gauntlet/hooks.jsonl ; jamais bloquant.
-source "$GAUNTLET_ROOT/hook_log.sh"
-RUN_DIR=""; LOG_TARGET=""
-log_cmd="$(jq -r '.tool_input.command // empty' <<<"$input")"
-log_decision() {   # log_decision <issue> <raison>
-  [ -n "$RUN_DIR" ] || RUN_DIR="$(hook_run_dir "$agent" "${cwd:-$PWD}" "$input" "${file:-}")"
-  hook_log "$RUN_DIR" pipeline-restrict-writes "$agent" "$tool" "${LOG_TARGET:-${file:-$log_cmd}}" "$1" "$2${log_cmd:+ — bash: $log_cmd}"
-}
-deny() {
-  log_decision deny "$1"
-  jq -n --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
-  exit 0
-}
-# Contexte illisible : Edit/Write (et Serena) refusés ; Bash laissé passer (un `> /tmp/log` n'a pas besoin
-# de la feature, et le gate reste le filet).
-ctx_deny() { [ "$tool" = Bash ] && exit 0; deny "$1"; }
-
-# Serena (ADR 0018) : liste fermée d'outils. La lecture passe si le serveur de l'agent sert bien ce
-# worktree ; un outil d'écriture va à la même zone qu'un Edit du fichier de relative_path ; tout autre
-# outil Serena est refusé.
-source "$GAUNTLET_ROOT/serena_guard.sh"
-skind="$(serena_kind "$tool")"; served=""
-if [ -n "$skind" ]; then
-  [ "$skind" = other ] && deny "pipeline : outil Serena hors liste ($tool). Permis : $SERENA_READ_TOOLS. Un refus se rapporte, il ne se contourne pas."
-  served="$(serena_served "${cwd:-$PWD}")"
-  [ -n "$served" ] || deny "pipeline : Serena ne sert aucun worktree connu. Cherche les usages avec grep, et dis-le dans ton rapport."
-  targets=""
-  if [ "$skind" = write ]; then
-    rp="$(jq -r '.tool_input.relative_path // empty' <<<"$input")"
-    [ -n "$rp" ] || deny "pipeline : $tool sans relative_path."
-    targets="$(serena_target "$served" "$rp")"
-  fi
-elif [ "$tool" = Bash ]; then
-  targets="$(jq -r '.tool_input.command // empty' <<<"$input" | python3 "$GAUNTLET_ROOT/bash_write_targets.py" "${cwd:-$PWD}")"
-else
-  targets="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")"
-fi
+hook_targets
 [ -n "$targets" ] || [ -n "$skind" ] || exit 0
 file="${targets%%$'\n'*}"
 
@@ -72,12 +33,12 @@ source "$GAUNTLET_ROOT/lib.sh"
 # Le worktree de la feature, pas le cwd : un sous-agent hérite du cwd de la session, qui peut être le
 # checkout principal (session ouverte sur le projet, reprise) — la branche y est develop et tout serait
 # refusé, ou contourné par Bash. Le fichier écrit, puis le cwd, puis la racine du prompt de l'agent.
-root="$(hook_feature_root "$cwd" "$file" "$(hook_agent_transcript "$input")")" && cwd="$root"
-cd "$cwd" 2>/dev/null || { [ -n "$skind" ] && deny "pipeline : Serena, worktree illisible ($cwd)"; exit 0; }
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { [ -n "$skind" ] && deny "pipeline : Serena, $cwd n'est pas un dépôt git"; exit 0; }
-feature="$(git branch --show-current 2>/dev/null | sed -n 's#^feature/##p')"
-[ -n "$feature" ] || feature="$(cat "$PROJECT_ROOT/.claude/features/.current" 2>/dev/null)"
-[ -n "$feature" ] || ctx_deny "pipeline : feature courante inconnue (branche feature/<nom> ou .claude/features/.current)"
+hook_run_root feature "$cwd" "$file" "$(hook_agent_transcript "$input")"
+cwd="$HOOK_ROOT"
+cd "$cwd" 2>/dev/null || { [ -n "$skind" ] && hook_deny "pipeline : Serena, worktree illisible ($cwd)"; exit 0; }
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { [ -n "$skind" ] && hook_deny "pipeline : Serena, $cwd n'est pas un dépôt git"; exit 0; }
+feature="$HOOK_RUN"
+[ -n "$feature" ] || hook_ctx_deny "pipeline : feature courante inconnue (branche feature/<nom> ou .claude/features/.current)"
 # Create mode before Arthur's scaffold: the package does not exist yet and init_project_context would die
 # (exit 2 inside the function, so `|| deny` never runs and every write is blocked). Only the specifier
 # (cadrage, spec) and the architect (scaffold) may write until the package exists.
@@ -86,28 +47,21 @@ pkg_planned="${pkg_planned%/}"
 if [ -n "$pkg_planned" ] && [ ! -d "$PROJECT_ROOT/$pkg_planned" ]; then
   case "$agent" in
     feature-specifier|feature-architect) ;;
-    *) ctx_deny "pipeline : le package $pkg_planned n'existe pas encore (mode create, avant le scaffold d'Arthur)." ;;
+    *) hook_ctx_deny "pipeline : le package $pkg_planned n'existe pas encore (mode create, avant le scaffold d'Arthur)." ;;
   esac
   CFG_FILE="${GAUNTLET_CFG:-$PROJECT_ROOT/.claude/pipeline/feature_pipeline.md}"
   [ -n "${GAUNTLET_CFG:-}" ] || [ -f "$CFG_FILE" ] || CFG_FILE="$PROJECT_ROOT/.claude/rules/feature_pipeline.md"   # ancien emplacement, projet pas encore migré (ADR 0008)
-  [ -f "$CFG_FILE" ] || ctx_deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
+  [ -f "$CFG_FILE" ] || hook_ctx_deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
   PKG_REL="$pkg_planned"
   stack_init "$PROJECT_ROOT/$pkg_planned"   # le dossier n'existe pas encore : le langage du parent qui existe
 else
-  init_project_context "$feature" 2>/dev/null || ctx_deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
+  init_project_context "$feature" 2>/dev/null || hook_ctx_deny "pipeline : contexte projet illisible (feature_pipeline.md ?)"
 fi
 
-# chemin absolu canonique (le fichier ou ses dossiers parents peuvent ne pas exister encore)
-normalize() {
-  local p="$1" rest=""
-  case "$p" in /*) ;; *) p="$cwd/$p" ;; esac
-  while [ ! -d "$p" ] && [ "$p" != "/" ]; do rest="/$(basename "$p")$rest"; p="$(dirname "$p")"; done
-  printf '%s%s' "$(cd "$p" && pwd -P)" "$rest"
-}
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd -P)"
 # Serena : le serveur de l'agent doit servir ce worktree (serena.sh which : cwd, sinon dernier prepare du repo).
 if [ -n "$skind" ]; then
-  [ "$served" = "$PROJECT_ROOT" ] || deny "pipeline : Serena sert $served, pas ton worktree ($PROJECT_ROOT). N'utilise pas Serena ici : grep pour les usages, et dis-le dans ton rapport."
+  [ "$served" = "$PROJECT_ROOT" ] || hook_deny "pipeline : Serena sert $served, pas ton worktree ($PROJECT_ROOT). N'utilise pas Serena ici : grep pour les usages, et dis-le dans ton rapport."
   [ "$skind" = read ] && exit 0
 fi
 
@@ -177,102 +131,94 @@ via=""; [ "$tool" = Bash ] && via=" (écriture par Bash : même zone que Edit/Wr
 
 # check <fichier> — décide pour un fichier ; deny sort du hook au premier refus.
 check() {
-  local file="$1" abs
-  abs="$(normalize "$file")"; LOG_TARGET="$abs"; IN_ZONE=0
-  in_serena_dir "$abs" && deny "pipeline : .serena/ est la config de Serena, réécrite par serena.sh à chaque démarrage ; personne n'y écrit (ADR 0018). Refusé : $file"
-  [ "$skind" = write ] && serena_generated "$abs" && deny "pipeline : $file est un fichier généré : Serena n'y écrit pas, la prochaine génération l'écraserait. Change sa source et relance le générateur (build_runner, gen-l10n)."
-  [ -n "$scratch" ] && [[ "$abs" == "$scratch"/* ]] && return 0     # brouillons : toujours permis
-  if [[ "$abs" != "$PROJECT_ROOT"/* ]]; then
-    [ "$tool" = Bash ] && return 0                                  # journaux, /tmp : hors zone, hors sujet
-    deny "pipeline : écriture hors du worktree de la feature refusée ($file). Le worktree est $PROJECT_ROOT : écris sous ce chemin."
-  fi
-  rel="${abs#$PROJECT_ROOT/}"; LOG_TARGET="$rel"; IN_ZONE=1
+  local file="$1"
+  hook_check_common "$file" "pipeline : écriture hors du worktree de la feature refusée ($file). Le worktree est $PROJECT_ROOT : écris sous ce chemin." || return 0
 case "$agent" in
   feature-specifier)
-    match "$rel" "$FEAT_REL/*" || deny "specifier : n'écrit que dans $FEAT_REL/ (spec.md). Le code vient après validation.$via"
+    match "$rel" "$FEAT_REL/*" || hook_deny "specifier : n'écrit que dans $FEAT_REL/ (spec.md). Le code vient après validation.$via"
     ;;
   feature-architect)
-    is_test_path && deny "architect : les tests sont écrits par le test-writer, pas par toi.$via"
+    is_test_path && hook_deny "architect : les tests sont écrits par le test-writer, pas par toi.$via"
     match "$rel" $pkg_src $pkg_manifests "$PKG_REL/README.md" "$PKG_REL/maestro/*" $MANIFESTS $extra \
-      || deny "architect : zone autorisée = $(label $pkg_src), $PKG_REL/README.md, $(label $MANIFESTS)${extra:+, $extra}. Refusé : $rel$via"
+      || hook_deny "architect : zone autorisée = $(label $pkg_src), $PKG_REL/README.md, $(label $MANIFESTS)${extra:+, $extra}. Refusé : $rel$via"
     ;;
   feature-test-planner)
     match "$rel" "$FEAT_REL/tests_plan.json" \
-      || deny "test-planner : tu n'écris que $FEAT_REL/tests_plan.json, la liste ; les tests s'écrivent après sa validation. Refusé : $rel$via"
+      || hook_deny "test-planner : tu n'écris que $FEAT_REL/tests_plan.json, la liste ; les tests s'écrivent après sa validation. Refusé : $rel$via"
     ;;
   feature-test-writer)
     match "$rel" $pkg_tests $pkg_manifests "$FEAT_REL/tests.md" $extra_tests $extra_pubspecs \
-      || deny "test-writer : tu n'écris que dans $(label $pkg_tests)${extra_tests:+, $extra_tests} (et $(label $MANIFESTS) pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
+      || hook_deny "test-writer : tu n'écris que dans $(label $pkg_tests)${extra_tests:+, $extra_tests} (et $(label $MANIFESTS) pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
     ;;
   # Moitiés parallèles des étapes 3 et 4 : chacune n'écrit que sa couche, l'autre écrit le reste en même
   # temps. data = src/data, src/domain, src/injection ; presentation = le reste du package (et writes.extra :
   # router, l10n). Le pubspec n'est ouvert qu'aux tests de présentation (dev_dependency bdd_widget_test).
   feature-test-writer-data)
     match "$rel" $data_tests \
-      || deny "test-writer data : tu n'écris que dans $test_layer_root/$data_label. Le BLoC, l'acceptation et le pubspec sont à la moitié présentation, qui écrit en même temps que toi. Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
+      || hook_deny "test-writer data : tu n'écris que dans $test_layer_root/$data_label. Le BLoC, l'acceptation et le pubspec sont à la moitié présentation, qui écrit en même temps que toi. Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
     ;;
   feature-test-writer-presentation)
     match "$rel" $data_tests \
-      && deny "test-writer présentation : $test_layer_root/$data_label est à la moitié data, qui écrit en même temps que toi. Refusé : $rel$via"
+      && hook_deny "test-writer présentation : $test_layer_root/$data_label est à la moitié data, qui écrit en même temps que toi. Refusé : $rel$via"
     match "$rel" $pkg_tests $pkg_manifests $extra_tests $extra_pubspecs \
-      || deny "test-writer présentation : tu n'écris que dans $(label $pkg_tests) hors $test_layer_root/{$data_names}${extra_tests:+, $extra_tests} (et $(label $MANIFESTS) pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
+      || hook_deny "test-writer présentation : tu n'écris que dans $(label $pkg_tests) hors $test_layer_root/{$data_names}${extra_tests:+, $extra_tests} (et $(label $MANIFESTS) pour les dev_dependencies). Si un contrat manque, signale-le, ne le crée pas. Refusé : $rel$via"
     ;;
   feature-implementer-data)
     is_probe && return 0
-    is_test_path && deny "implementer data : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
+    is_test_path && hook_deny "implementer data : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     match "$rel" $data_libs \
-      || deny "implementer data : zone autorisée = $data_label (code). La présentation est à l'autre moitié ; une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
+      || hook_deny "implementer data : zone autorisée = $data_label (code). La présentation est à l'autre moitié ; une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
     ;;
   feature-implementer-presentation)
     is_probe && return 0
-    is_test_path && deny "implementer présentation : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
+    is_test_path && hook_deny "implementer présentation : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     match "$rel" $data_libs \
-      && deny "implementer présentation : $data_label (code) est à la moitié data, qui écrit en même temps que toi. Tu ne dépends que des signatures des use cases. Refusé : $rel$via"
+      && hook_deny "implementer présentation : $data_label (code) est à la moitié data, qui écrit en même temps que toi. Tu ne dépends que des signatures des use cases. Refusé : $rel$via"
     match "$rel" $pkg_src $extra \
-      || deny "implementer présentation : zone autorisée = $(label $pkg_src) hors {$data_names}${extra:+, $extra}. Une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
+      || hook_deny "implementer présentation : zone autorisée = $(label $pkg_src) hors {$data_names}${extra:+, $extra}. Une dépendance nouvelle (pubspec) est une décision d'architecture à rapporter. Refusé : $rel$via"
     ;;
   feature-implementer|feature-cleaner)
     is_probe && return 0
-    is_test_path && deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
+    is_test_path && hook_deny "${agent#feature-} : les tests sont GELÉS. Si un test est faux, dis-le dans ton rapport final ; ne le modifie pas. $probe_hint Refusé : $rel$via"
     # Nina retire une dépendance ou déplace un fichier : le README du package le dit (cas réel, par sed).
     # Elle ajoute aussi au vocabulaire des rôles le mot qu'aucun ne couvre (ADR 0016) ; Thibault le voit au point d'étape.
     readme=""; [ "$agent" = feature-cleaner ] && readme="$PKG_REL/README.md $(cfg roles.file .claude/rules/roles.md)"
     match "$rel" $pkg_src $pkg_manifests $MANIFESTS $readme $extra \
-      || deny "${agent#feature-} : zone autorisée = $(label $pkg_src), $(label $MANIFESTS)${readme:+, $readme}${extra:+, $extra}. Refusé : $rel$via"
+      || hook_deny "${agent#feature-} : zone autorisée = $(label $pkg_src), $(label $MANIFESTS)${readme:+, $readme}${extra:+, $extra}. Refusé : $rel$via"
     ;;
   feature-hardener)
     is_probe && return 0
     if is_test_path; then
-      is_frozen && deny "hardener : $rel est un test gelé (gel $freeze_sha) : il ne se modifie pas. Tue le mutant dans un NOUVEAU fichier de test ($(label $pkg_tests), suffixe _mutation_test) ; ceux que tu as créés, tu les corriges avec Edit. $probe_hint$via"
+      is_frozen && hook_deny "hardener : $rel est un test gelé (gel $freeze_sha) : il ne se modifie pas. Tue le mutant dans un NOUVEAU fichier de test ($(label $pkg_tests), suffixe _mutation_test) ; ceux que tu as créés, tu les corriges avec Edit. $probe_hint$via"
       return 0
     fi
     match "$rel" $pkg_src "$FEAT_REL/mutants.md" $extra_pubspecs \
-      || deny "hardener : zone autorisée = nouveaux fichiers de test, $(label $pkg_src) (rare), $FEAT_REL/mutants.md, $(label $MANIFESTS) des packages de writes.extra. Refusé : $rel$via"
+      || hook_deny "hardener : zone autorisée = nouveaux fichiers de test, $(label $pkg_src) (rare), $FEAT_REL/mutants.md, $(label $MANIFESTS) des packages de writes.extra. Refusé : $rel$via"
     ;;
   feature-reviewer)
     match "$rel" "$FEAT_REL/review.md" "$FEAT_REL/review.json" \
-      || deny "reviewer : lecture seule. Tu n'écris que $FEAT_REL/review.md et review.json, ni test ni probe : une critique que tu ne prouves pas en lisant le code ou en rejouant un test existant va dans review.json → to_verify, avec ce qu'il faudrait lancer. Refusé : $rel$via"
+      || hook_deny "reviewer : lecture seule. Tu n'écris que $FEAT_REL/review.md et review.json, ni test ni probe : une critique que tu ne prouves pas en lisant le code ou en rejouant un test existant va dans review.json → to_verify, avec ce qu'il faudrait lancer. Refusé : $rel$via"
     ;;
   feature-dedup)
     match "$rel" "$FEAT_REL/dedup.md" "$FEAT_REL/dedup.json" \
-      || deny "dedup : lecture seule. Tu n'écris que $FEAT_REL/dedup.md et dedup.json. Refusé : $rel$via"
+      || hook_deny "dedup : lecture seule. Tu n'écris que $FEAT_REL/dedup.md et dedup.json. Refusé : $rel$via"
     ;;
   feature-spec-critic)
     match "$rel" "$FEAT_REL/spec_review.md" "$FEAT_REL/spec_review.json" \
-      || deny "spec-critic : lecture seule. Tu n'écris que $FEAT_REL/spec_review.md et spec_review.json — pas la spec elle-même. Refusé : $rel$via"
+      || hook_deny "spec-critic : lecture seule. Tu n'écris que $FEAT_REL/spec_review.md et spec_review.json — pas la spec elle-même. Refusé : $rel$via"
     ;;
   feature-test-reviewer)
     match "$rel" "$FEAT_REL/tests_review.md" "$FEAT_REL/tests_review.json" \
-      || deny "test-reviewer : lecture seule. Tu n'écris que $FEAT_REL/tests_review.md et tests_review.json — jamais un test ni un probe : ce que tu ne prouves pas en lisant ou en rejouant un test existant va dans tests_review.json → to_verify. Refusé : $rel$via"
+      || hook_deny "test-reviewer : lecture seule. Tu n'écris que $FEAT_REL/tests_review.md et tests_review.json — jamais un test ni un probe : ce que tu ne prouves pas en lisant ou en rejouant un test existant va dans tests_review.json → to_verify. Refusé : $rel$via"
     ;;
   feature-polisher)
-    is_test_path && deny "polisher : les tests sont GELÉS, clés et Semantics comprises. Un test qui gêne le polish se signale dans polish.md. Refusé : $rel$via"
+    is_test_path && hook_deny "polisher : les tests sont GELÉS, clés et Semantics comprises. Un test qui gêne le polish se signale dans polish.md. Refusé : $rel$via"
     match "$rel" $pkg_presentation "$FEAT_REL/polish.md" "$FEAT_REL/polish/*" $extra \
-      || deny "polisher : zone autorisée = $(label $pkg_presentation), $FEAT_REL/polish.md, $FEAT_REL/polish/**${extra:+, $extra}. La logique, le domain et la data ne bougent pas au polish. Refusé : $rel$via"
+      || hook_deny "polisher : zone autorisée = $(label $pkg_presentation), $FEAT_REL/polish.md, $FEAT_REL/polish/**${extra:+, $extra}. La logique, le domain et la data ne bougent pas au polish. Refusé : $rel$via"
     ;;
   feature-qa)
     match "$rel" "$FEAT_REL/qa/*" "$FEAT_REL/qa.md" "$PKG_REL/maestro/*" \
-      || deny "qa : zone autorisée = $PKG_REL/maestro/** et $FEAT_REL/qa/. Un bug trouvé se rapporte dans qa.md, il ne se corrige pas ici. Refusé : $rel$via"
+      || hook_deny "qa : zone autorisée = $PKG_REL/maestro/** et $FEAT_REL/qa/. Un bug trouvé se rapporte dans qa.md, il ne se corrige pas ici. Refusé : $rel$via"
     ;;
   *) return 0 ;;
 esac
@@ -283,6 +229,6 @@ esac
 while IFS= read -r t; do
   [ -n "$t" ] || continue
   check "$t"
-  [ "${IN_ZONE:-0}" = 1 ] && log_decision allow ""
+  [ "${IN_ZONE:-0}" = 1 ] && hook_log_decision allow ""
 done <<<"$targets"
 exit 0
