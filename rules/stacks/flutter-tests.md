@@ -220,6 +220,7 @@ Future<void> emit(WidgetTester tester, List<Item> items) async {
 - Pas de `verify()` sauf side-effect critique listé dans la spec.
 - Logique qui peut échouer en partie (boucle, import, synchro) : teste le réessai après l'échec partiel, et vérifie qu'au second passage rien n'est perdu ni doublé. (learn 2026-11-07, retry-path, 2 runs)
 - Un comportement propre à une plateforme se teste sous chaque plateforme concernée (`variant: TargetPlatformVariant({...})`), jamais seulement sous la plateforme par défaut du harnais. (learn 2026-11-16, platform_path_tested_on_default_platform_only, 2 runs)
+- Un test qui dépend de l'environnement (fuseau, `.env`, secrets) ne se saute pas : il construit son entrée depuis `DateTime.utc(...)` pour rester vrai dans tout fuseau, ou échoue avec un message qui nomme ce qui manque. (learn 2026-11-20, test_skipped_by_environment, 2 runs)
 - Widget alimenté par un stream : `await tester.pump(Duration.zero)` après chaque émission ou erreur (section
   ci-dessus), dans les helpers d'émission.
 
