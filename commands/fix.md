@@ -96,6 +96,7 @@ d'abord). Ici, celles propres à `/fix`.
   Une écriture qui n'a pas sa commande est une question au dev, pas un `Edit`.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
   évident. Ce qui doit changer passe par l'agent propriétaire.
+- **Renvoyer Bastien après la correction.** Avant de lui faire écrire un test alors que la correction de Fanny est en place, passe la phase en `arbitrate` (`fix.py phase <nom> arbitrate`) pour que son hook juge `repro_report` et non `red`, puis remets `impl` après le re-gel (learn 2026-11-20, hook_replays_gate_after_reedit, 2 runs)
 - **Règles tirées des réponses du dev.** Avant toute question, lis `~/.claude/pipeline/answers.md` et
   `.claude/rules/pipeline_answers.md` du projet s'il existe : une règle qui tranche s'applique, tu le
   dis avec le bloc « ce que tu tranches sans lui » (règle citée, ce qu'elle change ici) et tu ne
