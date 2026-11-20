@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Repro — l'orchestrateur de /feature lisait lui-même le code (plan de refacto, point 18) : environ 870 tours de
 # grep, sed, cat, ls et Read, dont lib/, test/ et les logs du gauntlet, malgré la règle « tu passes des chemins
-# et des faits ». ADR 0020 : orchestrator-reads.sh refuse à la session principale, pendant un /feature, la lecture
-# du code et du log entier du gauntlet ; les fichiers du pipeline restent lisibles ; un sous-agent n'est jamais
-# bloqué ; hors /feature, rien ne change.
+# et des faits ». ADR 0020 : orchestrator-reads.sh refuse à la session principale, pendant un /feature ou un /fix,
+# la lecture du code et du log entier du gauntlet ; les fichiers du pipeline restent lisibles ; un sous-agent
+# n'est jamais bloqué ; hors /feature et /fix, rien ne change.
 source "$(dirname "$0")/fixture.sh"
 
 HOOK="$TESTS_DIR/../../../hooks/orchestrator-reads.sh"
@@ -122,9 +122,10 @@ expect_no_out deny "grep -r par le reviewer : permis"
 OUT="$(jq -n --arg tr "$T_FEATURE" --arg c "$R" --arg f "$A" '{transcript_path:$tr, cwd:$c, agent_id:"ab12", tool_name:"Read", tool_input:{file_path:$f}}' | bash "$HOOK" 2>&1)"
 expect_no_out deny "agent_id sans agent_type : permis"
 
-echo "hors /feature — rien ne change"
-bash_ "cat $A" "$T_FIX"
-expect_no_out deny "/fix lancé après le /feature : permis"
+echo "hors /feature et /fix — rien ne change"
+T_REVIEW="$TMP_ROOT/review.jsonl"; { cmd_line fix; cmd_line reviewPR; } > "$T_REVIEW"
+bash_ "cat $A" "$T_REVIEW"
+expect_no_out deny "/reviewPR lancé après le /fix : permis"
 bash_ "cat $A" "$T_NONE"
 expect_no_out deny "aucune commande du pipeline : permis"
 bash_ "cat $A" "$TMP_ROOT/absent.jsonl"
@@ -133,5 +134,22 @@ bash_ "cat $A" "$T_QUOTED"
 expect_no_out deny "/feature seulement cité dans un résultat d'outil : permis"
 bash_ "cat $A" "$T_SKILL"
 expect_out deny "/feature lancé par le Skill tool : refusé"
+
+echo "orchestrateur, /fix actif — même règle, journal du fix"
+F="$TMP_ROOT/fixrepo"; mk_repo "$F"
+mkdir -p "$F/lib" "$F/.claude/fixes/crash"
+printf 'int b = 1;\n' > "$F/lib/b.dart"; echo '{}' > "$F/.claude/fixes/crash/fix.json"; echo '# diag' > "$F/.claude/fixes/crash/diagnosis.md"
+commit "$F" init >/dev/null; git -C "$F" checkout -q -b fix/crash
+R="$(cd "$F" && pwd -P)"
+bash_ "cat lib/b.dart" "$T_FIX"
+expect_out deny "/fix lancé après le /feature : cat de lib/ refusé"
+expect_out "/fix ne lit pas de code" "le refus nomme /fix"
+expect_file_has "$R/.claude/fixes/crash/.gauntlet/hooks.jsonl" '"hook":"orchestrator-reads"' "le refus est au journal du fix"
+bash_ "cat .claude/fixes/crash/diagnosis.md" "$T_FIX"
+expect_no_out deny "/fix : le diagnostic dans .claude/fixes/ reste lisible"
+bash_ "sed -n '1,10p' lib/b.dart" "$T_FIX"
+expect_no_out deny "/fix : un extrait de 10 lignes reste permis"
+bash_ "cat lib/b.dart" "$T_FIX" fix-reproducer
+expect_no_out deny "/fix : le reproducer n'est jamais bloqué"
 
 finish

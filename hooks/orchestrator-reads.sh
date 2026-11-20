@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # orchestrator-reads.sh — PreToolUse (Read|Grep|Glob|Bash) de settings.json (ADR 0020).
-# L'orchestrateur d'un /feature ne lit pas de code : une question sur le code part à l'agent de l'étape, qui
-# rend un fait. Chaque lecture de l'orchestrateur reste dans son contexte jusqu'à la fin de la session.
+# L'orchestrateur d'un /feature ou d'un /fix ne lit pas de code : une question sur le code part à l'agent de
+# l'étape, qui rend un fait. Chaque lecture de l'orchestrateur reste dans son contexte jusqu'à la fin de la session.
 #
 # Qui : la session principale seulement (ni agent_type ni agent_id : un sous-agent n'est jamais concerné), et
-# seulement pendant un /feature : la dernière commande d'orchestration de son transcript (feature, fix, epic,
-# reviewPR ; tapée `/feature` ou appelée par le Skill tool) est `feature`. Une autre commande (create_mr, que
-# /feature appelle lui-même ; /compact, /model…) ne change rien ; un /fix, un /reviewPR ou un /epic lancé après, si.
+# seulement pendant un /feature ou un /fix : la dernière commande d'orchestration de son transcript (feature,
+# fix, epic, reviewPR ; tapée ou appelée par le Skill tool) est `feature` ou `fix`. Une autre commande
+# (create_mr, que /feature appelle lui-même ; /compact, /model…) ne change rien ; un /reviewPR ou un /epic
+# lancé après, si.
 #
 # Refusé :
 #   - un fichier de code : un chemin dont un dossier est lib, test, tests, integration_test, test_driver ou src,
@@ -18,7 +19,7 @@
 #     donne le résumé.
 # Permis :
 #   - les fichiers du pipeline : tout ce qui est sous un dossier .claude du projet (.claude/features/<nom>/,
-#     pipeline.json, spec.md, .claude/rules/) hors .claude/worktrees/, ~/.claude (steps, scripts), le scratchpad ;
+#     .claude/fixes/<nom>/, pipeline.json, fix.json, spec.md, .claude/rules/) hors .claude/worktrees/, ~/.claude (steps, scripts), le scratchpad ;
 #   - un extrait à montrer à Thibault (fichier:ligne) : Read avec limit ≤ EXCERPT_MAX, sed -n 'a,bp' ou head/tail
 #     de EXCERPT_MAX lignes au plus, sur un fichier nommé ;
 #   - le log du gauntlet par tail, head, grep, sed, ou Read avec limit ; last_<profil>.json par jq ;
@@ -35,8 +36,8 @@ transcript="$(jq -r '.transcript_path // empty' <<<"$raw")"
 # Les commandes qui orchestrent un run. Les autres (create_mr, create_commits, appelées par /feature lui-même,
 # et les commandes intégrées) ne le terminent pas.
 ORCHESTRATORS=' feature fix epic reviewPR '
-# feature_active — la dernière commande d'orchestration du transcript est /feature
-feature_active() {
+# run_active — la dernière commande d'orchestration du transcript est /feature ou /fix ; pose KIND
+run_active() {
   local n last=""
   while IFS= read -r n; do
     n="${n#<command-name>/}"; n="${n%%<*}"; n="${n#\"skill\":\"}"; n="${n%\"}"
@@ -45,9 +46,10 @@ feature_active() {
   # Skill tool : le même texte cité dans un résultat d'outil ou un fichier écrit a ses guillemets échappés.
   done < <(grep -oE '"role":"user","content":"<command-message>[^<]*</command-message>(\\n)?<command-name>/[A-Za-z0-9_-]+<|"name":"Skill","input":\{"skill":"[A-Za-z0-9_-]+"' "$transcript" 2>/dev/null \
     | grep -oE '<command-name>/[A-Za-z0-9_-]+<|"skill":"[A-Za-z0-9_-]+"')
-  [ "$last" = feature ]
+  KIND="$last"
+  [ "$last" = feature ] || [ "$last" = fix ]
 }
-feature_active || exit 0
+run_active || exit 0
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 hook_input <<<"$raw"
@@ -91,17 +93,18 @@ has_code_below() {
     -o -name .dart_tool -o -name .gradle -o -name Pods \) -prune -o -type d \( "${a[@]}" \) -print -quit 2>/dev/null)" ]
 }
 
-# journal (ADR 0019) : le dossier de la feature du worktree visé ou du cwd, s'il est connu
+# journal (ADR 0019) : le dossier du run (feature ou fix) du worktree visé ou du cwd, s'il est connu
+RUNS_DIR=features; [ "$KIND" = fix ] && RUNS_DIR=fixes
 set_run_dir() {
-  hook_run_root feature "${cwd:-$PWD}" "${1:-}" 2>/dev/null || return 0
-  [ -n "$HOOK_RUN" ] && [ -d "$HOOK_ROOT/.claude/features/$HOOK_RUN" ] && RUN_DIR="$HOOK_ROOT/.claude/features/$HOOK_RUN"
+  hook_run_root "$KIND" "${cwd:-$PWD}" "${1:-}" 2>/dev/null || return 0
+  [ -n "$HOOK_RUN" ] && [ -d "$HOOK_ROOT/.claude/$RUNS_DIR/$HOOK_RUN" ] && RUN_DIR="$HOOK_ROOT/.claude/$RUNS_DIR/$HOOK_RUN"
   return 0
 }
 
-WHY_CODE="L'orchestrateur d'un /feature ne lit pas de code (ADR 0020) : chaque lecture reste dans ton contexte jusqu'à la fin de la session. \
+WHY_CODE="L'orchestrateur d'un /$KIND ne lit pas de code (ADR 0020) : chaque lecture reste dans ton contexte jusqu'à la fin de la session. \
 La question part à l'agent de l'étape : passe-lui le chemin et ce que tu cherches, il te rend un fait. \
 Pour montrer un extrait à Thibault (fichier:ligne) : Read avec offset et limit ≤ $EXCERPT_MAX, ou sed -n 'a,bp' <fichier> ($EXCERPT_MAX lignes au plus). \
-Les fichiers du pipeline (.claude/features/<nom>/, pipeline.json, steps) restent lisibles. Un refus se rapporte, il ne se contourne pas."
+Les fichiers du pipeline (.claude/$RUNS_DIR/<nom>/, steps) restent lisibles. Un refus se rapporte, il ne se contourne pas."
 WHY_LOG="Le log entier du gauntlet ne se lit pas (ADR 0020) : le gate en donne le résumé, sa sortie et .gauntlet/last_<profil>.json (jq '.failed'). \
 Pour un check précis : tail -60, grep -n <check> sur le log, ou Read avec limit."
 

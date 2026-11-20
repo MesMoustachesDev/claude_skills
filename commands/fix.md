@@ -92,6 +92,11 @@ d'abord). Ici, celles propres à `/fix`.
 - **Contexte vierge, passé par fichiers.** Tu donnes des chemins et des faits, pas ton historique.
   Exception voulue : Bastien et Fanny sont **repris** par `SendMessage` pour l'arbitrage
   et les boucles — leur contexte vaut cher, ne le jette pas en relançant un agent neuf.
+- **Tu ne lis pas de code.** Une question sur le code part à Bastien, Fanny ou Victor, avec le chemin et
+  ce que tu cherches ; il te rend un fait. Le hook `orchestrator-reads.sh` (ADR 0020) refuse pendant un
+  /fix `Read`, `Grep`, `Glob`, `cat`, `sed`, `grep`, `ls`… sur `lib/`, `test/` et les sources du langage.
+  Restent lisibles : `.claude/fixes/<nom>/` (diagnostic, `fix.json`), les steps ; un extrait à montrer à
+  Thibault (`Read` avec `limit` ≤ 40, `sed -n 'a,bp'`) ; du gauntlet, le résumé du gate plutôt que le log.
 - **`fix.json` ne s'écrit que par `fix.py`** (ADR 0003) : jamais d'`Edit` ni de `Write` dessus, même d'une clé.
   Une écriture qui n'a pas sa commande est une question au dev, pas un `Edit`.
 - **Les rôles sont étanches.** Tu ne corriges jamais un test ni le code, même d'une ligne, même si c'est
