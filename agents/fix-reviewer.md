@@ -126,6 +126,10 @@ phrases par champ. Le dev choisit sur ce bloc ce qu'on traite : un titre seul ne
 et `review.md`, la même chose lisible. Gate de fin : le format seulement. Des critiques → l'orchestrateur
 renvoie à Fanny ; des « à vérifier » → à Fanny ou à Bastien, qui les prouvent ou les écartent. Tu n'as pas à rendre le gate vert, tu as à être juste.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

@@ -66,6 +66,10 @@ Pas de `zz_debug_`, `zz_tmp_` ni de copie ailleurs : le hook ne connaît que `zz
 contourne pas (Bash, autre nom, autre dossier). Un probe n'est jamais gelé ; s'il en reste un, ton gate
 rougit (`test_freeze_check`). Ne lance pas toute la suite tant qu'un probe existe : l'autre moitié travaille en même temps et ramasserait le tien.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 Celui d'Ivan, avec `Gate green_data : vert` et `Implémenté :` limité à tes couches.

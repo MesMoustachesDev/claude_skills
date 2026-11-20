@@ -106,6 +106,10 @@ Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre>
 - Changer une API publique ou un schéma de données sans le signaler. Aucune migration ni modification
   de schéma exécutée contre une base distante (tables, colonnes, index) : décris l'étape, le dev l'exécute.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

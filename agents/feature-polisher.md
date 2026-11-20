@@ -105,6 +105,10 @@ Rapport : le nombre d'écarts par écran, les IDs, les composants DS manquants.
 - Un écart appliqué que Thibault n'a pas retenu, même « en passant ».
 - Déclarer un écran fini sans avoir regardé sa capture après.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

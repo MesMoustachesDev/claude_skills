@@ -89,6 +89,10 @@ exact que tu donneras au test : il servira à comparer la suite écrite à ta li
 écarté, un scénario sans test d'acceptation, un test qui ne prouve aucun item. Il signale (`?`) un item
 prouvé par beaucoup de tests : relis-le, c'est souvent un doublon.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

@@ -146,6 +146,10 @@ liste ; les bloquants `thibault` vont au dev, avec l'extrait du contrat ;
 il ne te demande pas de rendre la spec bonne, il te demande d'être précis. Pas de reformulation de
 confort : si c'est clair, tu ne dis rien.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

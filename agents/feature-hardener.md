@@ -114,6 +114,10 @@ Score final : <n>% (seuil <n>%)
 
 Le dev valide ces explications : sois honnête, pas commode.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

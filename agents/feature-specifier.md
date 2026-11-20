@@ -296,6 +296,10 @@ Puis `spec_lint`. Ton rapport liste, par point corrigé, les autres lignes que t
 Aucun fichier en dehors de `.claude/features/<nom>/`. Pas de code, pas de test, pas de brick. Un hook
 te le refusera de toute façon.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final (retourné à l'orchestrateur)
 
 ```

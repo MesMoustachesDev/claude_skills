@@ -73,6 +73,10 @@ couvert par l'autre.
 (sortie dans `.claude/features/<nom>/.gauntlet/data/`). Le hook de fin le relance. Les fichiers de l'autre
 moitié ne te bloquent pas ; ne les corrige pas. Le gate complet (`red`) se joue après vous deux.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

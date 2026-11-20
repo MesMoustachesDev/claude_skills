@@ -129,6 +129,10 @@ dans la même commande. Prouvé → corrige le test concerné. Ton rapport final
 `prouvé — <sortie qui le montre> — <test corrigé>` ou `écarté — <ce qui le contredit>`. Pas de verdict sans
 exécution ou sans lecture citée.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

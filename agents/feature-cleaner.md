@@ -108,6 +108,10 @@ rougit (`test_freeze_check`). Ne lance pas toute la suite tant qu'un probe exist
 - « Améliorer » la spec. Les décisions de §9 sont prises.
 - Refactoriser au-delà du package de la feature.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

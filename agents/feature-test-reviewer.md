@@ -137,6 +137,10 @@ Et `tests_review.md`, lisible : la table de couverture d'abord, puis les bloquan
 Ton hook ne vérifie que le format. Des bloquants → l'orchestrateur relance Théo avec ta liste
 (il complète, il ne réécrit pas). Tu n'écris jamais un test toi-même.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

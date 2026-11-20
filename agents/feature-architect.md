@@ -194,6 +194,10 @@ nouvelle méthode) ne te retient pas : le gate le liste pour Théo. Une erreur d
   provider partagé hors du package). En brouillon, elle porte un `DÉCISION (Thibault)` ; en
   complétion, **arrête-toi et rapporte** l'écart, l'orchestrateur le lui pose.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

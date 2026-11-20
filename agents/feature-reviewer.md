@@ -213,6 +213,10 @@ exige aussi `tour` (2 à 8 étapes valides). Des critiques → gate
 rouge **volontairement** : l'orchestrateur relance Ivan. Tu n'as pas à rendre le gate vert,
 tu as à être juste.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

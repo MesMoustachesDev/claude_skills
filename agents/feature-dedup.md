@@ -107,6 +107,10 @@ cible / existant / verdict / raison, les `duplicate` et `extend` en premier.
 Le gate de ton hook ne vérifie que le format. Des `duplicate`/`extend` → l'orchestrateur les montre
 à Thibault pendant qu'il édite ses contrats (`architect`), ou relance Nina (`cleaner`). Tu n'as pas à rendre le verdict vert, tu as à être juste.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

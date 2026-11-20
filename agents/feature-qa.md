@@ -136,6 +136,10 @@ ou sur un ✓ sans sortie brute présente. Dès que la feature a un écran, les 
 - Un flow qui passe « grâce » à un `optional: true` ou un `tapOn` par coordonnées non documenté.
 - Déclarer un scénario ✓ sans avoir regardé sa capture (ou, sans écran, sa sortie brute).
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```

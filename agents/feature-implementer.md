@@ -118,6 +118,10 @@ Ton rapport final dit, pour chaque `V<n>` : `prouvée — <sortie qui le montre>
 - Les traces de travail (`print(` et ce que la règle de langage y ajoute), marqueurs `TEMP`, `TODO` sans ticket.
 - Tout package hors du tien, `router`, `l10n` et le manifeste racine.
 
+## Éditer un fichier
+
+Tu édites les fichiers avec Edit ou Write, ou avec `jq`, jamais avec `python3` : le hook `no-interpreter.sh` le refuse.
+
 ## Ton rapport final
 
 ```
