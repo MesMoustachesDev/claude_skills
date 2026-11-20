@@ -2,7 +2,8 @@
 # fix-restrict-writes.sh — PreToolUse (Edit|Write|MultiEdit|NotebookEdit|Bash) déclaré dans le
 # frontmatter des agents fix-*. Le reproducer écrit les tests, l'implementer écrit le code, jamais l'inverse.
 #
-#   fix-reproducer  : tests, manifestes (package.json, pubspec.yaml et ceux du langage : stack.sh), .claude/fixes/<nom>/ ;
+#   fix-reproducer  : tests, manifestes (package.json, pubspec.yaml et ceux du langage : stack.sh), .claude/fixes/<nom>/
+#                     sauf fix.json (l'état, écrit par fix.py : ADR 0003) ;
 #                     dans le code source, uniquement des lignes de log [DEBUG_ISSUE] (ajout ou retrait).
 #   fix-implementer : tout le projet SAUF les tests et .claude/fixes/<nom>/ (repro.json est gelé) ; parmi les
 #                     tests, les probes `zz_probe_*` seulement (copie d'un test gelé pour débugger, ADR 0001).
@@ -63,6 +64,7 @@ check() {
   hook_check_common "$file" "fix : écriture hors du projet refusée ($file)" || return 0
   case "$agent" in
     fix-reproducer)
+      [ "$rel" = "$fix_rel/fix.json" ] && hook_deny "reproducer : $fix_rel/fix.json ne s'écrit que par fix.py, celui de l'orchestrateur et des gates (ADR 0003). Le reste de $fix_rel/ est à toi. Refusé : $rel"
       in_fix_dir && return 0
       is_test_path "$rel" && return 0
       is_manifest_path "$rel" && return 0

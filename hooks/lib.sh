@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hooks/lib.sh — ce que partagent les hooks de zone (pipeline-restrict-writes.sh, fix-restrict-writes.sh), les
-# gates de fin d'agent (pipeline-gate.sh, fix-gate.sh) et no-interpreter.sh. Sourcé, pas exécuté.
+# gates de fin d'agent (pipeline-gate.sh, fix-gate.sh), no-interpreter.sh et state-guard.sh. Sourcé, pas exécuté.
 #
 # Chemins : ceux de ce checkout (le dossier du hook), jamais $HOME/.claude en dur, pour qu'un worktree de
 # ~/.claude se teste lui-même. PIPELINE_GAUNTLET_ROOT surcharge le dossier du gauntlet (tests des hooks).

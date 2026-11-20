@@ -41,6 +41,8 @@ expect_out "hors du worktree" "fichier dans le checkout principal : refusé"
 expect_out "$W" "le refus donne le chemin du worktree (tiré de la racine du prompt)"
 hook pipeline-restrict-writes.sh feature-specifier a2 "$M/.claude/features/x/spec.md"
 expect_out "feature courante inconnue" "sans racine ni fichier dans le worktree : refus inchangé"
+hook pipeline-restrict-writes.sh feature-specifier a1 "$W/.claude/features/x/pipeline.json"
+expect_out "ne s'écrit que par pipeline.sh" "specifier : pipeline.json refusé (ADR 0003), le reste de son dossier permis"
 
 echo "hook de gate — cwd au checkout principal"
 hook pipeline-gate.sh feature-dedup a1 ""

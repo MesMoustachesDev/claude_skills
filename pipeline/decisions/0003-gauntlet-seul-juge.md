@@ -2,12 +2,12 @@
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-10
 (trous du gauntlet, plus bas), le 2026-11-17 (checks d'avertissement, plus bas), le 2026-11-19 (verrou de l'état)
-et le 2026-11-19 (`fix.json` écrit par script, plus bas), le 2026-11-20 (verdict du hook par script)
+et le 2026-11-19 (`fix.json` écrit par script, plus bas), le 2026-11-20 (verdict du hook par script, puis garde de l'état)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
 (gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`, sous le verrou de
 `scripts/statefile.py`, comme `review.py`, `fix/steps.py` et `learn.py` ; les deux gates par `hook-verdict`,
 via `gate_run` de `hooks/lib.sh`) · `scripts/fix/fix.py` (seul à écrire `fix.json`, `hooks/fix-gate.sh` par
-son `hook-verdict`) · `pipeline/conduite.md`
+son `hook-verdict`) · `hooks/state-guard.sh` (refuse l'écriture de l'état à la main) · `pipeline/conduite.md`
 (« Le script décide, pas l'agent, pas toi »)
 
 ## Contexte
@@ -95,3 +95,13 @@ profil dans la liste des gates de fin d'agent, statut et tentatives bornés, éc
 `hooks/lib.sh`) : un gate rejoué à la main s'écrit par `pipeline.sh replay` (feature) ou `fix.py review-pass`.
 `state_set` de `fix/lib.sh` est retiré.
 
+
+## Amendement du 2026-11-20 : un hook refuse l'écriture de l'état à la main
+
+« Jamais à la main » n'était qu'une consigne : rien ne refusait à l'orchestrateur un `Edit` de `pipeline.json` ou
+un `jq … > fix.json`, et le specifier comme le reproducer avaient le fichier dans leur zone. Désormais
+`hooks/state-guard.sh`, PreToolUse de `settings.json` pour toutes les sessions, refuse `Edit`, `Write`,
+`MultiEdit` et une écriture par Bash (ce que voit `bash_write_targets.py`) de `.claude/features/<nom>/pipeline.json`
+et `.claude/fixes/<nom>/fix.json`, en nommant le script à utiliser ; le refus va au journal du run (ADR 0019).
+Les zones du specifier et du reproducer excluent ces fichiers. Les scripts écrivent sans passer par un outil :
+le hook ne les voit pas. Une écriture qu'aucune commande ne sait faire se dit à Thibault : on ajoute la commande.

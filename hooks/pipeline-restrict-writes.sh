@@ -133,6 +133,7 @@ check() {
   hook_check_common "$file" "pipeline : écriture hors du worktree de la feature refusée ($file). Le worktree est $PROJECT_ROOT : écris sous ce chemin." || return 0
 case "$agent" in
   feature-specifier)
+    [ "$rel" = "$FEAT_REL/pipeline.json" ] && hook_deny "specifier : $FEAT_REL/pipeline.json ne s'écrit que par pipeline.sh, celui de l'orchestrateur et des gates (ADR 0003). Ce qu'il faudrait y mettre (package, writes_extra…), dis-le dans ton rapport.$via"
     match "$rel" "$FEAT_REL/*" || hook_deny "specifier : n'écrit que dans $FEAT_REL/ (spec.md). Le code vient après validation.$via"
     ;;
   feature-architect)
