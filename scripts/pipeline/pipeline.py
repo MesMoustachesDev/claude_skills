@@ -1034,6 +1034,34 @@ def cmd_replay(c, args):
     sys.exit(0 if ok else 1)
 
 
+# Verdicts que hooks/pipeline-gate.sh écrit au nom du gauntlet (hook-verdict), un par agent qui s'arrête.
+HOOK_PROFILES = REPLAY_PROFILES | {"spec_lint", "review", "dedup", "spec_review", "tests_review"}
+HOOK_STATUSES = {"PASSED", "RED", "FAILED"}
+
+
+def hook_verdict(c, profiles, args):
+    """`hook-verdict <nom> <profil> PASSED|RED|FAILED <tentatives>` : le verdict d'un gate de fin d'agent, écrit
+    par le hook (PIPELINE_GATE_HOOK=1) et jamais par l'orchestrateur, qui rejoue un gate avec `replay`. Sous le
+    verrou de statefile : stages.<profil> = {status, at}, attempts.<profil> = <tentatives>. Valeurs bornées."""
+    if os.environ.get("PIPELINE_GATE_HOOK") != "1":
+        die("hook-verdict : réservé au hook de fin d'agent. Un gate rejoué à la main : replay (fix : le gauntlet, "
+            "puis after)")
+    if len(args) != 3 or args[0] not in profiles or args[1] not in HOOK_STATUSES \
+            or not re.fullmatch(r"\d{1,3}", args[2]):
+        die(f"usage : hook-verdict <nom> <profil> {'|'.join(sorted(HOOK_STATUSES))} <tentatives> "
+            f"(profils : {', '.join(sorted(profiles))})")
+    profile, status, attempts = args[0], args[1], int(args[2])
+
+    def write(state):
+        state.setdefault("stages", {})[profile] = {"status": status, "at": now()}
+        state.setdefault("attempts", {})[profile] = attempts
+    statefile.update(c.path, write)
+
+
+def cmd_hook_verdict(c, args):
+    hook_verdict(c, HOOK_PROFILES, args)
+
+
 # ---------------------------------------------------------------------------
 # Git : contrats, gel
 # ---------------------------------------------------------------------------
@@ -1263,7 +1291,7 @@ COMMANDS = {
     "next": cmd_next, "status": cmd_status, "init": cmd_init, "size": cmd_size, "pass": cmd_pass, "join": cmd_join,
     "skip": cmd_skip, "gate": cmd_gate, "loop": cmd_loop, "debt": cmd_debt, "accept": cmd_accept, "set": cmd_set, "extra": cmd_extra, "ask": cmd_ask, "recap": cmd_recap,
     "devices": cmd_devices, "watchdog": cmd_watchdog,
-    "after-architect": cmd_after_architect, "reached": cmd_reached, "replay": cmd_replay, "contracts-files": cmd_contracts_files,
+    "after-architect": cmd_after_architect, "reached": cmd_reached, "replay": cmd_replay, "hook-verdict": cmd_hook_verdict, "contracts-files": cmd_contracts_files,
     "commit-contracts": cmd_commit_contracts, "freeze": cmd_freeze, "refreeze": cmd_refreeze,
 }
 
@@ -1275,7 +1303,7 @@ def main(argv):
             print("".join(l[2:] for l in f.readlines()[1:] if l.startswith("#")))
         sys.exit(0 if len(argv) and argv[0] in ("-h", "--help") else 2)
     cmd, name, rest = argv[0], argv[1], argv[2:]
-    c = Ctx(name, must_exist=cmd not in ("init", "next", "status"))
+    c = Ctx(name, must_exist=cmd not in ("init", "next", "status", "hook-verdict"))
     if cmd == "status" and not c.p:
         die("pipeline.json absent : aucune feature de ce nom dans ce worktree")
     COMMANDS[cmd](c, rest)

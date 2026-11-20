@@ -92,4 +92,24 @@ expect_out "GELÉS" "rsync vers test/ : refusé"
 hook fix-implementer Bash "git apply $TMP_ROOT/lib.patch 2>/dev/null; rsync -a lib/ /tmp/backup/; git checkout -- lib/a.dart"
 expect_no_out deny "code source, sauvegarde hors du projet : permis"
 
+echo "bug 1 — cwd au checkout principal, fix dans son worktree"
+git -C "$R" checkout -q develop
+printf '.claude/worktrees/\n' > "$R/.gitignore"; git -C "$R" add -A && git -C "$R" -c user.email=t@t -c user.name=t commit -q -m ignore
+W="$R/.claude/worktrees/fix-crash"
+git -C "$R" branch -q -D fix/crash; git -C "$R" worktree add -q "$W" -b fix/crash
+W="$(cd "$W" && pwd -P)"
+echo crash > "$R/.claude/fixes/.current"   # le cas où l'ancien hook prenait le checkout principal pour le fix
+hook fix-implementer Edit "$W/test/a_test.dart"
+expect_out "GELÉS" "Edit d'un test du worktree, cwd au checkout principal : jugé dans le worktree, refusé"
+hook fix-implementer Edit "$W/lib/a.dart"
+expect_no_out deny "Edit du code source du worktree : permis (pas « hors du projet »)"
+hook fix-implementer Write "$W/.claude/fixes/crash/repro.json"
+expect_out "repro.json est gelé" "repro.json du worktree : refusé à l'implementer (jugé hors de son dossier de fix avant)"
+hook fix-reviewer Write "$W/.claude/fixes/crash/review.json"
+expect_no_out deny "review.json du worktree : permis au reviewer (refusé avant)"
+hook fix-reproducer Write "$W/.claude/fixes/crash/diagnosis.md"
+expect_no_out deny "diagnosis.md du worktree : permis au reproducer (refusé avant)"
+hook fix-reproducer Edit "$R/test/a_test.dart"
+expect_no_out "hors du projet" "fichier du checkout principal sans worktree dans le prompt : comportement d'avant (.current)"
+
 finish

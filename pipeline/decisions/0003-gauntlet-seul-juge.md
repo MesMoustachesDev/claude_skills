@@ -2,11 +2,12 @@
 
 Statut : acceptée (2026-11-05, reprise du pipeline existant depuis 2026-09-25), amendée le 2026-11-10
 (trous du gauntlet, plus bas), le 2026-11-17 (checks d'avertissement, plus bas), le 2026-11-19 (verrou de l'état)
-et le 2026-11-19 (`fix.json` écrit par script, plus bas)
+et le 2026-11-19 (`fix.json` écrit par script, plus bas), le 2026-11-20 (verdict du hook par script)
 Où elle vit : `scripts/gauntlet.sh` et `scripts/gauntlet/` (profils, checks) · `hooks/pipeline-gate.sh`
 (gate de fin d'agent) · `scripts/pipeline.sh` (seul à écrire `pipeline.json`, sous le verrou de
-`scripts/statefile.py`, comme `gate_set` des deux gates (`gate_run` de `hooks/lib.sh`), `review.py`,
-`fix/steps.py`, `state_set` de `fix/lib.sh` et `learn.py`) · `scripts/fix/fix.py` (seul à écrire `fix.json` avec `hooks/fix-gate.sh`) · `pipeline/conduite.md`
+`scripts/statefile.py`, comme `review.py`, `fix/steps.py` et `learn.py` ; les deux gates par `hook-verdict`,
+via `gate_run` de `hooks/lib.sh`) · `scripts/fix/fix.py` (seul à écrire `fix.json`, `hooks/fix-gate.sh` par
+son `hook-verdict`) · `pipeline/conduite.md`
 (« Le script décide, pas l'agent, pas toi »)
 
 ## Contexte
@@ -82,3 +83,15 @@ l'état du fix à la main, en 19 passages (gabarit de création, `phase`, `freez
   `fix.py review-pass`, qui joue `fix_gauntlet.sh review_verdict`. `fix.py pass` et `skip` refusent ces clés.
 - `set` n'accepte qu'une liste fermée (`suggestions.<id>` avec une décision bornée, `issue`, `watchdog_cron`) :
   le modèle donne la valeur, le script la décode et refuse ce qui sort du schéma.
+
+## Amendement du 2026-11-20 : le verdict du hook passe par le script
+
+Les gates de fin d'agent écrivaient `stages.<profil>` et `attempts.<profil>` par un filtre jq passé à
+`statefile.py jq` : la forme de l'état et les valeurs permises vivaient dans deux hooks shell, hors des scripts
+« seuls à écrire ». Désormais `pipeline-gate.sh` appelle `pipeline.sh hook-verdict <nom> <profil>
+PASSED|RED|FAILED <tentatives>` et `fix-gate.sh` `fix.py hook-verdict` (même code, `pipeline.hook_verdict`) :
+profil dans la liste des gates de fin d'agent, statut et tentatives bornés, écriture sous le verrou de
+`statefile.py`. La commande refuse de tourner hors d'un hook (`PIPELINE_GATE_HOOK=1`, posé par `gate_run` de
+`hooks/lib.sh`) : un gate rejoué à la main s'écrit par `pipeline.sh replay` (feature) ou `fix.py review-pass`.
+`state_set` de `fix/lib.sh` est retiré.
+

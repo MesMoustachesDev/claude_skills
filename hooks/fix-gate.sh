@@ -17,7 +17,8 @@ HOOK_NAME=fix-gate
 [[ "$agent" == fix-* ]] || exit 0
 
 source "$HOOK_SCRIPTS/fix/lib.sh"
-hook_run_root fix "$cwd"
+# Le worktree du fix, pas le cwd hérité de la session : le cwd, puis le worktree cité dans le prompt.
+hook_run_root fix "$cwd" "" "$(hook_agent_transcript "$input")"
 cd "$HOOK_ROOT" 2>/dev/null || exit 0
 name="$HOOK_RUN"
 [ -n "$name" ] || { echo "fix-gate : fix courant inconnu, gate ignoré" >&2; exit 0; }
@@ -33,9 +34,8 @@ esac
 
 max="$(state_get .max_attempts)"; max="${max:-5}"
 attempts="$(state_get ".attempts[\"$profile\"]")"; attempts="${attempts:-0}"
-# gate_set <statut> <tentatives> (appelé par gate_run) — sous le verrou de statefile.py (fix.json.lock).
-gate_set() {
-  state_set '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}' --arg p "$profile" --arg s "$1" --argjson a "$2"
-}
+# gate_set <statut> <tentatives> (appelé par gate_run) — fix.py hook-verdict : valeurs bornées, sous le verrou de
+# statefile.py (fix.json.lock), le même que les commandes de l'orchestrateur.
+gate_set() { python3 "$HOOK_SCRIPTS/fix/fix.py" hook-verdict "$name" "$profile" "$1" "$2" >/dev/null; }
 GATE_DIR="$FIX_DIR"; GATE_OUT="$FIX_OUT"
 gate_run "$HOOK_SCRIPTS/fix_gauntlet.sh" "$profile" "$name"

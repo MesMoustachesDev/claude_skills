@@ -69,6 +69,17 @@ gate fix-reproducer
 OUT="$(st .stages.repro_report.status) $(st .stages.red.status)"
 expect_out "RED absent" "phase arbitrate : profil repro_report, stages.red non touché"
 
+echo "hook-verdict : réservé au hook, valeurs bornées"
+OUT="$(cd "$R" && python3 "$TESTS_DIR/../../fix/fix.py" hook-verdict crash green PASSED 0 2>&1)"; RC=$?
+expect_rc 2 "hors hook (PIPELINE_GATE_HOOK absent) : refusé"
+expect_out "réservé au hook" "le refus le dit"
+OUT="$(cd "$R" && PIPELINE_GATE_HOOK=1 python3 "$TESTS_DIR/../../fix/fix.py" hook-verdict crash green DONE 0 2>&1)"; RC=$?
+expect_rc 2 "statut hors liste : refusé"
+OUT="$(cd "$R" && PIPELINE_GATE_HOOK=1 python3 "$TESTS_DIR/../../fix/fix.py" hook-verdict crash review PASSED 0 2>&1)"; RC=$?
+expect_rc 2 "profil qui n'est pas un gate de fin d'agent (review : review-pass) : refusé"
+OUT="$(st .stages.green.status)"
+expect_out "absent" "rien n'est écrit"
+
 echo "fix courant inconnu : aucune décision"
 git -C "$R" checkout -q develop
 echo '{}' > "$S"
@@ -77,5 +88,22 @@ expect_rc 0 "ni branche fix/ ni .current : exit 0"
 expect_out "fix courant inconnu" "et il le dit"
 OUT="$(st .stages)"
 expect_out "absent" "fix.json non touché"
+
+echo "bug 1 — cwd au checkout principal, fix dans son worktree"
+git -C "$R" checkout -q develop
+printf '.claude/worktrees/\n' > "$R/.gitignore"; commit "$R" ignore >/dev/null
+W="$R/.claude/worktrees/fix-crash"
+git -C "$R" branch -q -D fix/crash; git -C "$R" worktree add -q "$W" -b fix/crash
+W="$(cd "$W" && pwd -P)"; WD="$W/.claude/fixes/crash"; mkdir -p "$WD"
+echo '{"phase":"review"}' > "$WD/fix.json"; rm -f "$S"
+T="$TMP_ROOT/session"; mkdir -p "$T/subagents"
+printf '{"type":"user","message":{"role":"user","content":"Victor, revue du fix. Worktree : %s"}}\n' "$W" > "$T/subagents/agent-v1.jsonl"
+OUT="$(jq -n --arg c "$R" --arg t "$T.jsonl" '{agent_type:"fix-reviewer", agent_id:"v1", cwd:$c, transcript_path:$t}' \
+  | bash "$HOOKS/fix-gate.sh" 2>&1)"; RC=$?
+expect_rc 2 "le gate se joue dans le worktree cité par le prompt (review.json absent → rouge)"
+OUT="$(jq -r '.stages.review_report.status // "absent"' "$WD/fix.json")"
+expect_out "RED" "stages.review_report écrit dans le fix.json du worktree"
+[ -f "$S" ] && _fail "fix.json écrit dans le checkout principal" || _pass "checkout principal non touché"
+expect_file_has "$WD/.gauntlet/hooks.jsonl" '"hook":"fix-gate"' "journal dans le dossier du fix du worktree"
 
 finish

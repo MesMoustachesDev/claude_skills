@@ -33,8 +33,6 @@ case "$agent" in
 esac
 
 GAUNTLET="$HOOK_SCRIPTS/gauntlet.sh"
-# shellcheck source=../scripts/gauntlet/lib.sh
-source "$GAUNTLET_ROOT/lib.sh"
 # Le worktree de la feature, pas le cwd hérité de la session (voir hook_feature_root).
 hook_run_root feature "$cwd" "" "$(hook_agent_transcript "$input")"
 cwd="$HOOK_ROOT"
@@ -77,13 +75,10 @@ if [ "${profile%%_*}" = red ] && ! bash "$GAUNTLET_ROOT/../pipeline.sh" reached 
   } >&2
   exit 2
 fi
-# gate_set <statut> <tentatives> (appelé par gate_run) — sous le verrou de statefile.py (flock sur
-# pipeline.json.lock), le même que pipeline.sh : les deux moitiés des étapes 3 et 4 finissent parfois ensemble, et un `pipeline.sh debt` peut
-# tomber au même moment ; aucune écriture n'efface l'autre.
-gate_set() {
-  python3 "$GAUNTLET_ROOT/../statefile.py" jq "$PIPE" --arg p "$profile" --arg s "$1" --argjson a "$2" \
-    '.attempts[$p]=$a | .stages[$p]={status:$s, at:(now|todate)}'
-}
+# gate_set <statut> <tentatives> (appelé par gate_run) — le verdict s'écrit par pipeline.sh hook-verdict (valeurs
+# bornées, sous le verrou de statefile.py, le même que les autres commandes) : les deux moitiés des étapes 3 et 4
+# finissent parfois ensemble, et un `pipeline.sh debt` peut tomber au même moment ; aucune écriture n'efface l'autre.
+gate_set() { bash "$HOOK_SCRIPTS/pipeline.sh" hook-verdict "$feature" "$profile" "$1" "$2" >/dev/null; }
 attempts="$(jq -r --arg p "$profile" '.attempts[$p] // 0' "$PIPE")"
 
 # QA: a run that already finished on the same state (commit + uncommitted changes) is not replayed, its

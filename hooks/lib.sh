@@ -22,6 +22,8 @@ GAUNTLET_ROOT="${PIPELINE_GAUNTLET_ROOT:-$(cd "$HOOKS_DIR/../scripts/gauntlet" &
 HOOK_SCRIPTS="$(cd "$GAUNTLET_ROOT/.." && pwd)"
 # Journal (ADR 0019) : une ligne par décision dans <dossier du run>/.gauntlet/hooks.jsonl ; jamais bloquant.
 source "$GAUNTLET_ROOT/hook_log.sh"
+# shellcheck source=../scripts/gauntlet/lib.sh
+source "$GAUNTLET_ROOT/lib.sh"   # hook_worktree_root, hook_agent_transcript ; init_project_context (pipeline)
 source "$GAUNTLET_ROOT/serena_guard.sh"
 RUN_DIR=""; LOG_TARGET=""; HOOK_DENY_SUFFIX="${HOOK_DENY_SUFFIX:-}"
 
@@ -97,18 +99,15 @@ hook_check_common() {
 }
 
 # hook_run_root feature|fix <cwd> [fichier] [transcript de l'agent] — le run de l'agent.
-#   HOOK_ROOT : le worktree du run, sinon <cwd>. feature : hook_feature_root (fichier écrit, cwd, « Racine : »
-#               du prompt), parce qu'un sous-agent hérite parfois du cwd du checkout principal.
+#   HOOK_ROOT : le worktree du run (hook_worktree_root : fichier écrit, cwd, prompt de l'agent), sinon <cwd> :
+#               un sous-agent hérite parfois du cwd du checkout principal (session ouverte sur le projet, reprise).
 #   HOOK_RUN  : son nom, branche feature/<nom> | fix/<nom> de HOOK_ROOT, sinon .claude/features|fixes/.current
 #               de sa racine git ; vide s'il est inconnu.
 # Rend 1 si HOOK_ROOT n'est pas dans un dépôt git.
 hook_run_root() {
   local kind="$1" top
   HOOK_ROOT="$2"; HOOK_RUN=""
-  if [ "$kind" = feature ]; then
-    declare -F hook_feature_root >/dev/null || source "$GAUNTLET_ROOT/lib.sh"
-    top="$(hook_feature_root "$2" "${3:-}" "${4:-}")" && HOOK_ROOT="$top"
-  fi
+  top="$(hook_worktree_root "$kind" "$2" "${3:-}" "${4:-}")" && HOOK_ROOT="$top"
   top="$(git -C "$HOOK_ROOT" rev-parse --show-toplevel 2>/dev/null)" || return 1
   HOOK_RUN="$(_git_named "$top" "$kind/" "$( [ "$kind" = fix ] && echo fixes || echo features )")"
   return 0

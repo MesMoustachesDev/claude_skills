@@ -49,7 +49,10 @@ hook_run_dir() {
       name="$(_git_named "$top" feature/ features)"; [ -n "$name" ] || return 0
       d="$top/.claude/features/$name" ;;
     fix-*)
-      top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" || return 0
+      declare -F hook_worktree_root >/dev/null || source "$HOOK_LOG_LIB_DIR/lib.sh" 2>/dev/null || return 0
+      t=""; [ -n "$input" ] && t="$(hook_agent_transcript "$input" 2>/dev/null)"
+      top="$(hook_worktree_root fix "$cwd" "$file" "$t" 2>/dev/null)" || top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)"
+      [ -n "$top" ] || return 0
       name="$(_git_named "$top" fix/ fixes)"; [ -n "$name" ] || return 0
       d="$top/.claude/fixes/$name" ;;
     review-*)

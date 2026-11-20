@@ -3,7 +3,7 @@
 # d'un hook : hook_run_root fix (hooks/lib.sh).
 #
 # Un fix = une branche fix/<nom> = un dossier .claude/fixes/<nom>/ :
-#   fix.json    état, écrit par l'orchestrateur et les hooks (phase, base_sha, freeze_sha, stages…)
+#   fix.json    état, écrit par fix.py seul (l'orchestrateur, et fix-gate.sh par hook-verdict) (phase, base_sha, freeze_sha, stages…)
 #   repro.json  écrit par le reproducer, GELÉ avec les tests : commandes et preuve du bug
 #   diagnosis.md, review.json, review.md, shots/, .gauntlet/
 
@@ -21,10 +21,6 @@ fix_context() {
 
 state_get() { [ -f "$STATE" ] && jq -r "$1 // empty" "$STATE"; }
 repro_get() { [ -f "$REPRO" ] && jq -r "$1 // empty" "$REPRO"; }
-state_set() { # state_set <filtre jq> [--arg k v]... — sous le verrou de statefile.py (fix.json.lock)
-  local f="$1"; shift
-  python3 "$(dirname "${BASH_SOURCE[0]}")/../statefile.py" jq "$STATE" "$@" "$f"
-}
 
 # --- Langage du package (scripts/stack.sh, ADR 0011) ----------------------------------------------------
 # Les globs de test et les manifestes du langage complètent les génériques ci-dessous. Le package qui décide :

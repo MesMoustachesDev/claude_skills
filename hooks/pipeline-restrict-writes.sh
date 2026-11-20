@@ -28,8 +28,6 @@ hook_targets
 file="${targets%%$'\n'*}"
 
 # --- contexte projet (réutilise le gauntlet) --------------------------------------------------
-# shellcheck source=../scripts/gauntlet/lib.sh
-source "$GAUNTLET_ROOT/lib.sh"
 # Le worktree de la feature, pas le cwd : un sous-agent hérite du cwd de la session, qui peut être le
 # checkout principal (session ouverte sur le projet, reprise) — la branche y est develop et tout serait
 # refusé, ou contourné par Bash. Le fichier écrit, puis le cwd, puis la racine du prompt de l'agent.

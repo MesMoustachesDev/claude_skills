@@ -26,7 +26,9 @@ hook_targets
 [ -n "$targets" ] || [ -n "$skind" ] || exit 0
 
 source "${FIX_LIB:-$HOOK_SCRIPTS/fix/lib.sh}"
-hook_run_root fix "$cwd"
+# Le worktree du fix, pas le cwd : un sous-agent hérite du cwd de la session, qui peut être le checkout
+# principal. Le fichier écrit, puis le cwd, puis le worktree cité dans le prompt de l'agent.
+hook_run_root fix "$cwd" "${targets%%$'\n'*}" "$(hook_agent_transcript "$input")"
 cd "$HOOK_ROOT" 2>/dev/null || { [ -n "$skind" ] && hook_deny "fix : Serena, worktree illisible ($cwd)"; exit 0; }
 cwd="$HOOK_ROOT"
 name="$HOOK_RUN"

@@ -35,6 +35,8 @@ d'agent (fix-gate.sh) ou `review-pass`, qui joue le gauntlet. `pass` et `skip` l
   set <nom> watchdog_cron <id>       les seules autres clés écrites par l'orchestrateur
   ask <nom> "<question>"             ce qu'on attend de Thibault ("" pour effacer) ; même chose que fix/steps.py ask
   recap <nom> <fichier.json>         résumé « Reprendre le fil » (schéma de pipeline.sh recap)
+  hook-verdict <nom> red|green|repro_report|review_report PASSED|RED|FAILED <tentatives>
+                                     verdict du hook de fin d'agent (fix-gate.sh seulement : PIPELINE_GATE_HOOK=1)
   pass <nom> evidence                étape 5 terminée : stages.evidence, attente effacée, .claude/fixes/.current retiré
   skip <nom> evidence "<raison>"
 
@@ -399,8 +401,15 @@ def cmd_skip(fx, args):
     pl.cmd_skip(fx, args[:2])
 
 
+HOOK_PROFILES = {"red", "green", "repro_report", "review_report"}
+
+
+def cmd_hook_verdict(fx, args):
+    pl.hook_verdict(fx, HOOK_PROFILES, args)
+
+
 COMMANDS = {
-    "init": cmd_init, "agent": cmd_agent, "after": cmd_after, "gate": cmd_gate, "freeze": cmd_freeze,
+    "hook-verdict": cmd_hook_verdict, "init": cmd_init, "agent": cmd_agent, "after": cmd_after, "gate": cmd_gate, "freeze": cmd_freeze,
     "refreeze": cmd_refreeze, "phase": cmd_phase, "arbitrate": cmd_arbitrate, "deviation": cmd_deviation,
     "review-pass": cmd_review_pass, "loop": cmd_loop, "debt": pl.cmd_debt, "accept": cmd_accept, "set": cmd_set,
     "ask": pl.cmd_ask, "recap": pl.cmd_recap, "pass": cmd_pass, "skip": cmd_skip,
@@ -412,7 +421,7 @@ def main(argv):
         print(__doc__)
         sys.exit(0 if argv[:1] in (["-h"], ["--help"]) else 2)
     cmd, name, rest = argv[0], argv[1], argv[2:]
-    COMMANDS[cmd](Fix(name, must_exist=cmd != "init"), rest)
+    COMMANDS[cmd](Fix(name, must_exist=cmd not in ("init", "hook-verdict")), rest)
 
 
 if __name__ == "__main__":

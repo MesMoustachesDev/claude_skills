@@ -24,6 +24,8 @@
 #   pipeline.sh set <nom> <clé.pointée> <json>   écriture libre (ex. suggestions.S1 '{"decision":"applied"}')
 #   pipeline.sh after-architect <nom>            après chaque retour d'Arthur avant l'étape 2 (1c, 1e)
 #   pipeline.sh replay <nom> <profil>            gate d'un agent rejoué à la main : réécrit stages.<profil> (PASSED|RED)
+#   pipeline.sh hook-verdict <nom> <profil> PASSED|RED|FAILED <n>   verdict du hook de fin d'agent (pipeline-gate.sh
+#                                                seulement : PIPELINE_GATE_HOOK=1) ; à la main, c'est replay
 #   pipeline.sh reached <nom> <clé>              exit 0 si la feature est à l'étape <clé> ou au-delà (hook de fin)
 #   pipeline.sh contracts-files <nom>            recalcule contracts.files (arbre de travail)
 #   pipeline.sh commit-contracts <nom> draft|thibault|reedit ["<quoi>"] [fichiers…]

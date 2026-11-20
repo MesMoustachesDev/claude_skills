@@ -20,22 +20,23 @@ command -v emulator >/dev/null 2>&1 || { [ -x "$_sdk/emulator/emulator" ] && PAT
 export PATH; unset _sdk
 
 # ---------------------------------------------------------------------------
-# Worktree de la feature, pour les hooks
+# Worktree du run (feature, fix), pour les hooks
 # ---------------------------------------------------------------------------
 # Un sous-agent hérite du cwd de la session de l'orchestrateur, qui n'est pas toujours le worktree de la
-# feature (session ouverte sur le checkout principal, reprise, cwd remis à zéro). Les hooks ne s'y fient
+# feature ou du fix (session ouverte sur le checkout principal, reprise, cwd remis à zéro). Les hooks ne s'y fient
 # donc pas seuls : ils cherchent le worktree dans le fichier écrit, le cwd, puis le prompt de l'agent
-# (l'orchestrateur y met toujours « Racine : <worktree> »).
+# (l'orchestrateur de /feature y met toujours « Racine : <worktree> » ; celui de /fix cite le worktree).
 
-# feature_root_from <chemin> — racine git de <chemin> (ou de son premier parent existant) si elle est sur
-# une branche feature/*, rien sinon
-feature_root_from() {
-  local d="$1" top
+# run_root_from <préfixe de branche> <chemin> — racine git de <chemin> (ou de son premier parent existant) si
+# elle est sur une branche <préfixe>* (feature/, fix/), rien sinon
+run_root_from() {
+  local d="$2" top
   [ -n "$d" ] || return 1
   while [ ! -d "$d" ] && [ "$d" != / ] && [ "$d" != . ]; do d="$(dirname "$d")"; done
   top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)" || return 1
-  case "$(git -C "$top" branch --show-current 2>/dev/null)" in feature/*) printf '%s\n' "$top" ;; *) return 1 ;; esac
+  case "$(git -C "$top" branch --show-current 2>/dev/null)" in "$1"*) printf '%s\n' "$top" ;; *) return 1 ;; esac
 }
+feature_root_from() { run_root_from feature/ "$1"; }
 # hook_agent_transcript <entrée JSON du hook> — transcript du sous-agent : agent_transcript_path, sinon
 # déduit du transcript de la session (<session>/subagents/agent-<id>.jsonl)
 hook_agent_transcript() {
@@ -45,18 +46,22 @@ hook_agent_transcript() {
   t="$(jq -r '.transcript_path // empty' <<<"$1")"; id="$(jq -r '.agent_id // empty' <<<"$1")"
   [ -n "$t" ] && [ -n "$id" ] && printf '%s\n' "${t%.jsonl}/subagents/agent-$id.jsonl"
 }
-# hook_feature_root <cwd> <fichier ou ""> <transcript de l'agent ou ""> — le worktree de la feature
-hook_feature_root() {
-  local r wt pat='/[^ "`'"'"'\\]*/\.claude/worktrees/feature-[A-Za-z0-9_.-]*'
-  r="$(feature_root_from "$2")" && { printf '%s\n' "$r"; return 0; }
-  r="$(feature_root_from "$1")" && { printf '%s\n' "$r"; return 0; }
-  [ -n "$3" ] && [ -f "$3" ] || return 1
-  # La ligne « Racine : » du prompt d'abord ; à défaut, le premier worktree de feature cité.
-  wt="$(grep -m1 'Racine' "$3" | grep -oE "$pat" | head -1)"
-  [ -n "$wt" ] || wt="$(head -c 400000 "$3" | grep -oE "$pat" | head -1)"
-  r="$(feature_root_from "$wt")" && { printf '%s\n' "$r"; return 0; }
+# hook_worktree_root feature|fix <cwd> <fichier ou ""> <transcript de l'agent ou ""> — le worktree du run :
+# celui du fichier écrit, puis du cwd, puis du prompt de l'agent (ligne « Racine : », sinon le premier
+# .claude/worktrees/<feature|fix>-<nom> cité). /fix et /feature créent leurs worktrees à ces chemins.
+hook_worktree_root() {
+  local kind="$1" r wt pat
+  pat='/[^ "`'"'"'\\]*/\.claude/worktrees/'"$kind"'-[A-Za-z0-9_.-]*'
+  r="$(run_root_from "$kind/" "$3")" && { printf '%s\n' "$r"; return 0; }
+  r="$(run_root_from "$kind/" "$2")" && { printf '%s\n' "$r"; return 0; }
+  [ -n "$4" ] && [ -f "$4" ] || return 1
+  wt="$(grep -m1 'Racine' "$4" | grep -oE "$pat" | head -1)"
+  [ -n "$wt" ] || wt="$(head -c 400000 "$4" | grep -oE "$pat" | head -1)"
+  r="$(run_root_from "$kind/" "$wt")" && { printf '%s\n' "$r"; return 0; }
   return 1
 }
+# hook_feature_root <cwd> <fichier ou ""> <transcript ou ""> — le worktree de la feature
+hook_feature_root() { hook_worktree_root feature "$@"; }
 
 # ---------------------------------------------------------------------------
 # Contexte projet
