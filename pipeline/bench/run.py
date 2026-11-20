@@ -13,6 +13,10 @@ dossier de la tâche dans `TASK_DIR`, pour ce que l'agent ne doit pas voir (`hid
 
 L'agent joue avec son prompt (`agents/<nom>.md`) mais sans ses hooks : la garde des écritures et le
 gate supposent un vrai projet du pipeline. Le banc mesure le prompt et le modèle, pas l'outillage.
+Les skills de son frontmatter sont préchargés comme pour un sous-agent (`skills.py`, ADR 0008) : à la
+suite du prompt de la tâche, dans le même message. Chaque run vérifie dans son transcript la phrase propre
+de chaque skill ; s'il en manque une, le run est raté (« passe cassée »). `--dry` montre ce qui serait
+préchargé, et d'où.
 
 Noté par run : réussite, détail du juge, tours, durée, tokens, et `total_cost_usd` de `claude -p` :
 l'équivalent au tarif de l'API, pas une facture (sur l'abonnement, c'est du quota consommé).
@@ -33,6 +37,8 @@ import uuid
 from pathlib import Path
 
 BENCH = Path(__file__).resolve().parent
+sys.path.insert(0, str(BENCH))
+import skills as preloaded  # noqa: E402
 AGENTS = BENCH.parent.parent / 'agents'
 TOOLS = 'Read Edit Write Glob Grep Bash(dart:*) Bash(git diff:*) Bash(git log:*) Bash(git show:*) Bash(git status:*) Bash(ls:*) Bash(cat:*)'
 
@@ -61,32 +67,45 @@ def bench_agent(name: str) -> dict:
 
 
 def play(task: Path, meta: dict, model: str, agent: str, budget: float, keep: bool) -> dict:
+    pre = preloaded.preload(agent, (task / 'prompt.md').read_text(), AGENTS.parent, Path.home())
     work = prepare(task)
     started = time.time()
-    # Nommée avant d'exister : avec --keep, le transcript ~/.claude/projects/*/<id>.jsonl est celui du run.
+    # Nommée avant d'exister : le transcript ~/.claude/projects/*/<id>.jsonl est celui du run (le contrôle des
+    # skills le lit ; supprimé ensuite sans --keep).
     session = str(uuid.uuid4())
     argv = [
-        'claude', '-p', (task / 'prompt.md').read_text(),
+        'claude', '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
         '--agents', json.dumps(bench_agent(agent)), '--agent', f'bench-{agent}', '--model', model,
-        '--output-format', 'json',
         '--permission-mode', 'acceptEdits', '--allowedTools', TOOLS,
         '--max-budget-usd', str(budget),
         '--strict-mcp-config',
         # Les hooks de l'utilisateur (rtk réécrit cat/ls, refusés ensuite) faussent la mesure.
         '--settings', '{"disableAllHooks":true}',
-        *(['--session-id', session] if keep else ['--no-session-persistence']),
+        '--session-id', session,
     ]
     try:
-        run = subprocess.run(argv, cwd=work, capture_output=True, text=True, timeout=meta.get('timeout_s', 900))
+        run = subprocess.run(argv, cwd=work, capture_output=True, text=True, timeout=meta.get('timeout_s', 900),
+                             input=preloaded.stdin_line(pre['content']))
         out = run.stdout
     except subprocess.TimeoutExpired as e:
         out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or '')
     wall = round(time.time() - started)
-    try:
-        result = json.loads(out.strip().splitlines()[-1]) if out.strip() else {}
-    except json.JSONDecodeError:
-        result = {}
-    ok, detail = judge(task, work)
+    result = {}
+    for line in reversed(out.strip().splitlines()):
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if msg.get('type') == 'result':
+            result = msg
+            break
+    status = preloaded.check_transcript(pre['skills'], session, Path.home())
+    if not keep:
+        path = preloaded.transcript(session, Path.home())
+        if path:
+            path.unlink(missing_ok=True)
+    problem = preloaded.broken(status)
+    ok, detail = (False, problem) if problem else judge(task, work)
     usage = result.get('usage') or {}
     shutil.rmtree(work, ignore_errors=True)
     return {
@@ -95,6 +114,7 @@ def play(task: Path, meta: dict, model: str, agent: str, budget: float, keep: bo
         'model': model,
         'ok': ok,
         'detail': detail,
+        'skills': status,
         'turns': result.get('num_turns'),
         'wall_s': wall,
         'input_tokens': (usage.get('input_tokens') or 0) + (usage.get('cache_read_input_tokens') or 0) + (usage.get('cache_creation_input_tokens') or 0),
@@ -135,10 +155,17 @@ def main() -> int:
         return 2
     names = args.task or sorted(p.name for p in (BENCH / 'tasks').iterdir() if (p / 'task.json').exists())
     rows = []
+    dry_broken = False
     for name in names:
         task = BENCH / 'tasks' / name
         meta = json.loads((task / 'task.json').read_text())
         if args.dry:
+            agent = args.agent or meta['agent']
+            pre = preloaded.preload(agent, (task / 'prompt.md').read_text(), AGENTS.parent, Path.home())
+            problem = preloaded.broken(preloaded.check(pre['skills'], [b['text'] for b in pre['content']]))
+            print(f'{name} : {agent}, skills préchargés :\n{preloaded.describe(pre)}')
+            print(f"  {problem or 'prompt construit : chaque skill présent une fois'}")
+            dry_broken = dry_broken or bool(problem)
             work = prepare(task)
             ok, detail = judge(task, work)
             shutil.rmtree(work, ignore_errors=True)
@@ -150,7 +177,7 @@ def main() -> int:
             print(f"  {'✓' if row['ok'] else '✗'} {row['detail']} · {row['wall_s']} s · {row['cost_usd']} $", flush=True)
             rows.append(row)
     if not rows:
-        return 0
+        return 1 if dry_broken else 0
     stamp = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
     out = BENCH / 'results' / f"{stamp}{'-' + args.label if args.label else ''}"
     out.parent.mkdir(exist_ok=True)

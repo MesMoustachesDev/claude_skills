@@ -1,10 +1,11 @@
 # 0008 — La doctrine d'un agent est préchargée comme skill, les règles projet viennent de .claude/rules
 
 Statut : acceptée (2026-11-05), remplace 0006 ; amendée le 2026-11-06 par 0011 (doctrine d'un langage) ; amendée le
-2026-11-19 (config des scripts hors de `.claude/rules/`, règles d'écran sous `paths:`)
+2026-11-19 (config des scripts hors de `.claude/rules/`, règles d'écran sous `paths:`) ; amendée le 2026-11-20
+(le banc précharge les skills comme pour un sous-agent)
 Où elle vit : le champ `skills:` des fichiers d'agent · `skills/doctrine-*` (liens vers les fichiers de
 `pipeline/` et des templates) · `.claude/rules/` des projets · `scripts/gauntlet/doctor.sh` et
-`steps/00_preconditions.md` (règle projet absente) · `.claude/pipeline/` des projets et ses lecteurs (`stack.sh`,
+`steps/00_preconditions.md` (règle projet absente) · `pipeline/bench/skills.py` (le banc) · `.claude/pipeline/` des projets et ses lecteurs (`stack.sh`,
 `gauntlet/lib.sh`, `pr_gauntlet.sh`, `review.py`, `pipeline.py`…, `commands/deploy_app.md`, `create_mr.md`) ·
 frontmatter `paths:` de `stacks/*/templates/create_screen_rules.md`
 
@@ -52,6 +53,25 @@ fichiers de `.claude/rules/` du projet, chargés d'office.
   - Rien d'autre ne bouge : `pr_rules.md`, `create_feature_rules.md`, `build_rules.md`, `roles.md` restent
     chargés d'office ; l'absence de règles projet dans un `/fix` en worktree est une autre question.
 
+- **Amendement du 2026-11-20 (décision de Thibault) : le banc reçoit ce que reçoit l'agent.** `claude -p --agent`,
+  par lequel le banc lançait l'agent, ne précharge pas `skills:` : absent des 17 passes `green` du 2026-11-19,
+  présent dans les vrais sous-agents. Tout avant / après du banc sur une doctrine ne mesurait que le corps du
+  prompt.
+  - `pipeline/bench/skills.py` construit ce que Claude Code donne à un sous-agent, relevé dans ses transcripts :
+    le prompt, puis par skill un bloc `<command-message>…<skill-format>true</skill-format>` et un bloc de corps
+    (`Base directory for this skill: <dossier>` puis `SKILL.md` sans frontmatter ; une commande, son corps
+    seul ; `$ARGUMENTS` vidé). Comparé octet pour octet aux sous-agents du jour : identique.
+  - `replay.py` et `run.py` envoient ces blocs à la suite du prompt dans le même message utilisateur
+    (`--input-format stream-json`). Un sous-agent les reçoit en messages séparés, que l'API fusionne avec le
+    prompt : mêmes blocs, même ordre. Écarté : passer par l'outil Agent d'une session intermédiaire, qui
+    ajoute un modèle qui peut reformuler le prompt et mêle ses tours et ses tokens à ceux de l'agent.
+  - Contrôle à chaque passe : la phrase propre de chaque skill (première ligne d'au moins 40 caractères qu'on
+    ne trouve ni dans le prompt de l'agent, ni dans celui de la tâche, ni dans les autres skills) doit figurer
+    une fois dans le texte des messages utilisateur du transcript. Absente, ou deux fois (un Claude Code qui
+    se mettrait à précharger lui aussi) : passe cassée, sans juge. `--dry` fait le même contrôle sur le
+    message construit et l'écrit à côté des résultats.
+  - Un skill de `skills:` sans fichier (skill intégré à Claude Code, plugin absent) : le banc refuse la passe.
+
 ## Conséquences
 
 - L'agent a ses règles en entier dès son premier tour, relances comprises, sans dépendre de lui.
@@ -60,6 +80,9 @@ fichiers de `.claude/rules/` du projet, chargés d'office.
   son contexte d'office. Un agent qui conclut sur l'écran sans avoir ouvert de fichier de présentation n'a pas
   `create_screen_rules.md` : son prompt le lui fait lire. Le gain attendu (environ 4 k tokens par agent et par
   étape) reste à mesurer sur un vrai `/feature` après migration des projets.
+
+- (2026-11-20) Un avant / après du banc sur un skill ou une doctrine mesure le texte que l'agent reçoit. Les
+  passes d'avant cette date ne se comparent pas à celles d'après : leur agent n'avait pas ses skills.
 
 ## Hors champ
 

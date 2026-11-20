@@ -36,6 +36,12 @@ Juges :
           intermédiaires d'un fix portent sur du code jamais commité) : réussi si aucune critique,
           constats en plus comptés.
 
+Skills du frontmatter : `claude -p --agent` ne les précharge pas. Le rejeu les pose comme Claude Code
+pour un sous-agent (`pipeline/bench/skills.py`) : à la suite du prompt, dans le même message (stream-json).
+Contrôle à chaque passe : la phrase propre de chaque skill une fois dans le transcript, sinon la passe est
+cassée (« passe cassée : skills préchargés … »), sans juge. `--dry` le vérifie sur le message construit,
+écrit à côté des résultats (`<résultats>-prompts/<cas>-<étape>.md`).
+
 Rien n'est poussé ni commité : push, commit, reset, checkout et les CLI GitLab/GitHub sont refusés à
 l'agent, et le worktree est supprimé après le juge (`--keep` le garde). Le transcript de chaque passe
 est gardé (session nommée), son id dans les résultats. `total_cost_usd` est un équivalent API : sur
@@ -56,6 +62,9 @@ import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+import skills as preloaded  # noqa: E402  (pipeline/bench/skills.py)
+
 LOCAL = Path.home() / '.claude-local' / 'bench'
 CASES = LOCAL / 'cases.json'
 CLAUDE = HERE.parent.parent.parent
@@ -109,8 +118,8 @@ DENIED = ('Bash(git push:*) Bash(git commit:*) Bash(git reset:*) Bash(git checko
           'Bash(glab:*) Bash(gh:*) Bash(rtk glab:*) Bash(rtk gh:*)')
 
 
-def sh(argv, cwd=None, timeout=3600, env=None):
-    return subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
+def sh(argv, cwd=None, timeout=3600, env=None, stdin=None):
+    return subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env, input=stdin)
 
 
 def git(repo, *args):
@@ -460,15 +469,34 @@ def judge(repo: Path, wt: Path, name: str, case: dict, stage: str, mutation: boo
             'recall': r['recall'], 'extra': len(r['extra']), 'reported': len(got), 'missed': r['missed']}
 
 
-def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
+def last_result(stdout: str) -> dict:
+    """Le message `result` de la sortie stream-json (sa dernière ligne, en principe)."""
+    for line in reversed(stdout.strip().splitlines()):
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if msg.get('type') == 'result':
+            return msg
+    return {}
+
+
+def play(repo, name, case, stage, model, mutation, keep, dry, dump=None) -> dict:
     wt = prepare(repo, name, case, stage)
     session = str(uuid.uuid4())
     started = time.time()
     result = {}
     try:
-        if not dry:
-            argv = ['claude', '-p', prompt(wt, name, case, stage), '--agent', AGENT[stage], '--model', model,
-                    '--output-format', 'json',
+        # L'agent et ses skills tels que `claude --agent` les charge : ceux de ~/.claude.
+        pre = preloaded.preload(AGENT[stage], prompt(wt, name, case, stage), Path.home() / '.claude', Path.home())
+        if dump:
+            dump.parent.mkdir(parents=True, exist_ok=True)
+            dump.write_text('\n\n'.join(b['text'] for b in pre['content']) + '\n')
+        if dry:
+            status = preloaded.check(pre['skills'], [b['text'] for b in pre['content']])
+        else:
+            argv = ['claude', '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+                    '--agent', AGENT[stage], '--model', model,
                     # acceptEdits tient tout `.claude/` pour sensible et refuse review.json : ni règle
                     # Write(...) ni hook allow n'y font rien. Accordé par Thibault pour le banc seul
                     # (2026-11-04) : worktree jetable, DENIED et les hooks de l'agent tiennent toujours.
@@ -476,12 +504,14 @@ def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
                     '--allowedTools', TOOLS, '--disallowedTools', DENIED,
                     '--strict-mcp-config', '--session-id', session]
             try:
-                run = sh(argv, cwd=wt, timeout=7200)
-                lines = run.stdout.strip().splitlines()
-                result = json.loads(lines[-1]) if lines else {}
-            except (subprocess.TimeoutExpired, json.JSONDecodeError):
+                run = sh(argv, cwd=wt, timeout=7200, stdin=preloaded.stdin_line(pre['content']))
+                result = last_result(run.stdout)
+            except subprocess.TimeoutExpired:
                 result = {}
-        verdict = judge(repo, wt, name, case, stage, mutation)
+            status = preloaded.check_transcript(pre['skills'], session, Path.home())
+        problem = preloaded.broken(status)
+        # Un skill manquant ou reçu deux fois : l'agent n'a pas eu ce qu'il a dans le pipeline, rien à juger.
+        verdict = {'ok': False, 'detail': problem} if problem else judge(repo, wt, name, case, stage, mutation)
     finally:
         if not keep:
             sh(['git', '-C', str(repo), 'worktree', 'remove', '--force', str(wt)])
@@ -489,7 +519,7 @@ def play(repo, name, case, stage, model, mutation, keep, dry) -> dict:
     models = sorted((result.get('modelUsage') or {}).keys())
     return {
         'feature': name, 'stage': stage, 'agent': AGENT[stage], 'model': model, 'models_used': models,
-        **verdict,
+        **verdict, 'skills': status,
         'turns': result.get('num_turns'), 'wall_s': round(time.time() - started),
         'output_tokens': usage.get('output_tokens') or 0,
         'cost_usd': result.get('total_cost_usd'), 'session': '' if dry else session,
@@ -578,11 +608,15 @@ def main() -> int:
                 for n in range(args.runs):
                     print(f'{name} · {stage} · {model} · passe {n + 1}/{args.runs} …', flush=True)
                     try:
-                        row = play(repo, name, case, stage, model, args.mutation, args.keep, args.dry)
+                        row = play(repo, name, case, stage, model, args.mutation, args.keep, args.dry,
+                                   dump=out.parent / f'{out.name}-prompts' / f'{name}-{stage}.md')
                     except Exception as e:  # une passe cassée n'arrête pas la campagne
                         row = {'feature': name, 'stage': stage, 'model': model, 'ok': False,
                                'detail': f'passe cassée : {e}'[:200], 'wall_s': 0}
                     print(f"  {'✓' if row['ok'] else '✗'} {row['detail']}", flush=True)
+                    if row.get('skills') is not None:
+                        print('  skills : ' + (', '.join(f'{k} {v}' for k, v in row['skills'].items()) or 'aucun'),
+                              flush=True)
                     rows.append(row)
                     # Écrit au fil de l'eau : une campagne de plusieurs heures interrompue garde ses passes.
                     out.with_suffix('.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
