@@ -34,6 +34,25 @@ Ces règles s'ajoutent à `voix.md` (tics, procédés, règles de style) et aux 
 - Emojis : zéro, ou un seul qui ajoute le ton. Jamais 🚀 💡 🎯 🔥 ✅ 👉 💪 🙌.
 - Longueur : 700 à 1 300 caractères, 1 800 au maximum. Ce n'est pas un tuto : un seul détail technique suffit, pas le mode d'emploi complet.
 
+## Les structures grillées
+
+Relevées le 20/11/2026 (last30days : page Wikipedia « Signs of AI writing », mesures de Pangram, liste de Ruben Hassid, skill Humanizer). Un mot isolé ne trahit rien : c'est la structure, et sa répétition, que le lecteur reconnaît à 1000 km. Avant de rendre un post, cherche chacune dans le texte. Le vérificateur en attrape une partie, pas toutes.
+
+- **Le « pas X, mais Y »** (3 fois plus fréquent chez une IA, le tic le plus repéré) : « Ce n'est pas un bug, c'est une feature », « Il ne s'agit pas de coder, mais de… », « Pas une app. Un compagnon. » Dis Y directement.
+- **L'étiquette suivie de deux-points** en tête de paragraphe : « Le contexte : », « Le résultat : », « Le fix : », « Le plus bizarre : », « La leçon : ». C'est un plan de slide déguisé en texte. Une seule par post au maximum, sinon une vraie phrase avec un sujet et un verbe.
+- **L'échauffement avant le propos** : « Voici le truc », « Soyons clairs », « Honnêtement ? », « Spoiler : », « Et c'est là que ça devient intéressant ». Commence par le propos.
+- **L'auto-applaudissement** : une phrase qui dit au lecteur que ce qu'il vient de lire est important (« Et ça change tout. », « Relis cette phrase. », « Personne n'en parle. »).
+- **La rafale de fragments** : « Rapide. Simple. Efficace. », « Pas de magie. Juste de la data. » Une interjection à moi passe (« La vache. »), deux fragments d'affilée non.
+- **Toujours trois** : trois adjectifs, trois exemples, trois puces, par réflexe (4 fois plus fréquent chez une IA). Mets le nombre que les faits donnent : deux, quatre, un seul.
+- **La chute en une ligne qui résume** : « En bref. », « Au final, », « Moralité : », « La leçon ? », ou une maxime posée seule en dernière ligne. La punchline doit venir de l'histoire (un fait, une vanne), pas la résumer.
+- **La question rhétorique suivie de sa réponse** : « Le résultat ? 40 % de tokens en plus. » Écris la phrase normalement.
+- **L'objection inventée** : « Je ne dis pas que X, mais… », « Tu vas me dire que… ». Personne n'a rien dit.
+- **La double métaphore et l'analogie qui suppose que tu connais** : « moins un marteau qu'un scalpel », « c'est le Notion du running ».
+- **L'inflation d'importance** : « marque un tournant », « témoigne de », « souligne », « un véritable », « révolutionner ». Dis ce qui s'est passé, le lecteur jugera.
+- **Le mot-valise d'IA** : plonger dans, naviguer, paysage, écosystème, favoriser, tirer parti, robuste, fluide, booster, décortiquer.
+- **Le texte qui parle du texte** : « Dans ce post, je vais… », « Voici ce que j'ai appris ».
+- **Le bloc d'une ligne par paragraphe sur tout le post** : alterne des blocs d'une ligne et de deux ou trois phrases.
+
 ## Le ton
 
 Constaté sur la MegaSearch de novembre 2026 : les posts tech FR qui marchent sont courts et prennent position.

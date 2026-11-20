@@ -76,6 +76,35 @@ TOURNURES = [
 ]
 cherche(TOURNURES, erreurs, "tournure IA")
 
+# Structures grillées (posts.md, « Les structures grillées »)
+cherche([r"\bce n'est pas (un|une|le|la|les|du|de la|qu)[^.!?\n]{1,60}, (c'est|mais)\b",
+         r"\bc'est pas (un|une|le|la|les|du|qu)[^.!?\n]{1,60}, (c'est|mais)\b",
+         r"\bil ne s'agit pas (de|d')[^.!?\n]{1,60}, mais\b",
+         r"(^|[.!?]\s+)pas (un|une|de|d')[^.!?\n]{1,40}\.\s+(un|une|juste|mais)\b"],
+        erreurs, "« pas X, mais Y »")
+cherche([r"voici le truc", r"soyons clairs", r"\bhonnêtement\s?\?", r"^spoiler\s?:", r"\nspoiler\s?:",
+         r"c'est là que (ça|tout) devient", r"accroche-toi", r"et c'est là que",
+         r"et ça change tout", r"relis cette phrase", r"personne n'en parle", r"ce que personne ne (dit|te dit)",
+         r"\ben bref\b", r"\ben résumé\b", r"\ben fin de compte\b", r"\bmoralité\s?:", r"la leçon\s?[:?]",
+         r"dans ce post", r"voici ce que j'ai appris", r"je ne dis pas que", r"tu vas me dire",
+         r"\bmarque un tournant", r"\btémoigne\b", r"\bun véritable\b", r"\bune véritable\b", r"révolutionn",
+         r"\bplonger dans\b", r"\bnaviguer\b", r"\bpaysage\b", r"\bécosystème\b", r"\bfavoriser\b",
+         r"tirer parti", r"\brobuste\b", r"\bfluide\b", r"\bbooster\b", r"\bdécortiqu"],
+        erreurs, "structure grillée")
+# Étiquettes « Le contexte : », « Le fix : » en tête de paragraphe : une au maximum
+etiquettes = re.findall(r"(?m)^((?:le|la|les|l')\s?[^:\n.!?]{1,28})\s:", texte, flags=re.I)
+if len(etiquettes) > 1:
+    erreurs.append(f"{len(etiquettes)} étiquettes avec deux-points en tête de paragraphe (une au maximum) : " + ", ".join(f"« {e} : »" for e in etiquettes))
+# Rafale de fragments : deux phrases de 1 à 3 mots d'affilée
+for m in re.finditer(r"(?:^|(?<=[.!?])\s+)((?:[^\s.!?]+\s?){1,3}[.!])\s+((?:[^\s.!?]+\s?){1,3}[.!])", texte):
+    attentions.append(f"deux fragments d'affilée : « {m.group(1)} {m.group(2)} »")
+# Toujours trois : « X, Y et Z » en mots seuls
+for m in re.finditer(r"\b(\w{3,}), (\w{3,}),? et (\w{3,})\b", texte):
+    attentions.append(f"triade : « {m.group(0)} » (le nombre vient-il des faits ?)")
+lignes_blocs = [b.strip() for b in re.split(r"\n\s*\n", texte) if b.strip()]
+if mode == "post" and lignes_blocs and sum(1 for b in lignes_blocs if "\n" not in b and len(b) < 70) / len(lignes_blocs) > 0.5:
+    attentions.append("plus de la moitié des blocs font une ligne courte : alterner avec des blocs de 2 ou 3 phrases")
+
 # Question rhétorique suivie d'une réponse courte (« Et honnêtement ? Je le comprends. »)
 for m in re.finditer(r"\?\s+([A-Za-zÀ-ÿ][^?!.\n]*)[.!]", texte):
     if len(m.group(1).split()) <= 4:

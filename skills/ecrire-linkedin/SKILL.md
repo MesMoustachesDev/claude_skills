@@ -27,7 +27,7 @@ Matière : un sujet, une idée Notion (« Idées post linked », `collection://8
 
 1. Lis 2 ou 3 de mes posts qui ont marché (voir `posts.md`, « Pour le ton »).
 2. Écris le post dans `~/Dropbox/MesMoustachesDev/linkedin/brouillons/<slug>-<AAAAMMJJ>.md`.
-3. Vérifie (étape 5). Puis relis-le toi-même contre la checklist de viralité de `posts.md`, case par case.
+3. Vérifie (étape 5). Puis relis-le toi-même contre « Les structures grillées » et la checklist de viralité de `posts.md`, case par case.
 4. Montre-moi le texte complet, puis une ligne par point de la checklist qui n'est pas évident, et les ATTENTION restantes du vérificateur avec ta décision.
 5. Après mon go seulement :
    - image : demande d'abord si le post part en texte seul ou avec une image (voir « Le ton » dans `posts.md`) ; avec une image seulement, propose `/image-post` (il pose sa propre question de style)
