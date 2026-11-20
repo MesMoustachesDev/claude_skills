@@ -105,6 +105,7 @@ autre use case, rend `Either<ErrorEntity, T>` : un `Future<void>` sur une telle 
 - Quand une méthode publique perd son dernier appelant en production, supprime-la avec ses tests (re-gel) ; ne la garde jamais pour un test. (learn 2026-11-16, dead_api_kept_for_frozen_test, 2 runs)
 - Un `Either` se lit par `fold` ; jamais `toOption()`, `swap()` ni `toNullable()!`, et jamais un `await` d'Either dont le résultat est ignoré. (learn 2026-11-17, either_unfolded_without_fold, 2 runs)
 - Une lecture ponctuelle passe par une méthode `Future` de la data source ou du repository (ajoutée à l'interface s'il le faut), jamais par `.first` ou `take(1)` sur un Stream d'observation. (learn 2026-11-18, one_shot_read_through_watch_flow, 2 runs)
+- Un appel de plugin natif qui ne répond qu'à un callback (init de SDK…) est borné par un `timeout` dans la data source ; le dépassement devient l'erreur typée, rapportée comme les autres. (learn 2026-11-20, unbounded_wait_on_platform_callback, 2 runs)
 
 ## Spec (Sophie, Camille)
 
