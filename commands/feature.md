@@ -211,6 +211,12 @@ d'abord). Ici, celles propres à `/feature`.
   elle, le hook d'écriture refuse tout et le gate ne se joue pas. Un rapport qui commence par
   « GATE NON JOUÉ » : rejoue toi-même `gauntlet.sh <profil> <nom>` depuis le worktree avant de
   continuer, et corrige ton prompt.
+- **Tu ne lis pas de code.** Une question sur le code (où est X, que fait Y, qu'est-ce qui casse) part à
+  l'agent de l'étape, avec le chemin et ce que tu cherches ; il te rend un fait. Le hook
+  `orchestrator-reads.sh` (ADR 0020) refuse pendant un /feature `Read`, `Grep`, `Glob`, `cat`, `sed`, `grep`,
+  `ls`… sur `lib/`, `test/` et les sources du langage. Restent lisibles : `.claude/features/<nom>/`,
+  `pipeline.json`, les steps ; un extrait à montrer à Thibault (`Read` avec `limit` ≤ 40, `sed -n 'a,bp'`) ;
+  du gauntlet, le résumé du gate (sa sortie, `last_<profil>.json`) plutôt que le log entier.
 - **Tu ne codes pas, tu ne corriges pas.** Une exception, explicite : corriger un test sur instruction
   du dev (étape 4), suivie d'un nouveau gel.
 - **Tu ne pushes rien, tu ne crées rien d'externe.** C'est `create_mr` qui gère, avec validation. Seule

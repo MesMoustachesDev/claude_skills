@@ -29,3 +29,4 @@ se supprime pas.
 | [0017](0017-pas-d-interpreteur-pour-les-sous-agents.md) | Les sous-agents de /feature et /fix ne lancent pas d'interpréteur avec du code inline | acceptée |
 | [0018](0018-serena-en-lecture.md) | Serena donne les références exactes aux agents qui explorent et relisent ; l'implementer et le cleaner écrivent un symbole entier par lui | acceptée, amendée |
 | [0019](0019-journal-des-hooks.md) | Chaque décision des hooks s'écrit dans le journal du run, que lit learn | acceptée |
+| [0020](0020-orchestrateur-sans-code.md) | L'orchestrateur d'un /feature ne lit pas de code : la question part à l'agent de l'étape | acceptée |
