@@ -23,8 +23,8 @@ la ligne le dit : **/feature :** … **/fix :** ….
   `ask` avant (« Watchdog », plus bas). Le watchdog rattrape un oubli après `watchdog.minutes`, il ne
   remplace pas cette règle. Cas réel : gate green de Fanny passé, l'orchestrateur a écrit « j'attends » et
   Victor n'a été lancé qu'au retour du dev.
-  **/feature :** le rapport d'un agent veut dire `next --after` (ci-dessous), puis l'étape suivante, dans
-  le même tour, même s'il ajoute « may notify more than once ».
+  Le rapport d'un agent veut dire l'attente ci-dessous (« Au rapport d'un agent »), puis l'étape suivante,
+  dans le même tour, même s'il ajoute « may notify more than once ».
 - **Au rapport d'un agent (« Subagent hand-back »), tu attends son verdict dans le même tour, bloqué.**
   Son rapport arrive avant que son hook de fin ait joué le gate (plus d'une minute pour `contracts`, `red`
   ou `green`), et un gate rouge le remet au travail après ce rapport. C'est le script qui attend, pas toi,
@@ -40,7 +40,7 @@ la ligne le dit : **/feature :** … **/fix :** ….
     commande, dans ce tour ; ne relance pas l'agent, ne rejoue pas le gate ;
   - « aucun hook de fin vu » (**/fix :** ou étape vide) → le hook n'a pas tourné : rejoue le gate et
     dis-le avec le bloc « ce que tu tranches sans lui ».
-  **/fix :** ne lis pas l'étape et ne rejoue pas le gate avant `after` : deux gauntlets dans le même
+  Ne lis pas l'étape et ne rejoue pas le gate avant cette commande : deux gauntlets dans le même
   worktree.
   La notification de fin (`<task-notification>`), si elle arrive après, ne déclenche rien de plus que le
   rapport : ignore-la. Cas réels : `import_cancel_sync` (quatre relances à la main), et un `/fix` dont le
@@ -49,7 +49,7 @@ la ligne le dit : **/feature :** … **/fix :** ….
   intermittence, sans ton historique : une ligne nue ne lui suffit pas.
   - **Première ligne d'un point d'étape, prévu ou hors plan : ce qu'on attend de lui** (la décision à
     prendre, ou « rien à décider, pour info »). Puis ce qui bloque ou ce qui existe aujourd'hui, les faits
-    qui comptent, les options, la question. **/feature :** pas de récit de ce que les agents ont fait.
+    qui comptent, les options, la question. Pas de récit de ce que les agents ont fait.
   - **Ce que tu tranches sans lui se dit en un bloc, jamais en une ligne nue** (règle appliquée, action
     réversible, gabarit, chemins ouverts, base de branche…) :
     1. ce qui a été fait, avec le `fichier:ligne` cliquable s'il y en a un ; 2. pourquoi : la règle
@@ -67,13 +67,13 @@ la ligne le dit : **/feature :** … **/fix :** ….
   imprévu :
   - le texte de la question dit de quoi on parle et ce qui existe aujourd'hui (le `fichier:ligne`, ce que
     fait ce code, ce que dit la spec ou la cause, en une ou deux phrases), puis ce qu'on lui demande ;
-  - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code (**/feature :** sans jargon
+  - chaque option dit ce qu'elle change pour l'utilisateur ou pour le code (sans jargon
     que la question n'explique pas) ;
   - jamais un identifiant seul (`S1`, `K3`, « le point 2 », « l'option B », « le plan B », « l'écart ») :
     il est toujours suivi de ce qu'il désigne (« S1 — `foo_mapper:42` : le mapper avale l'erreur réseau
     → la remonter en `NetworkError` »).
-  Le message au-dessus peut porter le détail long (**/feature :** l'extrait, 3 à 8 lignes, lien
-  cliquable) ; la question ne s'y réfère pas (« voir ci-dessus »). **/feature :** relue seule, elle doit
+  Le message au-dessus peut porter le détail long (l'extrait, 3 à 8 lignes, lien
+  cliquable) ; la question ne s'y réfère pas (« voir ci-dessus »). Relue seule, elle doit
   permettre de répondre sans cocher « Recommandé » au hasard.
 - **Le rapport d'abord.** Tout point d'étape, prévu ou hors plan, commence par le rapport, cité par un
   lien cliquable vers `report.html`, avant le texte et la question : **/feature :** `gauntlet.sh report

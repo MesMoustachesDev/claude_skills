@@ -1,6 +1,6 @@
 # 0005 — Le pipeline ne s'arrête que pour attendre Thibault
 
-Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`), amendée le 2026-11-19 (`after` de /fix en Python), amendée le 2026-11-20 (consignes communes dans `pipeline/conduite.md`)
+Statut : acceptée (2026-11-05), amendée le 2026-11-05 (rapport d'agent), amendée le 2026-11-05 (attente bloquante, /fix), amendée le 2026-11-06 (watchdog de /fix), amendée le 2026-11-13 (prompt court, période), amendée le 2026-11-19 (`say` devient `ask`), amendée le 2026-11-19 (`after` de /fix en Python), amendée le 2026-11-20 (consignes communes dans `pipeline/conduite.md`), amendée le 2026-11-20 (précisions étendues aux deux)
 Où elle vit : `scripts/pipeline.sh watchdog` (verdict, `pipeline/pipeline.py` → `watchdog_verdict`) ·
 `scripts/watchdog.sh` (veille hors session, LaunchAgent `com.claude.feature-watchdog`) ·
 `pipeline/feature/steps/00_preconditions.md` (« Watchdog » : `CronCreate`, `register`) ·
@@ -87,6 +87,10 @@ personne ne l'a vu.
   /fix. `commands/fix.md` est découpé en étapes (`pipeline/fix/steps/`) : la pose du cron de /fix est dans
   `0_preconditions.md`. Le prompt court du cron ne change pas : « Détail : fix.md, « Watchdog » » mène à un
   renvoi vers `conduite.md`, comme celui de /feature.
+- Amendement 8 (2026-11-20, Thibault) : deux précisions qui n'étaient écrites que pour l'un valent pour les
+  deux. « Ne lis pas l'étape et ne rejoue pas le gate avant la commande d'attente : deux gauntlets dans le
+  même worktree » (venue de /fix) et « le rapport d'un agent veut dire l'attente puis l'étape suivante, même
+  s'il ajoute *may notify more than once* » (venue de /feature).
 
 ## Conséquences
 
